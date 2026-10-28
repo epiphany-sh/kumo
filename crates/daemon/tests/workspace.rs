@@ -356,3 +356,35 @@ async fn namespaces_survive_a_daemon_restart_and_delete_keeps_repos() {
     running.await.unwrap().unwrap();
     tokio::time::sleep(Duration::from_millis(10)).await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_failed_worktree_leaves_no_folders_behind() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let root = git_repo(&daemon.home().join("dev/svc"), None);
+    Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .args(["branch", "taken"])
+        .output()
+        .unwrap();
+    save_namespace(&mut client, "svc", &[&root]).await;
+
+    let error = client
+        .workspace
+        .create_worktree(pb::CreateWorktreeRequest {
+            repo_path: root.display().to_string(),
+            branch: "taken".into(),
+            create_branch: true,
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error.code(),
+        tonic::Code::FailedPrecondition,
+        "{}",
+        error.message()
+    );
+    assert!(!daemon.home().join("wt").exists(), "nothing left in ~/wt");
+}

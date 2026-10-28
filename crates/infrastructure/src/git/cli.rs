@@ -117,11 +117,9 @@ impl Git for GitCli {
         Ok(parse_status(&status))
     }
 
+    /// Git creates the missing parent folders itself, and leaves none
+    /// behind when it fails (e.g. the branch already exists).
     fn add_worktree(&self, repo: &Path, worktree: &NewWorktree) -> Result<(), WorkspaceError> {
-        if let Some(parent) = worktree.path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| WorkspaceError::Git(format!("{}: {e}", parent.display())))?;
-        }
         let mut args: Vec<&OsStr> = vec![OsStr::new("worktree"), OsStr::new("add")];
         if worktree.create_branch {
             args.extend([

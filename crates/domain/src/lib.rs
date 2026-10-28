@@ -3,11 +3,13 @@
 //! Pure business types and rules. This crate does no I/O and depends on no
 //! runtime or transport: outer layers implement its ports (traits).
 //!
+//! - [`agents`]: the user's coding-agent CLIs and the sessions they run.
 //! - [`changes`]: changes, files and history of one worktree.
 //! - [`terminal`]: PTY-backed terminal sessions, their output and lifecycle.
 //! - [`daemon`]: daemon identity, security and discovery rules.
 //! - [`workspace`]: namespaces, git repositories and their worktrees.
 
+pub mod agents;
 pub mod changes;
 pub mod daemon;
 pub mod terminal;

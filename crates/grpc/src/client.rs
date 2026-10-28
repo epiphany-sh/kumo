@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 
 use kumo_domain::daemon::{ApiVersion, AuthToken};
 use kumo_proto::v1 as pb;
+use kumo_proto::v1::agents_client::AgentsClient;
 use kumo_proto::v1::core_client::CoreClient;
 use kumo_proto::v1::git_client::GitClient;
 use kumo_proto::v1::terminals_client::TerminalsClient;
@@ -23,6 +24,7 @@ pub struct KumoClient {
     pub terminals: TerminalsClient<AuthChannel>,
     pub workspace: WorkspaceClient<AuthChannel>,
     pub git: GitClient<AuthChannel>,
+    pub agents: AgentsClient<AuthChannel>,
 }
 
 impl KumoClient {
@@ -39,7 +41,8 @@ impl KumoClient {
             core: CoreClient::with_interceptor(channel.clone(), auth.clone()),
             terminals: TerminalsClient::with_interceptor(channel.clone(), auth.clone()),
             workspace: WorkspaceClient::with_interceptor(channel.clone(), auth.clone()),
-            git: GitClient::with_interceptor(channel, auth),
+            git: GitClient::with_interceptor(channel.clone(), auth.clone()),
+            agents: AgentsClient::with_interceptor(channel, auth),
         })
     }
 
