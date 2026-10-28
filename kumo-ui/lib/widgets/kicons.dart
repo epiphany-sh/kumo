@@ -1,0 +1,66 @@
+import 'package:flutter/material.dart';
+
+/// Semantic icon names used across the app, mapped to Material symbols
+/// (bundled with Flutter, no extra dependency). Swap here to change the set.
+abstract final class KIcons {
+  static const terminal = Icons.terminal_rounded;
+  static const files = Icons.description_outlined;
+  static const agent = Icons.auto_awesome_outlined;
+  static const tasks = Icons.task_alt_rounded;
+  static const git = Icons.account_tree_outlined;
+  static const docs = Icons.menu_book_outlined;
+  static const branch = Icons.alt_route_rounded;
+  static const pullRequest = Icons.merge_type_rounded;
+  static const repo = Icons.folder_outlined;
+  static const folder = Icons.folder_outlined;
+  static const folderOpen = Icons.folder_open_outlined;
+  static const file = Icons.insert_drive_file_outlined;
+  static const fileAdd = Icons.note_add_outlined;
+  static const folderAdd = Icons.create_new_folder_outlined;
+  static const collapseAll = Icons.unfold_less_rounded;
+  static const search = Icons.search_rounded;
+  static const add = Icons.add_rounded;
+  static const remove = Icons.remove_rounded;
+  static const sun = Icons.light_mode_outlined;
+  static const moon = Icons.dark_mode_outlined;
+  static const hybrid = Icons.contrast_rounded;
+  static const chevronDown = Icons.keyboard_arrow_down_rounded;
+  static const chevronUp = Icons.keyboard_arrow_up_rounded;
+  static const chevronRight = Icons.keyboard_arrow_right_rounded;
+  static const chevronUpDown = Icons.unfold_more_rounded;
+  static const settings = Icons.tune_rounded;
+  static const pause = Icons.pause_rounded;
+  static const send = Icons.arrow_upward_rounded;
+  static const check = Icons.check_rounded;
+  static const close = Icons.close_rounded;
+  static const cluster = Icons.view_in_ar_outlined;
+  static const sidebar = Icons.view_sidebar_outlined;
+  static const split = Icons.vertical_split_outlined;
+  static const tabs = Icons.tab_outlined;
+  static const more = Icons.more_horiz_rounded;
+  static const clock = Icons.schedule_rounded;
+  static const shield = Icons.shield_outlined;
+  static const external = Icons.open_in_new_rounded;
+  static const warning = Icons.warning_amber_rounded;
+  static const save = Icons.save_outlined;
+  static const upload = Icons.upload_rounded;
+  static const download = Icons.download_rounded;
+  static const namespace = Icons.layers_outlined;
+  static const moreVert = Icons.more_vert_rounded;
+  static const rename = Icons.edit_outlined;
+  static const trash = Icons.delete_outline_rounded;
+  static const copy = Icons.content_copy_rounded;
+  static const reveal = Icons.folder_open_outlined;
+  static const collapse = Icons.unfold_less_rounded;
+  static const expand = Icons.unfold_more_rounded;
+  static const splitRight = Icons.vertical_split_outlined;
+  static const splitDown = Icons.horizontal_split_outlined;
+  static const info = Icons.info_outline_rounded;
+  static const widgets = Icons.dashboard_customize_outlined;
+  static const sparkle = Icons.auto_awesome_outlined;
+  static const arrowRight = Icons.arrow_forward_rounded;
+  static const dragHandle = Icons.drag_handle_rounded;
+  static const flask = Icons.science_outlined;
+  static const activity = Icons.timeline_rounded;
+  static const sidePanel = Icons.view_sidebar_outlined;
+}

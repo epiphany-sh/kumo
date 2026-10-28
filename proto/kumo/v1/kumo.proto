@@ -1,0 +1,119 @@
+// Kumo daemon API, v1.
+//
+// Transport: gRPC over HTTP/2 on TCP loopback. Every call carries
+// `authorization: Bearer <token>` (token from the discovery file).
+// Keep this file backwards compatible once the UI consumes it:
+// never reuse or renumber fields, only add.
+syntax = "proto3";
+
+package kumo.v1;
+
+// ---------------------------------------------------------------------------
+// Core
+// ---------------------------------------------------------------------------
+
+service Core {
+  // Version handshake. Clients must refuse to operate if
+  // `server_api_version` differs from their own.
+  rpc Hello(HelloRequest) returns (HelloResponse);
+}
+
+message HelloRequest {
+  uint32 client_api_version = 1;
+  string client_name = 2;
+}
+
+message HelloResponse {
+  uint32 server_api_version = 1;
+  string server_version = 2;
+  uint64 server_time_unix_nanos = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Terminals
+// ---------------------------------------------------------------------------
+
+service Terminals {
+  rpc Open(OpenRequest) returns (OpenResponse);
+  // First client message must be `attach`. After that: `data` / `resize`.
+  // The server streams output batches and, last, `exited`.
+  rpc Attach(stream TerminalInput) returns (stream TerminalOutput);
+  // Kills the process (if still running) and forgets the session.
+  rpc Close(CloseRequest) returns (CloseResponse);
+  rpc List(ListRequest) returns (ListResponse);
+}
+
+message OpenRequest {
+  string program = 1;
+  repeated string args = 2;
+  // Empty means the daemon's working directory.
+  string cwd = 3;
+  map<string, string> env = 4;
+  uint32 cols = 5;
+  uint32 rows = 6;
+}
+
+message OpenResponse {
+  string terminal_id = 1;
+}
+
+message TerminalInput {
+  oneof kind {
+    AttachTo attach = 1;
+    bytes data = 2;
+    Resize resize = 3;
+  }
+}
+
+message AttachTo {
+  string terminal_id = 1;
+  // Send the bounded replay buffer before live output. Replay and live
+  // output never overlap: `seq` is strictly increasing across both.
+  bool replay_scrollback = 2;
+}
+
+message Resize {
+  uint32 cols = 1;
+  uint32 rows = 2;
+}
+
+message TerminalOutput {
+  oneof kind {
+    OutputBatch output = 1;
+    Exited exited = 2;
+    // M2: ScreenUpdate (dirty-line diffs).
+  }
+}
+
+message OutputBatch {
+  // Monotonic per session, starting at 1.
+  uint64 seq = 1;
+  bytes data = 2;
+  // When the first coalesced chunk was read from the PTY (latency tracing).
+  uint64 first_read_unix_nanos = 3;
+  // How many PTY reads were coalesced into this batch.
+  uint32 chunks = 4;
+}
+
+message Exited {
+  int32 exit_code = 1;
+}
+
+message CloseRequest {
+  string terminal_id = 1;
+}
+
+message CloseResponse {}
+
+message ListRequest {}
+
+message ListResponse {
+  repeated TerminalInfo terminals = 1;
+}
+
+message TerminalInfo {
+  string terminal_id = 1;
+  string program = 2;
+  bool exited = 3;
+  int32 exit_code = 4;
+}

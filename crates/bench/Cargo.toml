@@ -1,0 +1,38 @@
+[package]
+name = "kumo-bench"
+description = "Reproducible benchmarks for the Kumo daemon (kumo.md §4): hello, echo, throughput."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "kumo-bench"
+path = "src/main.rs"
+
+[[bin]]
+name = "kumo-echo"
+path = "src/bin/kumo-echo.rs"
+
+[dependencies]
+kumo-domain.workspace = true
+kumo-infrastructure.workspace = true
+kumo-grpc.workspace = true
+tonic.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync", "process"] }
+tokio-stream.workspace = true
+bytes.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+hdrhistogram.workspace = true
+tempfile.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_System_Console"] }
+
+[lints]
+workspace = true

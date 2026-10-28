@@ -1,0 +1,54 @@
+name: kumo_ui
+description: Kumo desktop UI — terminal, AI agents, worktrees, tasks and docs in one window (macOS + Windows).
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  fixnum: ^1.1.1
+  flutter:
+    sdk: flutter
+  # Native window translucency: NSVisualEffectView on macOS, Mica/Acrylic on Windows.
+  # Pulls in macos_window_utils. No webviews.
+  flutter_acrylic: ^1.1.4
+  grpc: ^5.2.0
+  protobuf: ^6.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: Geist
+      fonts:
+        - asset: assets/fonts/Geist-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Geist-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Geist-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Geist-Bold.ttf
+          weight: 700
+    - family: GeistMono
+      fonts:
+        - asset: assets/fonts/GeistMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/GeistMono-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/GeistMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/GeistMono-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/GeistMono-Bold.ttf
+          weight: 700
+    # Nerd Fonts symbols only (MIT, v3.5.1): icon fallback for terminal prompts.
+    - family: SymbolsNerdFontMono
+      fonts:
+        - asset: assets/fonts/SymbolsNerdFontMono-Regular.ttf

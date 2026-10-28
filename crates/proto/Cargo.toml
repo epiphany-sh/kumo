@@ -1,0 +1,21 @@
+[package]
+name = "kumo-proto"
+description = "Generated gRPC/protobuf bindings for the Kumo daemon API."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tonic.workspace = true
+tonic-prost.workspace = true
+prost.workspace = true
+bytes.workspace = true
+
+[build-dependencies]
+tonic-prost-build.workspace = true
+protoc-bin-vendored.workspace = true
+
+[lints]
+workspace = true

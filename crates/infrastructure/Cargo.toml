@@ -1,0 +1,23 @@
+[package]
+name = "kumo-infrastructure"
+description = "Kumo adapters: implements domain ports with the OS (PTYs, files, randomness)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+kumo-domain.workspace = true
+portable-pty.workspace = true
+getrandom.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+dirs.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

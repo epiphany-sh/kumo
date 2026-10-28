@@ -1,0 +1,11 @@
+//! Kumo domain layer.
+//!
+//! Pure business types and rules. This crate does no I/O and depends on no
+//! runtime or transport: outer layers implement its ports (traits).
+//!
+//! - [`terminal`]: PTY-backed terminal sessions, their output and lifecycle.
+//! - [`daemon`]: daemon identity, security and discovery rules.
+
+pub mod daemon;
+pub mod terminal;
+pub mod time;

@@ -1,0 +1,22 @@
+[package]
+name = "kumo-application"
+description = "Kumo use cases: orchestrates domain types through ports. Transport-agnostic."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+kumo-domain.workspace = true
+bytes.workspace = true
+tokio = { workspace = true, features = ["sync", "rt", "macros", "time"] }
+tokio-stream.workspace = true
+futures.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["sync", "rt-multi-thread", "macros", "time"] }
+
+[lints]
+workspace = true
