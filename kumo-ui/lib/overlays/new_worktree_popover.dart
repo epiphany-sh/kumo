@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../app/app_state.dart';
 import '../data/mock_data.dart';
 import '../data/models.dart';
+import '../data/tasks_source.dart';
 import '../data/workspace_source.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
@@ -30,7 +31,8 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
   _Source _src = _Source.ticket;
   late String _repo = widget.repo;
   String _base = 'main';
-  String _ticket = 'PRC-421';
+  /// Id of the task to start from.
+  String? _ticket;
   String _existing = 'origin/fix/PRC-377-export-rounding';
   String _agent = 'claude';
   bool _agentOn = true;
@@ -43,11 +45,13 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
   final _branch = TextEditingController();
   final _path = TextEditingController();
 
-  static const _tickets = <(String, String)>[
-    ('PRC-421', 'PRC-421 · Expose price history in admin API'),
-    ('CU-2302', 'CU-2302 · Role templates for store managers'),
-    ('TD-ROT', 'Todoist · Rotate staging Kafka credentials'),
-  ];
+  /// Open tasks, the ones already in progress first.
+  List<TaskEntry> get _tickets {
+    final open = [for (final t in AppScope.read(context).tasks.tasks) if (t.column != TaskColumn.done) t];
+    return [for (final t in open) if (t.column != TaskColumn.todo) t, for (final t in open) if (t.column == TaskColumn.todo) t];
+  }
+
+  TaskEntry? get _task => _tickets.where((t) => t.id == _ticket).firstOrNull ?? _tickets.firstOrNull;
 
   WorkspaceSource get _workspace => AppScope.read(context).workspace;
   Repo? get _repoEntry => _workspace.repo(_repo);
@@ -107,10 +111,9 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
 
   void _fillNames() {
     final (b, p) = switch (_src) {
-      _Source.ticket => switch (_ticket) {
-          'PRC-421' => ('feat/PRC-421-price-history', '~/wt/$_repoName/PRC-421'),
-          'CU-2302' => ('feat/CU-2302-role-templates', '~/wt/$_repoName/CU-2302'),
-          _ => ('chore/rotate-kafka-creds', '~/wt/$_repoName/kafka-creds'),
+      _Source.ticket => switch (_task?.suggestedBranch) {
+          final branch? => (branch, '~/wt/$_repoName/${branch.replaceAll('/', '-')}'),
+          null => ('feat/', '~/wt/$_repoName/'),
         },
       _Source.fresh => ('feat/', '~/wt/$_repoName/'),
       _Source.existing => (_localName(_existing), '~/wt/$_repoName/${_localName(_existing).replaceAll('/', '-')}'),
@@ -132,8 +135,7 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
     final connected = s.agents.connected;
     if (!s.agents.live || connected.isEmpty) return;
     final provider = connected.any((p) => p.id == _agent) ? _agent : connected.first.id;
-    final prompt = _src == _Source.ticket ? _tickets.firstWhere((t) => t.$1 == _ticket).$2 : '';
-    final run = await s.agents.start(providerId: provider, worktreePath: worktree, prompt: prompt);
+    final run = await s.agents.start(providerId: provider, worktreePath: worktree);
     if (run != null) {
       s.openTerminal(run.terminalId, title: run.title, agent: true);
     } else if (mounted) {
@@ -160,6 +162,25 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
     });
     s.selectWorktree(branch);
     if (repo == null) return;
+    final task = _src == _Source.ticket ? _task : null;
+    if (task != null) {
+      // The same flow as Tasks: linked, moved to In progress, the task as
+      // the agent's prompt.
+      try {
+        final error = await s.startTask(task, repo: repo, branch: branch, base: _base, path: _path.text, agent: _agentOn, providerId: _agent);
+        if (mounted) setState(() => _error = error);
+      } on Object catch (e) {
+        if (mounted) {
+          setState(() {
+            _created = false;
+            _error = '$e';
+          });
+        }
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
+      return;
+    }
     try {
       await s.workspace.createWorktree(
         repo,
@@ -233,7 +254,7 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
           _src = v;
           _fillNames();
         }),
-        items: const [(_Source.ticket, 'From ticket', null), (_Source.fresh, 'New branch', null), (_Source.existing, 'Existing', null)],
+        items: const [(_Source.ticket, 'From task', null), (_Source.fresh, 'New branch', null), (_Source.existing, 'Existing', null)],
       ),
       const SizedBox(height: 12),
       KSelect<String>(
@@ -250,11 +271,14 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
         }),
       ),
       const SizedBox(height: 10),
-      if (_src == _Source.ticket) ...[
+      if (_src == _Source.ticket && _task == null) ...[
+        Text('No open tasks: connect where your tasks live in Settings › Tasks.', style: sans(11.5, color: p.text3)),
+        const SizedBox(height: 10),
+      ] else if (_src == _Source.ticket) ...[
         KSelect<String>(
-          label: 'Ticket',
-          value: _ticket,
-          items: _tickets,
+          label: 'Task',
+          value: _task!.id,
+          items: [for (final t in _tickets) (t.id, '${t.key} · ${t.title}')],
           onChanged: (v) => setState(() {
             _ticket = v;
             _fillNames();

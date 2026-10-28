@@ -307,7 +307,7 @@ class KSegmented<T> extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: on ? chipDecoration(c, radius: height * 0.38, fill: c.tabActive) : BoxDecoration(color: hover ? c.tile : null, borderRadius: BorderRadius.circular(height * 0.38)),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(text, style: sans(12, weight: FontWeight.w500, color: on ? c.text : c.text2)),
+                  Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, weight: FontWeight.w500, color: on ? c.text : c.text2))),
                   if (count != null) ...[const SizedBox(width: 6), Text(count, style: sans(11, color: c.text3))],
                 ]),
               );

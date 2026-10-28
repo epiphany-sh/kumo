@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../data/agents_source.dart';
+import '../data/tasks_source.dart';
 import '../data/changes.dart';
 import '../data/workspace_source.dart';
 import '../data/worktree_changes.dart';
@@ -39,9 +40,11 @@ class AppState extends ChangeNotifier {
     WorkspaceSource? workspace,
     WorktreeChanges Function(String worktreePath)? changesFor,
     AgentsSource? agents,
+    TasksSource? tasks,
   })  : prefs = prefs ?? Preferences.memory(),
         workspace = workspace ?? MockWorkspaceSource(),
         agents = agents ?? MockAgentsSource(),
+        tasks = tasks ?? MockTasksSource(),
         _changesFor = changesFor,
         _mode = mode {
     _changes = changesFor == null ? MockWorktreeChanges() : NoWorktreeChanges();
@@ -522,6 +525,51 @@ class AppState extends ChangeNotifier {
     terminalOpener?.call(terminalId, title, agent: agent);
   }
 
+  // ---- Tasks ----
+
+  /// Tasks from the user's tools. Views listen to it directly: a board
+  /// update doesn't rebuild the rest of the app.
+  final TasksSource tasks;
+
+  /// Starts work on [task]: a new worktree on [branch], linked to the task,
+  /// the task moved to In progress where its tool allows, and (with
+  /// [agent]) an agent with the task as its prompt. Throws a readable
+  /// message if the worktree can't be created; returns why the agent
+  /// didn't start, or null.
+  Future<String?> startTask(TaskEntry task, {required Repo repo, required String branch, String base = '', String path = '', bool agent = true, String? providerId}) async {
+    try {
+      await workspace.createWorktree(repo, branch: branch, createBranch: true, base: base, path: path);
+    } on Object catch (e) {
+      throw workspace.error ?? '$e';
+    }
+    final created = workspace.repo(repo.id)?.worktrees.where((w) => w.branch == branch).firstOrNull;
+    final worktreePath = created == null ? '' : workspace.absolutePathOf(created);
+    if (created != null) selectWorktree(created.branch, path: created.path);
+    await tasks.link(task.id, worktreePath: worktreePath.isEmpty ? path : worktreePath, branch: branch);
+    final source = tasks.source(task.sourceId);
+    if (task.column == TaskColumn.todo && (source?.writable.contains(TaskColumn.doing) ?? false)) {
+      tasks.setStatus(task.id, TaskColumn.doing).ignore();
+    }
+    if (!agent || created == null || !agents.live || agents.connected.isEmpty) return null;
+    final run = await agents.start(providerId: providerId, worktreePath: worktreePath, prompt: taskPrompt(task), title: '${task.key} · ${task.title}');
+    if (run == null) return 'Worktree ready, but the agent didn’t start: ${agents.error ?? 'unknown error'}';
+    openTerminal(run.terminalId, title: run.title, agent: true);
+    return null;
+  }
+
+  /// What an agent gets when it starts from a task.
+  static String taskPrompt(TaskEntry task) {
+    final where = [task.kind.label, if (task.context.isNotEmpty) task.context].join(' · ');
+    return [
+      task.title,
+      '',
+      'Task ${task.key} ($where).',
+      if (task.labels.isNotEmpty) 'Labels: ${task.labels.join(', ')}.',
+      if (task.due.isNotEmpty) 'Due ${task.due}.',
+      if (task.url.startsWith('http')) task.url,
+    ].join('\n');
+  }
+
   // ---- Terminal commands (⌘D / ⌘⇧D / ⌘W) ----
 
   /// The Terminal screen registers itself here; the window-level shortcuts
@@ -542,6 +590,7 @@ class AppState extends ChangeNotifier {
     agents
       ..removeListener(notifyListeners)
       ..dispose();
+    tasks.dispose();
     _changes
       ..removeListener(notifyListeners)
       ..dispose();
