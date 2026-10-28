@@ -122,7 +122,9 @@ class _SourceControlTabState extends State<_SourceControlTab> {
       setState(() => _needMsg = true);
       return;
     }
-    if (s.commit(_msg.text, how: how)) {
+    // Like VS Code: what is staged, or every change when nothing is.
+    final staged = s.pendingChanges.any((f) => s.changes.stagedList.contains(f.path));
+    if (s.commit(_msg.text, how: how, all: !staged)) {
       _msg.clear();
       setState(() => _needMsg = false);
     }
@@ -137,6 +139,11 @@ class _SourceControlTabState extends State<_SourceControlTab> {
     final q = _query.text.trim().toLowerCase();
     bool match(ChangedFile f) => q.isEmpty || f.path.toLowerCase().contains(q);
     final git = s.changes;
+    final staged = [for (final f in pending) if (git.stagedList.contains(f.path)) f];
+    final unstaged = [
+      for (final f in pending)
+        if (!git.stagedList.contains(f.path) || git.unstagedChanges.contains(f.path) || git.untracked.contains(f.path)) f,
+    ];
     final ahead = git.ahead;
     final base = git.base.isEmpty ? 'its base' : git.base;
 
@@ -292,13 +299,28 @@ class _SourceControlTabState extends State<_SourceControlTab> {
         ),
       ],
       const SizedBox(height: 14),
+      if (staged.isNotEmpty) ...[
+        _ScSection(
+          title: 'Staged',
+          total: staged.length,
+          files: staged.where(match).toList(),
+          open: !_collapsed.contains('staged'),
+          onToggle: () => setState(() => _collapsed.contains('staged') ? _collapsed.remove('staged') : _collapsed.add('staged')),
+          empty: 'No files match “$q”.',
+          staged: true,
+        ),
+        const SizedBox(height: 6),
+      ],
       _ScSection(
         title: 'Changes',
-        total: pending.length,
-        files: pending.where(match).toList(),
+        total: unstaged.length,
+        files: unstaged.where(match).toList(),
         open: !_collapsed.contains('changes'),
         onToggle: () => setState(() => _collapsed.contains('changes') ? _collapsed.remove('changes') : _collapsed.add('changes')),
-        empty: q.isNotEmpty && pending.isNotEmpty ? 'No files match “$q”.' : (s.commitNotice != null ? 'Nothing to commit. Working tree clean.' : 'No changes.'),
+        empty: q.isNotEmpty && unstaged.isNotEmpty
+            ? 'No files match “$q”.'
+            : (staged.isNotEmpty ? 'Everything is staged.' : (s.commitNotice != null ? 'Nothing to commit. Working tree clean.' : 'No changes.')),
+        staged: false,
       ),
       const SizedBox(height: 6),
       _ScSection(
@@ -397,7 +419,7 @@ class _CommitButton extends StatelessWidget {
 }
 
 class _ScSection extends StatelessWidget {
-  const _ScSection({required this.title, required this.total, required this.files, required this.open, required this.onToggle, required this.empty, this.onViewAll});
+  const _ScSection({required this.title, required this.total, required this.files, required this.open, required this.onToggle, required this.empty, this.onViewAll, this.staged});
 
   final String title;
   final int total;
@@ -406,6 +428,10 @@ class _ScSection extends StatelessWidget {
   final VoidCallback onToggle;
   final String empty;
   final VoidCallback? onViewAll;
+
+  /// Uncommitted files get stage / unstage and discard: true for the staged
+  /// ones, false for the rest, null for committed ones (no actions).
+  final bool? staged;
 
   @override
   Widget build(BuildContext context) {
@@ -431,17 +457,20 @@ class _ScSection extends StatelessWidget {
         if (onViewAll != null) KButton(label: 'View all', kind: KButtonKind.ghost, height: 24, fontSize: 12, onTap: onViewAll),
       ]),
       if (open) ...[
-        for (final f in files) ChangedFileRow(file: f),
+        for (final f in files) ChangedFileRow(file: f, staged: staged),
         if (files.isEmpty) Padding(padding: const EdgeInsets.fromLTRB(6, 4, 6, 6), child: Text(empty, style: sans(12, color: c.text3))),
       ],
     ]);
   }
 }
 
-/// icon · name · folder · +a −d · M/A. Click opens the file tab.
+/// icon · name · folder · +a −d · M/A. Click opens the file tab. With
+/// [staged] set (uncommitted files), hovering shows discard and stage /
+/// unstage.
 class ChangedFileRow extends StatelessWidget {
-  const ChangedFileRow({super.key, required this.file});
+  const ChangedFileRow({super.key, required this.file, this.staged});
   final ChangedFile file;
+  final bool? staged;
 
   @override
   Widget build(BuildContext context) {
@@ -476,10 +505,26 @@ class ChangedFileRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          Text.rich(TextSpan(children: [
-            TextSpan(text: '+${file.added} ', style: mono(11, color: c.ok)),
-            TextSpan(text: '−${file.deleted}', style: mono(11, color: c.err)),
-          ])),
+          if (staged != null && (hover || focus)) ...[
+            KIconButton(
+              icon: KIcons.discard,
+              label: file.kind == 'U' ? 'Delete ${file.name}' : 'Discard changes to ${file.name}',
+              size: 22,
+              iconSize: 13,
+              onTap: () => s.discardChanges(file.path),
+            ),
+            KIconButton(
+              icon: staged! ? KIcons.remove : KIcons.add,
+              label: '${staged! ? 'Unstage' : 'Stage'} ${file.name}',
+              size: 22,
+              iconSize: 14,
+              onTap: () => staged! ? s.changes.unstage([file.path]) : s.changes.stage([file.path]),
+            ),
+          ] else
+            Text.rich(TextSpan(children: [
+              TextSpan(text: '+${file.added} ', style: mono(11, color: c.ok)),
+              TextSpan(text: '−${file.deleted}', style: mono(11, color: c.err)),
+            ])),
           const SizedBox(width: 6),
           SizedBox(width: 12, child: Text(file.kind, textAlign: TextAlign.center, style: mono(11, weight: FontWeight.w700, color: col))),
         ]),
@@ -984,7 +1029,7 @@ class _ChangesWidget extends StatelessWidget {
           ])),
         ),
         const SizedBox(height: 2),
-        Text('${files.length} uncommitted · feat/PRC-412-bulk-discounts', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, color: c.text3)),
+        Text('${files.length} uncommitted · ${s.changes.branch}', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, color: c.text3)),
         const SizedBox(height: 8),
         for (final f in files) ChangedFileRow(file: f),
         if (files.isEmpty) Text('Working tree clean.', style: sans(12, color: c.text3)),

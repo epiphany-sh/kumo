@@ -21,6 +21,7 @@ abstract final class KIcons {
   static const search = Icons.search_rounded;
   static const add = Icons.add_rounded;
   static const remove = Icons.remove_rounded;
+  static const discard = Icons.undo_rounded;
   static const sun = Icons.light_mode_outlined;
   static const moon = Icons.dark_mode_outlined;
   static const hybrid = Icons.contrast_rounded;

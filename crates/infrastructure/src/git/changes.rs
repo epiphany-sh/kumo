@@ -255,11 +255,38 @@ impl GitChanges for GitCli {
         }
     }
 
+    /// Back to HEAD. Files git doesn't track yet are deleted (`git clean`),
+    /// since there's nothing to restore them to.
     fn restore(&self, worktree: &Path, paths: &[RelativePath]) -> Result<(), ChangesError> {
+        let untracked: Vec<RelativePath> = self
+            .git_paths(
+                worktree,
+                &["ls-files", "-z", "--others", "--exclude-standard"],
+                paths,
+            )?
+            .split('\0')
+            .filter_map(|line| {
+                paths
+                    .iter()
+                    .find(|p| p.to_string().replace('\\', "/") == line)
+                    .cloned()
+            })
+            .collect();
+        if !untracked.is_empty() {
+            self.git_paths(worktree, &["clean", "-f", "-q"], &untracked)?;
+        }
+        let tracked: Vec<RelativePath> = paths
+            .iter()
+            .filter(|p| !untracked.contains(p))
+            .cloned()
+            .collect();
+        if tracked.is_empty() {
+            return Ok(());
+        }
         self.git_paths(
             worktree,
             &["restore", "--source=HEAD", "--staged", "--worktree"],
-            paths,
+            &tracked,
         )
         .map(drop)
     }

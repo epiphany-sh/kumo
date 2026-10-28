@@ -492,11 +492,13 @@ class _FilesScreenState extends State<FilesScreen> {
 
   Widget _sourceControl(BuildContext context) {
     final c = context.c;
+    final app = AppScope.of(context);
+    List<String> shown(List<String> paths) => [for (final p in paths) if (!app.isDiscarding(p)) p];
     final sections = [
       ('Merge conflicts', _git.conflicts, 'conflict', c.err),
-      ('Staged', _git.stagedList, 'staged', c.text),
-      ('Changes', _git.unstagedChanges, 'changes', c.text),
-      ('Untracked', _git.untracked, 'untracked', c.text),
+      ('Staged', shown(_git.stagedList), 'staged', c.text),
+      ('Changes', shown(_git.unstagedChanges), 'changes', c.text),
+      ('Untracked', shown(_git.untracked), 'untracked', c.text),
     ].where((s) => s.$2.isNotEmpty).toList();
     final s = AppScope.of(context);
     final unstaged = [..._git.unstagedChanges, ..._git.untracked];
@@ -637,7 +639,14 @@ class _FilesScreenState extends State<FilesScreen> {
             ),
           ),
         ),
-        if (mode != 'conflict')
+        if (mode != 'conflict') ...[
+          KIconButton(
+            icon: KIcons.discard,
+            label: mode == 'untracked' ? 'Delete $name' : 'Discard changes to $name',
+            size: 24,
+            iconSize: 13,
+            onTap: () => AppScope.read(context).discardChanges(path),
+          ),
           KIconButton(
             icon: mode == 'staged' ? KIcons.remove : KIcons.add,
             label: '${mode == 'staged' ? 'Unstage' : 'Stage'} $name',
@@ -645,6 +654,7 @@ class _FilesScreenState extends State<FilesScreen> {
             iconSize: 14,
             onTap: () => mode == 'staged' ? _git.unstage([path]) : _git.stage([path]),
           ),
+        ],
       ]),
     );
   }

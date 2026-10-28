@@ -446,3 +446,36 @@ async fn fetch_sees_new_commits_and_pull_fast_forwards() {
     assert_eq!((s.ahead, s.behind), (0, 0));
     assert!(wt.join("theirs.txt").exists());
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn restore_discards_modified_added_and_untracked_files() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = feature_worktree(&daemon, &mut client).await;
+    std::fs::write(wt.join("README.md"), "changed\n").unwrap();
+    std::fs::write(wt.join("added.txt"), "added\n").unwrap();
+    git(&wt, &["add", "added.txt"]);
+    std::fs::write(wt.join("new file.txt"), "untracked\n").unwrap();
+    std::fs::write(wt.join("keep.txt"), "untracked, not discarded\n").unwrap();
+
+    client
+        .git
+        .restore(pb::PathsRequest {
+            worktree_path: request(&wt),
+            paths: vec![
+                "README.md".into(),
+                "added.txt".into(),
+                "new file.txt".into(),
+            ],
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(wt.join("README.md")).unwrap(),
+        "hello\nworld\n"
+    );
+    assert!(!wt.join("added.txt").exists());
+    assert!(!wt.join("new file.txt").exists());
+    assert!(wt.join("keep.txt").exists());
+    assert_eq!(git(&wt, &["status", "--porcelain"]), "?? keep.txt\n");
+}

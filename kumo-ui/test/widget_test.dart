@@ -89,6 +89,8 @@ void main() {
     await tester.pump();
     expect(find.byType(FileView), findsOneWidget);
     expect(state.activeFile, 'internal/discount/repository.go');
+    // Nothing staged: Commit takes every change.
+    state.changes.unstage(List.of(state.changes.stagedList));
     await tester.tap(find.byTooltip('Generate message from the changes'));
     await tester.pump();
     await tester.tap(find.text('Commit').first);

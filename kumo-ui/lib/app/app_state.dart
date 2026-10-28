@@ -457,6 +457,9 @@ class AppState extends ChangeNotifier {
     final entry = activeWorktreeEntry;
     final path = entry == null ? null : workspace.absolutePathOf(entry);
     if (path == _changesPath) return;
+    // A discard still in its undo window happens now, on its own worktree.
+    if (_discarding.isNotEmpty) dismissUndo();
+    _discarding.clear();
     _changes
       ..removeListener(notifyListeners)
       ..dispose();
@@ -479,8 +482,39 @@ class AppState extends ChangeNotifier {
   /// Git answers asynchronously; ignore answers that arrive after disposal.
   bool _disposed = false;
 
-  /// Working-tree changes not committed yet.
-  List<ChangedFile> get pendingChanges => _changes.pending;
+  /// Working-tree changes not committed yet (minus the ones being
+  /// discarded).
+  List<ChangedFile> get pendingChanges => [for (final f in _changes.pending) if (!_discarding.contains(f.path)) f];
+
+  /// Files whose changes are being discarded, still within the undo window.
+  final Set<String> _discarding = {};
+  bool isDiscarding(String path) => _discarding.contains(path);
+
+  /// Takes [path] back to the last commit (a file git doesn't track yet is
+  /// deleted). It disappears from the changes at once; git does it when the
+  /// undo window closes.
+  void discardChanges(String path) {
+    if (!_discarding.add(path)) return;
+    final changes = _changes;
+    _offerUndo(
+      'Discarded changes to ${path.split('/').last}',
+      () => _discarding.remove(path),
+      commit: () => _discarded = changes.restore(path).whenComplete(() {
+        if (_disposed || !identical(changes, _changes)) return;
+        _discarding.remove(path);
+        notifyListeners();
+      }),
+    );
+  }
+
+  Future<void>? _discarded;
+
+  /// Discards still in their undo window happen now; done when git did.
+  Future<void> _settleDiscards() {
+    if (_discarding.isEmpty) return Future.value();
+    dismissUndo();
+    return _discarded ?? Future.value();
+  }
 
   /// Changes already in commits on the branch (vs. its base).
   List<ChangedFile> get branchChanges => _changes.onBranch;
@@ -502,7 +536,9 @@ class AppState extends ChangeNotifier {
     _commitNotice = how == 'amend' ? 'Amending with $n…' : 'Committed $n${push ? ', pushing…' : ''}';
     _canUndoCommit = false;
     final changes = _changes;
-    final committing = changes.commit(message, all: all, amend: how == 'amend', push: push);
+    // A file being discarded must not end up in the commit.
+    Future<String?> run() => changes.commit(message, all: all, amend: how == 'amend', push: push);
+    final committing = _discarding.isEmpty ? run() : _settleDiscards().then((_) => run());
     notifyListeners();
     committing.then((sha) {
       if (_disposed || !identical(changes, _changes)) return;
