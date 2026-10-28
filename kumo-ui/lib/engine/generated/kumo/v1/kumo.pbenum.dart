@@ -148,5 +148,99 @@ class AgentState extends $pb.ProtobufEnum {
   const AgentState._(super.value, super.name);
 }
 
+class TaskSourceKind extends $pb.ProtobufEnum {
+  static const TaskSourceKind TASK_SOURCE_KIND_UNSPECIFIED =
+      TaskSourceKind._(0, _omitEnumNames ? '' : 'TASK_SOURCE_KIND_UNSPECIFIED');
+
+  /// Options: vault (folder).
+  static const TaskSourceKind TASK_SOURCE_KIND_OBSIDIAN =
+      TaskSourceKind._(1, _omitEnumNames ? '' : 'TASK_SOURCE_KIND_OBSIDIAN');
+
+  /// Options: database (optional path to Bear's database).
+  static const TaskSourceKind TASK_SOURCE_KIND_BEAR =
+      TaskSourceKind._(2, _omitEnumNames ? '' : 'TASK_SOURCE_KIND_BEAR');
+
+  /// Options: query (GitHub search syntax). Signs in through `gh`.
+  static const TaskSourceKind TASK_SOURCE_KIND_GITHUB =
+      TaskSourceKind._(3, _omitEnumNames ? '' : 'TASK_SOURCE_KIND_GITHUB');
+
+  /// Options: site, email, jql. Secret: API token.
+  static const TaskSourceKind TASK_SOURCE_KIND_JIRA =
+      TaskSourceKind._(4, _omitEnumNames ? '' : 'TASK_SOURCE_KIND_JIRA');
+
+  /// Options: project (optional). Secret: API token.
+  static const TaskSourceKind TASK_SOURCE_KIND_TODOIST =
+      TaskSourceKind._(5, _omitEnumNames ? '' : 'TASK_SOURCE_KIND_TODOIST');
+
+  static const $core.List<TaskSourceKind> values = <TaskSourceKind>[
+    TASK_SOURCE_KIND_UNSPECIFIED,
+    TASK_SOURCE_KIND_OBSIDIAN,
+    TASK_SOURCE_KIND_BEAR,
+    TASK_SOURCE_KIND_GITHUB,
+    TASK_SOURCE_KIND_JIRA,
+    TASK_SOURCE_KIND_TODOIST,
+  ];
+
+  static final $core.List<TaskSourceKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static TaskSourceKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TaskSourceKind._(super.value, super.name);
+}
+
+class TaskStatus extends $pb.ProtobufEnum {
+  static const TaskStatus TASK_STATUS_TODO =
+      TaskStatus._(0, _omitEnumNames ? '' : 'TASK_STATUS_TODO');
+  static const TaskStatus TASK_STATUS_DOING =
+      TaskStatus._(1, _omitEnumNames ? '' : 'TASK_STATUS_DOING');
+  static const TaskStatus TASK_STATUS_REVIEW =
+      TaskStatus._(2, _omitEnumNames ? '' : 'TASK_STATUS_REVIEW');
+  static const TaskStatus TASK_STATUS_DONE =
+      TaskStatus._(3, _omitEnumNames ? '' : 'TASK_STATUS_DONE');
+
+  static const $core.List<TaskStatus> values = <TaskStatus>[
+    TASK_STATUS_TODO,
+    TASK_STATUS_DOING,
+    TASK_STATUS_REVIEW,
+    TASK_STATUS_DONE,
+  ];
+
+  static final $core.List<TaskStatus?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static TaskStatus? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TaskStatus._(super.value, super.name);
+}
+
+class TaskPriority extends $pb.ProtobufEnum {
+  static const TaskPriority TASK_PRIORITY_NONE =
+      TaskPriority._(0, _omitEnumNames ? '' : 'TASK_PRIORITY_NONE');
+  static const TaskPriority TASK_PRIORITY_LOW =
+      TaskPriority._(1, _omitEnumNames ? '' : 'TASK_PRIORITY_LOW');
+  static const TaskPriority TASK_PRIORITY_MEDIUM =
+      TaskPriority._(2, _omitEnumNames ? '' : 'TASK_PRIORITY_MEDIUM');
+  static const TaskPriority TASK_PRIORITY_HIGH =
+      TaskPriority._(3, _omitEnumNames ? '' : 'TASK_PRIORITY_HIGH');
+  static const TaskPriority TASK_PRIORITY_URGENT =
+      TaskPriority._(4, _omitEnumNames ? '' : 'TASK_PRIORITY_URGENT');
+
+  static const $core.List<TaskPriority> values = <TaskPriority>[
+    TASK_PRIORITY_NONE,
+    TASK_PRIORITY_LOW,
+    TASK_PRIORITY_MEDIUM,
+    TASK_PRIORITY_HIGH,
+    TASK_PRIORITY_URGENT,
+  ];
+
+  static final $core.List<TaskPriority?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static TaskPriority? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TaskPriority._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

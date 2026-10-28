@@ -8,12 +8,14 @@ use std::sync::Arc;
 use kumo_application::agents::AgentService;
 use kumo_application::changes::ChangesService;
 use kumo_application::daemon::HelloService;
+use kumo_application::tasks::TaskService;
 use kumo_application::terminal::TerminalService;
 use kumo_application::workspace::WorkspaceService;
 use kumo_domain::daemon::{AuthToken, DaemonError, ListenAddress};
 use kumo_proto::v1::agents_server::AgentsServer;
 use kumo_proto::v1::core_server::CoreServer;
 use kumo_proto::v1::git_server::GitServer;
+use kumo_proto::v1::tasks_server::TasksServer;
 use kumo_proto::v1::terminals_server::TerminalsServer;
 use kumo_proto::v1::workspace_server::WorkspaceServer;
 use tokio::net::TcpListener;
@@ -21,7 +23,7 @@ use tonic::transport::Server;
 use tonic::transport::server::TcpIncoming;
 
 use crate::auth::RequireBearer;
-use crate::services::{AgentsGrpc, CoreGrpc, GitGrpc, TerminalsGrpc, WorkspaceGrpc};
+use crate::services::{AgentsGrpc, CoreGrpc, GitGrpc, TasksGrpc, TerminalsGrpc, WorkspaceGrpc};
 
 /// Use cases the server exposes.
 #[derive(Debug, Clone)]
@@ -31,6 +33,7 @@ pub struct Services {
     pub workspace: Arc<WorkspaceService>,
     pub changes: Arc<ChangesService>,
     pub agents: Arc<AgentService>,
+    pub tasks: Arc<TaskService>,
 }
 
 /// A bound, not yet serving, gRPC server.
@@ -95,6 +98,10 @@ impl GrpcServer {
             ))
             .add_service(AgentsServer::with_interceptor(
                 AgentsGrpc::new(self.services.agents),
+                auth.clone(),
+            ))
+            .add_service(TasksServer::with_interceptor(
+                TasksGrpc::new(self.services.tasks),
                 auth,
             ))
             .serve_with_incoming_shutdown(incoming, shutdown)

@@ -5,9 +5,12 @@ use anyhow::Context;
 use kumo_application::agents::{AgentPorts, AgentService};
 use kumo_application::changes::{ChangesPorts, ChangesService};
 use kumo_application::daemon::HelloService;
+use kumo_application::tasks::{TaskPorts, TaskService, TaskTiming};
 use kumo_application::terminal::TerminalService;
 use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
+use kumo_domain::agents::ProgramLocator;
 use kumo_domain::daemon::{ApiVersion, DaemonEndpoint, DiscoveryStore};
+use kumo_domain::tasks::{SecretStore, TaskConnector};
 use kumo_domain::workspace::WorktreeLocation;
 use kumo_grpc::server::{GrpcServer, Services};
 use kumo_infrastructure::agents::ShellPathLocator;
@@ -15,12 +18,16 @@ use kumo_infrastructure::discovery::FileDiscoveryStore;
 use kumo_infrastructure::fs::LocalFileStore;
 use kumo_infrastructure::git::{FsRepoFinder, GitCli};
 use kumo_infrastructure::pty::PortablePtySystem;
+use kumo_infrastructure::secrets::{KeychainSecretStore, MemorySecretStore};
 use kumo_infrastructure::security::generate_auth_token;
-use kumo_infrastructure::storage::{SqliteAgentStore, SqliteWorkspaceStore};
+use kumo_infrastructure::storage::{SqliteAgentStore, SqliteTaskStore, SqliteWorkspaceStore};
+use kumo_infrastructure::tasks::{
+    BearConnector, GitHubConnector, JiraConnector, ObsidianConnector, TodoistConnector,
+};
 use kumo_infrastructure::watch::NotifyWatcher;
 
-use crate::DaemonConfig;
 use crate::single_instance::ensure_not_running;
+use crate::{DaemonConfig, SecretsBackend};
 
 /// A started daemon: listening, advertised, not yet serving.
 #[derive(Debug)]
@@ -66,6 +73,32 @@ impl Daemon {
             Arc::new(PortablePtySystem),
             config.session,
         ));
+        let locator: Arc<dyn ProgramLocator> = Arc::new(match config.agent_path {
+            Some(path) => ShellPathLocator::with_path(&home, path),
+            None => ShellPathLocator::new(&home),
+        });
+        let secrets: Arc<dyn SecretStore> = match config.secrets {
+            SecretsBackend::Keychain => Arc::new(KeychainSecretStore::new()),
+            SecretsBackend::Memory => Arc::new(MemorySecretStore::default()),
+        };
+        let connectors: Vec<Arc<dyn TaskConnector>> = vec![
+            Arc::new(ObsidianConnector::new(&home)),
+            Arc::new(BearConnector::new(&home)),
+            Arc::new(GitHubConnector::new(Arc::clone(&locator))),
+            Arc::new(JiraConnector::default()),
+            Arc::new(TodoistConnector::default()),
+        ];
+        let tasks = TaskService::load(
+            TaskPorts {
+                store: Arc::new(SqliteTaskStore::open(&data_dir.join("kumo.db"))?),
+                secrets,
+                connectors,
+                watcher: Arc::new(NotifyWatcher),
+            },
+            TaskTiming::default(),
+        )
+        .await?;
+
         let services = Services {
             hello: HelloService::new(env!("CARGO_PKG_VERSION")),
             terminals: Arc::clone(&terminals),
@@ -81,14 +114,12 @@ impl Daemon {
             agents: Arc::new(AgentService::new(
                 AgentPorts {
                     store: Arc::new(SqliteAgentStore::open(&data_dir.join("kumo.db"))?),
-                    locator: Arc::new(match config.agent_path {
-                        Some(path) => ShellPathLocator::with_path(&home, path),
-                        None => ShellPathLocator::new(&home),
-                    }),
+                    locator,
                 },
                 Arc::clone(&terminals),
                 workspace,
             )),
+            tasks,
         };
         let server = GrpcServer::bind(config.listen, token.clone(), services).await?;
 

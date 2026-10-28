@@ -7,6 +7,7 @@ use kumo_proto::v1 as pb;
 use kumo_proto::v1::agents_client::AgentsClient;
 use kumo_proto::v1::core_client::CoreClient;
 use kumo_proto::v1::git_client::GitClient;
+use kumo_proto::v1::tasks_client::TasksClient;
 use kumo_proto::v1::terminals_client::TerminalsClient;
 use kumo_proto::v1::workspace_client::WorkspaceClient;
 use tonic::Status;
@@ -25,6 +26,7 @@ pub struct KumoClient {
     pub workspace: WorkspaceClient<AuthChannel>,
     pub git: GitClient<AuthChannel>,
     pub agents: AgentsClient<AuthChannel>,
+    pub tasks: TasksClient<AuthChannel>,
 }
 
 impl KumoClient {
@@ -42,7 +44,8 @@ impl KumoClient {
             terminals: TerminalsClient::with_interceptor(channel.clone(), auth.clone()),
             workspace: WorkspaceClient::with_interceptor(channel.clone(), auth.clone()),
             git: GitClient::with_interceptor(channel.clone(), auth.clone()),
-            agents: AgentsClient::with_interceptor(channel, auth),
+            agents: AgentsClient::with_interceptor(channel.clone(), auth.clone()),
+            tasks: TasksClient::with_interceptor(channel, auth),
         })
     }
 

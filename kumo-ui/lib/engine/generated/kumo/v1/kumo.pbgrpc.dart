@@ -1118,3 +1118,291 @@ abstract class AgentsServiceBase extends $grpc.Service {
   $async.Stream<$0.AgentsSnapshot> watch(
       $grpc.ServiceCall call, $0.WatchAgentsRequest request);
 }
+
+/// Tasks from the tools the user already works with. The board is served
+/// from a local cache and pushed whenever a source's tasks change; sources
+/// are re-read in the background (on file changes for local ones, on an
+/// interval for APIs). Nothing here waits on the network except Test,
+/// SetStatus and Detect.
+@$pb.GrpcServiceName('kumo.v1.Tasks')
+class TasksClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  TasksClient(super.channel, {super.options, super.interceptors});
+
+  /// The board now, then again whenever it changes (last wins). Each update
+  /// carries every source but only the task lists that changed.
+  $grpc.ResponseStream<$0.TasksUpdate> watch(
+    $0.WatchTasksRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createStreamingCall(_$watch, $async.Stream.fromIterable([request]),
+        options: options);
+  }
+
+  /// Sources found on this machine that aren't configured yet (Obsidian
+  /// vaults, Bear, a signed-in `gh`).
+  $grpc.ResponseFuture<$0.DetectSourcesResponse> detect(
+    $0.DetectSourcesRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$detect, request, options: options);
+  }
+
+  /// Checks options and credentials without saving them.
+  $grpc.ResponseFuture<$0.TestSourceResponse> testSource(
+    $0.TestSourceRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$testSource, request, options: options);
+  }
+
+  /// Creates (empty id) or updates a source.
+  $grpc.ResponseFuture<$0.TaskSource> saveSource(
+    $0.SaveSourceRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$saveSource, request, options: options);
+  }
+
+  /// Forgets a source, its cached tasks, links and stored token.
+  $grpc.ResponseFuture<$0.DeleteSourceResponse> deleteSource(
+    $0.DeleteSourceRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$deleteSource, request, options: options);
+  }
+
+  /// Reads a source (empty id: all) now.
+  $grpc.ResponseFuture<$0.SyncTasksResponse> sync(
+    $0.SyncTasksRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$sync, request, options: options);
+  }
+
+  /// Writes the status back to the source (only `writable` ones).
+  $grpc.ResponseFuture<$0.Task> setStatus(
+    $0.SetTaskStatusRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$setStatus, request, options: options);
+  }
+
+  /// Records that a task is being worked on in a worktree.
+  $grpc.ResponseFuture<$0.TaskLink> link(
+    $0.LinkTaskRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$link, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.UnlinkTaskResponse> unlink(
+    $0.UnlinkTaskRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$unlink, request, options: options);
+  }
+
+  // method descriptors
+
+  static final _$watch =
+      $grpc.ClientMethod<$0.WatchTasksRequest, $0.TasksUpdate>(
+          '/kumo.v1.Tasks/Watch',
+          ($0.WatchTasksRequest value) => value.writeToBuffer(),
+          $0.TasksUpdate.fromBuffer);
+  static final _$detect =
+      $grpc.ClientMethod<$0.DetectSourcesRequest, $0.DetectSourcesResponse>(
+          '/kumo.v1.Tasks/Detect',
+          ($0.DetectSourcesRequest value) => value.writeToBuffer(),
+          $0.DetectSourcesResponse.fromBuffer);
+  static final _$testSource =
+      $grpc.ClientMethod<$0.TestSourceRequest, $0.TestSourceResponse>(
+          '/kumo.v1.Tasks/TestSource',
+          ($0.TestSourceRequest value) => value.writeToBuffer(),
+          $0.TestSourceResponse.fromBuffer);
+  static final _$saveSource =
+      $grpc.ClientMethod<$0.SaveSourceRequest, $0.TaskSource>(
+          '/kumo.v1.Tasks/SaveSource',
+          ($0.SaveSourceRequest value) => value.writeToBuffer(),
+          $0.TaskSource.fromBuffer);
+  static final _$deleteSource =
+      $grpc.ClientMethod<$0.DeleteSourceRequest, $0.DeleteSourceResponse>(
+          '/kumo.v1.Tasks/DeleteSource',
+          ($0.DeleteSourceRequest value) => value.writeToBuffer(),
+          $0.DeleteSourceResponse.fromBuffer);
+  static final _$sync =
+      $grpc.ClientMethod<$0.SyncTasksRequest, $0.SyncTasksResponse>(
+          '/kumo.v1.Tasks/Sync',
+          ($0.SyncTasksRequest value) => value.writeToBuffer(),
+          $0.SyncTasksResponse.fromBuffer);
+  static final _$setStatus =
+      $grpc.ClientMethod<$0.SetTaskStatusRequest, $0.Task>(
+          '/kumo.v1.Tasks/SetStatus',
+          ($0.SetTaskStatusRequest value) => value.writeToBuffer(),
+          $0.Task.fromBuffer);
+  static final _$link = $grpc.ClientMethod<$0.LinkTaskRequest, $0.TaskLink>(
+      '/kumo.v1.Tasks/Link',
+      ($0.LinkTaskRequest value) => value.writeToBuffer(),
+      $0.TaskLink.fromBuffer);
+  static final _$unlink =
+      $grpc.ClientMethod<$0.UnlinkTaskRequest, $0.UnlinkTaskResponse>(
+          '/kumo.v1.Tasks/Unlink',
+          ($0.UnlinkTaskRequest value) => value.writeToBuffer(),
+          $0.UnlinkTaskResponse.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Tasks')
+abstract class TasksServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.Tasks';
+
+  TasksServiceBase() {
+    $addMethod($grpc.ServiceMethod<$0.WatchTasksRequest, $0.TasksUpdate>(
+        'Watch',
+        watch_Pre,
+        false,
+        true,
+        ($core.List<$core.int> value) => $0.WatchTasksRequest.fromBuffer(value),
+        ($0.TasksUpdate value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.DetectSourcesRequest, $0.DetectSourcesResponse>(
+            'Detect',
+            detect_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.DetectSourcesRequest.fromBuffer(value),
+            ($0.DetectSourcesResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.TestSourceRequest, $0.TestSourceResponse>(
+        'TestSource',
+        testSource_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.TestSourceRequest.fromBuffer(value),
+        ($0.TestSourceResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.SaveSourceRequest, $0.TaskSource>(
+        'SaveSource',
+        saveSource_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.SaveSourceRequest.fromBuffer(value),
+        ($0.TaskSource value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.DeleteSourceRequest, $0.DeleteSourceResponse>(
+            'DeleteSource',
+            deleteSource_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.DeleteSourceRequest.fromBuffer(value),
+            ($0.DeleteSourceResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.SyncTasksRequest, $0.SyncTasksResponse>(
+        'Sync',
+        sync_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.SyncTasksRequest.fromBuffer(value),
+        ($0.SyncTasksResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.SetTaskStatusRequest, $0.Task>(
+        'SetStatus',
+        setStatus_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.SetTaskStatusRequest.fromBuffer(value),
+        ($0.Task value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.LinkTaskRequest, $0.TaskLink>(
+        'Link',
+        link_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.LinkTaskRequest.fromBuffer(value),
+        ($0.TaskLink value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.UnlinkTaskRequest, $0.UnlinkTaskResponse>(
+        'Unlink',
+        unlink_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.UnlinkTaskRequest.fromBuffer(value),
+        ($0.UnlinkTaskResponse value) => value.writeToBuffer()));
+  }
+
+  $async.Stream<$0.TasksUpdate> watch_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WatchTasksRequest> $request) async* {
+    yield* watch($call, await $request);
+  }
+
+  $async.Stream<$0.TasksUpdate> watch(
+      $grpc.ServiceCall call, $0.WatchTasksRequest request);
+
+  $async.Future<$0.DetectSourcesResponse> detect_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.DetectSourcesRequest> $request) async {
+    return detect($call, await $request);
+  }
+
+  $async.Future<$0.DetectSourcesResponse> detect(
+      $grpc.ServiceCall call, $0.DetectSourcesRequest request);
+
+  $async.Future<$0.TestSourceResponse> testSource_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.TestSourceRequest> $request) async {
+    return testSource($call, await $request);
+  }
+
+  $async.Future<$0.TestSourceResponse> testSource(
+      $grpc.ServiceCall call, $0.TestSourceRequest request);
+
+  $async.Future<$0.TaskSource> saveSource_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.SaveSourceRequest> $request) async {
+    return saveSource($call, await $request);
+  }
+
+  $async.Future<$0.TaskSource> saveSource(
+      $grpc.ServiceCall call, $0.SaveSourceRequest request);
+
+  $async.Future<$0.DeleteSourceResponse> deleteSource_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.DeleteSourceRequest> $request) async {
+    return deleteSource($call, await $request);
+  }
+
+  $async.Future<$0.DeleteSourceResponse> deleteSource(
+      $grpc.ServiceCall call, $0.DeleteSourceRequest request);
+
+  $async.Future<$0.SyncTasksResponse> sync_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.SyncTasksRequest> $request) async {
+    return sync($call, await $request);
+  }
+
+  $async.Future<$0.SyncTasksResponse> sync(
+      $grpc.ServiceCall call, $0.SyncTasksRequest request);
+
+  $async.Future<$0.Task> setStatus_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.SetTaskStatusRequest> $request) async {
+    return setStatus($call, await $request);
+  }
+
+  $async.Future<$0.Task> setStatus(
+      $grpc.ServiceCall call, $0.SetTaskStatusRequest request);
+
+  $async.Future<$0.TaskLink> link_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.LinkTaskRequest> $request) async {
+    return link($call, await $request);
+  }
+
+  $async.Future<$0.TaskLink> link(
+      $grpc.ServiceCall call, $0.LinkTaskRequest request);
+
+  $async.Future<$0.UnlinkTaskResponse> unlink_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.UnlinkTaskRequest> $request) async {
+    return unlink($call, await $request);
+  }
+
+  $async.Future<$0.UnlinkTaskResponse> unlink(
+      $grpc.ServiceCall call, $0.UnlinkTaskRequest request);
+}

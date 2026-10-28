@@ -10,6 +10,7 @@ import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
 import 'agent_settings.dart';
+import 'task_settings.dart';
 
 enum SettingsTab {
   general('General', Icons.settings_outlined),
@@ -17,7 +18,7 @@ enum SettingsTab {
   terminal('Terminal', Icons.terminal_rounded),
   shortcuts('Shortcuts', Icons.keyboard_outlined),
   ai('AI agents', Icons.auto_awesome_outlined),
-  tickets('Tickets', Icons.task_alt_rounded),
+  tickets('Tasks', Icons.task_alt_rounded),
   repos('Repositories', Icons.account_tree_outlined),
   docs('Docs', Icons.menu_book_outlined);
 
@@ -228,7 +229,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13.5, weight: FontWeight.w600, color: c.text)),
-                Text(on ? p.meta : (p.offMeta ?? p.meta), maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: c.text3)),
+                Text(p.meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: c.text3)),
               ]),
             ),
             const SizedBox(width: 10),
@@ -380,37 +381,9 @@ class _SettingsDialogState extends State<SettingsDialog> {
         );
       case SettingsTab.tickets:
         return _Page(
-          'Tickets',
-          'Where your tasks come from. Kumo pulls the ones assigned to you into Tasks and can start a worktree + agent from any of them.',
-          addLabel: 'Add tracker',
-          addNote: 'Linear, Asana and GitHub Issues are coming next.',
-          providers: [
-            _Provider('jira', 'JI', 'Jira Cloud', 'fravega.atlassian.net · projects PRC, IAM', 'on', testNote: 'Authenticated · 12 issues', rows: () => [
-                  _text(s, 'tickets.jira.projects', 'Projects', null, 'PRC, IAM', mono: true),
-                  _text(s, 'tickets.jira.jql', 'Filter (JQL)', 'Which issues show up in Tasks.', 'assignee = currentUser() AND sprint in openSprints()', mono: true),
-                  _toggle(s, 'tickets.jira.move', 'Move to In Progress when an agent starts', null, true),
-                ]),
-            _Provider('clickup', 'CU', 'ClickUp', 'Workspace Fravega · Identity space', 'on', rows: () => [
-                  _text(s, 'tickets.clickup.spaces', 'Spaces', null, 'Identity'),
-                ]),
-            _Provider('todoist', 'TD', 'Todoist', 'Inbox + project “Work”', 'on', rows: () => [
-                  _toggle(s, 'tickets.todoist.complete', 'Complete the task when its PR merges', null, false),
-                ]),
-            _Provider('trello', 'TR', 'Trello', 'Boards as Tasks columns', 'off', offMeta: 'Bring boards and cards into Tasks', rows: () => [
-                  _text(s, 'tickets.trello.board', 'Board', null, 'Pricing sprint'),
-                ]),
-          ],
-          sections: [
-            ('From ticket to branch', [
-              _text(s, 'tickets.branch', 'Branch name', 'Variables: {key} {slug} {type}', 'feat/{key}-{slug}', mono: true),
-              _text(s, 'tickets.worktree', 'Worktree folder', null, '~/wt/{repo}/{key}', mono: true),
-              _toggle(s, 'tickets.comment', 'Comment the PR link on the ticket', null, true),
-            ]),
-            ('Sync', [
-              _select(s, 'tickets.sync', 'Refresh', null, const ['Every minute', 'Every 5 minutes', 'Every 15 minutes', 'Manually'], 'Every 5 minutes'),
-              _toggle(s, 'tickets.mine', 'Only tickets assigned to me', null, true),
-            ]),
-          ],
+          'Tasks',
+          'Where your tasks come from. Kumo keeps them on this Mac so Tasks opens instantly, re-reads them in the background and writes status changes back. Start a worktree with an agent from any of them.',
+          custom: const TaskSourceSettingsPanel(),
         );
       case SettingsTab.repos:
         return _Page(
@@ -516,7 +489,7 @@ class _Page {
 }
 
 class _Provider {
-  _Provider(this.id, this.k, this.name, this.meta, this.initial, {required this.rows, this.offMeta, this.warn, this.testNote = 'Connected · token valid'});
+  _Provider(this.id, this.k, this.name, this.meta, this.initial, {required this.rows, this.warn, this.testNote = 'Connected · token valid'});
   final String id;
   final String k;
   final String name;
@@ -525,7 +498,6 @@ class _Provider {
   /// on / warn / off / missing (before the user changes it).
   final String initial;
   final List<Widget> Function() rows;
-  final String? offMeta;
   final String? warn;
   final String testNote;
 }

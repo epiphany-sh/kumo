@@ -5535,6 +5535,1597 @@ class AgentsSnapshot extends $pb.GeneratedMessage {
   $pb.PbList<AgentSession> get sessions => $_getList(1);
 }
 
+class TaskSource extends $pb.GeneratedMessage {
+  factory TaskSource({
+    $core.String? id,
+    TaskSourceKind? kind,
+    $core.String? name,
+    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? options,
+    $core.bool? enabled,
+    $core.String? badge,
+    $core.bool? needsSecret,
+    $core.bool? hasSecret,
+    $core.Iterable<TaskStatus>? writable,
+    $core.bool? syncing,
+    $fixnum.Int64? lastSyncedUnixMs,
+    $core.String? error,
+    $core.int? taskCount,
+  }) {
+    final result = TaskSource._();
+    if (id != null) result.id = id;
+    if (kind != null) result.kind = kind;
+    if (name != null) result.name = name;
+    if (options != null) result.options.addEntries(options);
+    if (enabled != null) result.enabled = enabled;
+    if (badge != null) result.badge = badge;
+    if (needsSecret != null) result.needsSecret = needsSecret;
+    if (hasSecret != null) result.hasSecret = hasSecret;
+    if (writable != null) result.writable.addAll(writable);
+    if (syncing != null) result.syncing = syncing;
+    if (lastSyncedUnixMs != null) result.lastSyncedUnixMs = lastSyncedUnixMs;
+    if (error != null) result.error = error;
+    if (taskCount != null) result.taskCount = taskCount;
+    return result;
+  }
+
+  TaskSource._();
+
+  factory TaskSource.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TaskSource()..mergeFromBuffer(data, registry);
+  factory TaskSource.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TaskSource()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TaskSource',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TaskSource.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aE<TaskSourceKind>(2, _omitFieldNames ? '' : 'kind',
+        enumValues: TaskSourceKind.values)
+    ..aOS(3, _omitFieldNames ? '' : 'name')
+    ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'options',
+        entryClassName: 'TaskSource.OptionsEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.OS,
+        packageName: const $pb.PackageName('kumo.v1'))
+    ..aOB(5, _omitFieldNames ? '' : 'enabled')
+    ..aOS(6, _omitFieldNames ? '' : 'badge')
+    ..aOB(7, _omitFieldNames ? '' : 'needsSecret')
+    ..aOB(8, _omitFieldNames ? '' : 'hasSecret')
+    ..pc<TaskStatus>(9, _omitFieldNames ? '' : 'writable', $pb.PbFieldType.KE,
+        valueOf: TaskStatus.valueOf,
+        enumValues: TaskStatus.values,
+        defaultEnumValue: TaskStatus.TASK_STATUS_TODO)
+    ..aOB(10, _omitFieldNames ? '' : 'syncing')
+    ..a<$fixnum.Int64>(
+        11, _omitFieldNames ? '' : 'lastSyncedUnixMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(12, _omitFieldNames ? '' : 'error')
+    ..aI(13, _omitFieldNames ? '' : 'taskCount', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TaskSource clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TaskSource copyWith(void Function(TaskSource) updates) =>
+      super.copyWith((message) => updates(message as TaskSource)) as TaskSource;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TaskSource() / TaskSource.new instead')
+  static TaskSource create() => TaskSource._();
+  static $pb.GeneratedMessage $_createMessage() => TaskSource._();
+  @$core.override
+  TaskSource createEmptyInstance() => TaskSource._();
+  @$core.pragma('dart2js:noInline')
+  static TaskSource getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TaskSource>(TaskSource.$_createMessage);
+  static TaskSource? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  TaskSourceKind get kind => $_getN(1);
+  @$pb.TagNumber(2)
+  set kind(TaskSourceKind value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKind() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKind() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get name => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set name($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $pb.PbMap<$core.String, $core.String> get options => $_getMap(3);
+
+  @$pb.TagNumber(5)
+  $core.bool get enabled => $_getBF(4);
+  @$pb.TagNumber(5)
+  set enabled($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasEnabled() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearEnabled() => $_clearField(5);
+
+  /// Two-letter badge, e.g. "JI".
+  @$pb.TagNumber(6)
+  $core.String get badge => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set badge($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasBadge() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearBadge() => $_clearField(6);
+
+  /// Needs an API token, and whether one is stored (in the OS keychain).
+  @$pb.TagNumber(7)
+  $core.bool get needsSecret => $_getBF(6);
+  @$pb.TagNumber(7)
+  set needsSecret($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasNeedsSecret() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearNeedsSecret() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get hasSecret => $_getBF(7);
+  @$pb.TagNumber(8)
+  set hasSecret($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasHasSecret() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearHasSecret() => $_clearField(8);
+
+  /// Statuses Kumo can write back.
+  @$pb.TagNumber(9)
+  $pb.PbList<TaskStatus> get writable => $_getList(8);
+
+  @$pb.TagNumber(10)
+  $core.bool get syncing => $_getBF(9);
+  @$pb.TagNumber(10)
+  set syncing($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasSyncing() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearSyncing() => $_clearField(10);
+
+  /// 0: not read since it was configured or the daemon started.
+  @$pb.TagNumber(11)
+  $fixnum.Int64 get lastSyncedUnixMs => $_getI64(10);
+  @$pb.TagNumber(11)
+  set lastSyncedUnixMs($fixnum.Int64 value) => $_setInt64(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasLastSyncedUnixMs() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearLastSyncedUnixMs() => $_clearField(11);
+
+  /// Why the last read failed; its cached tasks are still shown.
+  @$pb.TagNumber(12)
+  $core.String get error => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set error($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasError() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearError() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.int get taskCount => $_getIZ(12);
+  @$pb.TagNumber(13)
+  set taskCount($core.int value) => $_setUnsignedInt32(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasTaskCount() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearTaskCount() => $_clearField(13);
+}
+
+class Task extends $pb.GeneratedMessage {
+  factory Task({
+    $core.String? id,
+    $core.String? sourceId,
+    $core.String? key,
+    $core.String? title,
+    TaskStatus? status,
+    TaskPriority? priority,
+    $core.String? due,
+    $core.String? url,
+    $core.String? context,
+    $core.Iterable<$core.String>? labels,
+    $fixnum.Int64? updatedUnixMs,
+    $core.String? suggestedBranch,
+  }) {
+    final result = Task._();
+    if (id != null) result.id = id;
+    if (sourceId != null) result.sourceId = sourceId;
+    if (key != null) result.key = key;
+    if (title != null) result.title = title;
+    if (status != null) result.status = status;
+    if (priority != null) result.priority = priority;
+    if (due != null) result.due = due;
+    if (url != null) result.url = url;
+    if (context != null) result.context = context;
+    if (labels != null) result.labels.addAll(labels);
+    if (updatedUnixMs != null) result.updatedUnixMs = updatedUnixMs;
+    if (suggestedBranch != null) result.suggestedBranch = suggestedBranch;
+    return result;
+  }
+
+  Task._();
+
+  factory Task.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Task()..mergeFromBuffer(data, registry);
+  factory Task.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Task()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Task',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: Task.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'sourceId')
+    ..aOS(3, _omitFieldNames ? '' : 'key')
+    ..aOS(4, _omitFieldNames ? '' : 'title')
+    ..aE<TaskStatus>(5, _omitFieldNames ? '' : 'status',
+        enumValues: TaskStatus.values)
+    ..aE<TaskPriority>(6, _omitFieldNames ? '' : 'priority',
+        enumValues: TaskPriority.values)
+    ..aOS(7, _omitFieldNames ? '' : 'due')
+    ..aOS(8, _omitFieldNames ? '' : 'url')
+    ..aOS(9, _omitFieldNames ? '' : 'context')
+    ..pPS(10, _omitFieldNames ? '' : 'labels')
+    ..a<$fixnum.Int64>(
+        11, _omitFieldNames ? '' : 'updatedUnixMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(12, _omitFieldNames ? '' : 'suggestedBranch')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Task clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Task copyWith(void Function(Task) updates) =>
+      super.copyWith((message) => updates(message as Task)) as Task;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Task() / Task.new instead')
+  static Task create() => Task._();
+  static $pb.GeneratedMessage $_createMessage() => Task._();
+  @$core.override
+  Task createEmptyInstance() => Task._();
+  @$core.pragma('dart2js:noInline')
+  static Task getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Task>(Task.$_createMessage);
+  static Task? _defaultInstance;
+
+  /// The source's id, a slash, and the id the task has in its source.
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get sourceId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sourceId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSourceId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSourceId() => $_clearField(2);
+
+  /// Short label: issue key (PRC-412, #18), project or note.
+  @$pb.TagNumber(3)
+  $core.String get key => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set key($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasKey() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearKey() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get title => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set title($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTitle() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTitle() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  TaskStatus get status => $_getN(4);
+  @$pb.TagNumber(5)
+  set status(TaskStatus value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStatus() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStatus() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  TaskPriority get priority => $_getN(5);
+  @$pb.TagNumber(6)
+  set priority(TaskPriority value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasPriority() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPriority() => $_clearField(6);
+
+  /// YYYY-MM-DD, or empty.
+  @$pb.TagNumber(7)
+  $core.String get due => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set due($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasDue() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearDue() => $_clearField(7);
+
+  /// Opens the task in its tool.
+  @$pb.TagNumber(8)
+  $core.String get url => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set url($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasUrl() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearUrl() => $_clearField(8);
+
+  /// Repository, project or folder.
+  @$pb.TagNumber(9)
+  $core.String get context => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set context($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasContext() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearContext() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $pb.PbList<$core.String> get labels => $_getList(9);
+
+  @$pb.TagNumber(11)
+  $fixnum.Int64 get updatedUnixMs => $_getI64(10);
+  @$pb.TagNumber(11)
+  set updatedUnixMs($fixnum.Int64 value) => $_setInt64(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasUpdatedUnixMs() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearUpdatedUnixMs() => $_clearField(11);
+
+  /// Branch to work on it, e.g. "feat/PRC-412-bulk-discounts".
+  @$pb.TagNumber(12)
+  $core.String get suggestedBranch => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set suggestedBranch($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasSuggestedBranch() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearSuggestedBranch() => $_clearField(12);
+}
+
+class SourceTasks extends $pb.GeneratedMessage {
+  factory SourceTasks({
+    $core.String? sourceId,
+    $fixnum.Int64? version,
+    $core.Iterable<Task>? tasks,
+  }) {
+    final result = SourceTasks._();
+    if (sourceId != null) result.sourceId = sourceId;
+    if (version != null) result.version = version;
+    if (tasks != null) result.tasks.addAll(tasks);
+    return result;
+  }
+
+  SourceTasks._();
+
+  factory SourceTasks.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourceTasks()..mergeFromBuffer(data, registry);
+  factory SourceTasks.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourceTasks()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SourceTasks',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SourceTasks.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'sourceId')
+    ..a<$fixnum.Int64>(2, _omitFieldNames ? '' : 'version', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..pPM<Task>(3, _omitFieldNames ? '' : 'tasks',
+        subBuilder: Task.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourceTasks clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourceTasks copyWith(void Function(SourceTasks) updates) =>
+      super.copyWith((message) => updates(message as SourceTasks))
+          as SourceTasks;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SourceTasks() / SourceTasks.new instead')
+  static SourceTasks create() => SourceTasks._();
+  static $pb.GeneratedMessage $_createMessage() => SourceTasks._();
+  @$core.override
+  SourceTasks createEmptyInstance() => SourceTasks._();
+  @$core.pragma('dart2js:noInline')
+  static SourceTasks getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SourceTasks>(
+          SourceTasks.$_createMessage);
+  static SourceTasks? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sourceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sourceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSourceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSourceId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get version => $_getI64(1);
+  @$pb.TagNumber(2)
+  set version($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasVersion() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearVersion() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<Task> get tasks => $_getList(2);
+}
+
+class TaskLink extends $pb.GeneratedMessage {
+  factory TaskLink({
+    $core.String? taskId,
+    $core.String? worktreePath,
+    $core.String? branch,
+    $fixnum.Int64? createdUnixMs,
+  }) {
+    final result = TaskLink._();
+    if (taskId != null) result.taskId = taskId;
+    if (worktreePath != null) result.worktreePath = worktreePath;
+    if (branch != null) result.branch = branch;
+    if (createdUnixMs != null) result.createdUnixMs = createdUnixMs;
+    return result;
+  }
+
+  TaskLink._();
+
+  factory TaskLink.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TaskLink()..mergeFromBuffer(data, registry);
+  factory TaskLink.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TaskLink()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TaskLink',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TaskLink.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'taskId')
+    ..aOS(2, _omitFieldNames ? '' : 'worktreePath')
+    ..aOS(3, _omitFieldNames ? '' : 'branch')
+    ..a<$fixnum.Int64>(
+        4, _omitFieldNames ? '' : 'createdUnixMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TaskLink clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TaskLink copyWith(void Function(TaskLink) updates) =>
+      super.copyWith((message) => updates(message as TaskLink)) as TaskLink;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TaskLink() / TaskLink.new instead')
+  static TaskLink create() => TaskLink._();
+  static $pb.GeneratedMessage $_createMessage() => TaskLink._();
+  @$core.override
+  TaskLink createEmptyInstance() => TaskLink._();
+  @$core.pragma('dart2js:noInline')
+  static TaskLink getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TaskLink>(TaskLink.$_createMessage);
+  static TaskLink? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get taskId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set taskId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTaskId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTaskId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get worktreePath => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set worktreePath($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasWorktreePath() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearWorktreePath() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get branch => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set branch($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBranch() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBranch() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get createdUnixMs => $_getI64(3);
+  @$pb.TagNumber(4)
+  set createdUnixMs($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCreatedUnixMs() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCreatedUnixMs() => $_clearField(4);
+}
+
+class WatchTasksRequest extends $pb.GeneratedMessage {
+  factory WatchTasksRequest() => WatchTasksRequest._();
+
+  WatchTasksRequest._();
+
+  factory WatchTasksRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WatchTasksRequest()..mergeFromBuffer(data, registry);
+  factory WatchTasksRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WatchTasksRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WatchTasksRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: WatchTasksRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchTasksRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchTasksRequest copyWith(void Function(WatchTasksRequest) updates) =>
+      super.copyWith((message) => updates(message as WatchTasksRequest))
+          as WatchTasksRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use WatchTasksRequest() / WatchTasksRequest.new instead')
+  static WatchTasksRequest create() => WatchTasksRequest._();
+  static $pb.GeneratedMessage $_createMessage() => WatchTasksRequest._();
+  @$core.override
+  WatchTasksRequest createEmptyInstance() => WatchTasksRequest._();
+  @$core.pragma('dart2js:noInline')
+  static WatchTasksRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<WatchTasksRequest>(
+          WatchTasksRequest.$_createMessage);
+  static WatchTasksRequest? _defaultInstance;
+}
+
+class TasksUpdate extends $pb.GeneratedMessage {
+  factory TasksUpdate({
+    $fixnum.Int64? version,
+    $core.Iterable<TaskSource>? sources,
+    $core.Iterable<SourceTasks>? changed,
+    $core.Iterable<TaskLink>? links,
+  }) {
+    final result = TasksUpdate._();
+    if (version != null) result.version = version;
+    if (sources != null) result.sources.addAll(sources);
+    if (changed != null) result.changed.addAll(changed);
+    if (links != null) result.links.addAll(links);
+    return result;
+  }
+
+  TasksUpdate._();
+
+  factory TasksUpdate.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TasksUpdate()..mergeFromBuffer(data, registry);
+  factory TasksUpdate.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TasksUpdate()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TasksUpdate',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TasksUpdate.$_createMessage)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'version', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..pPM<TaskSource>(2, _omitFieldNames ? '' : 'sources',
+        subBuilder: TaskSource.$_createMessage)
+    ..pPM<SourceTasks>(3, _omitFieldNames ? '' : 'changed',
+        subBuilder: SourceTasks.$_createMessage)
+    ..pPM<TaskLink>(4, _omitFieldNames ? '' : 'links',
+        subBuilder: TaskLink.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TasksUpdate clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TasksUpdate copyWith(void Function(TasksUpdate) updates) =>
+      super.copyWith((message) => updates(message as TasksUpdate))
+          as TasksUpdate;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TasksUpdate() / TasksUpdate.new instead')
+  static TasksUpdate create() => TasksUpdate._();
+  static $pb.GeneratedMessage $_createMessage() => TasksUpdate._();
+  @$core.override
+  TasksUpdate createEmptyInstance() => TasksUpdate._();
+  @$core.pragma('dart2js:noInline')
+  static TasksUpdate getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TasksUpdate>(
+          TasksUpdate.$_createMessage);
+  static TasksUpdate? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get version => $_getI64(0);
+  @$pb.TagNumber(1)
+  set version($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearVersion() => $_clearField(1);
+
+  /// Every configured source, in order. Tasks of sources not listed are gone.
+  @$pb.TagNumber(2)
+  $pb.PbList<TaskSource> get sources => $_getList(1);
+
+  /// Task lists that changed since the previous update (all of them in the
+  /// first one). Lists of other sources stay as they were.
+  @$pb.TagNumber(3)
+  $pb.PbList<SourceTasks> get changed => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $pb.PbList<TaskLink> get links => $_getList(3);
+}
+
+class DetectSourcesRequest extends $pb.GeneratedMessage {
+  factory DetectSourcesRequest() => DetectSourcesRequest._();
+
+  DetectSourcesRequest._();
+
+  factory DetectSourcesRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DetectSourcesRequest()..mergeFromBuffer(data, registry);
+  factory DetectSourcesRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DetectSourcesRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DetectSourcesRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DetectSourcesRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DetectSourcesRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DetectSourcesRequest copyWith(void Function(DetectSourcesRequest) updates) =>
+      super.copyWith((message) => updates(message as DetectSourcesRequest))
+          as DetectSourcesRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DetectSourcesRequest() / DetectSourcesRequest.new instead')
+  static DetectSourcesRequest create() => DetectSourcesRequest._();
+  static $pb.GeneratedMessage $_createMessage() => DetectSourcesRequest._();
+  @$core.override
+  DetectSourcesRequest createEmptyInstance() => DetectSourcesRequest._();
+  @$core.pragma('dart2js:noInline')
+  static DetectSourcesRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DetectSourcesRequest>(
+          DetectSourcesRequest.$_createMessage);
+  static DetectSourcesRequest? _defaultInstance;
+}
+
+class DetectedSource extends $pb.GeneratedMessage {
+  factory DetectedSource({
+    TaskSourceKind? kind,
+    $core.String? name,
+    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? options,
+  }) {
+    final result = DetectedSource._();
+    if (kind != null) result.kind = kind;
+    if (name != null) result.name = name;
+    if (options != null) result.options.addEntries(options);
+    return result;
+  }
+
+  DetectedSource._();
+
+  factory DetectedSource.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DetectedSource()..mergeFromBuffer(data, registry);
+  factory DetectedSource.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DetectedSource()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DetectedSource',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DetectedSource.$_createMessage)
+    ..aE<TaskSourceKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: TaskSourceKind.values)
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..m<$core.String, $core.String>(3, _omitFieldNames ? '' : 'options',
+        entryClassName: 'DetectedSource.OptionsEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.OS,
+        packageName: const $pb.PackageName('kumo.v1'))
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DetectedSource clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DetectedSource copyWith(void Function(DetectedSource) updates) =>
+      super.copyWith((message) => updates(message as DetectedSource))
+          as DetectedSource;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use DetectedSource() / DetectedSource.new instead')
+  static DetectedSource create() => DetectedSource._();
+  static $pb.GeneratedMessage $_createMessage() => DetectedSource._();
+  @$core.override
+  DetectedSource createEmptyInstance() => DetectedSource._();
+  @$core.pragma('dart2js:noInline')
+  static DetectedSource getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<DetectedSource>(
+          DetectedSource.$_createMessage);
+  static DetectedSource? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  TaskSourceKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(TaskSourceKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbMap<$core.String, $core.String> get options => $_getMap(2);
+}
+
+class DetectSourcesResponse extends $pb.GeneratedMessage {
+  factory DetectSourcesResponse({
+    $core.Iterable<DetectedSource>? sources,
+  }) {
+    final result = DetectSourcesResponse._();
+    if (sources != null) result.sources.addAll(sources);
+    return result;
+  }
+
+  DetectSourcesResponse._();
+
+  factory DetectSourcesResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DetectSourcesResponse()..mergeFromBuffer(data, registry);
+  factory DetectSourcesResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DetectSourcesResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DetectSourcesResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DetectSourcesResponse.$_createMessage)
+    ..pPM<DetectedSource>(1, _omitFieldNames ? '' : 'sources',
+        subBuilder: DetectedSource.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DetectSourcesResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DetectSourcesResponse copyWith(
+          void Function(DetectSourcesResponse) updates) =>
+      super.copyWith((message) => updates(message as DetectSourcesResponse))
+          as DetectSourcesResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DetectSourcesResponse() / DetectSourcesResponse.new instead')
+  static DetectSourcesResponse create() => DetectSourcesResponse._();
+  static $pb.GeneratedMessage $_createMessage() => DetectSourcesResponse._();
+  @$core.override
+  DetectSourcesResponse createEmptyInstance() => DetectSourcesResponse._();
+  @$core.pragma('dart2js:noInline')
+  static DetectSourcesResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DetectSourcesResponse>(
+          DetectSourcesResponse.$_createMessage);
+  static DetectSourcesResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<DetectedSource> get sources => $_getList(0);
+}
+
+class TestSourceRequest extends $pb.GeneratedMessage {
+  factory TestSourceRequest({
+    $core.String? id,
+    TaskSourceKind? kind,
+    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? options,
+    $core.String? secret,
+  }) {
+    final result = TestSourceRequest._();
+    if (id != null) result.id = id;
+    if (kind != null) result.kind = kind;
+    if (options != null) result.options.addEntries(options);
+    if (secret != null) result.secret = secret;
+    return result;
+  }
+
+  TestSourceRequest._();
+
+  factory TestSourceRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TestSourceRequest()..mergeFromBuffer(data, registry);
+  factory TestSourceRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TestSourceRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TestSourceRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TestSourceRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aE<TaskSourceKind>(2, _omitFieldNames ? '' : 'kind',
+        enumValues: TaskSourceKind.values)
+    ..m<$core.String, $core.String>(3, _omitFieldNames ? '' : 'options',
+        entryClassName: 'TestSourceRequest.OptionsEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.OS,
+        packageName: const $pb.PackageName('kumo.v1'))
+    ..aOS(4, _omitFieldNames ? '' : 'secret')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestSourceRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestSourceRequest copyWith(void Function(TestSourceRequest) updates) =>
+      super.copyWith((message) => updates(message as TestSourceRequest))
+          as TestSourceRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TestSourceRequest() / TestSourceRequest.new instead')
+  static TestSourceRequest create() => TestSourceRequest._();
+  static $pb.GeneratedMessage $_createMessage() => TestSourceRequest._();
+  @$core.override
+  TestSourceRequest createEmptyInstance() => TestSourceRequest._();
+  @$core.pragma('dart2js:noInline')
+  static TestSourceRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TestSourceRequest>(
+          TestSourceRequest.$_createMessage);
+  static TestSourceRequest? _defaultInstance;
+
+  /// Set to test with the token stored for that source.
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  TaskSourceKind get kind => $_getN(1);
+  @$pb.TagNumber(2)
+  set kind(TaskSourceKind value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKind() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKind() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbMap<$core.String, $core.String> get options => $_getMap(2);
+
+  /// A new token; empty uses the stored one.
+  @$pb.TagNumber(4)
+  $core.String get secret => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set secret($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSecret() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSecret() => $_clearField(4);
+}
+
+class TestSourceResponse extends $pb.GeneratedMessage {
+  factory TestSourceResponse({
+    $core.String? message,
+  }) {
+    final result = TestSourceResponse._();
+    if (message != null) result.message = message;
+    return result;
+  }
+
+  TestSourceResponse._();
+
+  factory TestSourceResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TestSourceResponse()..mergeFromBuffer(data, registry);
+  factory TestSourceResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TestSourceResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TestSourceResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TestSourceResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'message')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestSourceResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestSourceResponse copyWith(void Function(TestSourceResponse) updates) =>
+      super.copyWith((message) => updates(message as TestSourceResponse))
+          as TestSourceResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TestSourceResponse() / TestSourceResponse.new instead')
+  static TestSourceResponse create() => TestSourceResponse._();
+  static $pb.GeneratedMessage $_createMessage() => TestSourceResponse._();
+  @$core.override
+  TestSourceResponse createEmptyInstance() => TestSourceResponse._();
+  @$core.pragma('dart2js:noInline')
+  static TestSourceResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TestSourceResponse>(
+          TestSourceResponse.$_createMessage);
+  static TestSourceResponse? _defaultInstance;
+
+  /// E.g. "signed in as Ana", "12 open tasks, 40 in total".
+  @$pb.TagNumber(1)
+  $core.String get message => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set message($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMessage() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMessage() => $_clearField(1);
+}
+
+class SaveSourceRequest extends $pb.GeneratedMessage {
+  factory SaveSourceRequest({
+    $core.String? id,
+    TaskSourceKind? kind,
+    $core.String? name,
+    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? options,
+    $core.bool? enabled,
+    $core.String? secret,
+  }) {
+    final result = SaveSourceRequest._();
+    if (id != null) result.id = id;
+    if (kind != null) result.kind = kind;
+    if (name != null) result.name = name;
+    if (options != null) result.options.addEntries(options);
+    if (enabled != null) result.enabled = enabled;
+    if (secret != null) result.secret = secret;
+    return result;
+  }
+
+  SaveSourceRequest._();
+
+  factory SaveSourceRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SaveSourceRequest()..mergeFromBuffer(data, registry);
+  factory SaveSourceRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SaveSourceRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SaveSourceRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SaveSourceRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aE<TaskSourceKind>(2, _omitFieldNames ? '' : 'kind',
+        enumValues: TaskSourceKind.values)
+    ..aOS(3, _omitFieldNames ? '' : 'name')
+    ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'options',
+        entryClassName: 'SaveSourceRequest.OptionsEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.OS,
+        packageName: const $pb.PackageName('kumo.v1'))
+    ..aOB(5, _omitFieldNames ? '' : 'enabled')
+    ..aOS(6, _omitFieldNames ? '' : 'secret')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SaveSourceRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SaveSourceRequest copyWith(void Function(SaveSourceRequest) updates) =>
+      super.copyWith((message) => updates(message as SaveSourceRequest))
+          as SaveSourceRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SaveSourceRequest() / SaveSourceRequest.new instead')
+  static SaveSourceRequest create() => SaveSourceRequest._();
+  static $pb.GeneratedMessage $_createMessage() => SaveSourceRequest._();
+  @$core.override
+  SaveSourceRequest createEmptyInstance() => SaveSourceRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SaveSourceRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SaveSourceRequest>(
+          SaveSourceRequest.$_createMessage);
+  static SaveSourceRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  TaskSourceKind get kind => $_getN(1);
+  @$pb.TagNumber(2)
+  set kind(TaskSourceKind value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKind() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKind() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get name => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set name($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $pb.PbMap<$core.String, $core.String> get options => $_getMap(3);
+
+  @$pb.TagNumber(5)
+  $core.bool get enabled => $_getBF(4);
+  @$pb.TagNumber(5)
+  set enabled($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasEnabled() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearEnabled() => $_clearField(5);
+
+  /// A new token; empty keeps the stored one.
+  @$pb.TagNumber(6)
+  $core.String get secret => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set secret($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasSecret() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearSecret() => $_clearField(6);
+}
+
+class DeleteSourceRequest extends $pb.GeneratedMessage {
+  factory DeleteSourceRequest({
+    $core.String? id,
+  }) {
+    final result = DeleteSourceRequest._();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  DeleteSourceRequest._();
+
+  factory DeleteSourceRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteSourceRequest()..mergeFromBuffer(data, registry);
+  factory DeleteSourceRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteSourceRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteSourceRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DeleteSourceRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteSourceRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteSourceRequest copyWith(void Function(DeleteSourceRequest) updates) =>
+      super.copyWith((message) => updates(message as DeleteSourceRequest))
+          as DeleteSourceRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use DeleteSourceRequest() / DeleteSourceRequest.new instead')
+  static DeleteSourceRequest create() => DeleteSourceRequest._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteSourceRequest._();
+  @$core.override
+  DeleteSourceRequest createEmptyInstance() => DeleteSourceRequest._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteSourceRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteSourceRequest>(
+          DeleteSourceRequest.$_createMessage);
+  static DeleteSourceRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+}
+
+class DeleteSourceResponse extends $pb.GeneratedMessage {
+  factory DeleteSourceResponse() => DeleteSourceResponse._();
+
+  DeleteSourceResponse._();
+
+  factory DeleteSourceResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteSourceResponse()..mergeFromBuffer(data, registry);
+  factory DeleteSourceResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteSourceResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteSourceResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DeleteSourceResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteSourceResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteSourceResponse copyWith(void Function(DeleteSourceResponse) updates) =>
+      super.copyWith((message) => updates(message as DeleteSourceResponse))
+          as DeleteSourceResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DeleteSourceResponse() / DeleteSourceResponse.new instead')
+  static DeleteSourceResponse create() => DeleteSourceResponse._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteSourceResponse._();
+  @$core.override
+  DeleteSourceResponse createEmptyInstance() => DeleteSourceResponse._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteSourceResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteSourceResponse>(
+          DeleteSourceResponse.$_createMessage);
+  static DeleteSourceResponse? _defaultInstance;
+}
+
+class SyncTasksRequest extends $pb.GeneratedMessage {
+  factory SyncTasksRequest({
+    $core.String? sourceId,
+  }) {
+    final result = SyncTasksRequest._();
+    if (sourceId != null) result.sourceId = sourceId;
+    return result;
+  }
+
+  SyncTasksRequest._();
+
+  factory SyncTasksRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SyncTasksRequest()..mergeFromBuffer(data, registry);
+  factory SyncTasksRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SyncTasksRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SyncTasksRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SyncTasksRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'sourceId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SyncTasksRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SyncTasksRequest copyWith(void Function(SyncTasksRequest) updates) =>
+      super.copyWith((message) => updates(message as SyncTasksRequest))
+          as SyncTasksRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SyncTasksRequest() / SyncTasksRequest.new instead')
+  static SyncTasksRequest create() => SyncTasksRequest._();
+  static $pb.GeneratedMessage $_createMessage() => SyncTasksRequest._();
+  @$core.override
+  SyncTasksRequest createEmptyInstance() => SyncTasksRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SyncTasksRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SyncTasksRequest>(
+          SyncTasksRequest.$_createMessage);
+  static SyncTasksRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sourceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sourceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSourceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSourceId() => $_clearField(1);
+}
+
+class SyncTasksResponse extends $pb.GeneratedMessage {
+  factory SyncTasksResponse() => SyncTasksResponse._();
+
+  SyncTasksResponse._();
+
+  factory SyncTasksResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SyncTasksResponse()..mergeFromBuffer(data, registry);
+  factory SyncTasksResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SyncTasksResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SyncTasksResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SyncTasksResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SyncTasksResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SyncTasksResponse copyWith(void Function(SyncTasksResponse) updates) =>
+      super.copyWith((message) => updates(message as SyncTasksResponse))
+          as SyncTasksResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SyncTasksResponse() / SyncTasksResponse.new instead')
+  static SyncTasksResponse create() => SyncTasksResponse._();
+  static $pb.GeneratedMessage $_createMessage() => SyncTasksResponse._();
+  @$core.override
+  SyncTasksResponse createEmptyInstance() => SyncTasksResponse._();
+  @$core.pragma('dart2js:noInline')
+  static SyncTasksResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SyncTasksResponse>(
+          SyncTasksResponse.$_createMessage);
+  static SyncTasksResponse? _defaultInstance;
+}
+
+class SetTaskStatusRequest extends $pb.GeneratedMessage {
+  factory SetTaskStatusRequest({
+    $core.String? taskId,
+    TaskStatus? status,
+  }) {
+    final result = SetTaskStatusRequest._();
+    if (taskId != null) result.taskId = taskId;
+    if (status != null) result.status = status;
+    return result;
+  }
+
+  SetTaskStatusRequest._();
+
+  factory SetTaskStatusRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetTaskStatusRequest()..mergeFromBuffer(data, registry);
+  factory SetTaskStatusRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetTaskStatusRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetTaskStatusRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SetTaskStatusRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'taskId')
+    ..aE<TaskStatus>(2, _omitFieldNames ? '' : 'status',
+        enumValues: TaskStatus.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetTaskStatusRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetTaskStatusRequest copyWith(void Function(SetTaskStatusRequest) updates) =>
+      super.copyWith((message) => updates(message as SetTaskStatusRequest))
+          as SetTaskStatusRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SetTaskStatusRequest() / SetTaskStatusRequest.new instead')
+  static SetTaskStatusRequest create() => SetTaskStatusRequest._();
+  static $pb.GeneratedMessage $_createMessage() => SetTaskStatusRequest._();
+  @$core.override
+  SetTaskStatusRequest createEmptyInstance() => SetTaskStatusRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SetTaskStatusRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SetTaskStatusRequest>(
+          SetTaskStatusRequest.$_createMessage);
+  static SetTaskStatusRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get taskId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set taskId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTaskId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTaskId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  TaskStatus get status => $_getN(1);
+  @$pb.TagNumber(2)
+  set status(TaskStatus value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasStatus() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStatus() => $_clearField(2);
+}
+
+class LinkTaskRequest extends $pb.GeneratedMessage {
+  factory LinkTaskRequest({
+    $core.String? taskId,
+    $core.String? worktreePath,
+    $core.String? branch,
+  }) {
+    final result = LinkTaskRequest._();
+    if (taskId != null) result.taskId = taskId;
+    if (worktreePath != null) result.worktreePath = worktreePath;
+    if (branch != null) result.branch = branch;
+    return result;
+  }
+
+  LinkTaskRequest._();
+
+  factory LinkTaskRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LinkTaskRequest()..mergeFromBuffer(data, registry);
+  factory LinkTaskRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LinkTaskRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LinkTaskRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: LinkTaskRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'taskId')
+    ..aOS(2, _omitFieldNames ? '' : 'worktreePath')
+    ..aOS(3, _omitFieldNames ? '' : 'branch')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LinkTaskRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LinkTaskRequest copyWith(void Function(LinkTaskRequest) updates) =>
+      super.copyWith((message) => updates(message as LinkTaskRequest))
+          as LinkTaskRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use LinkTaskRequest() / LinkTaskRequest.new instead')
+  static LinkTaskRequest create() => LinkTaskRequest._();
+  static $pb.GeneratedMessage $_createMessage() => LinkTaskRequest._();
+  @$core.override
+  LinkTaskRequest createEmptyInstance() => LinkTaskRequest._();
+  @$core.pragma('dart2js:noInline')
+  static LinkTaskRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<LinkTaskRequest>(
+          LinkTaskRequest.$_createMessage);
+  static LinkTaskRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get taskId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set taskId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTaskId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTaskId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get worktreePath => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set worktreePath($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasWorktreePath() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearWorktreePath() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get branch => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set branch($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBranch() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBranch() => $_clearField(3);
+}
+
+class UnlinkTaskRequest extends $pb.GeneratedMessage {
+  factory UnlinkTaskRequest({
+    $core.String? taskId,
+    $core.String? worktreePath,
+  }) {
+    final result = UnlinkTaskRequest._();
+    if (taskId != null) result.taskId = taskId;
+    if (worktreePath != null) result.worktreePath = worktreePath;
+    return result;
+  }
+
+  UnlinkTaskRequest._();
+
+  factory UnlinkTaskRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnlinkTaskRequest()..mergeFromBuffer(data, registry);
+  factory UnlinkTaskRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnlinkTaskRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnlinkTaskRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: UnlinkTaskRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'taskId')
+    ..aOS(2, _omitFieldNames ? '' : 'worktreePath')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnlinkTaskRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnlinkTaskRequest copyWith(void Function(UnlinkTaskRequest) updates) =>
+      super.copyWith((message) => updates(message as UnlinkTaskRequest))
+          as UnlinkTaskRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use UnlinkTaskRequest() / UnlinkTaskRequest.new instead')
+  static UnlinkTaskRequest create() => UnlinkTaskRequest._();
+  static $pb.GeneratedMessage $_createMessage() => UnlinkTaskRequest._();
+  @$core.override
+  UnlinkTaskRequest createEmptyInstance() => UnlinkTaskRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UnlinkTaskRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<UnlinkTaskRequest>(
+          UnlinkTaskRequest.$_createMessage);
+  static UnlinkTaskRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get taskId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set taskId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTaskId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTaskId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get worktreePath => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set worktreePath($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasWorktreePath() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearWorktreePath() => $_clearField(2);
+}
+
+class UnlinkTaskResponse extends $pb.GeneratedMessage {
+  factory UnlinkTaskResponse() => UnlinkTaskResponse._();
+
+  UnlinkTaskResponse._();
+
+  factory UnlinkTaskResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnlinkTaskResponse()..mergeFromBuffer(data, registry);
+  factory UnlinkTaskResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UnlinkTaskResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnlinkTaskResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: UnlinkTaskResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnlinkTaskResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnlinkTaskResponse copyWith(void Function(UnlinkTaskResponse) updates) =>
+      super.copyWith((message) => updates(message as UnlinkTaskResponse))
+          as UnlinkTaskResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use UnlinkTaskResponse() / UnlinkTaskResponse.new instead')
+  static UnlinkTaskResponse create() => UnlinkTaskResponse._();
+  static $pb.GeneratedMessage $_createMessage() => UnlinkTaskResponse._();
+  @$core.override
+  UnlinkTaskResponse createEmptyInstance() => UnlinkTaskResponse._();
+  @$core.pragma('dart2js:noInline')
+  static UnlinkTaskResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnlinkTaskResponse>(
+          UnlinkTaskResponse.$_createMessage);
+  static UnlinkTaskResponse? _defaultInstance;
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

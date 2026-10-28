@@ -592,3 +592,196 @@ message AgentsSnapshot {
   uint64 version = 1;
   repeated AgentSession sessions = 2;
 }
+
+// ---------------------------------------------------------------------------
+// Tasks
+// ---------------------------------------------------------------------------
+
+// Tasks from the tools the user already works with. The board is served
+// from a local cache and pushed whenever a source's tasks change; sources
+// are re-read in the background (on file changes for local ones, on an
+// interval for APIs). Nothing here waits on the network except Test,
+// SetStatus and Detect.
+service Tasks {
+  // The board now, then again whenever it changes (last wins). Each update
+  // carries every source but only the task lists that changed.
+  rpc Watch(WatchTasksRequest) returns (stream TasksUpdate);
+  // Sources found on this machine that aren't configured yet (Obsidian
+  // vaults, Bear, a signed-in `gh`).
+  rpc Detect(DetectSourcesRequest) returns (DetectSourcesResponse);
+  // Checks options and credentials without saving them.
+  rpc TestSource(TestSourceRequest) returns (TestSourceResponse);
+  // Creates (empty id) or updates a source.
+  rpc SaveSource(SaveSourceRequest) returns (TaskSource);
+  // Forgets a source, its cached tasks, links and stored token.
+  rpc DeleteSource(DeleteSourceRequest) returns (DeleteSourceResponse);
+  // Reads a source (empty id: all) now.
+  rpc Sync(SyncTasksRequest) returns (SyncTasksResponse);
+  // Writes the status back to the source (only `writable` ones).
+  rpc SetStatus(SetTaskStatusRequest) returns (Task);
+  // Records that a task is being worked on in a worktree.
+  rpc Link(LinkTaskRequest) returns (TaskLink);
+  rpc Unlink(UnlinkTaskRequest) returns (UnlinkTaskResponse);
+}
+
+enum TaskSourceKind {
+  TASK_SOURCE_KIND_UNSPECIFIED = 0;
+  // Options: vault (folder).
+  TASK_SOURCE_KIND_OBSIDIAN = 1;
+  // Options: database (optional path to Bear's database).
+  TASK_SOURCE_KIND_BEAR = 2;
+  // Options: query (GitHub search syntax). Signs in through `gh`.
+  TASK_SOURCE_KIND_GITHUB = 3;
+  // Options: site, email, jql. Secret: API token.
+  TASK_SOURCE_KIND_JIRA = 4;
+  // Options: project (optional). Secret: API token.
+  TASK_SOURCE_KIND_TODOIST = 5;
+}
+
+enum TaskStatus {
+  TASK_STATUS_TODO = 0;
+  TASK_STATUS_DOING = 1;
+  TASK_STATUS_REVIEW = 2;
+  TASK_STATUS_DONE = 3;
+}
+
+enum TaskPriority {
+  TASK_PRIORITY_NONE = 0;
+  TASK_PRIORITY_LOW = 1;
+  TASK_PRIORITY_MEDIUM = 2;
+  TASK_PRIORITY_HIGH = 3;
+  TASK_PRIORITY_URGENT = 4;
+}
+
+message TaskSource {
+  string id = 1;
+  TaskSourceKind kind = 2;
+  string name = 3;
+  map<string, string> options = 4;
+  bool enabled = 5;
+  // Two-letter badge, e.g. "JI".
+  string badge = 6;
+  // Needs an API token, and whether one is stored (in the OS keychain).
+  bool needs_secret = 7;
+  bool has_secret = 8;
+  // Statuses Kumo can write back.
+  repeated TaskStatus writable = 9;
+  bool syncing = 10;
+  // 0: not read since it was configured or the daemon started.
+  uint64 last_synced_unix_ms = 11;
+  // Why the last read failed; its cached tasks are still shown.
+  string error = 12;
+  uint32 task_count = 13;
+}
+
+message Task {
+  // The source's id, a slash, and the id the task has in its source.
+  string id = 1;
+  string source_id = 2;
+  // Short label: issue key (PRC-412, #18), project or note.
+  string key = 3;
+  string title = 4;
+  TaskStatus status = 5;
+  TaskPriority priority = 6;
+  // YYYY-MM-DD, or empty.
+  string due = 7;
+  // Opens the task in its tool.
+  string url = 8;
+  // Repository, project or folder.
+  string context = 9;
+  repeated string labels = 10;
+  uint64 updated_unix_ms = 11;
+  // Branch to work on it, e.g. "feat/PRC-412-bulk-discounts".
+  string suggested_branch = 12;
+}
+
+message SourceTasks {
+  string source_id = 1;
+  uint64 version = 2;
+  repeated Task tasks = 3;
+}
+
+message TaskLink {
+  string task_id = 1;
+  string worktree_path = 2;
+  string branch = 3;
+  uint64 created_unix_ms = 4;
+}
+
+message WatchTasksRequest {}
+
+message TasksUpdate {
+  uint64 version = 1;
+  // Every configured source, in order. Tasks of sources not listed are gone.
+  repeated TaskSource sources = 2;
+  // Task lists that changed since the previous update (all of them in the
+  // first one). Lists of other sources stay as they were.
+  repeated SourceTasks changed = 3;
+  repeated TaskLink links = 4;
+}
+
+message DetectSourcesRequest {}
+
+message DetectedSource {
+  TaskSourceKind kind = 1;
+  string name = 2;
+  map<string, string> options = 3;
+}
+
+message DetectSourcesResponse {
+  repeated DetectedSource sources = 1;
+}
+
+message TestSourceRequest {
+  // Set to test with the token stored for that source.
+  string id = 1;
+  TaskSourceKind kind = 2;
+  map<string, string> options = 3;
+  // A new token; empty uses the stored one.
+  string secret = 4;
+}
+
+message TestSourceResponse {
+  // E.g. "signed in as Ana", "12 open tasks, 40 in total".
+  string message = 1;
+}
+
+message SaveSourceRequest {
+  string id = 1;
+  TaskSourceKind kind = 2;
+  string name = 3;
+  map<string, string> options = 4;
+  bool enabled = 5;
+  // A new token; empty keeps the stored one.
+  string secret = 6;
+}
+
+message DeleteSourceRequest {
+  string id = 1;
+}
+
+message DeleteSourceResponse {}
+
+message SyncTasksRequest {
+  string source_id = 1;
+}
+
+message SyncTasksResponse {}
+
+message SetTaskStatusRequest {
+  string task_id = 1;
+  TaskStatus status = 2;
+}
+
+message LinkTaskRequest {
+  string task_id = 1;
+  string worktree_path = 2;
+  string branch = 3;
+}
+
+message UnlinkTaskRequest {
+  string task_id = 1;
+  string worktree_path = 2;
+}
+
+message UnlinkTaskResponse {}
