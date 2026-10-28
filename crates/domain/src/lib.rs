@@ -5,7 +5,9 @@
 //!
 //! - [`terminal`]: PTY-backed terminal sessions, their output and lifecycle.
 //! - [`daemon`]: daemon identity, security and discovery rules.
+//! - [`workspace`]: namespaces, git repositories and their worktrees.
 
 pub mod daemon;
 pub mod terminal;
 pub mod time;
+pub mod workspace;

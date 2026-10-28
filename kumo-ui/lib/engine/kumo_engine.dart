@@ -16,13 +16,15 @@ enum EngineStatus { connecting, ready, failed }
 class EngineConnection {
   EngineConnection._(this.channel, this.endpoint, this.serverVersion, CallOptions auth)
       : core = CoreClient(channel, options: auth),
-        terminals = TerminalsClient(channel, options: auth);
+        terminals = TerminalsClient(channel, options: auth),
+        workspace = WorkspaceClient(channel, options: auth);
 
   final ClientChannel channel;
   final DaemonEndpoint endpoint;
   final String serverVersion;
   final CoreClient core;
   final TerminalsClient terminals;
+  final WorkspaceClient workspace;
 }
 
 /// Discovers or launches the daemon, handshakes and hands out the

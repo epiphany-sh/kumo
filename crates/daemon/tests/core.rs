@@ -33,10 +33,7 @@ async fn invalid_token_is_rejected() {
 #[tokio::test(flavor = "multi_thread")]
 async fn second_instance_refuses_to_start() {
     let data_dir = tempfile::tempdir().unwrap();
-    let config = kumod::DaemonConfig {
-        data_dir: Some(data_dir.path().into()),
-        ..Default::default()
-    };
+    let config = common::test_config(data_dir.path());
     let first = kumod::Daemon::start(config.clone()).await.unwrap();
     let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
     let running = tokio::spawn(first.run(async {

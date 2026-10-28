@@ -17,6 +17,7 @@ class Worktree {
     this.changes = '',
     this.unpushed = 0,
     this.everPushed = true,
+    this.principal,
   });
   final String branch;
   final String note;
@@ -31,6 +32,11 @@ class Worktree {
 
   /// False when the branch only exists locally (no remote, so no pipelines).
   final bool everPushed;
+
+  /// The repository's main checkout (not a `git worktree`). Mocks leave it
+  /// unset and use the branch name.
+  final bool? principal;
+  bool get isMain => principal ?? branch == 'main';
 }
 
 enum CheckState { ok, running, waiting }
@@ -46,8 +52,14 @@ class PipelineRun {
 }
 
 class Repo {
-  const Repo({required this.name, required this.host, required this.worktrees});
+  const Repo({required this.name, required this.host, required this.worktrees, this.path});
   final String name;
+
+  /// Absolute path of the main checkout (daemon data). Mocks have none.
+  final String? path;
+
+  /// Identity: the path when known, else the name (mocks).
+  String get id => path ?? name;
 
   /// GH / GL / BB
   final String host;

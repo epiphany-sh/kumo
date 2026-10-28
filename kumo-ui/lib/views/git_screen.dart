@@ -32,8 +32,15 @@ class _GitScreenState extends State<GitScreen> {
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final c = context.c;
-    final repo = Mock.repoOf(s.activeWorktree);
-    final wt = repo.worktrees.firstWhere((w) => w.branch == s.activeWorktree, orElse: () => repo.worktrees.first);
+    final repo = s.activeRepo;
+    final wt = s.activeWorktreeEntry ?? repo?.worktrees.firstOrNull;
+    if (repo == null || wt == null) {
+      return ScreenFrame(
+        toolbar: const ScreenToolbar(breadcrumb: Breadcrumb(icon: KIcons.branch, parts: ['Git'])),
+        body: Center(child: Text('Add a repository to a namespace to see its worktrees here.', style: sans(12.5, color: c.text3))),
+        status: const [],
+      );
+    }
     final prs = Mock.prs.where((p) => p.repo == repo.name).toList();
     final open = prs.where((p) => p.state != PrState.merged).length;
 
@@ -94,7 +101,7 @@ class _WorktreeTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final s = AppScope.of(context);
-    final rows = [for (final r in Mock.repos) ...s.worktreesOf(r)];
+    final rows = [for (final r in s.workspace.repos) ...s.worktreesOf(r)];
     TextStyle head() => sans(11, weight: FontWeight.w500, color: c.text3);
     Widget cell(Widget child) => Padding(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8), child: child);
     String syncOf(Worktree w) {
@@ -128,15 +135,15 @@ class _WorktreeTable extends StatelessWidget {
                   for (final w in rows)
                     TableRow(
                       decoration: BoxDecoration(
-                        color: s.activeWorktree == w.branch ? c.accSoft : null,
+                        color: s.isActiveWorktree(w) ? c.accSoft : null,
                         border: Border(bottom: BorderSide(color: c.divider)),
                       ),
                       children: [
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                           child: KPressable(
-                            onTap: () => s.selectWorktree(w.branch),
-                            selected: s.activeWorktree == w.branch,
+                            onTap: () => s.selectWorktree(w.branch, path: w.path),
+                            selected: s.isActiveWorktree(w),
                             semanticLabel: 'Make ${w.path} the current worktree',
                             tooltip: 'Make this the current worktree',
                             builder: (context, hover, focus) => Container(
@@ -165,7 +172,7 @@ class _WorktreeTable extends StatelessWidget {
                             label: 'Open terminal in ${w.branch}',
                             filled: true,
                             onTap: () {
-                              s.selectWorktree(w.branch);
+                              s.selectWorktree(w.branch, path: w.path);
                               s.view = KumoView.terminal;
                             },
                           ),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
-import '../data/mock_data.dart';
 import '../data/models.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
@@ -58,7 +57,14 @@ class _NamespaceDialogState extends State<NamespaceDialog> {
   void initState() {
     super.initState();
     _filter.addListener(() => setState(() {}));
+    // Look for repositories on disk while the dialog opens.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) AppScope.read(context).workspace.discover();
+    });
   }
+
+  /// Repositories that can go in a namespace (from the daemon or the mocks).
+  List<RepoCandidate> get _candidates => AppScope.read(context).workspace.candidates;
 
   @override
   void dispose() {
@@ -69,7 +75,7 @@ class _NamespaceDialogState extends State<NamespaceDialog> {
 
   void _save() {
     final s = AppScope.read(context);
-    final repos = [for (final cand in Mock.candidates) if (_checked.contains(cand.name)) cand.name];
+    final repos = [for (final cand in _candidates) if (_checked.contains(cand.repo.id)) cand.repo.id];
     final id = widget.edit?.id ?? _createdId;
     if (id == null) {
       _createdId = s.createNamespace(_name.text, repos);
@@ -85,7 +91,7 @@ class _NamespaceDialogState extends State<NamespaceDialog> {
   String? _tagFor(RepoCandidate cand, List<Namespace> all) {
     final others = [
       for (final n in all)
-        if (n.id != (widget.edit?.id ?? _createdId) && n.repos.contains(cand.name)) n.name,
+        if (n.id != (widget.edit?.id ?? _createdId) && n.repos.contains(cand.repo.id)) n.name,
     ];
     return others.isEmpty ? null : 'in ${others.join(', ')}';
   }
@@ -145,12 +151,12 @@ class _NamespaceDialogState extends State<NamespaceDialog> {
   List<Widget> _form(AppState s) {
     final p = context.c;
     final q = _filter.text.trim().toLowerCase();
-    int count(String h) => Mock.candidates.where((r) => h == 'all' || r.host == h).length;
+    int count(String h) => _candidates.where((r) => h == 'all' || r.host == h).length;
     final rows = [
-      for (final cand in Mock.candidates)
+      for (final cand in _candidates)
         if ((_src == 'all' || cand.host == _src) && (q.isEmpty || cand.fullName.toLowerCase().contains(q) || cand.meta.toLowerCase().contains(q))) cand,
     ];
-    final picked = [for (final cand in Mock.candidates) if (_checked.contains(cand.name)) cand];
+    final picked = [for (final cand in _candidates) if (_checked.contains(cand.repo.id)) cand];
     final toClone = picked.where((r) => !r.cloned).length;
     return [
       Wrap(spacing: 10, runSpacing: 10, children: [
@@ -243,10 +249,10 @@ class _NamespaceDialogState extends State<NamespaceDialog> {
 
   Widget _row(RepoCandidate cand, AppState s) {
     final c = context.c;
-    final on = _checked.contains(cand.name);
+    final on = _checked.contains(cand.repo.id);
     final tag = _tagFor(cand, s.namespaces);
     return KPressable(
-      onTap: () => setState(() => on ? _checked.remove(cand.name) : _checked.add(cand.name)),
+      onTap: () => setState(() => on ? _checked.remove(cand.repo.id) : _checked.add(cand.repo.id)),
       semanticLabel: '${cand.fullName}, ${on ? 'selected' : 'not selected'}',
       selected: on,
       builder: (context, hover, focus) => Container(
@@ -285,7 +291,7 @@ class _NamespaceDialogState extends State<NamespaceDialog> {
 
   List<Widget> _done() {
     final p = context.c;
-    final picked = [for (final cand in Mock.candidates) if (_checked.contains(cand.name)) cand];
+    final picked = [for (final cand in _candidates) if (_checked.contains(cand.repo.id)) cand];
     final toClone = picked.where((r) => !r.cloned).length;
     final name = _name.text.trim().isEmpty ? 'untitled' : _name.text.trim();
     final n = picked.length;

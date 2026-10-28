@@ -5,6 +5,8 @@
 //!
 //! - [`terminal`]: open, attach to, drive and close terminal sessions.
 //! - [`daemon`]: daemon-level use cases (handshake).
+//! - [`workspace`]: namespaces, repositories and worktrees.
 
 pub mod daemon;
 pub mod terminal;
+pub mod workspace;

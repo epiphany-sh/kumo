@@ -15,7 +15,11 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'kumo.pbenum.dart';
+
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+
+export 'kumo.pbenum.dart';
 
 class HelloRequest extends $pb.GeneratedMessage {
   factory HelloRequest({
@@ -1112,6 +1116,1542 @@ class TerminalInfo extends $pb.GeneratedMessage {
   $core.bool hasExitCode() => $_has(3);
   @$pb.TagNumber(4)
   void clearExitCode() => $_clearField(4);
+}
+
+class WatchWorkspaceRequest extends $pb.GeneratedMessage {
+  factory WatchWorkspaceRequest() => WatchWorkspaceRequest._();
+
+  WatchWorkspaceRequest._();
+
+  factory WatchWorkspaceRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WatchWorkspaceRequest()..mergeFromBuffer(data, registry);
+  factory WatchWorkspaceRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WatchWorkspaceRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WatchWorkspaceRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: WatchWorkspaceRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchWorkspaceRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchWorkspaceRequest copyWith(
+          void Function(WatchWorkspaceRequest) updates) =>
+      super.copyWith((message) => updates(message as WatchWorkspaceRequest))
+          as WatchWorkspaceRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use WatchWorkspaceRequest() / WatchWorkspaceRequest.new instead')
+  static WatchWorkspaceRequest create() => WatchWorkspaceRequest._();
+  static $pb.GeneratedMessage $_createMessage() => WatchWorkspaceRequest._();
+  @$core.override
+  WatchWorkspaceRequest createEmptyInstance() => WatchWorkspaceRequest._();
+  @$core.pragma('dart2js:noInline')
+  static WatchWorkspaceRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<WatchWorkspaceRequest>(
+          WatchWorkspaceRequest.$_createMessage);
+  static WatchWorkspaceRequest? _defaultInstance;
+}
+
+class WorkspaceSnapshot extends $pb.GeneratedMessage {
+  factory WorkspaceSnapshot({
+    $fixnum.Int64? version,
+    $core.Iterable<Namespace>? namespaces,
+    $core.Iterable<Repository>? repositories,
+  }) {
+    final result = WorkspaceSnapshot._();
+    if (version != null) result.version = version;
+    if (namespaces != null) result.namespaces.addAll(namespaces);
+    if (repositories != null) result.repositories.addAll(repositories);
+    return result;
+  }
+
+  WorkspaceSnapshot._();
+
+  factory WorkspaceSnapshot.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WorkspaceSnapshot()..mergeFromBuffer(data, registry);
+  factory WorkspaceSnapshot.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WorkspaceSnapshot()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WorkspaceSnapshot',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: WorkspaceSnapshot.$_createMessage)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'version', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..pPM<Namespace>(2, _omitFieldNames ? '' : 'namespaces',
+        subBuilder: Namespace.$_createMessage)
+    ..pPM<Repository>(3, _omitFieldNames ? '' : 'repositories',
+        subBuilder: Repository.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WorkspaceSnapshot clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WorkspaceSnapshot copyWith(void Function(WorkspaceSnapshot) updates) =>
+      super.copyWith((message) => updates(message as WorkspaceSnapshot))
+          as WorkspaceSnapshot;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use WorkspaceSnapshot() / WorkspaceSnapshot.new instead')
+  static WorkspaceSnapshot create() => WorkspaceSnapshot._();
+  static $pb.GeneratedMessage $_createMessage() => WorkspaceSnapshot._();
+  @$core.override
+  WorkspaceSnapshot createEmptyInstance() => WorkspaceSnapshot._();
+  @$core.pragma('dart2js:noInline')
+  static WorkspaceSnapshot getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<WorkspaceSnapshot>(
+          WorkspaceSnapshot.$_createMessage);
+  static WorkspaceSnapshot? _defaultInstance;
+
+  /// Increases with every change.
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get version => $_getI64(0);
+  @$pb.TagNumber(1)
+  set version($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<Namespace> get namespaces => $_getList(1);
+
+  /// Every repository referenced by a namespace.
+  @$pb.TagNumber(3)
+  $pb.PbList<Repository> get repositories => $_getList(2);
+}
+
+class Namespace extends $pb.GeneratedMessage {
+  factory Namespace({
+    $core.String? id,
+    $core.String? name,
+    $core.Iterable<$core.String>? repoPaths,
+    $core.bool? collapsed,
+  }) {
+    final result = Namespace._();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (repoPaths != null) result.repoPaths.addAll(repoPaths);
+    if (collapsed != null) result.collapsed = collapsed;
+    return result;
+  }
+
+  Namespace._();
+
+  factory Namespace.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Namespace()..mergeFromBuffer(data, registry);
+  factory Namespace.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Namespace()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Namespace',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: Namespace.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..pPS(3, _omitFieldNames ? '' : 'repoPaths')
+    ..aOB(4, _omitFieldNames ? '' : 'collapsed')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Namespace clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Namespace copyWith(void Function(Namespace) updates) =>
+      super.copyWith((message) => updates(message as Namespace)) as Namespace;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Namespace() / Namespace.new instead')
+  static Namespace create() => Namespace._();
+  static $pb.GeneratedMessage $_createMessage() => Namespace._();
+  @$core.override
+  Namespace createEmptyInstance() => Namespace._();
+  @$core.pragma('dart2js:noInline')
+  static Namespace getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Namespace>(Namespace.$_createMessage);
+  static Namespace? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  /// Repository paths, in sidebar order.
+  @$pb.TagNumber(3)
+  $pb.PbList<$core.String> get repoPaths => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $core.bool get collapsed => $_getBF(3);
+  @$pb.TagNumber(4)
+  set collapsed($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCollapsed() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCollapsed() => $_clearField(4);
+}
+
+class Repository extends $pb.GeneratedMessage {
+  factory Repository({
+    $core.String? path,
+    $core.String? name,
+    GitHost? host,
+    $core.String? fullName,
+    $core.String? remoteUrl,
+    $core.Iterable<Worktree>? worktrees,
+    $core.String? error,
+  }) {
+    final result = Repository._();
+    if (path != null) result.path = path;
+    if (name != null) result.name = name;
+    if (host != null) result.host = host;
+    if (fullName != null) result.fullName = fullName;
+    if (remoteUrl != null) result.remoteUrl = remoteUrl;
+    if (worktrees != null) result.worktrees.addAll(worktrees);
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  Repository._();
+
+  factory Repository.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Repository()..mergeFromBuffer(data, registry);
+  factory Repository.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Repository()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Repository',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: Repository.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'path')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aE<GitHost>(3, _omitFieldNames ? '' : 'host', enumValues: GitHost.values)
+    ..aOS(4, _omitFieldNames ? '' : 'fullName')
+    ..aOS(5, _omitFieldNames ? '' : 'remoteUrl')
+    ..pPM<Worktree>(6, _omitFieldNames ? '' : 'worktrees',
+        subBuilder: Worktree.$_createMessage)
+    ..aOS(7, _omitFieldNames ? '' : 'error')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Repository clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Repository copyWith(void Function(Repository) updates) =>
+      super.copyWith((message) => updates(message as Repository)) as Repository;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Repository() / Repository.new instead')
+  static Repository create() => Repository._();
+  static $pb.GeneratedMessage $_createMessage() => Repository._();
+  @$core.override
+  Repository createEmptyInstance() => Repository._();
+  @$core.pragma('dart2js:noInline')
+  static Repository getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Repository>(Repository.$_createMessage);
+  static Repository? _defaultInstance;
+
+  /// Absolute path of the main checkout: the repository's identity.
+  @$pb.TagNumber(1)
+  $core.String get path => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set path($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPath() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  GitHost get host => $_getN(2);
+  @$pb.TagNumber(3)
+  set host(GitHost value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasHost() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearHost() => $_clearField(3);
+
+  /// "owner/name" on the host, empty without a remote.
+  @$pb.TagNumber(4)
+  $core.String get fullName => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set fullName($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFullName() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFullName() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get remoteUrl => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set remoteUrl($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasRemoteUrl() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRemoteUrl() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $pb.PbList<Worktree> get worktrees => $_getList(5);
+
+  /// Set when git could not be read (moved or deleted folder…).
+  @$pb.TagNumber(7)
+  $core.String get error => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set error($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearError() => $_clearField(7);
+}
+
+class Worktree extends $pb.GeneratedMessage {
+  factory Worktree({
+    $core.String? path,
+    $core.String? branch,
+    $core.String? head,
+    $core.bool? isMain,
+    $core.bool? locked,
+    WorktreeStatus? status,
+  }) {
+    final result = Worktree._();
+    if (path != null) result.path = path;
+    if (branch != null) result.branch = branch;
+    if (head != null) result.head = head;
+    if (isMain != null) result.isMain = isMain;
+    if (locked != null) result.locked = locked;
+    if (status != null) result.status = status;
+    return result;
+  }
+
+  Worktree._();
+
+  factory Worktree.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Worktree()..mergeFromBuffer(data, registry);
+  factory Worktree.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Worktree()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Worktree',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: Worktree.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'path')
+    ..aOS(2, _omitFieldNames ? '' : 'branch')
+    ..aOS(3, _omitFieldNames ? '' : 'head')
+    ..aOB(4, _omitFieldNames ? '' : 'isMain')
+    ..aOB(5, _omitFieldNames ? '' : 'locked')
+    ..aOM<WorktreeStatus>(6, _omitFieldNames ? '' : 'status',
+        subBuilder: WorktreeStatus.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Worktree clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Worktree copyWith(void Function(Worktree) updates) =>
+      super.copyWith((message) => updates(message as Worktree)) as Worktree;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Worktree() / Worktree.new instead')
+  static Worktree create() => Worktree._();
+  static $pb.GeneratedMessage $_createMessage() => Worktree._();
+  @$core.override
+  Worktree createEmptyInstance() => Worktree._();
+  @$core.pragma('dart2js:noInline')
+  static Worktree getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Worktree>(Worktree.$_createMessage);
+  static Worktree? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get path => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set path($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPath() => $_clearField(1);
+
+  /// Empty when HEAD is detached.
+  @$pb.TagNumber(2)
+  $core.String get branch => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set branch($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBranch() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBranch() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get head => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set head($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasHead() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearHead() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get isMain => $_getBF(3);
+  @$pb.TagNumber(4)
+  set isMain($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasIsMain() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearIsMain() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get locked => $_getBF(4);
+  @$pb.TagNumber(5)
+  set locked($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasLocked() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearLocked() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  WorktreeStatus get status => $_getN(5);
+  @$pb.TagNumber(6)
+  set status(WorktreeStatus value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasStatus() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearStatus() => $_clearField(6);
+  @$pb.TagNumber(6)
+  WorktreeStatus ensureStatus() => $_ensure(5);
+}
+
+class WorktreeStatus extends $pb.GeneratedMessage {
+  factory WorktreeStatus({
+    $core.int? changedFiles,
+    $core.int? ahead,
+    $core.int? behind,
+    $core.String? upstream,
+  }) {
+    final result = WorktreeStatus._();
+    if (changedFiles != null) result.changedFiles = changedFiles;
+    if (ahead != null) result.ahead = ahead;
+    if (behind != null) result.behind = behind;
+    if (upstream != null) result.upstream = upstream;
+    return result;
+  }
+
+  WorktreeStatus._();
+
+  factory WorktreeStatus.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WorktreeStatus()..mergeFromBuffer(data, registry);
+  factory WorktreeStatus.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WorktreeStatus()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WorktreeStatus',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: WorktreeStatus.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'changedFiles',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'ahead', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'behind', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(4, _omitFieldNames ? '' : 'upstream')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WorktreeStatus clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WorktreeStatus copyWith(void Function(WorktreeStatus) updates) =>
+      super.copyWith((message) => updates(message as WorktreeStatus))
+          as WorktreeStatus;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use WorktreeStatus() / WorktreeStatus.new instead')
+  static WorktreeStatus create() => WorktreeStatus._();
+  static $pb.GeneratedMessage $_createMessage() => WorktreeStatus._();
+  @$core.override
+  WorktreeStatus createEmptyInstance() => WorktreeStatus._();
+  @$core.pragma('dart2js:noInline')
+  static WorktreeStatus getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<WorktreeStatus>(
+          WorktreeStatus.$_createMessage);
+  static WorktreeStatus? _defaultInstance;
+
+  /// Files with staged, unstaged or untracked changes.
+  @$pb.TagNumber(1)
+  $core.int get changedFiles => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set changedFiles($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChangedFiles() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChangedFiles() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get ahead => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set ahead($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAhead() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAhead() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get behind => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set behind($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBehind() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBehind() => $_clearField(3);
+
+  /// e.g. "origin/main"; empty if the branch was never pushed.
+  @$pb.TagNumber(4)
+  $core.String get upstream => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set upstream($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasUpstream() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearUpstream() => $_clearField(4);
+}
+
+class RefreshWorkspaceRequest extends $pb.GeneratedMessage {
+  factory RefreshWorkspaceRequest() => RefreshWorkspaceRequest._();
+
+  RefreshWorkspaceRequest._();
+
+  factory RefreshWorkspaceRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RefreshWorkspaceRequest()..mergeFromBuffer(data, registry);
+  factory RefreshWorkspaceRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RefreshWorkspaceRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RefreshWorkspaceRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: RefreshWorkspaceRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshWorkspaceRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshWorkspaceRequest copyWith(
+          void Function(RefreshWorkspaceRequest) updates) =>
+      super.copyWith((message) => updates(message as RefreshWorkspaceRequest))
+          as RefreshWorkspaceRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use RefreshWorkspaceRequest() / RefreshWorkspaceRequest.new instead')
+  static RefreshWorkspaceRequest create() => RefreshWorkspaceRequest._();
+  static $pb.GeneratedMessage $_createMessage() => RefreshWorkspaceRequest._();
+  @$core.override
+  RefreshWorkspaceRequest createEmptyInstance() => RefreshWorkspaceRequest._();
+  @$core.pragma('dart2js:noInline')
+  static RefreshWorkspaceRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RefreshWorkspaceRequest>(
+          RefreshWorkspaceRequest.$_createMessage);
+  static RefreshWorkspaceRequest? _defaultInstance;
+}
+
+class RefreshWorkspaceResponse extends $pb.GeneratedMessage {
+  factory RefreshWorkspaceResponse() => RefreshWorkspaceResponse._();
+
+  RefreshWorkspaceResponse._();
+
+  factory RefreshWorkspaceResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RefreshWorkspaceResponse()..mergeFromBuffer(data, registry);
+  factory RefreshWorkspaceResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RefreshWorkspaceResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RefreshWorkspaceResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: RefreshWorkspaceResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshWorkspaceResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshWorkspaceResponse copyWith(
+          void Function(RefreshWorkspaceResponse) updates) =>
+      super.copyWith((message) => updates(message as RefreshWorkspaceResponse))
+          as RefreshWorkspaceResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use RefreshWorkspaceResponse() / RefreshWorkspaceResponse.new instead')
+  static RefreshWorkspaceResponse create() => RefreshWorkspaceResponse._();
+  static $pb.GeneratedMessage $_createMessage() => RefreshWorkspaceResponse._();
+  @$core.override
+  RefreshWorkspaceResponse createEmptyInstance() =>
+      RefreshWorkspaceResponse._();
+  @$core.pragma('dart2js:noInline')
+  static RefreshWorkspaceResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RefreshWorkspaceResponse>(
+          RefreshWorkspaceResponse.$_createMessage);
+  static RefreshWorkspaceResponse? _defaultInstance;
+}
+
+class DiscoverReposRequest extends $pb.GeneratedMessage {
+  factory DiscoverReposRequest({
+    $core.Iterable<$core.String>? roots,
+  }) {
+    final result = DiscoverReposRequest._();
+    if (roots != null) result.roots.addAll(roots);
+    return result;
+  }
+
+  DiscoverReposRequest._();
+
+  factory DiscoverReposRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DiscoverReposRequest()..mergeFromBuffer(data, registry);
+  factory DiscoverReposRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DiscoverReposRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DiscoverReposRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DiscoverReposRequest.$_createMessage)
+    ..pPS(1, _omitFieldNames ? '' : 'roots')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DiscoverReposRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DiscoverReposRequest copyWith(void Function(DiscoverReposRequest) updates) =>
+      super.copyWith((message) => updates(message as DiscoverReposRequest))
+          as DiscoverReposRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DiscoverReposRequest() / DiscoverReposRequest.new instead')
+  static DiscoverReposRequest create() => DiscoverReposRequest._();
+  static $pb.GeneratedMessage $_createMessage() => DiscoverReposRequest._();
+  @$core.override
+  DiscoverReposRequest createEmptyInstance() => DiscoverReposRequest._();
+  @$core.pragma('dart2js:noInline')
+  static DiscoverReposRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DiscoverReposRequest>(
+          DiscoverReposRequest.$_createMessage);
+  static DiscoverReposRequest? _defaultInstance;
+
+  /// Folders to scan; empty means the usual ones (~/workspace, ~/dev, ~/code…).
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get roots => $_getList(0);
+}
+
+class DiscoverReposResponse extends $pb.GeneratedMessage {
+  factory DiscoverReposResponse({
+    $core.Iterable<RepoCandidate>? candidates,
+  }) {
+    final result = DiscoverReposResponse._();
+    if (candidates != null) result.candidates.addAll(candidates);
+    return result;
+  }
+
+  DiscoverReposResponse._();
+
+  factory DiscoverReposResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DiscoverReposResponse()..mergeFromBuffer(data, registry);
+  factory DiscoverReposResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DiscoverReposResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DiscoverReposResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DiscoverReposResponse.$_createMessage)
+    ..pPM<RepoCandidate>(1, _omitFieldNames ? '' : 'candidates',
+        subBuilder: RepoCandidate.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DiscoverReposResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DiscoverReposResponse copyWith(
+          void Function(DiscoverReposResponse) updates) =>
+      super.copyWith((message) => updates(message as DiscoverReposResponse))
+          as DiscoverReposResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DiscoverReposResponse() / DiscoverReposResponse.new instead')
+  static DiscoverReposResponse create() => DiscoverReposResponse._();
+  static $pb.GeneratedMessage $_createMessage() => DiscoverReposResponse._();
+  @$core.override
+  DiscoverReposResponse createEmptyInstance() => DiscoverReposResponse._();
+  @$core.pragma('dart2js:noInline')
+  static DiscoverReposResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DiscoverReposResponse>(
+          DiscoverReposResponse.$_createMessage);
+  static DiscoverReposResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<RepoCandidate> get candidates => $_getList(0);
+}
+
+class RepoCandidate extends $pb.GeneratedMessage {
+  factory RepoCandidate({
+    $core.String? path,
+    $core.String? name,
+    GitHost? host,
+    $core.String? fullName,
+    $core.int? worktreeCount,
+  }) {
+    final result = RepoCandidate._();
+    if (path != null) result.path = path;
+    if (name != null) result.name = name;
+    if (host != null) result.host = host;
+    if (fullName != null) result.fullName = fullName;
+    if (worktreeCount != null) result.worktreeCount = worktreeCount;
+    return result;
+  }
+
+  RepoCandidate._();
+
+  factory RepoCandidate.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RepoCandidate()..mergeFromBuffer(data, registry);
+  factory RepoCandidate.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RepoCandidate()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RepoCandidate',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: RepoCandidate.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'path')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aE<GitHost>(3, _omitFieldNames ? '' : 'host', enumValues: GitHost.values)
+    ..aOS(4, _omitFieldNames ? '' : 'fullName')
+    ..aI(5, _omitFieldNames ? '' : 'worktreeCount',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RepoCandidate clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RepoCandidate copyWith(void Function(RepoCandidate) updates) =>
+      super.copyWith((message) => updates(message as RepoCandidate))
+          as RepoCandidate;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use RepoCandidate() / RepoCandidate.new instead')
+  static RepoCandidate create() => RepoCandidate._();
+  static $pb.GeneratedMessage $_createMessage() => RepoCandidate._();
+  @$core.override
+  RepoCandidate createEmptyInstance() => RepoCandidate._();
+  @$core.pragma('dart2js:noInline')
+  static RepoCandidate getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RepoCandidate>(
+          RepoCandidate.$_createMessage);
+  static RepoCandidate? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get path => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set path($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPath() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  GitHost get host => $_getN(2);
+  @$pb.TagNumber(3)
+  set host(GitHost value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasHost() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearHost() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get fullName => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set fullName($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFullName() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFullName() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get worktreeCount => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set worktreeCount($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasWorktreeCount() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearWorktreeCount() => $_clearField(5);
+}
+
+class SaveNamespaceRequest extends $pb.GeneratedMessage {
+  factory SaveNamespaceRequest({
+    $core.String? id,
+    $core.String? name,
+    $core.Iterable<$core.String>? repoPaths,
+    $core.bool? collapsed,
+    $core.int? position,
+  }) {
+    final result = SaveNamespaceRequest._();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (repoPaths != null) result.repoPaths.addAll(repoPaths);
+    if (collapsed != null) result.collapsed = collapsed;
+    if (position != null) result.position = position;
+    return result;
+  }
+
+  SaveNamespaceRequest._();
+
+  factory SaveNamespaceRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SaveNamespaceRequest()..mergeFromBuffer(data, registry);
+  factory SaveNamespaceRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SaveNamespaceRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SaveNamespaceRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SaveNamespaceRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..pPS(3, _omitFieldNames ? '' : 'repoPaths')
+    ..aOB(4, _omitFieldNames ? '' : 'collapsed')
+    ..aI(5, _omitFieldNames ? '' : 'position', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SaveNamespaceRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SaveNamespaceRequest copyWith(void Function(SaveNamespaceRequest) updates) =>
+      super.copyWith((message) => updates(message as SaveNamespaceRequest))
+          as SaveNamespaceRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SaveNamespaceRequest() / SaveNamespaceRequest.new instead')
+  static SaveNamespaceRequest create() => SaveNamespaceRequest._();
+  static $pb.GeneratedMessage $_createMessage() => SaveNamespaceRequest._();
+  @$core.override
+  SaveNamespaceRequest createEmptyInstance() => SaveNamespaceRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SaveNamespaceRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SaveNamespaceRequest>(
+          SaveNamespaceRequest.$_createMessage);
+  static SaveNamespaceRequest? _defaultInstance;
+
+  /// Empty to create one.
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<$core.String> get repoPaths => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $core.bool get collapsed => $_getBF(3);
+  @$pb.TagNumber(4)
+  set collapsed($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCollapsed() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCollapsed() => $_clearField(4);
+
+  /// Position among namespaces (past the end appends). Unset: new ones are
+  /// appended, existing ones keep their place.
+  @$pb.TagNumber(5)
+  $core.int get position => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set position($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPosition() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPosition() => $_clearField(5);
+}
+
+class SaveNamespaceResponse extends $pb.GeneratedMessage {
+  factory SaveNamespaceResponse({
+    $core.String? id,
+  }) {
+    final result = SaveNamespaceResponse._();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  SaveNamespaceResponse._();
+
+  factory SaveNamespaceResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SaveNamespaceResponse()..mergeFromBuffer(data, registry);
+  factory SaveNamespaceResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SaveNamespaceResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SaveNamespaceResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SaveNamespaceResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SaveNamespaceResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SaveNamespaceResponse copyWith(
+          void Function(SaveNamespaceResponse) updates) =>
+      super.copyWith((message) => updates(message as SaveNamespaceResponse))
+          as SaveNamespaceResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SaveNamespaceResponse() / SaveNamespaceResponse.new instead')
+  static SaveNamespaceResponse create() => SaveNamespaceResponse._();
+  static $pb.GeneratedMessage $_createMessage() => SaveNamespaceResponse._();
+  @$core.override
+  SaveNamespaceResponse createEmptyInstance() => SaveNamespaceResponse._();
+  @$core.pragma('dart2js:noInline')
+  static SaveNamespaceResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SaveNamespaceResponse>(
+          SaveNamespaceResponse.$_createMessage);
+  static SaveNamespaceResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+}
+
+class DeleteNamespaceRequest extends $pb.GeneratedMessage {
+  factory DeleteNamespaceRequest({
+    $core.String? id,
+  }) {
+    final result = DeleteNamespaceRequest._();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  DeleteNamespaceRequest._();
+
+  factory DeleteNamespaceRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteNamespaceRequest()..mergeFromBuffer(data, registry);
+  factory DeleteNamespaceRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteNamespaceRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteNamespaceRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DeleteNamespaceRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteNamespaceRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteNamespaceRequest copyWith(
+          void Function(DeleteNamespaceRequest) updates) =>
+      super.copyWith((message) => updates(message as DeleteNamespaceRequest))
+          as DeleteNamespaceRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DeleteNamespaceRequest() / DeleteNamespaceRequest.new instead')
+  static DeleteNamespaceRequest create() => DeleteNamespaceRequest._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteNamespaceRequest._();
+  @$core.override
+  DeleteNamespaceRequest createEmptyInstance() => DeleteNamespaceRequest._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteNamespaceRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteNamespaceRequest>(
+          DeleteNamespaceRequest.$_createMessage);
+  static DeleteNamespaceRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+}
+
+class DeleteNamespaceResponse extends $pb.GeneratedMessage {
+  factory DeleteNamespaceResponse() => DeleteNamespaceResponse._();
+
+  DeleteNamespaceResponse._();
+
+  factory DeleteNamespaceResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteNamespaceResponse()..mergeFromBuffer(data, registry);
+  factory DeleteNamespaceResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteNamespaceResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteNamespaceResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DeleteNamespaceResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteNamespaceResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteNamespaceResponse copyWith(
+          void Function(DeleteNamespaceResponse) updates) =>
+      super.copyWith((message) => updates(message as DeleteNamespaceResponse))
+          as DeleteNamespaceResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DeleteNamespaceResponse() / DeleteNamespaceResponse.new instead')
+  static DeleteNamespaceResponse create() => DeleteNamespaceResponse._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteNamespaceResponse._();
+  @$core.override
+  DeleteNamespaceResponse createEmptyInstance() => DeleteNamespaceResponse._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteNamespaceResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteNamespaceResponse>(
+          DeleteNamespaceResponse.$_createMessage);
+  static DeleteNamespaceResponse? _defaultInstance;
+}
+
+class CreateWorktreeRequest extends $pb.GeneratedMessage {
+  factory CreateWorktreeRequest({
+    $core.String? repoPath,
+    $core.String? branch,
+    $core.bool? createBranch,
+    $core.String? base,
+    $core.String? path,
+  }) {
+    final result = CreateWorktreeRequest._();
+    if (repoPath != null) result.repoPath = repoPath;
+    if (branch != null) result.branch = branch;
+    if (createBranch != null) result.createBranch = createBranch;
+    if (base != null) result.base = base;
+    if (path != null) result.path = path;
+    return result;
+  }
+
+  CreateWorktreeRequest._();
+
+  factory CreateWorktreeRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateWorktreeRequest()..mergeFromBuffer(data, registry);
+  factory CreateWorktreeRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateWorktreeRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateWorktreeRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: CreateWorktreeRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'repoPath')
+    ..aOS(2, _omitFieldNames ? '' : 'branch')
+    ..aOB(3, _omitFieldNames ? '' : 'createBranch')
+    ..aOS(4, _omitFieldNames ? '' : 'base')
+    ..aOS(5, _omitFieldNames ? '' : 'path')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateWorktreeRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateWorktreeRequest copyWith(
+          void Function(CreateWorktreeRequest) updates) =>
+      super.copyWith((message) => updates(message as CreateWorktreeRequest))
+          as CreateWorktreeRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreateWorktreeRequest() / CreateWorktreeRequest.new instead')
+  static CreateWorktreeRequest create() => CreateWorktreeRequest._();
+  static $pb.GeneratedMessage $_createMessage() => CreateWorktreeRequest._();
+  @$core.override
+  CreateWorktreeRequest createEmptyInstance() => CreateWorktreeRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CreateWorktreeRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreateWorktreeRequest>(
+          CreateWorktreeRequest.$_createMessage);
+  static CreateWorktreeRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get repoPath => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set repoPath($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRepoPath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRepoPath() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get branch => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set branch($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBranch() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBranch() => $_clearField(2);
+
+  /// Create `branch` from `base` (default: the repo's current HEAD); false
+  /// checks out an existing branch.
+  @$pb.TagNumber(3)
+  $core.bool get createBranch => $_getBF(2);
+  @$pb.TagNumber(3)
+  set createBranch($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCreateBranch() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCreateBranch() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get base => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set base($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasBase() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearBase() => $_clearField(4);
+
+  /// Where to put it; "~" is expanded. Empty: ~/wt/<repo>/<branch>.
+  @$pb.TagNumber(5)
+  $core.String get path => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set path($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPath() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPath() => $_clearField(5);
+}
+
+class CreateWorktreeResponse extends $pb.GeneratedMessage {
+  factory CreateWorktreeResponse({
+    Worktree? worktree,
+  }) {
+    final result = CreateWorktreeResponse._();
+    if (worktree != null) result.worktree = worktree;
+    return result;
+  }
+
+  CreateWorktreeResponse._();
+
+  factory CreateWorktreeResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateWorktreeResponse()..mergeFromBuffer(data, registry);
+  factory CreateWorktreeResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateWorktreeResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateWorktreeResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: CreateWorktreeResponse.$_createMessage)
+    ..aOM<Worktree>(1, _omitFieldNames ? '' : 'worktree',
+        subBuilder: Worktree.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateWorktreeResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateWorktreeResponse copyWith(
+          void Function(CreateWorktreeResponse) updates) =>
+      super.copyWith((message) => updates(message as CreateWorktreeResponse))
+          as CreateWorktreeResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreateWorktreeResponse() / CreateWorktreeResponse.new instead')
+  static CreateWorktreeResponse create() => CreateWorktreeResponse._();
+  static $pb.GeneratedMessage $_createMessage() => CreateWorktreeResponse._();
+  @$core.override
+  CreateWorktreeResponse createEmptyInstance() => CreateWorktreeResponse._();
+  @$core.pragma('dart2js:noInline')
+  static CreateWorktreeResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreateWorktreeResponse>(
+          CreateWorktreeResponse.$_createMessage);
+  static CreateWorktreeResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Worktree get worktree => $_getN(0);
+  @$pb.TagNumber(1)
+  set worktree(Worktree value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasWorktree() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearWorktree() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Worktree ensureWorktree() => $_ensure(0);
+}
+
+class RemoveWorktreeRequest extends $pb.GeneratedMessage {
+  factory RemoveWorktreeRequest({
+    $core.String? repoPath,
+    $core.String? worktreePath,
+    $core.bool? force,
+  }) {
+    final result = RemoveWorktreeRequest._();
+    if (repoPath != null) result.repoPath = repoPath;
+    if (worktreePath != null) result.worktreePath = worktreePath;
+    if (force != null) result.force = force;
+    return result;
+  }
+
+  RemoveWorktreeRequest._();
+
+  factory RemoveWorktreeRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RemoveWorktreeRequest()..mergeFromBuffer(data, registry);
+  factory RemoveWorktreeRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RemoveWorktreeRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RemoveWorktreeRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: RemoveWorktreeRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'repoPath')
+    ..aOS(2, _omitFieldNames ? '' : 'worktreePath')
+    ..aOB(3, _omitFieldNames ? '' : 'force')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RemoveWorktreeRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RemoveWorktreeRequest copyWith(
+          void Function(RemoveWorktreeRequest) updates) =>
+      super.copyWith((message) => updates(message as RemoveWorktreeRequest))
+          as RemoveWorktreeRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use RemoveWorktreeRequest() / RemoveWorktreeRequest.new instead')
+  static RemoveWorktreeRequest create() => RemoveWorktreeRequest._();
+  static $pb.GeneratedMessage $_createMessage() => RemoveWorktreeRequest._();
+  @$core.override
+  RemoveWorktreeRequest createEmptyInstance() => RemoveWorktreeRequest._();
+  @$core.pragma('dart2js:noInline')
+  static RemoveWorktreeRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RemoveWorktreeRequest>(
+          RemoveWorktreeRequest.$_createMessage);
+  static RemoveWorktreeRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get repoPath => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set repoPath($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRepoPath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRepoPath() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get worktreePath => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set worktreePath($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasWorktreePath() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearWorktreePath() => $_clearField(2);
+
+  /// Also remove it with uncommitted changes.
+  @$pb.TagNumber(3)
+  $core.bool get force => $_getBF(2);
+  @$pb.TagNumber(3)
+  set force($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasForce() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearForce() => $_clearField(3);
+}
+
+class RemoveWorktreeResponse extends $pb.GeneratedMessage {
+  factory RemoveWorktreeResponse() => RemoveWorktreeResponse._();
+
+  RemoveWorktreeResponse._();
+
+  factory RemoveWorktreeResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RemoveWorktreeResponse()..mergeFromBuffer(data, registry);
+  factory RemoveWorktreeResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RemoveWorktreeResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RemoveWorktreeResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: RemoveWorktreeResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RemoveWorktreeResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RemoveWorktreeResponse copyWith(
+          void Function(RemoveWorktreeResponse) updates) =>
+      super.copyWith((message) => updates(message as RemoveWorktreeResponse))
+          as RemoveWorktreeResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use RemoveWorktreeResponse() / RemoveWorktreeResponse.new instead')
+  static RemoveWorktreeResponse create() => RemoveWorktreeResponse._();
+  static $pb.GeneratedMessage $_createMessage() => RemoveWorktreeResponse._();
+  @$core.override
+  RemoveWorktreeResponse createEmptyInstance() => RemoveWorktreeResponse._();
+  @$core.pragma('dart2js:noInline')
+  static RemoveWorktreeResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RemoveWorktreeResponse>(
+          RemoveWorktreeResponse.$_createMessage);
+  static RemoveWorktreeResponse? _defaultInstance;
+}
+
+class ListBranchesRequest extends $pb.GeneratedMessage {
+  factory ListBranchesRequest({
+    $core.String? repoPath,
+  }) {
+    final result = ListBranchesRequest._();
+    if (repoPath != null) result.repoPath = repoPath;
+    return result;
+  }
+
+  ListBranchesRequest._();
+
+  factory ListBranchesRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListBranchesRequest()..mergeFromBuffer(data, registry);
+  factory ListBranchesRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListBranchesRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListBranchesRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ListBranchesRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'repoPath')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListBranchesRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListBranchesRequest copyWith(void Function(ListBranchesRequest) updates) =>
+      super.copyWith((message) => updates(message as ListBranchesRequest))
+          as ListBranchesRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use ListBranchesRequest() / ListBranchesRequest.new instead')
+  static ListBranchesRequest create() => ListBranchesRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListBranchesRequest._();
+  @$core.override
+  ListBranchesRequest createEmptyInstance() => ListBranchesRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListBranchesRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListBranchesRequest>(
+          ListBranchesRequest.$_createMessage);
+  static ListBranchesRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get repoPath => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set repoPath($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRepoPath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRepoPath() => $_clearField(1);
+}
+
+class ListBranchesResponse extends $pb.GeneratedMessage {
+  factory ListBranchesResponse({
+    $core.String? current,
+    $core.Iterable<$core.String>? local,
+    $core.Iterable<$core.String>? remote,
+  }) {
+    final result = ListBranchesResponse._();
+    if (current != null) result.current = current;
+    if (local != null) result.local.addAll(local);
+    if (remote != null) result.remote.addAll(remote);
+    return result;
+  }
+
+  ListBranchesResponse._();
+
+  factory ListBranchesResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListBranchesResponse()..mergeFromBuffer(data, registry);
+  factory ListBranchesResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListBranchesResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListBranchesResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ListBranchesResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'current')
+    ..pPS(2, _omitFieldNames ? '' : 'local')
+    ..pPS(3, _omitFieldNames ? '' : 'remote')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListBranchesResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListBranchesResponse copyWith(void Function(ListBranchesResponse) updates) =>
+      super.copyWith((message) => updates(message as ListBranchesResponse))
+          as ListBranchesResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListBranchesResponse() / ListBranchesResponse.new instead')
+  static ListBranchesResponse create() => ListBranchesResponse._();
+  static $pb.GeneratedMessage $_createMessage() => ListBranchesResponse._();
+  @$core.override
+  ListBranchesResponse createEmptyInstance() => ListBranchesResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListBranchesResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListBranchesResponse>(
+          ListBranchesResponse.$_createMessage);
+  static ListBranchesResponse? _defaultInstance;
+
+  /// Branch checked out in the main checkout; empty if detached.
+  @$pb.TagNumber(1)
+  $core.String get current => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set current($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCurrent() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCurrent() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<$core.String> get local => $_getList(1);
+
+  /// e.g. "origin/feat/x", without the remotes' HEAD aliases.
+  @$pb.TagNumber(3)
+  $pb.PbList<$core.String> get remote => $_getList(2);
 }
 
 const $core.bool _omitFieldNames =

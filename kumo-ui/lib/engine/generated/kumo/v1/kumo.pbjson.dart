@@ -15,6 +15,25 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+@$core.Deprecated('Use gitHostDescriptor instead')
+const GitHost$json = {
+  '1': 'GitHost',
+  '2': [
+    {'1': 'GIT_HOST_UNSPECIFIED', '2': 0},
+    {'1': 'GIT_HOST_LOCAL', '2': 1},
+    {'1': 'GIT_HOST_GITHUB', '2': 2},
+    {'1': 'GIT_HOST_GITLAB', '2': 3},
+    {'1': 'GIT_HOST_BITBUCKET', '2': 4},
+    {'1': 'GIT_HOST_OTHER', '2': 5},
+  ],
+};
+
+/// Descriptor for `GitHost`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List gitHostDescriptor = $convert.base64Decode(
+    'CgdHaXRIb3N0EhgKFEdJVF9IT1NUX1VOU1BFQ0lGSUVEEAASEgoOR0lUX0hPU1RfTE9DQUwQAR'
+    'ITCg9HSVRfSE9TVF9HSVRIVUIQAhITCg9HSVRfSE9TVF9HSVRMQUIQAxIWChJHSVRfSE9TVF9C'
+    'SVRCVUNLRVQQBBISCg5HSVRfSE9TVF9PVEhFUhAF');
+
 @$core.Deprecated('Use helloRequestDescriptor instead')
 const HelloRequest$json = {
   '1': 'HelloRequest',
@@ -316,3 +335,366 @@ final $typed_data.Uint8List terminalInfoDescriptor = $convert.base64Decode(
     'CgxUZXJtaW5hbEluZm8SHwoLdGVybWluYWxfaWQYASABKAlSCnRlcm1pbmFsSWQSGAoHcHJvZ3'
     'JhbRgCIAEoCVIHcHJvZ3JhbRIWCgZleGl0ZWQYAyABKAhSBmV4aXRlZBIbCglleGl0X2NvZGUY'
     'BCABKAVSCGV4aXRDb2Rl');
+
+@$core.Deprecated('Use watchWorkspaceRequestDescriptor instead')
+const WatchWorkspaceRequest$json = {
+  '1': 'WatchWorkspaceRequest',
+};
+
+/// Descriptor for `WatchWorkspaceRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List watchWorkspaceRequestDescriptor =
+    $convert.base64Decode('ChVXYXRjaFdvcmtzcGFjZVJlcXVlc3Q=');
+
+@$core.Deprecated('Use workspaceSnapshotDescriptor instead')
+const WorkspaceSnapshot$json = {
+  '1': 'WorkspaceSnapshot',
+  '2': [
+    {'1': 'version', '3': 1, '4': 1, '5': 4, '10': 'version'},
+    {
+      '1': 'namespaces',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.Namespace',
+      '10': 'namespaces'
+    },
+    {
+      '1': 'repositories',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.Repository',
+      '10': 'repositories'
+    },
+  ],
+};
+
+/// Descriptor for `WorkspaceSnapshot`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List workspaceSnapshotDescriptor = $convert.base64Decode(
+    'ChFXb3Jrc3BhY2VTbmFwc2hvdBIYCgd2ZXJzaW9uGAEgASgEUgd2ZXJzaW9uEjIKCm5hbWVzcG'
+    'FjZXMYAiADKAsyEi5rdW1vLnYxLk5hbWVzcGFjZVIKbmFtZXNwYWNlcxI3CgxyZXBvc2l0b3Jp'
+    'ZXMYAyADKAsyEy5rdW1vLnYxLlJlcG9zaXRvcnlSDHJlcG9zaXRvcmllcw==');
+
+@$core.Deprecated('Use namespaceDescriptor instead')
+const Namespace$json = {
+  '1': 'Namespace',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'repo_paths', '3': 3, '4': 3, '5': 9, '10': 'repoPaths'},
+    {'1': 'collapsed', '3': 4, '4': 1, '5': 8, '10': 'collapsed'},
+  ],
+};
+
+/// Descriptor for `Namespace`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List namespaceDescriptor = $convert.base64Decode(
+    'CglOYW1lc3BhY2USDgoCaWQYASABKAlSAmlkEhIKBG5hbWUYAiABKAlSBG5hbWUSHQoKcmVwb1'
+    '9wYXRocxgDIAMoCVIJcmVwb1BhdGhzEhwKCWNvbGxhcHNlZBgEIAEoCFIJY29sbGFwc2Vk');
+
+@$core.Deprecated('Use repositoryDescriptor instead')
+const Repository$json = {
+  '1': 'Repository',
+  '2': [
+    {'1': 'path', '3': 1, '4': 1, '5': 9, '10': 'path'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {
+      '1': 'host',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.GitHost',
+      '10': 'host'
+    },
+    {'1': 'full_name', '3': 4, '4': 1, '5': 9, '10': 'fullName'},
+    {'1': 'remote_url', '3': 5, '4': 1, '5': 9, '10': 'remoteUrl'},
+    {
+      '1': 'worktrees',
+      '3': 6,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.Worktree',
+      '10': 'worktrees'
+    },
+    {'1': 'error', '3': 7, '4': 1, '5': 9, '10': 'error'},
+  ],
+};
+
+/// Descriptor for `Repository`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List repositoryDescriptor = $convert.base64Decode(
+    'CgpSZXBvc2l0b3J5EhIKBHBhdGgYASABKAlSBHBhdGgSEgoEbmFtZRgCIAEoCVIEbmFtZRIkCg'
+    'Rob3N0GAMgASgOMhAua3Vtby52MS5HaXRIb3N0UgRob3N0EhsKCWZ1bGxfbmFtZRgEIAEoCVII'
+    'ZnVsbE5hbWUSHQoKcmVtb3RlX3VybBgFIAEoCVIJcmVtb3RlVXJsEi8KCXdvcmt0cmVlcxgGIA'
+    'MoCzIRLmt1bW8udjEuV29ya3RyZWVSCXdvcmt0cmVlcxIUCgVlcnJvchgHIAEoCVIFZXJyb3I=');
+
+@$core.Deprecated('Use worktreeDescriptor instead')
+const Worktree$json = {
+  '1': 'Worktree',
+  '2': [
+    {'1': 'path', '3': 1, '4': 1, '5': 9, '10': 'path'},
+    {'1': 'branch', '3': 2, '4': 1, '5': 9, '10': 'branch'},
+    {'1': 'head', '3': 3, '4': 1, '5': 9, '10': 'head'},
+    {'1': 'is_main', '3': 4, '4': 1, '5': 8, '10': 'isMain'},
+    {'1': 'locked', '3': 5, '4': 1, '5': 8, '10': 'locked'},
+    {
+      '1': 'status',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.WorktreeStatus',
+      '10': 'status'
+    },
+  ],
+};
+
+/// Descriptor for `Worktree`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List worktreeDescriptor = $convert.base64Decode(
+    'CghXb3JrdHJlZRISCgRwYXRoGAEgASgJUgRwYXRoEhYKBmJyYW5jaBgCIAEoCVIGYnJhbmNoEh'
+    'IKBGhlYWQYAyABKAlSBGhlYWQSFwoHaXNfbWFpbhgEIAEoCFIGaXNNYWluEhYKBmxvY2tlZBgF'
+    'IAEoCFIGbG9ja2VkEi8KBnN0YXR1cxgGIAEoCzIXLmt1bW8udjEuV29ya3RyZWVTdGF0dXNSBn'
+    'N0YXR1cw==');
+
+@$core.Deprecated('Use worktreeStatusDescriptor instead')
+const WorktreeStatus$json = {
+  '1': 'WorktreeStatus',
+  '2': [
+    {'1': 'changed_files', '3': 1, '4': 1, '5': 13, '10': 'changedFiles'},
+    {'1': 'ahead', '3': 2, '4': 1, '5': 13, '10': 'ahead'},
+    {'1': 'behind', '3': 3, '4': 1, '5': 13, '10': 'behind'},
+    {'1': 'upstream', '3': 4, '4': 1, '5': 9, '10': 'upstream'},
+  ],
+};
+
+/// Descriptor for `WorktreeStatus`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List worktreeStatusDescriptor = $convert.base64Decode(
+    'Cg5Xb3JrdHJlZVN0YXR1cxIjCg1jaGFuZ2VkX2ZpbGVzGAEgASgNUgxjaGFuZ2VkRmlsZXMSFA'
+    'oFYWhlYWQYAiABKA1SBWFoZWFkEhYKBmJlaGluZBgDIAEoDVIGYmVoaW5kEhoKCHVwc3RyZWFt'
+    'GAQgASgJUgh1cHN0cmVhbQ==');
+
+@$core.Deprecated('Use refreshWorkspaceRequestDescriptor instead')
+const RefreshWorkspaceRequest$json = {
+  '1': 'RefreshWorkspaceRequest',
+};
+
+/// Descriptor for `RefreshWorkspaceRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List refreshWorkspaceRequestDescriptor =
+    $convert.base64Decode('ChdSZWZyZXNoV29ya3NwYWNlUmVxdWVzdA==');
+
+@$core.Deprecated('Use refreshWorkspaceResponseDescriptor instead')
+const RefreshWorkspaceResponse$json = {
+  '1': 'RefreshWorkspaceResponse',
+};
+
+/// Descriptor for `RefreshWorkspaceResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List refreshWorkspaceResponseDescriptor =
+    $convert.base64Decode('ChhSZWZyZXNoV29ya3NwYWNlUmVzcG9uc2U=');
+
+@$core.Deprecated('Use discoverReposRequestDescriptor instead')
+const DiscoverReposRequest$json = {
+  '1': 'DiscoverReposRequest',
+  '2': [
+    {'1': 'roots', '3': 1, '4': 3, '5': 9, '10': 'roots'},
+  ],
+};
+
+/// Descriptor for `DiscoverReposRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List discoverReposRequestDescriptor =
+    $convert.base64Decode(
+        'ChREaXNjb3ZlclJlcG9zUmVxdWVzdBIUCgVyb290cxgBIAMoCVIFcm9vdHM=');
+
+@$core.Deprecated('Use discoverReposResponseDescriptor instead')
+const DiscoverReposResponse$json = {
+  '1': 'DiscoverReposResponse',
+  '2': [
+    {
+      '1': 'candidates',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.RepoCandidate',
+      '10': 'candidates'
+    },
+  ],
+};
+
+/// Descriptor for `DiscoverReposResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List discoverReposResponseDescriptor = $convert.base64Decode(
+    'ChVEaXNjb3ZlclJlcG9zUmVzcG9uc2USNgoKY2FuZGlkYXRlcxgBIAMoCzIWLmt1bW8udjEuUm'
+    'Vwb0NhbmRpZGF0ZVIKY2FuZGlkYXRlcw==');
+
+@$core.Deprecated('Use repoCandidateDescriptor instead')
+const RepoCandidate$json = {
+  '1': 'RepoCandidate',
+  '2': [
+    {'1': 'path', '3': 1, '4': 1, '5': 9, '10': 'path'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {
+      '1': 'host',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.GitHost',
+      '10': 'host'
+    },
+    {'1': 'full_name', '3': 4, '4': 1, '5': 9, '10': 'fullName'},
+    {'1': 'worktree_count', '3': 5, '4': 1, '5': 13, '10': 'worktreeCount'},
+  ],
+};
+
+/// Descriptor for `RepoCandidate`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List repoCandidateDescriptor = $convert.base64Decode(
+    'Cg1SZXBvQ2FuZGlkYXRlEhIKBHBhdGgYASABKAlSBHBhdGgSEgoEbmFtZRgCIAEoCVIEbmFtZR'
+    'IkCgRob3N0GAMgASgOMhAua3Vtby52MS5HaXRIb3N0UgRob3N0EhsKCWZ1bGxfbmFtZRgEIAEo'
+    'CVIIZnVsbE5hbWUSJQoOd29ya3RyZWVfY291bnQYBSABKA1SDXdvcmt0cmVlQ291bnQ=');
+
+@$core.Deprecated('Use saveNamespaceRequestDescriptor instead')
+const SaveNamespaceRequest$json = {
+  '1': 'SaveNamespaceRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'repo_paths', '3': 3, '4': 3, '5': 9, '10': 'repoPaths'},
+    {'1': 'collapsed', '3': 4, '4': 1, '5': 8, '10': 'collapsed'},
+    {
+      '1': 'position',
+      '3': 5,
+      '4': 1,
+      '5': 13,
+      '9': 0,
+      '10': 'position',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_position'},
+  ],
+};
+
+/// Descriptor for `SaveNamespaceRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List saveNamespaceRequestDescriptor = $convert.base64Decode(
+    'ChRTYXZlTmFtZXNwYWNlUmVxdWVzdBIOCgJpZBgBIAEoCVICaWQSEgoEbmFtZRgCIAEoCVIEbm'
+    'FtZRIdCgpyZXBvX3BhdGhzGAMgAygJUglyZXBvUGF0aHMSHAoJY29sbGFwc2VkGAQgASgIUglj'
+    'b2xsYXBzZWQSHwoIcG9zaXRpb24YBSABKA1IAFIIcG9zaXRpb26IAQFCCwoJX3Bvc2l0aW9u');
+
+@$core.Deprecated('Use saveNamespaceResponseDescriptor instead')
+const SaveNamespaceResponse$json = {
+  '1': 'SaveNamespaceResponse',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+  ],
+};
+
+/// Descriptor for `SaveNamespaceResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List saveNamespaceResponseDescriptor = $convert
+    .base64Decode('ChVTYXZlTmFtZXNwYWNlUmVzcG9uc2USDgoCaWQYASABKAlSAmlk');
+
+@$core.Deprecated('Use deleteNamespaceRequestDescriptor instead')
+const DeleteNamespaceRequest$json = {
+  '1': 'DeleteNamespaceRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+  ],
+};
+
+/// Descriptor for `DeleteNamespaceRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteNamespaceRequestDescriptor = $convert
+    .base64Decode('ChZEZWxldGVOYW1lc3BhY2VSZXF1ZXN0Eg4KAmlkGAEgASgJUgJpZA==');
+
+@$core.Deprecated('Use deleteNamespaceResponseDescriptor instead')
+const DeleteNamespaceResponse$json = {
+  '1': 'DeleteNamespaceResponse',
+};
+
+/// Descriptor for `DeleteNamespaceResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteNamespaceResponseDescriptor =
+    $convert.base64Decode('ChdEZWxldGVOYW1lc3BhY2VSZXNwb25zZQ==');
+
+@$core.Deprecated('Use createWorktreeRequestDescriptor instead')
+const CreateWorktreeRequest$json = {
+  '1': 'CreateWorktreeRequest',
+  '2': [
+    {'1': 'repo_path', '3': 1, '4': 1, '5': 9, '10': 'repoPath'},
+    {'1': 'branch', '3': 2, '4': 1, '5': 9, '10': 'branch'},
+    {'1': 'create_branch', '3': 3, '4': 1, '5': 8, '10': 'createBranch'},
+    {'1': 'base', '3': 4, '4': 1, '5': 9, '10': 'base'},
+    {'1': 'path', '3': 5, '4': 1, '5': 9, '10': 'path'},
+  ],
+};
+
+/// Descriptor for `CreateWorktreeRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createWorktreeRequestDescriptor = $convert.base64Decode(
+    'ChVDcmVhdGVXb3JrdHJlZVJlcXVlc3QSGwoJcmVwb19wYXRoGAEgASgJUghyZXBvUGF0aBIWCg'
+    'ZicmFuY2gYAiABKAlSBmJyYW5jaBIjCg1jcmVhdGVfYnJhbmNoGAMgASgIUgxjcmVhdGVCcmFu'
+    'Y2gSEgoEYmFzZRgEIAEoCVIEYmFzZRISCgRwYXRoGAUgASgJUgRwYXRo');
+
+@$core.Deprecated('Use createWorktreeResponseDescriptor instead')
+const CreateWorktreeResponse$json = {
+  '1': 'CreateWorktreeResponse',
+  '2': [
+    {
+      '1': 'worktree',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.Worktree',
+      '10': 'worktree'
+    },
+  ],
+};
+
+/// Descriptor for `CreateWorktreeResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createWorktreeResponseDescriptor =
+    $convert.base64Decode(
+        'ChZDcmVhdGVXb3JrdHJlZVJlc3BvbnNlEi0KCHdvcmt0cmVlGAEgASgLMhEua3Vtby52MS5Xb3'
+        'JrdHJlZVIId29ya3RyZWU=');
+
+@$core.Deprecated('Use removeWorktreeRequestDescriptor instead')
+const RemoveWorktreeRequest$json = {
+  '1': 'RemoveWorktreeRequest',
+  '2': [
+    {'1': 'repo_path', '3': 1, '4': 1, '5': 9, '10': 'repoPath'},
+    {'1': 'worktree_path', '3': 2, '4': 1, '5': 9, '10': 'worktreePath'},
+    {'1': 'force', '3': 3, '4': 1, '5': 8, '10': 'force'},
+  ],
+};
+
+/// Descriptor for `RemoveWorktreeRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List removeWorktreeRequestDescriptor = $convert.base64Decode(
+    'ChVSZW1vdmVXb3JrdHJlZVJlcXVlc3QSGwoJcmVwb19wYXRoGAEgASgJUghyZXBvUGF0aBIjCg'
+    '13b3JrdHJlZV9wYXRoGAIgASgJUgx3b3JrdHJlZVBhdGgSFAoFZm9yY2UYAyABKAhSBWZvcmNl');
+
+@$core.Deprecated('Use removeWorktreeResponseDescriptor instead')
+const RemoveWorktreeResponse$json = {
+  '1': 'RemoveWorktreeResponse',
+};
+
+/// Descriptor for `RemoveWorktreeResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List removeWorktreeResponseDescriptor =
+    $convert.base64Decode('ChZSZW1vdmVXb3JrdHJlZVJlc3BvbnNl');
+
+@$core.Deprecated('Use listBranchesRequestDescriptor instead')
+const ListBranchesRequest$json = {
+  '1': 'ListBranchesRequest',
+  '2': [
+    {'1': 'repo_path', '3': 1, '4': 1, '5': 9, '10': 'repoPath'},
+  ],
+};
+
+/// Descriptor for `ListBranchesRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listBranchesRequestDescriptor =
+    $convert.base64Decode(
+        'ChNMaXN0QnJhbmNoZXNSZXF1ZXN0EhsKCXJlcG9fcGF0aBgBIAEoCVIIcmVwb1BhdGg=');
+
+@$core.Deprecated('Use listBranchesResponseDescriptor instead')
+const ListBranchesResponse$json = {
+  '1': 'ListBranchesResponse',
+  '2': [
+    {'1': 'current', '3': 1, '4': 1, '5': 9, '10': 'current'},
+    {'1': 'local', '3': 2, '4': 3, '5': 9, '10': 'local'},
+    {'1': 'remote', '3': 3, '4': 3, '5': 9, '10': 'remote'},
+  ],
+};
+
+/// Descriptor for `ListBranchesResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listBranchesResponseDescriptor = $convert.base64Decode(
+    'ChRMaXN0QnJhbmNoZXNSZXNwb25zZRIYCgdjdXJyZW50GAEgASgJUgdjdXJyZW50EhQKBWxvY2'
+    'FsGAIgAygJUgVsb2NhbBIWCgZyZW1vdGUYAyADKAlSBnJlbW90ZQ==');

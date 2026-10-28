@@ -6,6 +6,7 @@ use kumo_domain::daemon::{ApiVersion, AuthToken};
 use kumo_proto::v1 as pb;
 use kumo_proto::v1::core_client::CoreClient;
 use kumo_proto::v1::terminals_client::TerminalsClient;
+use kumo_proto::v1::workspace_client::WorkspaceClient;
 use tonic::Status;
 use tonic::service::interceptor::InterceptedService;
 use tonic::transport::{Channel, Endpoint};
@@ -19,6 +20,7 @@ pub type AuthChannel = InterceptedService<Channel, AttachBearer>;
 pub struct KumoClient {
     pub core: CoreClient<AuthChannel>,
     pub terminals: TerminalsClient<AuthChannel>,
+    pub workspace: WorkspaceClient<AuthChannel>,
 }
 
 impl KumoClient {
@@ -33,7 +35,8 @@ impl KumoClient {
         let auth = AttachBearer::new(token);
         Ok(Self {
             core: CoreClient::with_interceptor(channel.clone(), auth.clone()),
-            terminals: TerminalsClient::with_interceptor(channel, auth),
+            terminals: TerminalsClient::with_interceptor(channel.clone(), auth.clone()),
+            workspace: WorkspaceClient::with_interceptor(channel, auth),
         })
     }
 

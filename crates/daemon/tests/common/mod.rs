@@ -24,10 +24,7 @@ pub struct TestDaemon {
 impl TestDaemon {
     pub async fn start() -> Self {
         let data_dir = tempfile::tempdir().unwrap();
-        let config = DaemonConfig {
-            data_dir: Some(data_dir.path().into()),
-            ..Default::default()
-        };
+        let config = test_config(data_dir.path());
         let daemon = Daemon::start(config).await.unwrap();
         let endpoint = daemon.endpoint().clone();
         let (stop, stopped) = oneshot::channel::<()>();
@@ -53,6 +50,21 @@ impl Drop for TestDaemon {
         if let Some(stop) = self.stop.take() {
             let _ = stop.send(());
         }
+    }
+}
+
+/// Data and home folders inside `dir`, so tests never touch the real ones.
+pub fn test_config(dir: &std::path::Path) -> DaemonConfig {
+    DaemonConfig {
+        data_dir: Some(dir.join("data")),
+        home: Some(dir.join("home")),
+        ..Default::default()
+    }
+}
+
+impl TestDaemon {
+    pub fn home(&self) -> std::path::PathBuf {
+        self._data_dir.path().join("home")
     }
 }
 

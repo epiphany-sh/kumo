@@ -4,11 +4,15 @@ use std::sync::Arc;
 use anyhow::Context;
 use kumo_application::daemon::HelloService;
 use kumo_application::terminal::TerminalService;
+use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
 use kumo_domain::daemon::{ApiVersion, DaemonEndpoint, DiscoveryStore};
+use kumo_domain::workspace::WorktreeLocation;
 use kumo_grpc::server::{GrpcServer, Services};
 use kumo_infrastructure::discovery::FileDiscoveryStore;
+use kumo_infrastructure::git::{FsRepoFinder, GitCli};
 use kumo_infrastructure::pty::PortablePtySystem;
 use kumo_infrastructure::security::generate_auth_token;
+use kumo_infrastructure::storage::SqliteWorkspaceStore;
 
 use crate::DaemonConfig;
 use crate::single_instance::ensure_not_running;
@@ -26,12 +30,31 @@ impl Daemon {
     /// Checks for another instance, binds on loopback and writes the
     /// discovery file.
     pub async fn start(config: DaemonConfig) -> anyhow::Result<Self> {
-        let discovery = match config.data_dir {
-            Some(dir) => FileDiscoveryStore::in_dir(dir),
-            None => FileDiscoveryStore::default_location()
-                .context("no local data directory for the discovery file")?,
+        let data_dir = match config.data_dir {
+            Some(dir) => dir,
+            None => dirs::data_local_dir()
+                .context("no local data directory")?
+                .join("kumo"),
         };
+        let home = match config.home {
+            Some(home) => home,
+            None => dirs::home_dir().context("no home directory")?,
+        };
+        let discovery = FileDiscoveryStore::in_dir(&data_dir);
         ensure_not_running(&discovery).await?;
+
+        let workspace = Arc::new(
+            WorkspaceService::load(WorkspacePorts {
+                git: Arc::new(GitCli::default()),
+                store: Arc::new(SqliteWorkspaceStore::open(&data_dir.join("kumo.db"))?),
+                finder: Arc::new(FsRepoFinder::new(&home)),
+                location: WorktreeLocation::new(&home),
+            })
+            .await?,
+        );
+        // Git state is read in the background: the daemon answers right away.
+        let initial = Arc::clone(&workspace);
+        tokio::spawn(async move { initial.refresh().await });
 
         let token = generate_auth_token().context("generating auth token")?;
         let terminals = Arc::new(TerminalService::new(
@@ -41,6 +64,7 @@ impl Daemon {
         let services = Services {
             hello: HelloService::new(env!("CARGO_PKG_VERSION")),
             terminals: Arc::clone(&terminals),
+            workspace,
         };
         let server = GrpcServer::bind(config.listen, token.clone(), services).await?;
 

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../data/changes.dart';
-import '../data/mock_data.dart';
+import '../data/workspace_source.dart';
 import '../data/models.dart';
 import '../theme/palette.dart';
 import 'preferences.dart';
@@ -26,9 +26,14 @@ enum KumoView {
 class AppState extends ChangeNotifier {
   /// [prefs] restores the user's settings (theme, translucency, side panel)
   /// and keeps them; without it everything is in memory (tests).
-  AppState({KumoThemeMode mode = KumoThemeMode.dark, this.demoWallpaper = false, Preferences? prefs})
+  ///
+  /// [workspace] provides namespaces, repos and worktrees: the daemon in the
+  /// app, the design mocks when omitted (tests).
+  AppState({KumoThemeMode mode = KumoThemeMode.dark, this.demoWallpaper = false, Preferences? prefs, WorkspaceSource? workspace})
       : prefs = prefs ?? Preferences.memory(),
+        workspace = workspace ?? MockWorkspaceSource(),
         _mode = mode {
+    this.workspace.addListener(_onWorkspaceChanged);
     final p = this.prefs;
     final saved = p.get<String>('theme', '');
     for (final m in KumoThemeMode.values) {
@@ -92,9 +97,43 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The selected worktree: its branch (shown) and, with real data, its path
+  /// (the identity: `main` exists in every repo). Mocks select by branch.
   String activeWorktree = 'feat/PRC-412-bulk-discounts';
-  void selectWorktree(String branch) {
+  String? activeWorktreePath;
+  void selectWorktree(String branch, {String? path}) {
     activeWorktree = branch;
+    activeWorktreePath = path;
+    notifyListeners();
+  }
+
+  bool isActiveWorktree(Worktree w) => activeWorktreePath != null ? w.path == activeWorktreePath : w.branch == activeWorktree;
+
+  /// Repo of the selected worktree (the first one when none matches).
+  Repo? get activeRepo {
+    final repos = workspace.repos;
+    for (final r in repos) {
+      if (worktreesOf(r).any(isActiveWorktree)) return r;
+    }
+    return repos.firstOrNull;
+  }
+
+  /// The selected worktree itself, if it is still there.
+  Worktree? get activeWorktreeEntry => activeRepo?.worktrees.where(isActiveWorktree).firstOrNull;
+
+  void _onWorkspaceChanged() {
+    if (workspace.error != _lastWorkspaceError) {
+      _lastWorkspaceError = workspace.error;
+      _workspaceErrorDismissed = false;
+    }
+    // Nothing selected yet (or it was removed): pick the first main checkout.
+    if (activeWorktreeEntry == null) {
+      final main = workspace.repos.firstOrNull?.worktrees.where((w) => w.isMain).firstOrNull;
+      if (main != null) {
+        activeWorktree = main.branch;
+        activeWorktreePath = main.path;
+      }
+    }
     notifyListeners();
   }
 
@@ -104,68 +143,100 @@ class AppState extends ChangeNotifier {
 
   // ---- Namespaces (sidebar groups of repos) ----
 
-  List<Namespace> _namespaces = List.of(Mock.initialNamespaces);
-  List<Namespace> get namespaces => List.unmodifiable(_namespaces);
-  int _nsSeq = 0;
+  /// Namespaces, repos and worktrees (see [WorkspaceSource]).
+  final WorkspaceSource workspace;
 
-  Namespace? namespaceById(String id) {
-    for (final n in _namespaces) {
-      if (n.id == id) return n;
-    }
-    return null;
-  }
+  /// Deleted namespaces still within their undo window.
+  final Set<String> _hiddenNamespaces = {};
 
-  void _replaceNamespace(String id, Namespace Function(Namespace) f) {
-    _namespaces = [for (final n in _namespaces) n.id == id ? f(n) : n];
-    notifyListeners();
-  }
+  List<Namespace> get namespaces => [for (final n in workspace.namespaces) if (!_hiddenNamespaces.contains(n.id)) n];
+
+  Namespace? namespaceById(String id) => namespaces.where((n) => n.id == id).firstOrNull;
 
   /// Creates a namespace and returns its id.
-  String createNamespace(String name, List<String> repos) {
-    final id = 'ns-${++_nsSeq}';
-    _namespaces = [..._namespaces, Namespace(id: id, name: name.trim().isEmpty ? 'untitled' : name.trim(), repos: repos)];
-    notifyListeners();
-    return id;
-  }
+  String createNamespace(String name, List<String> repos) =>
+      workspace.saveNamespace(name: name.trim().isEmpty ? 'untitled' : name.trim(), repos: repos);
 
-  void updateNamespace(String id, {String? name, List<String>? repos}) =>
-      _replaceNamespace(id, (n) => n.copyWith(name: (name == null || name.trim().isEmpty) ? null : name.trim(), repos: repos));
+  void updateNamespace(String id, {String? name, List<String>? repos, bool? collapsed}) {
+    final n = namespaceById(id);
+    if (n == null) return;
+    workspace.saveNamespace(
+      id: id,
+      name: (name == null || name.trim().isEmpty) ? n.name : name.trim(),
+      repos: repos ?? n.repos,
+      collapsed: collapsed ?? n.collapsed,
+    );
+  }
 
   void renameNamespace(String id, String name) {
     if (name.trim().isEmpty) return;
     updateNamespace(id, name: name);
   }
 
-  void toggleNamespaceCollapsed(String id) => _replaceNamespace(id, (n) => n.copyWith(collapsed: !n.collapsed));
+  void toggleNamespaceCollapsed(String id) {
+    final n = namespaceById(id);
+    if (n != null) updateNamespace(id, collapsed: !n.collapsed);
+  }
 
-  /// Removes the group only; repos and worktrees stay on disk. Undoable.
+  /// Removes the group only; repos and worktrees stay on disk. Undoable:
+  /// the daemon is only told once the undo window closes.
   void deleteNamespace(String id) {
-    final idx = _namespaces.indexWhere((n) => n.id == id);
-    if (idx < 0) return;
-    final removed = _namespaces[idx];
-    _namespaces = [..._namespaces]..removeAt(idx);
-    _offerUndo('Deleted “${removed.name}”', () {
-      final at = idx > _namespaces.length ? _namespaces.length : idx;
-      _namespaces = [..._namespaces]..insert(at, removed);
-    });
+    final n = namespaceById(id);
+    if (n == null) return;
+    _hiddenNamespaces.add(id);
+    _offerUndo(
+      'Deleted “${n.name}”',
+      () => _hiddenNamespaces.remove(id),
+      commit: () {
+        _hiddenNamespaces.remove(id);
+        workspace.deleteNamespace(id);
+      },
+    );
   }
 
   // ---- Worktrees ----
 
+  /// Removed worktrees (`<repo id>:<path>`) still within their undo window.
   final Set<String> _removedWorktrees = {};
-  bool isWorktreeRemoved(String repo, String branch) => _removedWorktrees.contains('$repo:$branch');
+  bool isWorktreeRemoved(Repo repo, Worktree w) => _removedWorktrees.contains('${repo.id}:${w.path}');
 
   /// Visible worktrees of [repo] (deleted ones filtered out).
-  List<Worktree> worktreesOf(Repo repo) => [for (final w in repo.worktrees) if (!isWorktreeRemoved(repo.name, w.branch)) w];
+  List<Worktree> worktreesOf(Repo repo) => [for (final w in repo.worktrees) if (!isWorktreeRemoved(repo, w)) w];
 
-  /// `git worktree remove` (optimistic; the branch stays). The principal
-  /// checkout (main) is not a worktree and can't be removed.
-  void deleteWorktree(String repo, String branch) {
-    if (branch == 'main') return;
-    final key = '$repo:$branch';
+  /// `git worktree remove` (the branch stays), once the undo window closes.
+  /// The principal checkout is not a worktree and can't be removed.
+  void deleteWorktree(String repoId, String branch) {
+    final repo = workspace.repo(repoId);
+    final w = repo?.worktrees.where((w) => w.branch == branch).firstOrNull;
+    if (repo == null || w == null || w.isMain) return;
+    final key = '${repo.id}:${w.path}';
     if (!_removedWorktrees.add(key)) return;
-    if (activeWorktree == branch) activeWorktree = 'main';
-    _offerUndo('Deleted worktree “$branch”', () => _removedWorktrees.remove(key));
+    if (isActiveWorktree(w)) {
+      final main = repo.worktrees.where((w) => w.isMain).firstOrNull;
+      activeWorktree = main?.branch ?? 'main';
+      activeWorktreePath = main == null || activeWorktreePath == null ? null : main.path;
+    }
+    _offerUndo(
+      'Deleted worktree “$branch”',
+      () => _removedWorktrees.remove(key),
+      commit: () => workspace.removeWorktree(repo, w).then(
+            (_) => _removedWorktrees.remove(key),
+            // Git refused (e.g. uncommitted changes): show it again.
+            onError: (Object _) {
+              _removedWorktrees.remove(key);
+              notifyListeners();
+            },
+          ),
+    );
+  }
+
+  /// The daemon's last error about the workspace, until dismissed.
+  String? get workspaceError => _workspaceErrorDismissed ? null : workspace.error;
+  bool _workspaceErrorDismissed = false;
+  String? _lastWorkspaceError;
+  void dismissWorkspaceError() {
+    _workspaceErrorDismissed = true;
+    notifyListeners();
   }
 
   // ---- Undo toast ----
@@ -173,12 +244,24 @@ class AppState extends ChangeNotifier {
   UndoNotice? _undo;
   UndoNotice? get undo => _undo;
   Timer? _undoTimer;
+  VoidCallback? _pendingCommit;
 
-  void _offerUndo(String message, VoidCallback restore) {
+  /// Shows an undo toast. [commit] runs when the window closes without an
+  /// undo (destructive work happens only then), or when another undoable
+  /// action replaces this one.
+  void _offerUndo(String message, VoidCallback restore, {VoidCallback? commit}) {
     _undoTimer?.cancel();
+    _runPendingCommit();
     _undo = UndoNotice(message, restore);
+    _pendingCommit = commit;
     _undoTimer = Timer(const Duration(seconds: 8), dismissUndo);
     notifyListeners();
+  }
+
+  void _runPendingCommit() {
+    final commit = _pendingCommit;
+    _pendingCommit = null;
+    commit?.call();
   }
 
   void undoLast() {
@@ -186,6 +269,7 @@ class AppState extends ChangeNotifier {
     if (u == null) return;
     _undoTimer?.cancel();
     _undo = null;
+    _pendingCommit = null;
     u.restore();
     notifyListeners();
   }
@@ -194,6 +278,7 @@ class AppState extends ChangeNotifier {
     _undoTimer?.cancel();
     if (_undo == null) return;
     _undo = null;
+    _runPendingCommit();
     notifyListeners();
   }
 
@@ -385,6 +470,9 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    workspace
+      ..removeListener(_onWorkspaceChanged)
+      ..dispose();
     prefs.dispose();
     _undoTimer?.cancel();
     newWorktreeRequests.dispose();

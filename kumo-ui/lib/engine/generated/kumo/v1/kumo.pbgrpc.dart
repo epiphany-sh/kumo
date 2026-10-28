@@ -198,3 +198,275 @@ abstract class TerminalsServiceBase extends $grpc.Service {
   $async.Future<$0.ListResponse> list(
       $grpc.ServiceCall call, $0.ListRequest request);
 }
+
+@$pb.GrpcServiceName('kumo.v1.Workspace')
+class WorkspaceClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  WorkspaceClient(super.channel, {super.options, super.interceptors});
+
+  /// Current snapshot first, then a new one after every change.
+  $grpc.ResponseStream<$0.WorkspaceSnapshot> watch(
+    $0.WatchWorkspaceRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createStreamingCall(_$watch, $async.Stream.fromIterable([request]),
+        options: options);
+  }
+
+  /// Re-reads git state (e.g. when the window gets focus).
+  $grpc.ResponseFuture<$0.RefreshWorkspaceResponse> refresh(
+    $0.RefreshWorkspaceRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$refresh, request, options: options);
+  }
+
+  /// Git repositories found on disk, to pick from when editing a namespace.
+  $grpc.ResponseFuture<$0.DiscoverReposResponse> discoverRepos(
+    $0.DiscoverReposRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$discoverRepos, request, options: options);
+  }
+
+  /// Creates (empty id) or replaces a namespace. Unknown repo paths are
+  /// registered; they must be git repositories.
+  $grpc.ResponseFuture<$0.SaveNamespaceResponse> saveNamespace(
+    $0.SaveNamespaceRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$saveNamespace, request, options: options);
+  }
+
+  /// Only the group: repositories and worktrees stay on disk.
+  $grpc.ResponseFuture<$0.DeleteNamespaceResponse> deleteNamespace(
+    $0.DeleteNamespaceRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$deleteNamespace, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.CreateWorktreeResponse> createWorktree(
+    $0.CreateWorktreeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$createWorktree, request, options: options);
+  }
+
+  /// `git worktree remove`; the branch stays. The main checkout can't be removed.
+  $grpc.ResponseFuture<$0.RemoveWorktreeResponse> removeWorktree(
+    $0.RemoveWorktreeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$removeWorktree, request, options: options);
+  }
+
+  /// Branches to start a worktree from or check out.
+  $grpc.ResponseFuture<$0.ListBranchesResponse> listBranches(
+    $0.ListBranchesRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$listBranches, request, options: options);
+  }
+
+  // method descriptors
+
+  static final _$watch =
+      $grpc.ClientMethod<$0.WatchWorkspaceRequest, $0.WorkspaceSnapshot>(
+          '/kumo.v1.Workspace/Watch',
+          ($0.WatchWorkspaceRequest value) => value.writeToBuffer(),
+          $0.WorkspaceSnapshot.fromBuffer);
+  static final _$refresh = $grpc.ClientMethod<$0.RefreshWorkspaceRequest,
+          $0.RefreshWorkspaceResponse>(
+      '/kumo.v1.Workspace/Refresh',
+      ($0.RefreshWorkspaceRequest value) => value.writeToBuffer(),
+      $0.RefreshWorkspaceResponse.fromBuffer);
+  static final _$discoverRepos =
+      $grpc.ClientMethod<$0.DiscoverReposRequest, $0.DiscoverReposResponse>(
+          '/kumo.v1.Workspace/DiscoverRepos',
+          ($0.DiscoverReposRequest value) => value.writeToBuffer(),
+          $0.DiscoverReposResponse.fromBuffer);
+  static final _$saveNamespace =
+      $grpc.ClientMethod<$0.SaveNamespaceRequest, $0.SaveNamespaceResponse>(
+          '/kumo.v1.Workspace/SaveNamespace',
+          ($0.SaveNamespaceRequest value) => value.writeToBuffer(),
+          $0.SaveNamespaceResponse.fromBuffer);
+  static final _$deleteNamespace =
+      $grpc.ClientMethod<$0.DeleteNamespaceRequest, $0.DeleteNamespaceResponse>(
+          '/kumo.v1.Workspace/DeleteNamespace',
+          ($0.DeleteNamespaceRequest value) => value.writeToBuffer(),
+          $0.DeleteNamespaceResponse.fromBuffer);
+  static final _$createWorktree =
+      $grpc.ClientMethod<$0.CreateWorktreeRequest, $0.CreateWorktreeResponse>(
+          '/kumo.v1.Workspace/CreateWorktree',
+          ($0.CreateWorktreeRequest value) => value.writeToBuffer(),
+          $0.CreateWorktreeResponse.fromBuffer);
+  static final _$removeWorktree =
+      $grpc.ClientMethod<$0.RemoveWorktreeRequest, $0.RemoveWorktreeResponse>(
+          '/kumo.v1.Workspace/RemoveWorktree',
+          ($0.RemoveWorktreeRequest value) => value.writeToBuffer(),
+          $0.RemoveWorktreeResponse.fromBuffer);
+  static final _$listBranches =
+      $grpc.ClientMethod<$0.ListBranchesRequest, $0.ListBranchesResponse>(
+          '/kumo.v1.Workspace/ListBranches',
+          ($0.ListBranchesRequest value) => value.writeToBuffer(),
+          $0.ListBranchesResponse.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Workspace')
+abstract class WorkspaceServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.Workspace';
+
+  WorkspaceServiceBase() {
+    $addMethod(
+        $grpc.ServiceMethod<$0.WatchWorkspaceRequest, $0.WorkspaceSnapshot>(
+            'Watch',
+            watch_Pre,
+            false,
+            true,
+            ($core.List<$core.int> value) =>
+                $0.WatchWorkspaceRequest.fromBuffer(value),
+            ($0.WorkspaceSnapshot value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.RefreshWorkspaceRequest,
+            $0.RefreshWorkspaceResponse>(
+        'Refresh',
+        refresh_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.RefreshWorkspaceRequest.fromBuffer(value),
+        ($0.RefreshWorkspaceResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.DiscoverReposRequest, $0.DiscoverReposResponse>(
+            'DiscoverRepos',
+            discoverRepos_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.DiscoverReposRequest.fromBuffer(value),
+            ($0.DiscoverReposResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.SaveNamespaceRequest, $0.SaveNamespaceResponse>(
+            'SaveNamespace',
+            saveNamespace_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.SaveNamespaceRequest.fromBuffer(value),
+            ($0.SaveNamespaceResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.DeleteNamespaceRequest,
+            $0.DeleteNamespaceResponse>(
+        'DeleteNamespace',
+        deleteNamespace_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.DeleteNamespaceRequest.fromBuffer(value),
+        ($0.DeleteNamespaceResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.CreateWorktreeRequest,
+            $0.CreateWorktreeResponse>(
+        'CreateWorktree',
+        createWorktree_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.CreateWorktreeRequest.fromBuffer(value),
+        ($0.CreateWorktreeResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.RemoveWorktreeRequest,
+            $0.RemoveWorktreeResponse>(
+        'RemoveWorktree',
+        removeWorktree_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.RemoveWorktreeRequest.fromBuffer(value),
+        ($0.RemoveWorktreeResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.ListBranchesRequest, $0.ListBranchesResponse>(
+            'ListBranches',
+            listBranches_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.ListBranchesRequest.fromBuffer(value),
+            ($0.ListBranchesResponse value) => value.writeToBuffer()));
+  }
+
+  $async.Stream<$0.WorkspaceSnapshot> watch_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WatchWorkspaceRequest> $request) async* {
+    yield* watch($call, await $request);
+  }
+
+  $async.Stream<$0.WorkspaceSnapshot> watch(
+      $grpc.ServiceCall call, $0.WatchWorkspaceRequest request);
+
+  $async.Future<$0.RefreshWorkspaceResponse> refresh_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.RefreshWorkspaceRequest> $request) async {
+    return refresh($call, await $request);
+  }
+
+  $async.Future<$0.RefreshWorkspaceResponse> refresh(
+      $grpc.ServiceCall call, $0.RefreshWorkspaceRequest request);
+
+  $async.Future<$0.DiscoverReposResponse> discoverRepos_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.DiscoverReposRequest> $request) async {
+    return discoverRepos($call, await $request);
+  }
+
+  $async.Future<$0.DiscoverReposResponse> discoverRepos(
+      $grpc.ServiceCall call, $0.DiscoverReposRequest request);
+
+  $async.Future<$0.SaveNamespaceResponse> saveNamespace_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.SaveNamespaceRequest> $request) async {
+    return saveNamespace($call, await $request);
+  }
+
+  $async.Future<$0.SaveNamespaceResponse> saveNamespace(
+      $grpc.ServiceCall call, $0.SaveNamespaceRequest request);
+
+  $async.Future<$0.DeleteNamespaceResponse> deleteNamespace_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.DeleteNamespaceRequest> $request) async {
+    return deleteNamespace($call, await $request);
+  }
+
+  $async.Future<$0.DeleteNamespaceResponse> deleteNamespace(
+      $grpc.ServiceCall call, $0.DeleteNamespaceRequest request);
+
+  $async.Future<$0.CreateWorktreeResponse> createWorktree_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.CreateWorktreeRequest> $request) async {
+    return createWorktree($call, await $request);
+  }
+
+  $async.Future<$0.CreateWorktreeResponse> createWorktree(
+      $grpc.ServiceCall call, $0.CreateWorktreeRequest request);
+
+  $async.Future<$0.RemoveWorktreeResponse> removeWorktree_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.RemoveWorktreeRequest> $request) async {
+    return removeWorktree($call, await $request);
+  }
+
+  $async.Future<$0.RemoveWorktreeResponse> removeWorktree(
+      $grpc.ServiceCall call, $0.RemoveWorktreeRequest request);
+
+  $async.Future<$0.ListBranchesResponse> listBranches_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.ListBranchesRequest> $request) async {
+    return listBranches($call, await $request);
+  }
+
+  $async.Future<$0.ListBranchesResponse> listBranches(
+      $grpc.ServiceCall call, $0.ListBranchesRequest request);
+}

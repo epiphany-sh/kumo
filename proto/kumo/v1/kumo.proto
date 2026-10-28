@@ -117,3 +117,166 @@ message TerminalInfo {
   bool exited = 3;
   int32 exit_code = 4;
 }
+
+// ---------------------------------------------------------------------------
+// Workspace: namespaces, repositories and worktrees
+// ---------------------------------------------------------------------------
+//
+// Repos are identified by the absolute path of their main checkout and
+// worktrees by their path. The daemon pushes the whole workspace on every
+// change (last wins): small, and the UI never has to merge events.
+
+service Workspace {
+  // Current snapshot first, then a new one after every change.
+  rpc Watch(WatchWorkspaceRequest) returns (stream WorkspaceSnapshot);
+  // Re-reads git state (e.g. when the window gets focus).
+  rpc Refresh(RefreshWorkspaceRequest) returns (RefreshWorkspaceResponse);
+  // Git repositories found on disk, to pick from when editing a namespace.
+  rpc DiscoverRepos(DiscoverReposRequest) returns (DiscoverReposResponse);
+  // Creates (empty id) or replaces a namespace. Unknown repo paths are
+  // registered; they must be git repositories.
+  rpc SaveNamespace(SaveNamespaceRequest) returns (SaveNamespaceResponse);
+  // Only the group: repositories and worktrees stay on disk.
+  rpc DeleteNamespace(DeleteNamespaceRequest) returns (DeleteNamespaceResponse);
+  rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse);
+  // `git worktree remove`; the branch stays. The main checkout can't be removed.
+  rpc RemoveWorktree(RemoveWorktreeRequest) returns (RemoveWorktreeResponse);
+  // Branches to start a worktree from or check out.
+  rpc ListBranches(ListBranchesRequest) returns (ListBranchesResponse);
+}
+
+message WatchWorkspaceRequest {}
+
+message WorkspaceSnapshot {
+  // Increases with every change.
+  uint64 version = 1;
+  repeated Namespace namespaces = 2;
+  // Every repository referenced by a namespace.
+  repeated Repository repositories = 3;
+}
+
+message Namespace {
+  string id = 1;
+  string name = 2;
+  // Repository paths, in sidebar order.
+  repeated string repo_paths = 3;
+  bool collapsed = 4;
+}
+
+enum GitHost {
+  GIT_HOST_UNSPECIFIED = 0;
+  GIT_HOST_LOCAL = 1; // no remote
+  GIT_HOST_GITHUB = 2;
+  GIT_HOST_GITLAB = 3;
+  GIT_HOST_BITBUCKET = 4;
+  GIT_HOST_OTHER = 5;
+}
+
+message Repository {
+  // Absolute path of the main checkout: the repository's identity.
+  string path = 1;
+  string name = 2;
+  GitHost host = 3;
+  // "owner/name" on the host, empty without a remote.
+  string full_name = 4;
+  string remote_url = 5;
+  repeated Worktree worktrees = 6;
+  // Set when git could not be read (moved or deleted folder…).
+  string error = 7;
+}
+
+message Worktree {
+  string path = 1;
+  // Empty when HEAD is detached.
+  string branch = 2;
+  string head = 3;
+  bool is_main = 4;
+  bool locked = 5;
+  WorktreeStatus status = 6;
+}
+
+message WorktreeStatus {
+  // Files with staged, unstaged or untracked changes.
+  uint32 changed_files = 1;
+  uint32 ahead = 2;
+  uint32 behind = 3;
+  // e.g. "origin/main"; empty if the branch was never pushed.
+  string upstream = 4;
+}
+
+message RefreshWorkspaceRequest {}
+message RefreshWorkspaceResponse {}
+
+message DiscoverReposRequest {
+  // Folders to scan; empty means the usual ones (~/workspace, ~/dev, ~/code…).
+  repeated string roots = 1;
+}
+
+message DiscoverReposResponse {
+  repeated RepoCandidate candidates = 1;
+}
+
+message RepoCandidate {
+  string path = 1;
+  string name = 2;
+  GitHost host = 3;
+  string full_name = 4;
+  uint32 worktree_count = 5;
+}
+
+message SaveNamespaceRequest {
+  // Empty to create one.
+  string id = 1;
+  string name = 2;
+  repeated string repo_paths = 3;
+  bool collapsed = 4;
+  // Position among namespaces (past the end appends). Unset: new ones are
+  // appended, existing ones keep their place.
+  optional uint32 position = 5;
+}
+
+message SaveNamespaceResponse {
+  string id = 1;
+}
+
+message DeleteNamespaceRequest {
+  string id = 1;
+}
+
+message DeleteNamespaceResponse {}
+
+message CreateWorktreeRequest {
+  string repo_path = 1;
+  string branch = 2;
+  // Create `branch` from `base` (default: the repo's current HEAD); false
+  // checks out an existing branch.
+  bool create_branch = 3;
+  string base = 4;
+  // Where to put it; "~" is expanded. Empty: ~/wt/<repo>/<branch>.
+  string path = 5;
+}
+
+message CreateWorktreeResponse {
+  Worktree worktree = 1;
+}
+
+message RemoveWorktreeRequest {
+  string repo_path = 1;
+  string worktree_path = 2;
+  // Also remove it with uncommitted changes.
+  bool force = 3;
+}
+
+message RemoveWorktreeResponse {}
+
+message ListBranchesRequest {
+  string repo_path = 1;
+}
+
+message ListBranchesResponse {
+  // Branch checked out in the main checkout; empty if detached.
+  string current = 1;
+  repeated string local = 2;
+  // e.g. "origin/feat/x", without the remotes' HEAD aliases.
+  repeated string remote = 3;
+}
