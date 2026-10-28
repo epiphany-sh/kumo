@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
 import '../data/mock_project.dart';
 import '../data/worktree_changes.dart';
 import '../editor/code_editor.dart';
 import '../editor/syntax.dart';
+import '../overlays/new_agent_dialog.dart';
 import '../shell/screen_chrome.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
@@ -51,6 +53,11 @@ class _FilesScreenState extends State<FilesScreen> {
   final _saved = <String, String>{};
   final _dirty = <String>{};
   final _expanded = <String>{};
+
+  /// "New file" / "New folder" open a path field at the top of the explorer.
+  _Creating? _creating;
+  final _newPath = TextEditingController();
+  String? _createError;
   final _resolved = <String>{};
   final _marks = <String, Map<int, bool>>{};
   Object? _marksKey;
@@ -150,6 +157,47 @@ class _FilesScreenState extends State<FilesScreen> {
     return const {};
   }
 
+  /// Opens the path field, starting in the open file's folder.
+  void _startCreating(_Creating what) {
+    final active = _active;
+    final dir = active == null || !active.contains('/') ? '' : '${active.substring(0, active.lastIndexOf('/'))}/';
+    _newPath
+      ..text = dir
+      ..selection = TextSelection.collapsed(offset: dir.length);
+    setState(() {
+      _creating = what;
+      _createError = null;
+    });
+  }
+
+  /// Writes the new file (empty), or a folder's `.gitkeep`: git doesn't
+  /// keep empty folders. Missing parent folders are created too.
+  Future<void> _create() async {
+    final what = _creating;
+    final raw = _newPath.text.trim().replaceAll(RegExp(r'^/+|/+$'), '');
+    if (what == null || raw.isEmpty) return;
+    final path = what == _Creating.folder ? '$raw/.gitkeep' : raw;
+    if (_git.files.contains(path) || (what == _Creating.folder && _git.files.any((f) => f.startsWith('$raw/')))) {
+      setState(() => _createError = '$raw already exists');
+      return;
+    }
+    await _git.write(path, '');
+    if (!mounted) return;
+    final error = _git.error;
+    if (error != null) {
+      setState(() => _createError = error);
+      return;
+    }
+    final parts = path.split('/');
+    setState(() {
+      _creating = null;
+      for (var i = 1; i < parts.length; i++) {
+        _expanded.add(parts.sublist(0, i).join('/'));
+      }
+    });
+    if (what == _Creating.file) _open(path);
+  }
+
   void _open(String path) => setState(() {
         if (!_tabs.contains(path)) _tabs = [..._tabs, path];
         _active = path;
@@ -209,7 +257,12 @@ class _FilesScreenState extends State<FilesScreen> {
         breadcrumb: Breadcrumb(icon: KIcons.branch, parts: [s.activeRepo?.name ?? 'No repository', if (_git.branch.isNotEmpty) _git.branch]),
         searchHint: 'Go to file or symbol…',
         searchKey: '⌘P',
-        primary: KButton.primary(label: 'Ask agent about file', icon: KIcons.agent, height: 36, onTap: () {}),
+        primary: KButton.primary(
+          label: 'Ask agent about file',
+          icon: KIcons.agent,
+          height: 36,
+          onTap: active == null ? null : () => showNewAgentDialog(context, prompt: 'About `$active`: '),
+        ),
       ),
       body: LayoutBuilder(builder: (context, box) {
         final showScm = box.maxWidth >= 980;
@@ -283,11 +336,12 @@ class _FilesScreenState extends State<FilesScreen> {
           padding: const EdgeInsets.only(left: 8),
           child: Row(children: [
             Expanded(child: Text('EXPLORER', style: microLabel(c))),
-            KIconButton(icon: KIcons.fileAdd, label: 'New file', size: 26, iconSize: 15, onTap: () {}),
-            KIconButton(icon: KIcons.folderAdd, label: 'New folder', size: 26, iconSize: 15, onTap: () {}),
+            KIconButton(icon: KIcons.fileAdd, label: 'New file', size: 26, iconSize: 15, onTap: () => _startCreating(_Creating.file)),
+            KIconButton(icon: KIcons.folderAdd, label: 'New folder', size: 26, iconSize: 15, onTap: () => _startCreating(_Creating.folder)),
             KIconButton(icon: KIcons.collapseAll, label: 'Collapse all folders', size: 26, iconSize: 15, onTap: () => setState(_expanded.clear)),
           ]),
         ),
+        if (_creating != null) _newPathField(context),
         const SizedBox(height: 10),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -313,6 +367,49 @@ class _FilesScreenState extends State<FilesScreen> {
                 Text(s.label, style: sans(10.5, color: c.text3)),
               ]),
           ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _newPathField(BuildContext context) {
+    final c = context.c;
+    final folder = _creating == _Creating.folder;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        CallbackShortcuts(
+          bindings: {const SingleActivator(LogicalKeyboardKey.escape): () => setState(() => _creating = null)},
+          child: Container(
+            height: 30,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(color: c.chip, borderRadius: BorderRadius.circular(8), border: Border.all(color: _createError == null ? c.acc : c.err)),
+            child: Row(children: [
+              Icon(folder ? KIcons.folderAdd : KIcons.fileAdd, size: 14, color: c.text3),
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('new-path'),
+                  controller: _newPath,
+                  autofocus: true,
+                  onChanged: (_) {
+                    if (_createError != null) setState(() => _createError = null);
+                  },
+                  // Keeps the focus: a refused path stays there to fix.
+                  onEditingComplete: () {},
+                  onSubmitted: (_) => _create(),
+                  style: mono(11.5, color: c.text),
+                  cursorColor: c.acc,
+                  decoration: InputDecoration.collapsed(hintText: folder ? 'folder/name' : 'path/to/file.ext', hintStyle: mono(11.5, color: c.text3)),
+                ),
+              ),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          _createError ?? (folder ? '↩ creates it with a .gitkeep · Esc cancels' : '↩ creates it · Esc cancels'),
+          style: sans(10.5, color: _createError == null ? c.text3 : c.err),
         ),
       ]),
     );
@@ -398,7 +495,8 @@ class _FilesScreenState extends State<FilesScreen> {
   Widget _breadcrumbRow(BuildContext context, String path) {
     final c = context.c;
     final parts = path.split('/');
-    final crumbs = parts.length > 1 ? 'price-admin › ${parts.sublist(0, parts.length - 1).join(' › ')} › ' : 'price-admin › ';
+    final repo = AppScope.of(context).activeRepo?.name ?? '';
+    final crumbs = [if (repo.isNotEmpty) repo, ...parts.sublist(0, parts.length - 1), ''].join(' › ');
     final info = langOf(path);
     return Container(
       height: 40,
@@ -734,3 +832,5 @@ class _TreeRow extends StatelessWidget {
     );
   }
 }
+
+enum _Creating { file, folder }

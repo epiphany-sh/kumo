@@ -1,11 +1,11 @@
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, Process;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
-import '../data/mock_data.dart';
+import '../data/ci_hosts_source.dart';
 import '../data/models.dart';
 import '../overlays/namespace_dialog.dart';
 import '../overlays/new_worktree_popover.dart';
@@ -108,15 +108,7 @@ class Sidebar extends StatelessWidget {
               ),
             ),
             Container(height: 1, color: c.divider, margin: const EdgeInsets.only(bottom: 12)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: SectionTitle('Integrations', trailing: Text('${Mock.integrations.length} synced', style: sans(11, color: c.ok))),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Wrap(spacing: 4, runSpacing: 4, children: [for (final i in Mock.integrations) SourceTile(i.k, tooltip: i.name)]),
-            ),
+            const _Integrations(),
             const SizedBox(height: 10),
             Row(children: [
               const SizedBox(width: 4),
@@ -125,10 +117,10 @@ class Sidebar extends StatelessWidget {
                 height: 26,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(color: c.accSoft, shape: BoxShape.circle),
-                child: Text('M', style: sans(12, weight: FontWeight.w600, color: c.acc)),
+                child: Text(_initial(_UserName.name), style: sans(12, weight: FontWeight.w600, color: c.acc)),
               ),
               const SizedBox(width: 9),
-              Expanded(child: Text('Mauri', style: sans(13, weight: FontWeight.w500, color: c.text))),
+              Expanded(child: Text(_UserName.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, weight: FontWeight.w500, color: c.text))),
               KIconButton(icon: KIcons.settings, label: 'Settings (⌘,)', onTap: () => showSettingsDialog(context)),
             ]),
           ],
@@ -138,35 +130,184 @@ class Sidebar extends StatelessWidget {
   }
 }
 
+/// The namespace being worked in (the selected worktree's), with its real
+/// counts; the menu jumps to another namespace or creates one.
 class _WorkspaceSwitcher extends StatelessWidget {
   const _WorkspaceSwitcher();
+
+  /// Selects the namespace's first repository's main checkout.
+  static void _enter(AppState s, Namespace ns) {
+    for (final id in ns.repos) {
+      final main = s.workspace.repo(id)?.worktrees.where((w) => w.isMain).firstOrNull;
+      if (main != null) return s.selectWorktree(main.branch, path: main.path);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    return KPressable(
-      onTap: () {},
-      semanticLabel: 'Switch workspace, current: pricing',
-      builder: (context, hover, focus) => Container(
-        padding: const EdgeInsets.all(8),
-        decoration: chipDecoration(c, radius: 14, fill: hover ? c.tabActive : null),
-        child: Row(children: [
-          Container(
-            width: 30,
-            height: 30,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: c.accFill, borderRadius: BorderRadius.circular(9)),
-            child: Text('P', style: sans(14, weight: FontWeight.w700, color: c.accText)),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('pricing', style: sans(13, weight: FontWeight.w600, color: c.text)),
-              Text('3 repos · 6 worktrees', style: sans(11.5, color: c.text3)),
-            ]),
-          ),
-          Icon(KIcons.chevronUpDown, size: 16, color: c.text3),
-        ]),
+    final s = AppScope.of(context);
+    final active = s.activeRepo;
+    final ns = s.namespaces.where((n) => active != null && n.repos.contains(active.id)).firstOrNull ?? s.namespaces.firstOrNull;
+    final repos = [for (final id in ns?.repos ?? const <String>[]) s.workspace.repo(id)].whereType<Repo>().toList();
+    final worktrees = repos.fold<int>(0, (n, r) => n + s.worktreesOf(r).length);
+    final name = ns?.name ?? 'Kumo';
+    final detail = ns == null ? 'No namespaces yet' : '${repos.length} ${repos.length == 1 ? 'repo' : 'repos'} · $worktrees ${worktrees == 1 ? 'worktree' : 'worktrees'}';
+    return Builder(
+      builder: (anchor) => KPressable(
+        onTap: () => showKMenu(
+          anchor,
+          position: belowOf(anchor, right: false),
+          builder: (context, close) => KMenuPanel(width: 240, children: [
+            for (final n in s.namespaces)
+              KMenuItem(
+                icon: n.id == ns?.id ? KIcons.check : KIcons.namespace,
+                label: n.name,
+                note: '${n.repos.length} ${n.repos.length == 1 ? 'repo' : 'repos'}',
+                onTap: () {
+                  close();
+                  _enter(s, n);
+                },
+              ),
+            if (s.namespaces.isNotEmpty) const KMenuDivider(),
+            KMenuItem(
+              icon: KIcons.add,
+              label: 'New namespace',
+              onTap: () {
+                close();
+                showNamespaceDialog(context);
+              },
+            ),
+          ]),
+        ),
+        semanticLabel: 'Switch namespace, current: $name',
+        builder: (context, hover, focus) => Container(
+          padding: const EdgeInsets.all(8),
+          decoration: chipDecoration(c, radius: 14, fill: hover ? c.tabActive : null),
+          child: Row(children: [
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: c.accFill, borderRadius: BorderRadius.circular(9)),
+              child: Text(_initial(name), style: sans(14, weight: FontWeight.w700, color: c.accText)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, weight: FontWeight.w600, color: c.text)),
+                Text(detail, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, color: c.text3)),
+              ]),
+            ),
+            Icon(KIcons.chevronUpDown, size: 16, color: c.text3),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+String _initial(String name) => name.trim().isEmpty ? '?' : name.trim().characters.first.toUpperCase();
+
+/// The user's name for the sidebar: git's `user.name`, else the login.
+abstract final class _UserName {
+  static final String name = _read();
+
+  static String _read() {
+    final login = Platform.environment['USER'] ?? Platform.environment['USERNAME'] ?? '';
+    if (kIsWeb) return login;
+    try {
+      final r = Process.runSync('git', ['config', '--global', 'user.name']);
+      final name = '${r.stdout}'.trim();
+      if (r.exitCode == 0 && name.isNotEmpty) return name;
+    } on Object {
+      // No git: the login will do.
+    }
+    return login.isEmpty ? 'You' : login;
+  }
+}
+
+/// What's connected: task sources and repository hosts (a token or gh).
+/// A tile opens its Settings page; failing ones show in warning colors.
+class _Integrations extends StatefulWidget {
+  const _Integrations();
+
+  @override
+  State<_Integrations> createState() => _IntegrationsState();
+}
+
+class _IntegrationsState extends State<_Integrations> {
+  Future<List<CiHostInfo>>? _hosts;
+
+  void _loadHosts() => _hosts = AppScope.read(context).ciHosts.list().catchError((Object _) => <CiHostInfo>[]);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_hosts == null) _loadHosts();
+  }
+
+  Future<void> _open(SettingsTab tab) async {
+    await showSettingsDialog(context, initial: tab);
+    if (mounted) setState(_loadHosts);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final s = AppScope.of(context);
+    return ListenableBuilder(
+      listenable: s.tasks,
+      builder: (context, _) => FutureBuilder<List<CiHostInfo>>(
+        future: _hosts,
+        builder: (context, hosts) {
+          // (badge, name, failing, settings page), one tile per badge.
+          final tiles = <String, (String, bool, SettingsTab)>{};
+          for (final src in s.tasks.sources.where((x) => x.enabled)) {
+            final prev = tiles[src.kind.badge];
+            tiles[src.kind.badge] = (prev == null ? src.name : '${prev.$1}, ${src.name}', (prev?.$2 ?? false) || src.error.isNotEmpty, SettingsTab.tickets);
+          }
+          for (final h in hosts.data ?? const <CiHostInfo>[]) {
+            if (!h.hasToken && !h.usesGh) continue;
+            final prev = tiles[h.provider.host];
+            tiles[h.provider.host] = (prev == null ? h.host : '${prev.$1}, ${h.host}', prev?.$2 ?? false, prev?.$3 ?? SettingsTab.repos);
+          }
+          final failing = tiles.values.where((t) => t.$2).length;
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: SectionTitle(
+                'Integrations',
+                trailing: tiles.isEmpty
+                    ? null
+                    : Text(failing > 0 ? '$failing failing' : '${tiles.length} connected', style: sans(11, color: failing > 0 ? c.warn : c.ok)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: tiles.isEmpty
+                  ? Align(
+                      alignment: Alignment.centerLeft,
+                      child: KButton(label: 'Connect your tools', height: 28, fontSize: 12, onTap: () => _open(SettingsTab.tickets)),
+                    )
+                  : Wrap(spacing: 4, runSpacing: 4, children: [
+                      for (final MapEntry(key: badge, value: (name, failing, tab)) in tiles.entries)
+                        KPressable(
+                          onTap: () => _open(tab),
+                          semanticLabel: failing ? '$name, failing' : name,
+                          builder: (context, hover, focus) => Opacity(
+                            opacity: hover ? 0.8 : 1,
+                            child: Container(
+                              decoration: failing ? BoxDecoration(borderRadius: BorderRadius.circular(7), border: Border.all(color: c.warn)) : null,
+                              child: SourceTile(badge, tooltip: failing ? '$name · failing' : name),
+                            ),
+                          ),
+                        ),
+                    ]),
+            ),
+          ]);
+        },
       ),
     );
   }
@@ -183,9 +324,14 @@ class _NavItem extends StatelessWidget {
     final s = AppScope.of(context);
     final c = context.c;
     final on = s.view == view;
+    // Agents: those waiting on you, else those running. Tasks: your open ones.
+    final waiting = s.agents.runs.where((r) => r.status == AgentStatus.needsYou).length;
+    final running = s.agents.runs.where((r) => r.status == AgentStatus.running).length;
+    final open = s.tasks.tasks.where((t) => t.mine && t.column != TaskColumn.done).length;
     final badge = switch (view) {
-      KumoView.agents => '1',
-      KumoView.tasks => '12',
+      KumoView.agents when waiting > 0 => '$waiting',
+      KumoView.agents when running > 0 => '$running',
+      KumoView.tasks when open > 0 => '$open',
       _ => null,
     };
     return KPressable(

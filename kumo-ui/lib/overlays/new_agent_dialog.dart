@@ -10,7 +10,8 @@ import 'settings_dialog.dart';
 
 /// "New agent": pick one of the connected agents, a worktree and a prompt.
 /// The agent's terminal opens in the Terminal view.
-Future<void> showNewAgentDialog(BuildContext context) {
+/// [prompt] starts the prompt field (e.g. about the file being read).
+Future<void> showNewAgentDialog(BuildContext context, {String prompt = ''}) {
   final c = context.c;
   return showGeneralDialog<void>(
     context: context,
@@ -19,25 +20,28 @@ Future<void> showNewAgentDialog(BuildContext context) {
     barrierColor: c.isDark ? const Color(0x66000000) : const Color(0x33141428),
     transitionDuration: const Duration(milliseconds: 140),
     transitionBuilder: (context, anim, _, child) => FadeTransition(opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut), child: child),
-    pageBuilder: (context, _, __) => const Align(
+    pageBuilder: (context, _, __) => Align(
       alignment: Alignment.topCenter,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(24, 96, 24, 24),
-        child: Material(type: MaterialType.transparency, child: NewAgentDialog()),
+        padding: const EdgeInsets.fromLTRB(24, 96, 24, 24),
+        child: Material(type: MaterialType.transparency, child: NewAgentDialog(prompt: prompt)),
       ),
     ),
   );
 }
 
 class NewAgentDialog extends StatefulWidget {
-  const NewAgentDialog({super.key});
+  const NewAgentDialog({super.key, this.prompt = ''});
+
+  /// What the prompt field starts with.
+  final String prompt;
 
   @override
   State<NewAgentDialog> createState() => _NewAgentDialogState();
 }
 
 class _NewAgentDialogState extends State<NewAgentDialog> {
-  final _prompt = TextEditingController();
+  late final _prompt = TextEditingController(text: widget.prompt);
   String? _provider;
   String? _worktree;
   bool _starting = false;

@@ -161,7 +161,7 @@ class _FileViewState extends State<FileView> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text.rich(TextSpan(children: [
           TextSpan(text: 'No changes in this file on ', style: sans(12.5, color: c.text2)),
-          TextSpan(text: 'feat/PRC-412-bulk-discounts', style: mono(12, color: c.text2)),
+          TextSpan(text: AppScope.of(context).changes.branch, style: mono(12, color: c.text2)),
           TextSpan(text: '.', style: sans(12.5, color: c.text2)),
         ])),
         const SizedBox(height: 12),

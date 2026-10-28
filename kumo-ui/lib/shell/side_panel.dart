@@ -1167,7 +1167,7 @@ class _PipelinesWidget extends StatelessWidget {
           Row(children: [
             TagChip(provider.host),
             const SizedBox(width: 6),
-            Text(provider.label, style: sans(11.5, color: c.text3)),
+            Flexible(child: Text(provider.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, color: c.text3))),
             Text(' · ', style: sans(11.5, color: c.text3)),
             Flexible(child: Text(p.branch, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11.5, color: c.text3))),
           ]),
