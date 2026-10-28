@@ -244,6 +244,36 @@ impl WorkspaceService {
         blocking(move || git.branches(&repo)).await
     }
 
+    /// The canonical path of `path` if it is a worktree of a repository in
+    /// the workspace.
+    pub async fn known_worktree(&self, path: &Path) -> Option<PathBuf> {
+        let state = self.state.lock().await;
+        state
+            .repos
+            .values()
+            .flat_map(|r| &r.worktrees)
+            .find(|w| same_path(&w.path, path))
+            .map(|w| w.path.clone())
+    }
+
+    /// Re-reads the repository that owns `worktree` (e.g. after a commit or
+    /// files changing on disk). Publishes only if something changed.
+    pub async fn refresh_worktree(&self, worktree: &Path) {
+        let mut state = self.state.lock().await;
+        let Some(owner) = state
+            .repos
+            .values()
+            .find(|r| r.worktrees.iter().any(|w| same_path(&w.path, worktree)))
+            .cloned()
+        else {
+            return;
+        };
+        let before = owner.clone();
+        if *self.reread(&mut state, owner.repo).await != before {
+            self.publish(&mut state);
+        }
+    }
+
     /// Git repositories under `roots` (or the usual folders), with the
     /// repository each one belongs to. Not added to the workspace.
     pub async fn discover(&self, roots: Vec<PathBuf>) -> Vec<RepoState> {

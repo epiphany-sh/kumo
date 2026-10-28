@@ -1,3 +1,4 @@
+use kumo_domain::changes::ChangesError;
 use kumo_domain::terminal::TerminalError;
 use kumo_domain::workspace::WorkspaceError;
 use tonic::Status;
@@ -32,5 +33,18 @@ pub fn workspace_status_from(error: WorkspaceError) -> Status {
             Status::failed_precondition(message)
         }
         WorkspaceError::Store(_) => Status::internal(message),
+    }
+}
+
+/// Maps an error on a worktree's changes; git's message reaches the client.
+pub fn changes_status_from(error: ChangesError) -> Status {
+    let message = error.to_string();
+    match error {
+        ChangesError::UnknownWorktree(_) => Status::not_found(message),
+        ChangesError::InvalidPath(_) | ChangesError::EmptyMessage => {
+            Status::invalid_argument(message)
+        }
+        ChangesError::Git(_) => Status::failed_precondition(message),
+        ChangesError::Io(_) => Status::internal(message),
     }
 }

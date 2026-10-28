@@ -226,3 +226,56 @@ pub async fn wait_exited(client: &mut KumoClient, terminal_id: &str) {
     .await
     .expect("terminal never exited");
 }
+
+/// `git init` with one commit, optionally with an `origin` remote.
+pub fn git_repo(dir: &std::path::Path, remote: Option<&str>) -> std::path::PathBuf {
+    std::fs::create_dir_all(dir).unwrap();
+    for args in [
+        &["init", "-q", "-b", "main"][..],
+        &["config", "user.email", "test@kumo.dev"],
+        &["config", "user.name", "Kumo Test"],
+    ] {
+        git(dir, args);
+    }
+    std::fs::write(dir.join("README.md"), "hello\n").unwrap();
+    git(dir, &["add", "."]);
+    git(dir, &["commit", "-q", "-m", "init"]);
+    if let Some(url) = remote {
+        git(dir, &["remote", "add", "origin", url]);
+    }
+    std::fs::canonicalize(dir).unwrap()
+}
+
+/// Runs git in `dir`, panicking on failure; returns stdout.
+pub fn git(dir: &std::path::Path, args: &[&str]) -> String {
+    let out = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).into_owned()
+}
+
+pub async fn save_namespace(
+    client: &mut KumoClient,
+    name: &str,
+    repos: &[&std::path::Path],
+) -> String {
+    client
+        .workspace
+        .save_namespace(pb::SaveNamespaceRequest {
+            name: name.into(),
+            repo_paths: repos.iter().map(|p| p.display().to_string()).collect(),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .id
+}

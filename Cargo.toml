@@ -58,6 +58,7 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 hdrhistogram = "7.6.0"
 tempfile = "3.27.0"
 rusqlite = { version = "0.41.0", features = ["bundled"] }
+notify = "8.2.1"
 libc = "0.2"
 windows-sys = "0.61.2"
 

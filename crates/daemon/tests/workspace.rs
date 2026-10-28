@@ -2,41 +2,13 @@
 
 mod common;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
-use common::{TIMEOUT, TestDaemon, test_config};
+use common::{TIMEOUT, TestDaemon, git_repo, save_namespace, test_config};
 use kumo_grpc::client::KumoClient;
 use kumo_proto::v1 as pb;
-
-/// `git init` with one commit, optionally with an `origin` remote.
-fn git_repo(dir: &Path, remote: Option<&str>) -> PathBuf {
-    std::fs::create_dir_all(dir).unwrap();
-    let git = |args: &[&str]| {
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(dir)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(
-            out.status.success(),
-            "git {args:?}: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-    };
-    git(&["init", "-q", "-b", "main"]);
-    git(&["config", "user.email", "test@kumo.dev"]);
-    git(&["config", "user.name", "Kumo Test"]);
-    std::fs::write(dir.join("README.md"), "hello\n").unwrap();
-    git(&["add", "."]);
-    git(&["commit", "-q", "-m", "init"]);
-    if let Some(url) = remote {
-        git(&["remote", "add", "origin", url]);
-    }
-    std::fs::canonicalize(dir).unwrap()
-}
 
 /// Waits for a snapshot that satisfies `ready`.
 async fn snapshot_where(
@@ -68,20 +40,6 @@ fn repo<'a>(snapshot: &'a pb::WorkspaceSnapshot, path: &Path) -> &'a pb::Reposit
         .iter()
         .find(|r| r.path == path)
         .expect("repo in snapshot")
-}
-
-async fn save_namespace(client: &mut KumoClient, name: &str, repos: &[&Path]) -> String {
-    client
-        .workspace
-        .save_namespace(pb::SaveNamespaceRequest {
-            name: name.into(),
-            repo_paths: repos.iter().map(|p| p.display().to_string()).collect(),
-            ..Default::default()
-        })
-        .await
-        .unwrap()
-        .into_inner()
-        .id
 }
 
 #[tokio::test(flavor = "multi_thread")]

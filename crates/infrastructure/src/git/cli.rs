@@ -21,8 +21,8 @@ impl Default for GitCli {
 }
 
 impl GitCli {
-    /// Runs `git -C <dir> <args>` and returns stdout.
-    fn run<I, S>(&self, dir: &Path, args: I) -> Result<String, WorkspaceError>
+    /// Runs `git -C <dir> <args>` and returns stdout, or git's error text.
+    pub(super) fn exec<I, S>(&self, dir: &Path, args: I) -> Result<String, String>
     where
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
@@ -31,17 +31,33 @@ impl GitCli {
             .arg("-C")
             .arg(dir)
             .args(args)
-            // Stable, English, non-interactive output.
+            // Stable, English, non-interactive output; ssh never prompts.
             .env("LC_ALL", "C")
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("GIT_OPTIONAL_LOCKS", "0")
+            .env("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
             .output()
-            .map_err(|e| WorkspaceError::Git(format!("can't run git: {e}")))?;
+            .map_err(|e| format!("can't run git: {e}"))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(WorkspaceError::Git(stderr.trim().to_owned()));
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Some commands (commit) explain themselves on stdout.
+            let message = if stderr.trim().is_empty() {
+                stdout
+            } else {
+                stderr
+            };
+            return Err(message.trim().to_owned());
         }
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    }
+
+    fn run<I, S>(&self, dir: &Path, args: I) -> Result<String, WorkspaceError>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        self.exec(dir, args).map_err(WorkspaceError::Git)
     }
 }
 
