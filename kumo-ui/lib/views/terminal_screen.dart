@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
@@ -31,15 +33,26 @@ class TerminalScreen extends StatefulWidget {
 class _TerminalScreenState extends State<TerminalScreen> {
   final Map<String, TerminalSurface> _surfaces = {};
 
-  /// Terminal tabs. Each tab holds its own split layout of panes; + / ⌘T
-  /// opens a new tab, ⌘D / ⇧⌘D split the focused pane inside the tab.
-  final List<_TermTab> _tabs = [];
-  int _active = 0;
+  /// One space of terminals per worktree, by its absolute path ('' when
+  /// none is selected): selecting a worktree shows its space, and the others
+  /// keep running. Each holds tabs; each tab its own split layout of panes.
+  /// + / ⌘T opens a new tab, ⌘D / ⇧⌘D split the focused pane inside the tab.
+  final Map<String, _Space> _spaces = {};
+  String _spaceKey = '';
   KumoEngine? _engine;
   bool _started = false;
   bool _agentConfirm = false;
   int _shellSeq = 0;
   AppState? _app;
+
+  /// Whether a shell already took over the terminals the daemon kept
+  /// running from a previous UI session.
+  bool _adopted = false;
+
+  _Space get _space => _spaces.putIfAbsent(_spaceKey, _Space.new);
+  List<_TermTab> get _tabs => _space.tabs;
+  int get _active => _space.active;
+  set _active(int i) => _space.active = i;
 
   _TermTab? get _tab => _tabs.isEmpty ? null : _tabs[_active < _tabs.length ? _active : _tabs.length - 1];
 
@@ -50,10 +63,90 @@ class _TerminalScreenState extends State<TerminalScreen> {
   set _focus(String? id) => _tab?.focus = id;
 
   _TermTab? _tabOf(String id) {
-    for (final t in _tabs) {
-      if (t.layout.contains(id)) return t;
+    for (final space in _spaces.values) {
+      for (final t in space.tabs) {
+        if (t.layout.contains(id)) return t;
+      }
     }
     return null;
+  }
+
+  /// The key of the space holding [t].
+  String? _spaceOf(_TermTab t) => _spaces.entries.where((e) => e.value.tabs.contains(t)).firstOrNull?.key;
+
+  /// The selected worktree's space key.
+  static String _keyOf(AppState s) {
+    final entry = s.activeWorktreeEntry;
+    return entry == null ? '' : s.workspace.absolutePathOf(entry);
+  }
+
+  /// The space of the worktree [directory] is in (the deepest one), or the
+  /// current one when it's in none.
+  String _spaceFor(String? directory) {
+    final s = _app;
+    if (directory == null || directory.isEmpty || s == null) return _spaceKey;
+    var best = '';
+    for (final r in s.workspace.repos) {
+      for (final w in r.worktrees) {
+        final path = s.workspace.absolutePathOf(w);
+        if ((directory == path || directory.startsWith('$path${Platform.pathSeparator}')) && path.length > best.length) best = path;
+      }
+    }
+    return best.isEmpty ? _spaceKey : best;
+  }
+
+  /// Where new shells of space [key] start: the worktree, if it's a real
+  /// path (the design mocks' aren't), else the home directory.
+  static String? _directoryOf(String key) => key.startsWith('/') || RegExp(r'^[A-Za-z]:[\\/]').hasMatch(key) ? key : null;
+
+  /// The worktree at [directory] was removed: its space goes away with its
+  /// terminals (shells are killed; agents were stopped by the app).
+  void _closeSpace(String directory) {
+    final space = _spaces.remove(directory);
+    if (space == null || !mounted) return;
+    for (final t in space.tabs) {
+      for (final id in t.layout.panes) {
+        _disposeLater(id);
+      }
+    }
+    setState(() {});
+  }
+
+  /// Shows space [key] by selecting its worktree.
+  void _showSpace(String key) {
+    final s = _app;
+    if (s == null || key == _spaceKey) return;
+    for (final r in s.workspace.repos) {
+      for (final w in r.worktrees) {
+        if (s.workspace.absolutePathOf(w) == key) return s.selectWorktree(w.branch, path: w.path);
+      }
+    }
+  }
+
+  /// Switches to the selected worktree's space. The first time a space
+  /// shows, it gets a shell in the worktree (unless it has one already,
+  /// e.g. one the daemon kept running); an agent opened there before
+  /// stays in front.
+  void _enter(String key) {
+    _spaceKey = key;
+    final space = _space;
+    final engine = _engine;
+    if (space.visited) return;
+    space.visited = true;
+    if (engine == null) return;
+    final hasShell = space.tabs.any((t) => t.layout.panes.any((p) => !_agentPanes.contains(p)));
+    if (hasShell) return;
+    final id = 'sh-${++_shellSeq}';
+    final adopt = !_adopted;
+    _adopted = true;
+    _surfaces[id] = GrpcTerminalSurface.shell(
+      engine,
+      directory: _directoryOf(key),
+      adopt: adopt ? () => _adoptRunning(key) : null,
+      onExit: (_) => _closeExited(id),
+    );
+    space.tabs.insert(0, _TermTab('t-$id', _single(id), id));
+    if (space.tabs.length > 1) space.active++;
   }
 
   static PaneLayout _single(String id) => PaneLayout([PaneColumn('col-$id', 1, [PaneCell(id, 1)])]);
@@ -73,46 +166,49 @@ class _TerminalScreenState extends State<TerminalScreen> {
     if (!_started) _start();
     final app = AppScope.read(context);
     if (!identical(app, _app)) {
-      if (_app?.terminalHandler == _onCommand) _app!.terminalHandler = null;
-      if (_app?.terminalOpener == _openTerminal) _app!.terminalOpener = null;
+      _unregister();
       _app = app
         ..terminalHandler = _onCommand
-        ..terminalOpener = _openTerminal;
+        ..terminalOpener = _openTerminal
+        ..terminalSpaceCloser = _closeSpace;
     }
+  }
+
+  void _unregister() {
+    final app = _app;
+    if (app == null) return;
+    if (app.terminalHandler == _onCommand) app.terminalHandler = null;
+    if (app.terminalOpener == _openTerminal) app.terminalOpener = null;
+    if (app.terminalSpaceCloser == _closeSpace) app.terminalSpaceCloser = null;
   }
 
   @override
   void dispose() {
-    if (_app?.terminalHandler == _onCommand) _app!.terminalHandler = null;
-    if (_app?.terminalOpener == _openTerminal) _app!.terminalOpener = null;
+    _unregister();
     for (final t in _surfaces.values) {
       t.dispose();
     }
     super.dispose();
   }
 
-  /// With an engine: a real shell that first re-attaches to whatever the
-  /// daemon kept running (agents come back in their own tabs).
+  /// With an engine, shells open as worktrees are shown (see [_enter]); the
+  /// first re-attaches to whatever the daemon kept running.
   /// Without one (widget tests): the scripted mocks.
   void _start() {
     _started = true;
     _engine = EngineScope.maybeOf(context);
-    final engine = _engine;
-    if (engine == null) {
-      _surfaces['agent'] = MockSessions.agent();
-      _surfaces['tests'] = MockSessions.tests();
-      _surfaces['logs'] = MockSessions.logs();
-      _tabs.add(_TermTab('t-agent', PaneLayout.initial, 'agent'));
-      return;
-    }
-    _shellSeq = 1;
-    _surfaces['sh-1'] = GrpcTerminalSurface.shell(engine, adopt: _adoptRunning, onExit: (_) => _closeExited('sh-1'));
-    _tabs.add(_TermTab('t-sh-1', _single('sh-1'), 'sh-1'));
+    if (_engine != null) return;
+    _surfaces['agent'] = MockSessions.agent();
+    _surfaces['tests'] = MockSessions.tests();
+    _surfaces['logs'] = MockSessions.logs();
+    _spaceKey = _keyOf(AppScope.read(context));
+    _tabs.add(_TermTab('t-agent', PaneLayout.initial, 'agent'));
   }
 
-  /// Terminals left running by a previous UI session: the first one fills
-  /// the initial shell pane, the rest get panes of their own.
-  Future<TerminalInfo?> _adoptRunning() async {
+  /// Terminals left running by a previous UI session, each back with its
+  /// worktree: the first one of space [key] fills the shell pane opening
+  /// there, the rest get tabs of their own.
+  Future<TerminalInfo?> _adoptRunning(String key) async {
     final all = await _engine!.runningTerminals();
     if (!mounted) return null;
     // Agents' terminals come back as agent tabs (closing those detaches).
@@ -122,21 +218,26 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final runs = {for (final r in agents.runs) r.terminalId: r};
     for (final info in all.where((t) => runs.containsKey(t.terminalId))) {
       final run = runs[info.terminalId]!;
-      _openTerminal(info.terminalId, run.title, agent: true, focus: false);
+      _openTerminal(info.terminalId, run.title, agent: true, focus: false, directory: run.worktreePath);
     }
-    final running = [for (final t in all) if (!runs.containsKey(t.terminalId)) t];
-    if (running.isEmpty) return null;
-    for (final info in running.skip(1)) {
+    TerminalInfo? here;
+    for (final info in all.where((t) => !runs.containsKey(t.terminalId))) {
+      final space = _spaceFor(info.cwd);
+      if (here == null && space == key) {
+        here = info;
+        continue;
+      }
       final id = 'sh-${++_shellSeq}';
-      _surfaces[id] = GrpcTerminalSurface.attach(_engine!, terminalId: info.terminalId, program: info.program, onExit: (_) => _closeExited(id));
+      _surfaces[id] = GrpcTerminalSurface.attach(_engine!, terminalId: info.terminalId, program: info.program, directory: info.cwd, onExit: (_) => _closeExited(id));
       // Each re-attached terminal comes back as a tab of its own.
-      setState(() => _tabs.add(_TermTab('t-$id', _single(id), id)));
+      setState(() => _spaces.putIfAbsent(space, _Space.new).tabs.add(_TermTab('t-$id', _single(id), id)));
     }
-    return running.first;
+    return here;
   }
 
-  /// Shows a daemon terminal in a new tab (or focuses the one showing it).
-  void _openTerminal(String terminalId, String title, {bool agent = false, bool focus = true}) {
+  /// Shows a daemon terminal in a new tab (or focuses the one showing it),
+  /// in the space of the worktree [directory] is in.
+  void _openTerminal(String terminalId, String title, {bool agent = false, bool focus = true, String? directory}) {
     final engine = _engine;
     if (engine == null || !mounted) return;
     final shown = _terminalOf.entries.where((e) => e.value == terminalId).firstOrNull?.key;
@@ -152,15 +253,19 @@ class _TerminalScreenState extends State<TerminalScreen> {
       terminalId: terminalId,
       program: title,
       title: title,
+      directory: directory,
       killOnClose: !agent,
       onExit: agent ? null : (_) => _closeExited(id),
     );
     _terminalOf[id] = terminalId;
     if (agent) _agentPanes.add(id);
+    final key = _spaceFor(directory);
+    final space = _spaces.putIfAbsent(key, _Space.new);
     setState(() {
-      _tabs.add(_TermTab('t-$id', _single(id), id));
-      if (focus) _active = _tabs.length - 1;
+      space.tabs.add(_TermTab('t-$id', _single(id), id));
+      if (focus) space.active = space.tabs.length - 1;
     });
+    if (focus) _showSpace(key);
   }
 
   /// The agent session shown in pane [id], if any.
@@ -196,7 +301,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final n = ++_shellSeq;
     final id = 'sh-$n';
     final engine = _engine;
-    _surfaces[id] = engine == null ? MockSessions.shell(n) : GrpcTerminalSurface.shell(engine, onExit: (_) => _closeExited(id));
+    _surfaces[id] = engine == null ? MockSessions.shell(n) : GrpcTerminalSurface.shell(engine, directory: _directoryOf(_spaceKey), onExit: (_) => _closeExited(id));
     return id;
   }
 
@@ -233,15 +338,21 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
   void _activate(_TermTab t) {
     _app?.showTerminals();
-    final i = _tabs.indexOf(t);
-    if (i >= 0 && i != _active) setState(() => _active = i);
+    final key = _spaceOf(t);
+    if (key == null) return;
+    final space = _spaces[key]!;
+    final i = space.tabs.indexOf(t);
+    if (i >= 0 && i != space.active) setState(() => space.active = i);
+    _showSpace(key);
   }
 
   void _dropTab(_TermTab t) {
-    final i = _tabs.indexOf(t);
-    if (i < 0) return;
-    _tabs.removeAt(i);
-    if (i < _active || _active >= _tabs.length) _active = _active > 0 ? _active - 1 : 0;
+    final key = _spaceOf(t);
+    if (key == null) return;
+    final space = _spaces[key]!;
+    final i = space.tabs.indexOf(t);
+    space.tabs.removeAt(i);
+    if (i < space.active || space.active >= space.tabs.length) space.active = space.active > 0 ? space.active - 1 : 0;
   }
 
   void _disposeLater(String id) {
@@ -303,6 +414,11 @@ class _TerminalScreenState extends State<TerminalScreen> {
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
+    // Until the workspace is known, the selected worktree isn't either.
+    if (s.workspace.loaded) {
+      final key = _keyOf(s);
+      if (key != _spaceKey || !_space.visited) _enter(key);
+    }
     return ScreenFrame(
       toolbar: ScreenToolbar(
         breadcrumb: Breadcrumb(icon: KIcons.branch, parts: [s.activeRepo?.name ?? 'No repository', if (s.changes.branch.isNotEmpty) s.changes.branch]),
@@ -408,7 +524,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
             child: s.activeFile != null
                 ? FileView(key: ValueKey(s.activeFile), path: s.activeFile!)
                 : _layout.isEmpty
-                ? _empty(context)
+                ? (s.workspace.loaded ? _empty(context) : const SizedBox.shrink())
                 : _splitPanes(context),
           ),
         ),
@@ -602,6 +718,15 @@ class _TerminalScreenState extends State<TerminalScreen> {
       },
     );
   }
+}
+
+/// The terminals of one worktree: its tabs and the one showing.
+class _Space {
+  final List<_TermTab> tabs = [];
+  int active = 0;
+
+  /// Whether it has shown yet (the first time, it gets a shell).
+  bool visited = false;
 }
 
 /// One terminal tab: its own split layout and focused pane.

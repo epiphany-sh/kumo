@@ -59,6 +59,9 @@ class EngineWorkspaceSource extends WorkspaceSource {
   @override
   String? get error => _error;
 
+  @override
+  bool get loaded => _snapshot != null || _error != null;
+
   Future<void> _watch() async {
     while (!_disposed) {
       try {

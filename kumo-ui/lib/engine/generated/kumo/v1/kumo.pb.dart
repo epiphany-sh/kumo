@@ -1031,12 +1031,14 @@ class TerminalInfo extends $pb.GeneratedMessage {
     $core.String? program,
     $core.bool? exited,
     $core.int? exitCode,
+    $core.String? cwd,
   }) {
     final result = TerminalInfo._();
     if (terminalId != null) result.terminalId = terminalId;
     if (program != null) result.program = program;
     if (exited != null) result.exited = exited;
     if (exitCode != null) result.exitCode = exitCode;
+    if (cwd != null) result.cwd = cwd;
     return result;
   }
 
@@ -1057,6 +1059,7 @@ class TerminalInfo extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'program')
     ..aOB(3, _omitFieldNames ? '' : 'exited')
     ..aI(4, _omitFieldNames ? '' : 'exitCode')
+    ..aOS(5, _omitFieldNames ? '' : 'cwd')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1116,6 +1119,17 @@ class TerminalInfo extends $pb.GeneratedMessage {
   $core.bool hasExitCode() => $_has(3);
   @$pb.TagNumber(4)
   void clearExitCode() => $_clearField(4);
+
+  /// Where it started (absolute); empty if it started in the daemon's own
+  /// directory. Lets a UI put terminals back with their worktree.
+  @$pb.TagNumber(5)
+  $core.String get cwd => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set cwd($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCwd() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCwd() => $_clearField(5);
 }
 
 class WatchWorkspaceRequest extends $pb.GeneratedMessage {

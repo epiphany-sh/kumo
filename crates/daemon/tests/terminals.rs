@@ -151,3 +151,38 @@ async fn unknown_program_fails_to_open() {
     let error = client.terminals.open(request).await.unwrap_err();
     assert_eq!(error.code(), tonic::Code::FailedPrecondition);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn list_reports_where_each_terminal_started() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let dir = tempfile::tempdir().unwrap();
+    let cwd = dir.path().display().to_string();
+    let response = client
+        .terminals
+        .open(pb::OpenRequest {
+            program: "sleep".into(),
+            args: vec!["30".into()],
+            cwd: cwd.clone(),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let elsewhere = open(&mut client, "sleep", &["30"]).await;
+
+    let list = client
+        .terminals
+        .list(pb::ListRequest {})
+        .await
+        .unwrap()
+        .into_inner();
+    let cwd_of = |id: &str| {
+        list.terminals
+            .iter()
+            .find(|t| t.terminal_id == id)
+            .map(|t| t.cwd.clone())
+    };
+    assert_eq!(cwd_of(&response.terminal_id), Some(cwd));
+    assert_eq!(cwd_of(&elsewhere), Some(String::new()));
+}

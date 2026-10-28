@@ -139,7 +139,7 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
     final provider = connected.any((p) => p.id == _agent) ? _agent : connected.first.id;
     final run = await s.agents.start(providerId: provider, worktreePath: worktree);
     if (run != null) {
-      s.openTerminal(run.terminalId, title: run.title, agent: true);
+      s.openTerminal(run.terminalId, title: run.title, agent: true, directory: worktree);
     } else if (mounted) {
       setState(() => _error = 'Worktree created, but the agent didn’t start: ${s.agents.error ?? 'unknown error'}');
     }
@@ -170,7 +170,9 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
       // the agent's prompt.
       try {
         final error = await s.startTask(task, repo: repo, branch: branch, base: _base, path: _path.text, agent: _agentOn, providerId: _agent);
-        if (mounted) setState(() => _error = error);
+        if (!mounted) return;
+        setState(() => _error = error);
+        if (error == null) widget.onClose();
       } on Object catch (e) {
         if (mounted) {
           setState(() {
@@ -193,8 +195,9 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
       );
       final created = s.workspace.repo(repo.id)?.worktrees.where((w) => w.branch == branch).firstOrNull;
       if (created != null) {
-        s.selectWorktree(created.branch, path: created.path);
+        s.openWorktree(created);
         if (_agentOn) await _startAgent(s, s.workspace.absolutePathOf(created));
+        if (mounted && _error == null) widget.onClose();
       }
     } on Object catch (e) {
       if (mounted) {

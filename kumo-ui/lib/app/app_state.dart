@@ -230,6 +230,7 @@ class AppState extends ChangeNotifier {
     if (repo == null || w == null || w.isMain) return;
     final key = '${repo.id}:${w.path}';
     if (!_removedWorktrees.add(key)) return;
+    final directory = workspace.absolutePathOf(w);
     if (isActiveWorktree(w)) {
       final main = repo.worktrees.where((w) => w.isMain).firstOrNull;
       activeWorktree = main?.branch ?? 'main';
@@ -239,7 +240,10 @@ class AppState extends ChangeNotifier {
       'Deleted worktree “$branch”',
       () => _removedWorktrees.remove(key),
       commit: () => workspace.removeWorktree(repo, w).then(
-            (_) => _removedWorktrees.remove(key),
+            (_) {
+              _removedWorktrees.remove(key);
+              _closeWorktreeTerminals(directory);
+            },
             // Git refused (e.g. uncommitted changes): show it again.
             onError: (Object _) {
               _removedWorktrees.remove(key);
@@ -247,6 +251,19 @@ class AppState extends ChangeNotifier {
             },
           ),
     );
+  }
+
+  /// The Terminal view registers itself here to close the terminals of a
+  /// worktree that was removed.
+  void Function(String directory)? terminalSpaceCloser;
+
+  /// Once a worktree is removed from the app: its agents stop and its
+  /// terminals close (they'd be left in a folder that no longer exists).
+  void _closeWorktreeTerminals(String directory) {
+    for (final run in agents.runs) {
+      if (run.worktreePath == directory && run.status != AgentStatus.done) agents.stop(run.id).ignore();
+    }
+    terminalSpaceCloser?.call(directory);
   }
 
   /// The daemon's last error about the workspace, until dismissed.
@@ -517,12 +534,21 @@ class AppState extends ChangeNotifier {
 
   /// The Terminal view registers itself here to open daemon terminals
   /// (agents, sign-in flows) in a pane.
-  void Function(String terminalId, String title, {bool agent})? terminalOpener;
+  void Function(String terminalId, String title, {bool agent, String? directory})? terminalOpener;
 
-  /// Shows [terminalId] in a pane of the Terminal view.
-  void openTerminal(String terminalId, {required String title, bool agent = false}) {
+  /// Shows [terminalId] in a pane of the Terminal view: with the terminals
+  /// of the worktree at [directory], else with the current ones.
+  void openTerminal(String terminalId, {required String title, bool agent = false, String? directory}) {
     view = KumoView.terminal;
-    terminalOpener?.call(terminalId, title, agent: agent);
+    terminalOpener?.call(terminalId, title, agent: agent, directory: directory);
+  }
+
+  /// Goes to work in [worktree]: selects it and shows its terminals (the
+  /// Terminal view opens a shell in it the first time).
+  void openWorktree(Worktree worktree) {
+    selectWorktree(worktree.branch, path: worktree.path);
+    view = KumoView.terminal;
+    showTerminals();
   }
 
   // ---- Tasks ----
@@ -544,7 +570,7 @@ class AppState extends ChangeNotifier {
     }
     final created = workspace.repo(repo.id)?.worktrees.where((w) => w.branch == branch).firstOrNull;
     final worktreePath = created == null ? '' : workspace.absolutePathOf(created);
-    if (created != null) selectWorktree(created.branch, path: created.path);
+    if (created != null) openWorktree(created);
     await tasks.link(task.id, worktreePath: worktreePath.isEmpty ? path : worktreePath, branch: branch);
     final source = tasks.source(task.sourceId);
     if (task.column == TaskColumn.todo && (source?.writable.contains(TaskColumn.doing) ?? false)) {
@@ -553,7 +579,7 @@ class AppState extends ChangeNotifier {
     if (!agent || created == null || !agents.live || agents.connected.isEmpty) return null;
     final run = await agents.start(providerId: providerId, worktreePath: worktreePath, prompt: taskPrompt(task), title: '${task.key} · ${task.title}');
     if (run == null) return 'Worktree ready, but the agent didn’t start: ${agents.error ?? 'unknown error'}';
-    openTerminal(run.terminalId, title: run.title, agent: true);
+    openTerminal(run.terminalId, title: run.title, agent: true, directory: worktreePath);
     return null;
   }
 

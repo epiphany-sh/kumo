@@ -47,6 +47,10 @@ pub fn terminal_info_to(info: TerminalInfo) -> pb::TerminalInfo {
     pb::TerminalInfo {
         terminal_id: info.id.to_string(),
         program: info.program,
+        cwd: info
+            .cwd
+            .map(|p| p.display().to_string())
+            .unwrap_or_default(),
         exited: exit.is_some(),
         exit_code: exit.unwrap_or_default(),
     }

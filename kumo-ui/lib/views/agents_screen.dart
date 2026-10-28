@@ -311,7 +311,7 @@ class _AgentCard extends StatelessWidget {
             onTap: () {
               final s = AppScope.read(context);
               final r = run;
-              r == null ? s.view = KumoView.terminal : s.openTerminal(r.terminalId, title: r.title, agent: true);
+              r == null ? s.view = KumoView.terminal : s.openTerminal(r.terminalId, title: r.title, agent: true, directory: r.worktreePath);
             },
           ),
         ]),

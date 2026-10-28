@@ -5,6 +5,7 @@ mod hub;
 mod io_threads;
 mod pump;
 
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use bytes::Bytes;
@@ -26,6 +27,7 @@ type SharedMaster = Arc<Mutex<Option<Box<dyn PtyMaster>>>>;
 pub struct TerminalSession {
     id: TerminalId,
     program: String,
+    cwd: Option<PathBuf>,
     opened_at: Timestamp,
     input: mpsc::Sender<Bytes>,
     /// `None` once the session finished and the PTY was released.
@@ -96,6 +98,7 @@ impl TerminalSession {
         Arc::new(Self {
             id,
             program: spec.program().to_owned(),
+            cwd: spec.cwd().map(Path::to_path_buf),
             opened_at: Timestamp::now(),
             input: input_tx,
             master,
@@ -116,6 +119,7 @@ impl TerminalSession {
         TerminalInfo {
             id: self.id.clone(),
             program: self.program.clone(),
+            cwd: self.cwd.clone(),
             status: self.status(),
             opened_at: self.opened_at,
         }

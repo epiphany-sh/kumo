@@ -446,6 +446,7 @@ const TerminalInfo$json = {
     {'1': 'program', '3': 2, '4': 1, '5': 9, '10': 'program'},
     {'1': 'exited', '3': 3, '4': 1, '5': 8, '10': 'exited'},
     {'1': 'exit_code', '3': 4, '4': 1, '5': 5, '10': 'exitCode'},
+    {'1': 'cwd', '3': 5, '4': 1, '5': 9, '10': 'cwd'},
   ],
 };
 
@@ -453,7 +454,7 @@ const TerminalInfo$json = {
 final $typed_data.Uint8List terminalInfoDescriptor = $convert.base64Decode(
     'CgxUZXJtaW5hbEluZm8SHwoLdGVybWluYWxfaWQYASABKAlSCnRlcm1pbmFsSWQSGAoHcHJvZ3'
     'JhbRgCIAEoCVIHcHJvZ3JhbRIWCgZleGl0ZWQYAyABKAhSBmV4aXRlZBIbCglleGl0X2NvZGUY'
-    'BCABKAVSCGV4aXRDb2Rl');
+    'BCABKAVSCGV4aXRDb2RlEhAKA2N3ZBgFIAEoCVIDY3dk');
 
 @$core.Deprecated('Use watchWorkspaceRequestDescriptor instead')
 const WatchWorkspaceRequest$json = {

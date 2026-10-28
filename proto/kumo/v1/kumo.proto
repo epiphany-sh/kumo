@@ -116,6 +116,9 @@ message TerminalInfo {
   string program = 2;
   bool exited = 3;
   int32 exit_code = 4;
+  // Where it started (absolute); empty if it started in the daemon's own
+  // directory. Lets a UI put terminals back with their worktree.
+  string cwd = 5;
 }
 
 // ---------------------------------------------------------------------------

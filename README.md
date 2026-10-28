@@ -33,7 +33,7 @@ Qué es real hoy y qué sigue siendo mock:
 
 | Área | Estado |
 |---|---|
-| Terminales (shells) | Real: PTYs en `kumod`, render en grilla de celdas |
+| Terminales (shells) | Real: PTYs en `kumod`, render en grilla de celdas. Un espacio de terminales por worktree: al elegir o crear uno se ve el suyo, con una shell parada en su carpeta; los demás siguen corriendo |
 | Namespaces, repos y worktrees | Real: `Workspace` en `kumod`, persistido en `kumo.db` (SQLite) |
 | Files, cambios de git, diffs, commit, push, historial | Real: `Git` en `kumod`; el estado se actualiza solo (file watcher) |
 | Gráfico de ramas del historial, panel Diff de la vista Git | Mock |

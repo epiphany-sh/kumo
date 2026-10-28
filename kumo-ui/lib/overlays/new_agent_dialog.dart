@@ -78,7 +78,7 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
       return;
     }
     Navigator.of(context).maybePop();
-    if (run != null) s.openTerminal(run.terminalId, title: run.title, agent: true);
+    if (run != null) s.openTerminal(run.terminalId, title: run.title, agent: true, directory: run.worktreePath);
   }
 
   void _openSettings() {

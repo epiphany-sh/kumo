@@ -16,13 +16,15 @@ import 'kumo_engine.dart';
 /// Output is parsed as it arrives but published at most once per frame
 /// (kumo.md §5.6). Keystrokes typed before the stream is up are queued.
 class GrpcTerminalSurface implements TerminalSurface {
-  /// Opens the user's login shell in their home directory. The PTY is
-  /// opened at the pane's real size, once it is first laid out.
+  /// Opens the user's login shell in [directory] (their home directory by
+  /// default). The PTY is opened at the pane's real size, once it is first
+  /// laid out.
   ///
   /// [adopt] may hand over a terminal the daemon already runs instead.
-  GrpcTerminalSurface.shell(this._engine, {this.onExit, Future<TerminalInfo?> Function()? adopt})
+  GrpcTerminalSurface.shell(this._engine, {String? directory, this.onExit, Future<TerminalInfo?> Function()? adopt})
       : title = _shellName,
-        cwd = '~',
+        cwd = _shorten(directory),
+        _directory = directory,
         _existingId = null,
         killOnClose = true,
         _adopt = adopt {
@@ -37,10 +39,12 @@ class GrpcTerminalSurface implements TerminalSurface {
     required String terminalId,
     required String program,
     String? title,
+    String? directory,
     this.onExit,
     this.killOnClose = true,
   })  : title = title ?? program.split(Platform.pathSeparator).last,
-        cwd = '~',
+        cwd = _shorten(directory),
+        _directory = directory,
         _existingId = terminalId,
         _adopt = null {
     _run();
@@ -48,6 +52,7 @@ class GrpcTerminalSurface implements TerminalSurface {
 
   final KumoEngine _engine;
   final String? _existingId;
+  final String? _directory;
 
   /// Whether closing the pane kills the process (shells) or only detaches.
   final bool killOnClose;
@@ -86,6 +91,15 @@ class GrpcTerminalSurface implements TerminalSurface {
       Platform.environment['SHELL'] ?? (Platform.isWindows ? (Platform.environment['COMSPEC'] ?? 'cmd.exe') : '/bin/zsh');
 
   static String get _shellName => _shellPath.split(Platform.pathSeparator).last;
+
+  static String get _home => Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+
+  /// `/Users/ana/wt/x` → `~/wt/x`, for the pane header.
+  static String _shorten(String? directory) {
+    final home = _home;
+    if (directory == null || directory.isEmpty || directory == home) return '~';
+    return home.isNotEmpty && directory.startsWith('$home${Platform.pathSeparator}') ? '~${directory.substring(home.length)}' : directory;
+  }
 
   Future<void> _run() async {
     final (cols, rows) = await _size.future;
@@ -126,10 +140,11 @@ class GrpcTerminalSurface implements TerminalSurface {
 
   OpenRequest _shellRequest(int cols, int rows) {
     final env = Platform.environment;
+    final directory = _directory;
     return OpenRequest(
       program: _shellPath,
       args: Platform.isWindows ? const [] : const ['-l'],
-      cwd: env['HOME'] ?? env['USERPROFILE'] ?? '',
+      cwd: directory == null || directory.isEmpty ? _home : directory,
       env: {
         'TERM_PROGRAM': 'kumo',
         if (!env.containsKey('LANG')) 'LANG': 'en_US.UTF-8',

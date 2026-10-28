@@ -723,7 +723,7 @@ class _TaskDetailState extends State<_TaskDetail> {
               const SizedBox(height: 10),
               Row(children: [
                 if (run != null && run.status != AgentStatus.done)
-                  KButton(label: 'Open terminal', icon: KIcons.terminal, height: 28, fontSize: 12, onTap: () => s.openTerminal(run.terminalId, title: run.title, agent: true)),
+                  KButton(label: 'Open terminal', icon: KIcons.terminal, height: 28, fontSize: 12, onTap: () => s.openTerminal(run.terminalId, title: run.title, agent: true, directory: run.worktreePath)),
                 const Spacer(),
                 KButton(label: 'Unlink', height: 28, fontSize: 12, kind: KButtonKind.ghost, onTap: () => s.tasks.unlink(widget.task.id, link.worktreePath)),
               ]),

@@ -23,6 +23,10 @@ abstract class WorkspaceSource extends ChangeNotifier {
   /// Last failure reported by the daemon, for a notice.
   String? get error;
 
+  /// Whether the first state arrived (or failed to): until then [repos] is
+  /// empty because it isn't known yet, not because there are none.
+  bool get loaded => true;
+
   /// Looks for repositories on disk ([candidates] updates when done).
   Future<void> discover();
 
