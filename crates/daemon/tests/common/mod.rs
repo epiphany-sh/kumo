@@ -55,9 +55,13 @@ impl Drop for TestDaemon {
 
 /// Data and home folders inside `dir`, so tests never touch the real ones.
 pub fn test_config(dir: &std::path::Path) -> DaemonConfig {
+    // Agent CLIs are only looked up in `bin/`: tests never run real ones.
+    let bin = dir.join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
     DaemonConfig {
         data_dir: Some(dir.join("data")),
         home: Some(dir.join("home")),
+        agent_path: Some(bin.display().to_string()),
         ..Default::default()
     }
 }
@@ -65,6 +69,11 @@ pub fn test_config(dir: &std::path::Path) -> DaemonConfig {
 impl TestDaemon {
     pub fn home(&self) -> std::path::PathBuf {
         self._data_dir.path().join("home")
+    }
+
+    /// The only folder agent CLIs are looked up in.
+    pub fn bin(&self) -> std::path::PathBuf {
+        self._data_dir.path().join("bin")
     }
 }
 

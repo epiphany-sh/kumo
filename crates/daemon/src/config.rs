@@ -13,5 +13,8 @@ pub struct DaemonConfig {
     /// The user's home: default worktree location (`~/wt`) and the usual
     /// folders scanned for repositories. `None` uses the real one.
     pub home: Option<PathBuf>,
+    /// PATH used to find agent CLIs. `None` reads the login shell's (tests
+    /// pass their own).
+    pub agent_path: Option<String>,
     pub session: SessionConfig,
 }

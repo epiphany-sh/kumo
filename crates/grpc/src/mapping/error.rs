@@ -1,3 +1,4 @@
+use kumo_domain::agents::AgentError;
 use kumo_domain::changes::ChangesError;
 use kumo_domain::terminal::TerminalError;
 use kumo_domain::workspace::WorkspaceError;
@@ -46,5 +47,21 @@ pub fn changes_status_from(error: ChangesError) -> Status {
         }
         ChangesError::Git(_) => Status::failed_precondition(message),
         ChangesError::Io(_) => Status::internal(message),
+    }
+}
+
+/// Maps an agent error; messages are written for the user.
+pub fn agents_status_from(error: AgentError) -> Status {
+    let message = error.to_string();
+    match error {
+        AgentError::UnknownProvider(_)
+        | AgentError::UnknownSession(_)
+        | AgentError::UnknownWorktree(_) => Status::not_found(message),
+        AgentError::InvalidArgs(_) | AgentError::Invalid(_) => Status::invalid_argument(message),
+        AgentError::NoProvider
+        | AgentError::NotInstalled(_)
+        | AgentError::Test(_)
+        | AgentError::Launch(_) => Status::failed_precondition(message),
+        AgentError::Store(_) => Status::internal(message),
     }
 }

@@ -123,5 +123,30 @@ class DiffLineKind extends $pb.ProtobufEnum {
   const DiffLineKind._(super.value, super.name);
 }
 
+class AgentState extends $pb.ProtobufEnum {
+  /// Producing output.
+  static const AgentState AGENT_STATE_WORKING =
+      AgentState._(0, _omitEnumNames ? '' : 'AGENT_STATE_WORKING');
+
+  /// Quiet, or it rang the terminal bell / sent a notification: your turn.
+  static const AgentState AGENT_STATE_NEEDS_INPUT =
+      AgentState._(1, _omitEnumNames ? '' : 'AGENT_STATE_NEEDS_INPUT');
+  static const AgentState AGENT_STATE_EXITED =
+      AgentState._(2, _omitEnumNames ? '' : 'AGENT_STATE_EXITED');
+
+  static const $core.List<AgentState> values = <AgentState>[
+    AGENT_STATE_WORKING,
+    AGENT_STATE_NEEDS_INPUT,
+    AGENT_STATE_EXITED,
+  ];
+
+  static final $core.List<AgentState?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static AgentState? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const AgentState._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

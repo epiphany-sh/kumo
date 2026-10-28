@@ -825,3 +825,296 @@ abstract class GitServiceBase extends $grpc.Service {
   $async.Future<$0.LogResponse> log(
       $grpc.ServiceCall call, $0.LogRequest request);
 }
+
+@$pb.GrpcServiceName('kumo.v1.Agents')
+class AgentsClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  AgentsClient(super.channel, {super.options, super.interceptors});
+
+  /// Known CLIs (installed or not) plus the user's custom ones.
+  $grpc.ResponseFuture<$0.ListProvidersResponse> listProviders(
+    $0.ListProvidersRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$listProviders, request, options: options);
+  }
+
+  /// Creates (empty id) a custom provider or updates any provider.
+  $grpc.ResponseFuture<$0.AgentProvider> saveProvider(
+    $0.SaveProviderRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$saveProvider, request, options: options);
+  }
+
+  /// Custom providers only; known ones are disabled instead.
+  $grpc.ResponseFuture<$0.DeleteProviderResponse> deleteProvider(
+    $0.DeleteProviderRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$deleteProvider, request, options: options);
+  }
+
+  /// Runs `<program> --version`.
+  $grpc.ResponseFuture<$0.TestProviderResponse> testProvider(
+    $0.TestProviderRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$testProvider, request, options: options);
+  }
+
+  /// Opens a terminal running the CLI's own sign-in; Kumo never sees
+  /// credentials.
+  $grpc.ResponseFuture<$0.LoginProviderResponse> loginProvider(
+    $0.LoginProviderRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$loginProvider, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.AgentSession> start(
+    $0.StartAgentRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$start, request, options: options);
+  }
+
+  /// Kills the agent's process.
+  $grpc.ResponseFuture<$0.StopAgentResponse> stop(
+    $0.StopAgentRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$stop, request, options: options);
+  }
+
+  /// Forgets a finished session.
+  $grpc.ResponseFuture<$0.DismissAgentResponse> dismiss(
+    $0.DismissAgentRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$dismiss, request, options: options);
+  }
+
+  /// Every session now, then again whenever one changes (last wins).
+  $grpc.ResponseStream<$0.AgentsSnapshot> watch(
+    $0.WatchAgentsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createStreamingCall(_$watch, $async.Stream.fromIterable([request]),
+        options: options);
+  }
+
+  // method descriptors
+
+  static final _$listProviders =
+      $grpc.ClientMethod<$0.ListProvidersRequest, $0.ListProvidersResponse>(
+          '/kumo.v1.Agents/ListProviders',
+          ($0.ListProvidersRequest value) => value.writeToBuffer(),
+          $0.ListProvidersResponse.fromBuffer);
+  static final _$saveProvider =
+      $grpc.ClientMethod<$0.SaveProviderRequest, $0.AgentProvider>(
+          '/kumo.v1.Agents/SaveProvider',
+          ($0.SaveProviderRequest value) => value.writeToBuffer(),
+          $0.AgentProvider.fromBuffer);
+  static final _$deleteProvider =
+      $grpc.ClientMethod<$0.DeleteProviderRequest, $0.DeleteProviderResponse>(
+          '/kumo.v1.Agents/DeleteProvider',
+          ($0.DeleteProviderRequest value) => value.writeToBuffer(),
+          $0.DeleteProviderResponse.fromBuffer);
+  static final _$testProvider =
+      $grpc.ClientMethod<$0.TestProviderRequest, $0.TestProviderResponse>(
+          '/kumo.v1.Agents/TestProvider',
+          ($0.TestProviderRequest value) => value.writeToBuffer(),
+          $0.TestProviderResponse.fromBuffer);
+  static final _$loginProvider =
+      $grpc.ClientMethod<$0.LoginProviderRequest, $0.LoginProviderResponse>(
+          '/kumo.v1.Agents/LoginProvider',
+          ($0.LoginProviderRequest value) => value.writeToBuffer(),
+          $0.LoginProviderResponse.fromBuffer);
+  static final _$start =
+      $grpc.ClientMethod<$0.StartAgentRequest, $0.AgentSession>(
+          '/kumo.v1.Agents/Start',
+          ($0.StartAgentRequest value) => value.writeToBuffer(),
+          $0.AgentSession.fromBuffer);
+  static final _$stop =
+      $grpc.ClientMethod<$0.StopAgentRequest, $0.StopAgentResponse>(
+          '/kumo.v1.Agents/Stop',
+          ($0.StopAgentRequest value) => value.writeToBuffer(),
+          $0.StopAgentResponse.fromBuffer);
+  static final _$dismiss =
+      $grpc.ClientMethod<$0.DismissAgentRequest, $0.DismissAgentResponse>(
+          '/kumo.v1.Agents/Dismiss',
+          ($0.DismissAgentRequest value) => value.writeToBuffer(),
+          $0.DismissAgentResponse.fromBuffer);
+  static final _$watch =
+      $grpc.ClientMethod<$0.WatchAgentsRequest, $0.AgentsSnapshot>(
+          '/kumo.v1.Agents/Watch',
+          ($0.WatchAgentsRequest value) => value.writeToBuffer(),
+          $0.AgentsSnapshot.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Agents')
+abstract class AgentsServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.Agents';
+
+  AgentsServiceBase() {
+    $addMethod(
+        $grpc.ServiceMethod<$0.ListProvidersRequest, $0.ListProvidersResponse>(
+            'ListProviders',
+            listProviders_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.ListProvidersRequest.fromBuffer(value),
+            ($0.ListProvidersResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.SaveProviderRequest, $0.AgentProvider>(
+        'SaveProvider',
+        saveProvider_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.SaveProviderRequest.fromBuffer(value),
+        ($0.AgentProvider value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.DeleteProviderRequest,
+            $0.DeleteProviderResponse>(
+        'DeleteProvider',
+        deleteProvider_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.DeleteProviderRequest.fromBuffer(value),
+        ($0.DeleteProviderResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.TestProviderRequest, $0.TestProviderResponse>(
+            'TestProvider',
+            testProvider_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.TestProviderRequest.fromBuffer(value),
+            ($0.TestProviderResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.LoginProviderRequest, $0.LoginProviderResponse>(
+            'LoginProvider',
+            loginProvider_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.LoginProviderRequest.fromBuffer(value),
+            ($0.LoginProviderResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.StartAgentRequest, $0.AgentSession>(
+        'Start',
+        start_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.StartAgentRequest.fromBuffer(value),
+        ($0.AgentSession value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.StopAgentRequest, $0.StopAgentResponse>(
+        'Stop',
+        stop_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.StopAgentRequest.fromBuffer(value),
+        ($0.StopAgentResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.DismissAgentRequest, $0.DismissAgentResponse>(
+            'Dismiss',
+            dismiss_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.DismissAgentRequest.fromBuffer(value),
+            ($0.DismissAgentResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.WatchAgentsRequest, $0.AgentsSnapshot>(
+        'Watch',
+        watch_Pre,
+        false,
+        true,
+        ($core.List<$core.int> value) =>
+            $0.WatchAgentsRequest.fromBuffer(value),
+        ($0.AgentsSnapshot value) => value.writeToBuffer()));
+  }
+
+  $async.Future<$0.ListProvidersResponse> listProviders_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.ListProvidersRequest> $request) async {
+    return listProviders($call, await $request);
+  }
+
+  $async.Future<$0.ListProvidersResponse> listProviders(
+      $grpc.ServiceCall call, $0.ListProvidersRequest request);
+
+  $async.Future<$0.AgentProvider> saveProvider_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.SaveProviderRequest> $request) async {
+    return saveProvider($call, await $request);
+  }
+
+  $async.Future<$0.AgentProvider> saveProvider(
+      $grpc.ServiceCall call, $0.SaveProviderRequest request);
+
+  $async.Future<$0.DeleteProviderResponse> deleteProvider_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.DeleteProviderRequest> $request) async {
+    return deleteProvider($call, await $request);
+  }
+
+  $async.Future<$0.DeleteProviderResponse> deleteProvider(
+      $grpc.ServiceCall call, $0.DeleteProviderRequest request);
+
+  $async.Future<$0.TestProviderResponse> testProvider_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.TestProviderRequest> $request) async {
+    return testProvider($call, await $request);
+  }
+
+  $async.Future<$0.TestProviderResponse> testProvider(
+      $grpc.ServiceCall call, $0.TestProviderRequest request);
+
+  $async.Future<$0.LoginProviderResponse> loginProvider_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.LoginProviderRequest> $request) async {
+    return loginProvider($call, await $request);
+  }
+
+  $async.Future<$0.LoginProviderResponse> loginProvider(
+      $grpc.ServiceCall call, $0.LoginProviderRequest request);
+
+  $async.Future<$0.AgentSession> start_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.StartAgentRequest> $request) async {
+    return start($call, await $request);
+  }
+
+  $async.Future<$0.AgentSession> start(
+      $grpc.ServiceCall call, $0.StartAgentRequest request);
+
+  $async.Future<$0.StopAgentResponse> stop_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.StopAgentRequest> $request) async {
+    return stop($call, await $request);
+  }
+
+  $async.Future<$0.StopAgentResponse> stop(
+      $grpc.ServiceCall call, $0.StopAgentRequest request);
+
+  $async.Future<$0.DismissAgentResponse> dismiss_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.DismissAgentRequest> $request) async {
+    return dismiss($call, await $request);
+  }
+
+  $async.Future<$0.DismissAgentResponse> dismiss(
+      $grpc.ServiceCall call, $0.DismissAgentRequest request);
+
+  $async.Stream<$0.AgentsSnapshot> watch_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WatchAgentsRequest> $request) async* {
+    yield* watch($call, await $request);
+  }
+
+  $async.Stream<$0.AgentsSnapshot> watch(
+      $grpc.ServiceCall call, $0.WatchAgentsRequest request);
+}

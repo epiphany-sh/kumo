@@ -21,12 +21,6 @@ class PaneLayout {
     PaneColumn('c2', 1, [PaneCell('tests', 1), PaneCell('logs', 1)]),
   ]);
 
-  /// With a live engine: the agent next to a real shell.
-  static const live = PaneLayout([
-    PaneColumn('c1', 1.38, [PaneCell('agent', 1)]),
-    PaneColumn('c2', 1, [PaneCell('sh-1', 1)]),
-  ]);
-
   bool get isEmpty => columns.isEmpty;
 
   /// Pane ids in reading order (left to right, top to bottom).

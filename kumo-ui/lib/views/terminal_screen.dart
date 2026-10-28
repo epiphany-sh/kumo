@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
+import '../data/agents_source.dart';
+import '../data/models.dart' show AgentStatus;
 import '../editor/file_view.dart';
+import '../overlays/new_agent_dialog.dart';
 import '../engine/engine_scope.dart';
 import '../engine/generated/kumo/v1/kumo.pb.dart' show TerminalInfo;
 import '../engine/grpc_terminal_surface.dart';
@@ -55,6 +58,11 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
   static PaneLayout _single(String id) => PaneLayout([PaneColumn('col-$id', 1, [PaneCell(id, 1)])]);
 
+  /// Panes showing an agent's terminal, and the daemon terminal behind each
+  /// pane opened on request (agents, sign-in flows).
+  final Set<String> _agentPanes = {};
+  final Map<String, String> _terminalOf = {};
+
   /// One key per pane so a pane keeps its state (steer text, scroll) when
   /// a split moves it to another column or into tabs mode.
   final Map<String, GlobalKey> _paneKeys = {};
@@ -66,28 +74,32 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final app = AppScope.read(context);
     if (!identical(app, _app)) {
       if (_app?.terminalHandler == _onCommand) _app!.terminalHandler = null;
-      _app = app..terminalHandler = _onCommand;
+      if (_app?.terminalOpener == _openTerminal) _app!.terminalOpener = null;
+      _app = app
+        ..terminalHandler = _onCommand
+        ..terminalOpener = _openTerminal;
     }
   }
 
   @override
   void dispose() {
     if (_app?.terminalHandler == _onCommand) _app!.terminalHandler = null;
+    if (_app?.terminalOpener == _openTerminal) _app!.terminalOpener = null;
     for (final t in _surfaces.values) {
       t.dispose();
     }
     super.dispose();
   }
 
-  /// With an engine: the agent (still a mock until M3) and a real shell
-  /// that first re-attaches to whatever the daemon kept running.
+  /// With an engine: a real shell that first re-attaches to whatever the
+  /// daemon kept running (agents come back in their own tabs).
   /// Without one (widget tests): the scripted mocks.
   void _start() {
     _started = true;
     _engine = EngineScope.maybeOf(context);
-    _surfaces['agent'] = MockSessions.agent();
     final engine = _engine;
     if (engine == null) {
+      _surfaces['agent'] = MockSessions.agent();
       _surfaces['tests'] = MockSessions.tests();
       _surfaces['logs'] = MockSessions.logs();
       _tabs.add(_TermTab('t-agent', PaneLayout.initial, 'agent'));
@@ -95,14 +107,25 @@ class _TerminalScreenState extends State<TerminalScreen> {
     }
     _shellSeq = 1;
     _surfaces['sh-1'] = GrpcTerminalSurface.shell(engine, adopt: _adoptRunning, onExit: (_) => _closeExited('sh-1'));
-    _tabs.add(_TermTab('t-agent', PaneLayout.live, 'sh-1'));
+    _tabs.add(_TermTab('t-sh-1', _single('sh-1'), 'sh-1'));
   }
 
   /// Terminals left running by a previous UI session: the first one fills
   /// the initial shell pane, the rest get panes of their own.
   Future<TerminalInfo?> _adoptRunning() async {
-    final running = await _engine!.runningTerminals();
-    if (running.isEmpty || !mounted) return null;
+    final all = await _engine!.runningTerminals();
+    if (!mounted) return null;
+    // Agents' terminals come back as agent tabs (closing those detaches).
+    final agents = _app!.agents;
+    await agents.ready.timeout(const Duration(seconds: 2), onTimeout: () {});
+    if (!mounted) return null;
+    final runs = {for (final r in agents.runs) r.terminalId: r};
+    for (final info in all.where((t) => runs.containsKey(t.terminalId))) {
+      final run = runs[info.terminalId]!;
+      _openTerminal(info.terminalId, run.title, agent: true, focus: false);
+    }
+    final running = [for (final t in all) if (!runs.containsKey(t.terminalId)) t];
+    if (running.isEmpty) return null;
     for (final info in running.skip(1)) {
       final id = 'sh-${++_shellSeq}';
       _surfaces[id] = GrpcTerminalSurface.attach(_engine!, terminalId: info.terminalId, program: info.program, onExit: (_) => _closeExited(id));
@@ -110,6 +133,40 @@ class _TerminalScreenState extends State<TerminalScreen> {
       setState(() => _tabs.add(_TermTab('t-$id', _single(id), id)));
     }
     return running.first;
+  }
+
+  /// Shows a daemon terminal in a new tab (or focuses the one showing it).
+  void _openTerminal(String terminalId, String title, {bool agent = false, bool focus = true}) {
+    final engine = _engine;
+    if (engine == null || !mounted) return;
+    final shown = _terminalOf.entries.where((e) => e.value == terminalId).firstOrNull?.key;
+    final shownIn = shown == null ? null : _tabOf(shown);
+    if (shownIn != null) {
+      _activate(shownIn);
+      setState(() => shownIn.focus = shown);
+      return;
+    }
+    final id = '${agent ? 'ag' : 'sh'}-${++_shellSeq}';
+    _surfaces[id] = GrpcTerminalSurface.attach(
+      engine,
+      terminalId: terminalId,
+      program: title,
+      title: title,
+      killOnClose: !agent,
+      onExit: agent ? null : (_) => _closeExited(id),
+    );
+    _terminalOf[id] = terminalId;
+    if (agent) _agentPanes.add(id);
+    setState(() {
+      _tabs.add(_TermTab('t-$id', _single(id), id));
+      if (focus) _active = _tabs.length - 1;
+    });
+  }
+
+  /// The agent session shown in pane [id], if any.
+  AgentRun? _runOf(String id) {
+    final terminal = _terminalOf[id];
+    return terminal == null ? null : _app?.agents.runs.where((r) => r.terminalId == terminal).firstOrNull;
   }
 
   /// A shell that exits closes its pane, like other terminals do.
@@ -190,6 +247,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
   void _disposeLater(String id) {
     final surface = _surfaces.remove(id);
     _paneKeys.remove(id);
+    _agentPanes.remove(id);
+    _terminalOf.remove(id);
     // Dispose after the pane is gone from the tree.
     if (surface != null) WidgetsBinding.instance.addPostFrameCallback((_) => surface.dispose());
   }
@@ -243,12 +302,11 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
     final s = AppScope.of(context);
     return ScreenFrame(
       toolbar: ScreenToolbar(
         breadcrumb: Breadcrumb(icon: KIcons.branch, parts: [s.activeRepo?.name ?? 'No repository', if (s.changes.branch.isNotEmpty) s.changes.branch]),
-        primary: KButton.primary(label: 'New agent', icon: KIcons.agent, height: 36, onTap: () {}),
+        primary: KButton.primary(label: 'New agent', icon: KIcons.agent, height: 36, onTap: () => showNewAgentDialog(context)),
       ),
       body: LayoutBuilder(builder: (context, box) {
         final showPanel = s.sidePanelOpen && box.maxWidth >= 640;
@@ -265,9 +323,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       }),
       status: [
         Flexible(child: StatusText('${s.changes.branch} ↑${s.commitsAhead} ↓${s.changes.behind}', icon: KIcons.branch, monospace: true, flexible: true)),
-        StatusText('1 agent needs you', color: c.warn, dot: true),
-        const StatusText('2 agents running'),
-        const StatusText('gke-staging · pricing', icon: KIcons.cluster),
+        ..._agentStatus(context, s),
         const Spacer(),
         StatusText('${_tabs.length} ${_tabs.length == 1 ? 'tab' : 'tabs'} · ${_layout.panes.length} ${_layout.panes.length == 1 ? 'pane' : 'panes'}'),
         const StatusText('zsh · UTF-8'),
@@ -276,8 +332,27 @@ class _TerminalScreenState extends State<TerminalScreen> {
     );
   }
 
+  /// Status bar: agents waiting on you and running (mocks: the canvas).
+  List<Widget> _agentStatus(BuildContext context, AppState s) {
+    final c = context.c;
+    if (!s.agents.live) {
+      return [
+        StatusText('1 agent needs you', color: c.warn, dot: true),
+        const StatusText('2 agents running'),
+        const StatusText('gke-staging · pricing', icon: KIcons.cluster),
+      ];
+    }
+    final waiting = s.agents.runs.where((r) => r.status == AgentStatus.needsYou).length;
+    final running = s.agents.runs.where((r) => r.status == AgentStatus.running).length;
+    return [
+      if (waiting > 0) StatusText('$waiting ${waiting == 1 ? 'agent needs' : 'agents need'} you', color: c.warn, dot: true),
+      if (running > 0) StatusText('$running ${running == 1 ? 'agent' : 'agents'} running'),
+    ];
+  }
+
   (IconData, Color) _look(BuildContext context, String id) {
     final c = context.c;
+    if (_agentPanes.contains(id)) return (KIcons.agent, c.acc);
     return switch (id) {
       'agent' => (KIcons.agent, c.acc),
       'tests' => (KIcons.terminal, c.ok),
@@ -467,7 +542,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final c = context.c;
     final surface = _surfaces[id]!;
     final (icon, color) = _look(context, id);
-    final isAgent = id == 'agent';
+    final isMockAgent = id == 'agent';
+    final run = _runOf(id);
+    final isAgent = isMockAgent || _agentPanes.contains(id);
     final focused = id == _focus && _layout.panes.length > 1;
     return LayoutBuilder(
       key: _paneKeys.putIfAbsent(id, GlobalKey.new),
@@ -479,15 +556,21 @@ class _TerminalScreenState extends State<TerminalScreen> {
           KIconButton(icon: KIcons.close, label: 'Close pane (⌘W)', size: 22, iconSize: 13, color: c.text3, onTap: () => _close(id)),
         ]);
         Widget? status;
-        if (isAgent) {
+        if (isMockAgent) {
           final paused = AppScope.of(context).agentPaused;
           status = Pill(label: paused ? 'Paused' : 'Running · 12:04', color: paused ? c.warn : c.acc, background: paused ? c.warnSoft : c.accSoft);
+        } else if (run != null) {
+          status = switch (run.status) {
+            AgentStatus.running => Pill(label: 'Working', color: c.acc, background: c.accSoft),
+            AgentStatus.needsYou => Pill(label: 'Needs you', color: c.warn, background: c.warnSoft),
+            AgentStatus.done => Pill(label: 'Exited · ${run.exitCode}', color: c.text3, background: c.tile),
+          };
         } else if (id == 'tests') {
           status = Text('148 passed', style: sans(11, weight: FontWeight.w600, color: c.ok));
         } else if (id == 'logs') {
           status = Text('1 warning', style: sans(11, weight: FontWeight.w600, color: c.warn));
         }
-        final trailing = isAgent && _agentConfirm
+        final trailing = isMockAgent && _agentConfirm
             ? Row(mainAxisSize: MainAxisSize.min, children: [
                 if (!compact) ...[Text('Agent is still running', style: sans(11.5, color: c.text2)), const SizedBox(width: 8)],
                 KButton(label: 'Keep', height: 24, fontSize: 11.5, onTap: () => setState(() => _agentConfirm = false)),
@@ -506,7 +589,15 @@ class _TerminalScreenState extends State<TerminalScreen> {
           active: id == _focus && AppScope.of(context).activeFile == null,
           onFocus: () => _setFocus(id),
           trailing: trailing,
-          footer: isAgent ? _SteerBar(surface: surface, paused: AppScope.of(context).agentPaused, onPause: AppScope.read(context).toggleAgentPaused) : null,
+          footer: isAgent
+              ? _SteerBar(
+                  surface: surface,
+                  agentName: run?.providerName ?? 'Claude',
+                  paused: AppScope.of(context).agentPaused,
+                  // Pausing is part of the design canvas only.
+                  onPause: isMockAgent ? AppScope.read(context).toggleAgentPaused : null,
+                )
+              : null,
         );
       },
     );
@@ -594,10 +685,11 @@ class _SplitterState extends State<_Splitter> {
 
 /// "STEER" composer under the agent pane: message the running agent.
 class _SteerBar extends StatefulWidget {
-  const _SteerBar({required this.surface, required this.paused, required this.onPause});
+  const _SteerBar({required this.surface, required this.agentName, required this.paused, this.onPause});
   final TerminalSurface surface;
+  final String agentName;
   final bool paused;
-  final VoidCallback onPause;
+  final VoidCallback? onPause;
 
   @override
   State<_SteerBar> createState() => _SteerBarState();
@@ -636,11 +728,12 @@ class _SteerBarState extends State<_SteerBar> {
               onSubmitted: (_) => _send(),
               style: sans(12.5, color: c.text),
               cursorColor: c.acc,
-              decoration: InputDecoration.collapsed(hintText: 'Tell Claude to change course, or / for commands', hintStyle: sans(12.5, color: c.text3)),
+              decoration: InputDecoration.collapsed(hintText: 'Tell ${widget.agentName} to change course, or / for commands', hintStyle: sans(12.5, color: c.text3)),
             ),
           ),
         ),
-        KIconButton(icon: widget.paused ? Icons.play_arrow_rounded : KIcons.pause, label: widget.paused ? 'Resume agent' : 'Pause agent', size: 30, iconSize: 15, onTap: widget.onPause),
+        if (widget.onPause != null)
+          KIconButton(icon: widget.paused ? Icons.play_arrow_rounded : KIcons.pause, label: widget.paused ? 'Resume agent' : 'Pause agent', size: 30, iconSize: 15, onTap: widget.onPause!),
         const SizedBox(width: 4),
         KPressable(
           onTap: _send,

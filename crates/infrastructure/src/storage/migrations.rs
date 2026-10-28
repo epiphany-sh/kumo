@@ -20,6 +20,17 @@ const STEPS: &[&str] = &[
         position     INTEGER NOT NULL,
         PRIMARY KEY (namespace_id, repo_path)
     );",
+    // 2: agents
+    "CREATE TABLE agent_providers (
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        program     TEXT NOT NULL,
+        args        TEXT NOT NULL DEFAULT '',
+        custom      INTEGER NOT NULL DEFAULT 0,
+        enabled     INTEGER NOT NULL DEFAULT 0,
+        is_default  INTEGER NOT NULL DEFAULT 0,
+        position    INTEGER NOT NULL
+    );",
 ];
 
 pub(super) fn migrate(conn: &mut Connection) -> rusqlite::Result<()> {

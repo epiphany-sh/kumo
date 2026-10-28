@@ -4147,6 +4147,1394 @@ class LogResponse extends $pb.GeneratedMessage {
   $pb.PbList<Commit> get commits => $_getList(0);
 }
 
+class AgentProvider extends $pb.GeneratedMessage {
+  factory AgentProvider({
+    $core.String? id,
+    $core.String? name,
+    $core.String? short,
+    $core.String? program,
+    $core.String? args,
+    $core.bool? custom,
+    $core.bool? enabled,
+    $core.bool? isDefault,
+    $core.bool? installed,
+    $core.String? resolvedPath,
+    $core.String? installHint,
+    $core.bool? takesPromptArgument,
+    $core.bool? hasLogin,
+  }) {
+    final result = AgentProvider._();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (short != null) result.short = short;
+    if (program != null) result.program = program;
+    if (args != null) result.args = args;
+    if (custom != null) result.custom = custom;
+    if (enabled != null) result.enabled = enabled;
+    if (isDefault != null) result.isDefault = isDefault;
+    if (installed != null) result.installed = installed;
+    if (resolvedPath != null) result.resolvedPath = resolvedPath;
+    if (installHint != null) result.installHint = installHint;
+    if (takesPromptArgument != null)
+      result.takesPromptArgument = takesPromptArgument;
+    if (hasLogin != null) result.hasLogin = hasLogin;
+    return result;
+  }
+
+  AgentProvider._();
+
+  factory AgentProvider.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AgentProvider()..mergeFromBuffer(data, registry);
+  factory AgentProvider.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AgentProvider()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AgentProvider',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: AgentProvider.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aOS(3, _omitFieldNames ? '' : 'short')
+    ..aOS(4, _omitFieldNames ? '' : 'program')
+    ..aOS(5, _omitFieldNames ? '' : 'args')
+    ..aOB(6, _omitFieldNames ? '' : 'custom')
+    ..aOB(7, _omitFieldNames ? '' : 'enabled')
+    ..aOB(8, _omitFieldNames ? '' : 'isDefault')
+    ..aOB(9, _omitFieldNames ? '' : 'installed')
+    ..aOS(10, _omitFieldNames ? '' : 'resolvedPath')
+    ..aOS(11, _omitFieldNames ? '' : 'installHint')
+    ..aOB(12, _omitFieldNames ? '' : 'takesPromptArgument')
+    ..aOB(13, _omitFieldNames ? '' : 'hasLogin')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AgentProvider clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AgentProvider copyWith(void Function(AgentProvider) updates) =>
+      super.copyWith((message) => updates(message as AgentProvider))
+          as AgentProvider;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use AgentProvider() / AgentProvider.new instead')
+  static AgentProvider create() => AgentProvider._();
+  static $pb.GeneratedMessage $_createMessage() => AgentProvider._();
+  @$core.override
+  AgentProvider createEmptyInstance() => AgentProvider._();
+  @$core.pragma('dart2js:noInline')
+  static AgentProvider getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AgentProvider>(
+          AgentProvider.$_createMessage);
+  static AgentProvider? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  /// Two-letter badge, e.g. "CC".
+  @$pb.TagNumber(3)
+  $core.String get short => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set short($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasShort() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearShort() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get program => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set program($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasProgram() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearProgram() => $_clearField(4);
+
+  /// Extra arguments, shell-quoted (e.g. "--model x").
+  @$pb.TagNumber(5)
+  $core.String get args => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set args($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasArgs() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearArgs() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get custom => $_getBF(5);
+  @$pb.TagNumber(6)
+  set custom($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCustom() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCustom() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get enabled => $_getBF(6);
+  @$pb.TagNumber(7)
+  set enabled($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasEnabled() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearEnabled() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get isDefault => $_getBF(7);
+  @$pb.TagNumber(8)
+  set isDefault($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasIsDefault() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearIsDefault() => $_clearField(8);
+
+  /// Found on the user's PATH.
+  @$pb.TagNumber(9)
+  $core.bool get installed => $_getBF(8);
+  @$pb.TagNumber(9)
+  set installed($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasInstalled() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearInstalled() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get resolvedPath => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set resolvedPath($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasResolvedPath() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearResolvedPath() => $_clearField(10);
+
+  /// How to install it (known CLIs).
+  @$pb.TagNumber(11)
+  $core.String get installHint => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set installHint($core.String value) => $_setString(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasInstallHint() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearInstallHint() => $_clearField(11);
+
+  /// The prompt can be passed at start; otherwise Kumo types it in.
+  @$pb.TagNumber(12)
+  $core.bool get takesPromptArgument => $_getBF(11);
+  @$pb.TagNumber(12)
+  set takesPromptArgument($core.bool value) => $_setBool(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasTakesPromptArgument() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearTakesPromptArgument() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.bool get hasLogin => $_getBF(12);
+  @$pb.TagNumber(13)
+  set hasLogin($core.bool value) => $_setBool(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasHasLogin() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearHasLogin() => $_clearField(13);
+}
+
+class ListProvidersRequest extends $pb.GeneratedMessage {
+  factory ListProvidersRequest() => ListProvidersRequest._();
+
+  ListProvidersRequest._();
+
+  factory ListProvidersRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListProvidersRequest()..mergeFromBuffer(data, registry);
+  factory ListProvidersRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListProvidersRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListProvidersRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ListProvidersRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListProvidersRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListProvidersRequest copyWith(void Function(ListProvidersRequest) updates) =>
+      super.copyWith((message) => updates(message as ListProvidersRequest))
+          as ListProvidersRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListProvidersRequest() / ListProvidersRequest.new instead')
+  static ListProvidersRequest create() => ListProvidersRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListProvidersRequest._();
+  @$core.override
+  ListProvidersRequest createEmptyInstance() => ListProvidersRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListProvidersRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListProvidersRequest>(
+          ListProvidersRequest.$_createMessage);
+  static ListProvidersRequest? _defaultInstance;
+}
+
+class ListProvidersResponse extends $pb.GeneratedMessage {
+  factory ListProvidersResponse({
+    $core.Iterable<AgentProvider>? providers,
+  }) {
+    final result = ListProvidersResponse._();
+    if (providers != null) result.providers.addAll(providers);
+    return result;
+  }
+
+  ListProvidersResponse._();
+
+  factory ListProvidersResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListProvidersResponse()..mergeFromBuffer(data, registry);
+  factory ListProvidersResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListProvidersResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListProvidersResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ListProvidersResponse.$_createMessage)
+    ..pPM<AgentProvider>(1, _omitFieldNames ? '' : 'providers',
+        subBuilder: AgentProvider.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListProvidersResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListProvidersResponse copyWith(
+          void Function(ListProvidersResponse) updates) =>
+      super.copyWith((message) => updates(message as ListProvidersResponse))
+          as ListProvidersResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListProvidersResponse() / ListProvidersResponse.new instead')
+  static ListProvidersResponse create() => ListProvidersResponse._();
+  static $pb.GeneratedMessage $_createMessage() => ListProvidersResponse._();
+  @$core.override
+  ListProvidersResponse createEmptyInstance() => ListProvidersResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListProvidersResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListProvidersResponse>(
+          ListProvidersResponse.$_createMessage);
+  static ListProvidersResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<AgentProvider> get providers => $_getList(0);
+}
+
+class SaveProviderRequest extends $pb.GeneratedMessage {
+  factory SaveProviderRequest({
+    $core.String? id,
+    $core.String? name,
+    $core.String? program,
+    $core.String? args,
+    $core.bool? enabled,
+    $core.bool? isDefault,
+  }) {
+    final result = SaveProviderRequest._();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (program != null) result.program = program;
+    if (args != null) result.args = args;
+    if (enabled != null) result.enabled = enabled;
+    if (isDefault != null) result.isDefault = isDefault;
+    return result;
+  }
+
+  SaveProviderRequest._();
+
+  factory SaveProviderRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SaveProviderRequest()..mergeFromBuffer(data, registry);
+  factory SaveProviderRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SaveProviderRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SaveProviderRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SaveProviderRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aOS(3, _omitFieldNames ? '' : 'program')
+    ..aOS(4, _omitFieldNames ? '' : 'args')
+    ..aOB(5, _omitFieldNames ? '' : 'enabled')
+    ..aOB(6, _omitFieldNames ? '' : 'isDefault')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SaveProviderRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SaveProviderRequest copyWith(void Function(SaveProviderRequest) updates) =>
+      super.copyWith((message) => updates(message as SaveProviderRequest))
+          as SaveProviderRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use SaveProviderRequest() / SaveProviderRequest.new instead')
+  static SaveProviderRequest create() => SaveProviderRequest._();
+  static $pb.GeneratedMessage $_createMessage() => SaveProviderRequest._();
+  @$core.override
+  SaveProviderRequest createEmptyInstance() => SaveProviderRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SaveProviderRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SaveProviderRequest>(
+          SaveProviderRequest.$_createMessage);
+  static SaveProviderRequest? _defaultInstance;
+
+  /// Empty: a new custom provider.
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get program => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set program($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasProgram() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearProgram() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get args => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set args($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasArgs() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearArgs() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get enabled => $_getBF(4);
+  @$pb.TagNumber(5)
+  set enabled($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasEnabled() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearEnabled() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get isDefault => $_getBF(5);
+  @$pb.TagNumber(6)
+  set isDefault($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasIsDefault() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearIsDefault() => $_clearField(6);
+}
+
+class DeleteProviderRequest extends $pb.GeneratedMessage {
+  factory DeleteProviderRequest({
+    $core.String? id,
+  }) {
+    final result = DeleteProviderRequest._();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  DeleteProviderRequest._();
+
+  factory DeleteProviderRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteProviderRequest()..mergeFromBuffer(data, registry);
+  factory DeleteProviderRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteProviderRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteProviderRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DeleteProviderRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteProviderRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteProviderRequest copyWith(
+          void Function(DeleteProviderRequest) updates) =>
+      super.copyWith((message) => updates(message as DeleteProviderRequest))
+          as DeleteProviderRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DeleteProviderRequest() / DeleteProviderRequest.new instead')
+  static DeleteProviderRequest create() => DeleteProviderRequest._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteProviderRequest._();
+  @$core.override
+  DeleteProviderRequest createEmptyInstance() => DeleteProviderRequest._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteProviderRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteProviderRequest>(
+          DeleteProviderRequest.$_createMessage);
+  static DeleteProviderRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+}
+
+class DeleteProviderResponse extends $pb.GeneratedMessage {
+  factory DeleteProviderResponse() => DeleteProviderResponse._();
+
+  DeleteProviderResponse._();
+
+  factory DeleteProviderResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteProviderResponse()..mergeFromBuffer(data, registry);
+  factory DeleteProviderResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteProviderResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteProviderResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DeleteProviderResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteProviderResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteProviderResponse copyWith(
+          void Function(DeleteProviderResponse) updates) =>
+      super.copyWith((message) => updates(message as DeleteProviderResponse))
+          as DeleteProviderResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DeleteProviderResponse() / DeleteProviderResponse.new instead')
+  static DeleteProviderResponse create() => DeleteProviderResponse._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteProviderResponse._();
+  @$core.override
+  DeleteProviderResponse createEmptyInstance() => DeleteProviderResponse._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteProviderResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteProviderResponse>(
+          DeleteProviderResponse.$_createMessage);
+  static DeleteProviderResponse? _defaultInstance;
+}
+
+class TestProviderRequest extends $pb.GeneratedMessage {
+  factory TestProviderRequest({
+    $core.String? id,
+  }) {
+    final result = TestProviderRequest._();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  TestProviderRequest._();
+
+  factory TestProviderRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TestProviderRequest()..mergeFromBuffer(data, registry);
+  factory TestProviderRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TestProviderRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TestProviderRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TestProviderRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestProviderRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestProviderRequest copyWith(void Function(TestProviderRequest) updates) =>
+      super.copyWith((message) => updates(message as TestProviderRequest))
+          as TestProviderRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use TestProviderRequest() / TestProviderRequest.new instead')
+  static TestProviderRequest create() => TestProviderRequest._();
+  static $pb.GeneratedMessage $_createMessage() => TestProviderRequest._();
+  @$core.override
+  TestProviderRequest createEmptyInstance() => TestProviderRequest._();
+  @$core.pragma('dart2js:noInline')
+  static TestProviderRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TestProviderRequest>(
+          TestProviderRequest.$_createMessage);
+  static TestProviderRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+}
+
+class TestProviderResponse extends $pb.GeneratedMessage {
+  factory TestProviderResponse({
+    $core.String? version,
+  }) {
+    final result = TestProviderResponse._();
+    if (version != null) result.version = version;
+    return result;
+  }
+
+  TestProviderResponse._();
+
+  factory TestProviderResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TestProviderResponse()..mergeFromBuffer(data, registry);
+  factory TestProviderResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TestProviderResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TestProviderResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TestProviderResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'version')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestProviderResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestProviderResponse copyWith(void Function(TestProviderResponse) updates) =>
+      super.copyWith((message) => updates(message as TestProviderResponse))
+          as TestProviderResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use TestProviderResponse() / TestProviderResponse.new instead')
+  static TestProviderResponse create() => TestProviderResponse._();
+  static $pb.GeneratedMessage $_createMessage() => TestProviderResponse._();
+  @$core.override
+  TestProviderResponse createEmptyInstance() => TestProviderResponse._();
+  @$core.pragma('dart2js:noInline')
+  static TestProviderResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TestProviderResponse>(
+          TestProviderResponse.$_createMessage);
+  static TestProviderResponse? _defaultInstance;
+
+  /// e.g. "2.1.0 (Claude Code)".
+  @$pb.TagNumber(1)
+  $core.String get version => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set version($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearVersion() => $_clearField(1);
+}
+
+class LoginProviderRequest extends $pb.GeneratedMessage {
+  factory LoginProviderRequest({
+    $core.String? id,
+  }) {
+    final result = LoginProviderRequest._();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  LoginProviderRequest._();
+
+  factory LoginProviderRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LoginProviderRequest()..mergeFromBuffer(data, registry);
+  factory LoginProviderRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LoginProviderRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LoginProviderRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: LoginProviderRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoginProviderRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoginProviderRequest copyWith(void Function(LoginProviderRequest) updates) =>
+      super.copyWith((message) => updates(message as LoginProviderRequest))
+          as LoginProviderRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use LoginProviderRequest() / LoginProviderRequest.new instead')
+  static LoginProviderRequest create() => LoginProviderRequest._();
+  static $pb.GeneratedMessage $_createMessage() => LoginProviderRequest._();
+  @$core.override
+  LoginProviderRequest createEmptyInstance() => LoginProviderRequest._();
+  @$core.pragma('dart2js:noInline')
+  static LoginProviderRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoginProviderRequest>(
+          LoginProviderRequest.$_createMessage);
+  static LoginProviderRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+}
+
+class LoginProviderResponse extends $pb.GeneratedMessage {
+  factory LoginProviderResponse({
+    $core.String? terminalId,
+  }) {
+    final result = LoginProviderResponse._();
+    if (terminalId != null) result.terminalId = terminalId;
+    return result;
+  }
+
+  LoginProviderResponse._();
+
+  factory LoginProviderResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LoginProviderResponse()..mergeFromBuffer(data, registry);
+  factory LoginProviderResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LoginProviderResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LoginProviderResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: LoginProviderResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'terminalId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoginProviderResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoginProviderResponse copyWith(
+          void Function(LoginProviderResponse) updates) =>
+      super.copyWith((message) => updates(message as LoginProviderResponse))
+          as LoginProviderResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use LoginProviderResponse() / LoginProviderResponse.new instead')
+  static LoginProviderResponse create() => LoginProviderResponse._();
+  static $pb.GeneratedMessage $_createMessage() => LoginProviderResponse._();
+  @$core.override
+  LoginProviderResponse createEmptyInstance() => LoginProviderResponse._();
+  @$core.pragma('dart2js:noInline')
+  static LoginProviderResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoginProviderResponse>(
+          LoginProviderResponse.$_createMessage);
+  static LoginProviderResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get terminalId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set terminalId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTerminalId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTerminalId() => $_clearField(1);
+}
+
+class StartAgentRequest extends $pb.GeneratedMessage {
+  factory StartAgentRequest({
+    $core.String? providerId,
+    $core.String? worktreePath,
+    $core.String? prompt,
+    $core.String? title,
+    $core.int? cols,
+    $core.int? rows,
+  }) {
+    final result = StartAgentRequest._();
+    if (providerId != null) result.providerId = providerId;
+    if (worktreePath != null) result.worktreePath = worktreePath;
+    if (prompt != null) result.prompt = prompt;
+    if (title != null) result.title = title;
+    if (cols != null) result.cols = cols;
+    if (rows != null) result.rows = rows;
+    return result;
+  }
+
+  StartAgentRequest._();
+
+  factory StartAgentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StartAgentRequest()..mergeFromBuffer(data, registry);
+  factory StartAgentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StartAgentRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StartAgentRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: StartAgentRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'providerId')
+    ..aOS(2, _omitFieldNames ? '' : 'worktreePath')
+    ..aOS(3, _omitFieldNames ? '' : 'prompt')
+    ..aOS(4, _omitFieldNames ? '' : 'title')
+    ..aI(5, _omitFieldNames ? '' : 'cols', fieldType: $pb.PbFieldType.OU3)
+    ..aI(6, _omitFieldNames ? '' : 'rows', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StartAgentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StartAgentRequest copyWith(void Function(StartAgentRequest) updates) =>
+      super.copyWith((message) => updates(message as StartAgentRequest))
+          as StartAgentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use StartAgentRequest() / StartAgentRequest.new instead')
+  static StartAgentRequest create() => StartAgentRequest._();
+  static $pb.GeneratedMessage $_createMessage() => StartAgentRequest._();
+  @$core.override
+  StartAgentRequest createEmptyInstance() => StartAgentRequest._();
+  @$core.pragma('dart2js:noInline')
+  static StartAgentRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<StartAgentRequest>(
+          StartAgentRequest.$_createMessage);
+  static StartAgentRequest? _defaultInstance;
+
+  /// Empty: the default provider.
+  @$pb.TagNumber(1)
+  $core.String get providerId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set providerId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProviderId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProviderId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get worktreePath => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set worktreePath($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasWorktreePath() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearWorktreePath() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get prompt => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set prompt($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPrompt() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPrompt() => $_clearField(3);
+
+  /// Shown on the card; empty uses the prompt's first line.
+  @$pb.TagNumber(4)
+  $core.String get title => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set title($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTitle() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTitle() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get cols => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set cols($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCols() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCols() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get rows => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set rows($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasRows() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearRows() => $_clearField(6);
+}
+
+class AgentSession extends $pb.GeneratedMessage {
+  factory AgentSession({
+    $core.String? id,
+    $core.String? providerId,
+    $core.String? providerName,
+    $core.String? short,
+    $core.String? worktreePath,
+    $core.String? terminalId,
+    $core.String? title,
+    $core.String? prompt,
+    AgentState? state,
+    $core.int? exitCode,
+    $fixnum.Int64? startedUnixMs,
+    $fixnum.Int64? stateSinceUnixMs,
+    $core.String? lastLine,
+  }) {
+    final result = AgentSession._();
+    if (id != null) result.id = id;
+    if (providerId != null) result.providerId = providerId;
+    if (providerName != null) result.providerName = providerName;
+    if (short != null) result.short = short;
+    if (worktreePath != null) result.worktreePath = worktreePath;
+    if (terminalId != null) result.terminalId = terminalId;
+    if (title != null) result.title = title;
+    if (prompt != null) result.prompt = prompt;
+    if (state != null) result.state = state;
+    if (exitCode != null) result.exitCode = exitCode;
+    if (startedUnixMs != null) result.startedUnixMs = startedUnixMs;
+    if (stateSinceUnixMs != null) result.stateSinceUnixMs = stateSinceUnixMs;
+    if (lastLine != null) result.lastLine = lastLine;
+    return result;
+  }
+
+  AgentSession._();
+
+  factory AgentSession.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AgentSession()..mergeFromBuffer(data, registry);
+  factory AgentSession.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AgentSession()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AgentSession',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: AgentSession.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'providerId')
+    ..aOS(3, _omitFieldNames ? '' : 'providerName')
+    ..aOS(4, _omitFieldNames ? '' : 'short')
+    ..aOS(5, _omitFieldNames ? '' : 'worktreePath')
+    ..aOS(6, _omitFieldNames ? '' : 'terminalId')
+    ..aOS(7, _omitFieldNames ? '' : 'title')
+    ..aOS(8, _omitFieldNames ? '' : 'prompt')
+    ..aE<AgentState>(9, _omitFieldNames ? '' : 'state',
+        enumValues: AgentState.values)
+    ..aI(10, _omitFieldNames ? '' : 'exitCode')
+    ..a<$fixnum.Int64>(
+        11, _omitFieldNames ? '' : 'startedUnixMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..a<$fixnum.Int64>(
+        12, _omitFieldNames ? '' : 'stateSinceUnixMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(13, _omitFieldNames ? '' : 'lastLine')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AgentSession clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AgentSession copyWith(void Function(AgentSession) updates) =>
+      super.copyWith((message) => updates(message as AgentSession))
+          as AgentSession;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use AgentSession() / AgentSession.new instead')
+  static AgentSession create() => AgentSession._();
+  static $pb.GeneratedMessage $_createMessage() => AgentSession._();
+  @$core.override
+  AgentSession createEmptyInstance() => AgentSession._();
+  @$core.pragma('dart2js:noInline')
+  static AgentSession getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AgentSession>(
+          AgentSession.$_createMessage);
+  static AgentSession? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get providerId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set providerId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasProviderId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearProviderId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get providerName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set providerName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasProviderName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearProviderName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get short => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set short($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasShort() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearShort() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get worktreePath => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set worktreePath($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasWorktreePath() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearWorktreePath() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get terminalId => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set terminalId($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTerminalId() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTerminalId() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get title => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set title($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasTitle() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearTitle() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get prompt => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set prompt($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasPrompt() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearPrompt() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  AgentState get state => $_getN(8);
+  @$pb.TagNumber(9)
+  set state(AgentState value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasState() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearState() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get exitCode => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set exitCode($core.int value) => $_setSignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasExitCode() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearExitCode() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $fixnum.Int64 get startedUnixMs => $_getI64(10);
+  @$pb.TagNumber(11)
+  set startedUnixMs($fixnum.Int64 value) => $_setInt64(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasStartedUnixMs() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearStartedUnixMs() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $fixnum.Int64 get stateSinceUnixMs => $_getI64(11);
+  @$pb.TagNumber(12)
+  set stateSinceUnixMs($fixnum.Int64 value) => $_setInt64(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasStateSinceUnixMs() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearStateSinceUnixMs() => $_clearField(12);
+
+  /// Last readable line of output.
+  @$pb.TagNumber(13)
+  $core.String get lastLine => $_getSZ(12);
+  @$pb.TagNumber(13)
+  set lastLine($core.String value) => $_setString(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasLastLine() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearLastLine() => $_clearField(13);
+}
+
+class StopAgentRequest extends $pb.GeneratedMessage {
+  factory StopAgentRequest({
+    $core.String? id,
+  }) {
+    final result = StopAgentRequest._();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  StopAgentRequest._();
+
+  factory StopAgentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StopAgentRequest()..mergeFromBuffer(data, registry);
+  factory StopAgentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StopAgentRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StopAgentRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: StopAgentRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StopAgentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StopAgentRequest copyWith(void Function(StopAgentRequest) updates) =>
+      super.copyWith((message) => updates(message as StopAgentRequest))
+          as StopAgentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use StopAgentRequest() / StopAgentRequest.new instead')
+  static StopAgentRequest create() => StopAgentRequest._();
+  static $pb.GeneratedMessage $_createMessage() => StopAgentRequest._();
+  @$core.override
+  StopAgentRequest createEmptyInstance() => StopAgentRequest._();
+  @$core.pragma('dart2js:noInline')
+  static StopAgentRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<StopAgentRequest>(
+          StopAgentRequest.$_createMessage);
+  static StopAgentRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+}
+
+class StopAgentResponse extends $pb.GeneratedMessage {
+  factory StopAgentResponse() => StopAgentResponse._();
+
+  StopAgentResponse._();
+
+  factory StopAgentResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StopAgentResponse()..mergeFromBuffer(data, registry);
+  factory StopAgentResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      StopAgentResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StopAgentResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: StopAgentResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StopAgentResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StopAgentResponse copyWith(void Function(StopAgentResponse) updates) =>
+      super.copyWith((message) => updates(message as StopAgentResponse))
+          as StopAgentResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use StopAgentResponse() / StopAgentResponse.new instead')
+  static StopAgentResponse create() => StopAgentResponse._();
+  static $pb.GeneratedMessage $_createMessage() => StopAgentResponse._();
+  @$core.override
+  StopAgentResponse createEmptyInstance() => StopAgentResponse._();
+  @$core.pragma('dart2js:noInline')
+  static StopAgentResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<StopAgentResponse>(
+          StopAgentResponse.$_createMessage);
+  static StopAgentResponse? _defaultInstance;
+}
+
+class DismissAgentRequest extends $pb.GeneratedMessage {
+  factory DismissAgentRequest({
+    $core.String? id,
+  }) {
+    final result = DismissAgentRequest._();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  DismissAgentRequest._();
+
+  factory DismissAgentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DismissAgentRequest()..mergeFromBuffer(data, registry);
+  factory DismissAgentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DismissAgentRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DismissAgentRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DismissAgentRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DismissAgentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DismissAgentRequest copyWith(void Function(DismissAgentRequest) updates) =>
+      super.copyWith((message) => updates(message as DismissAgentRequest))
+          as DismissAgentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use DismissAgentRequest() / DismissAgentRequest.new instead')
+  static DismissAgentRequest create() => DismissAgentRequest._();
+  static $pb.GeneratedMessage $_createMessage() => DismissAgentRequest._();
+  @$core.override
+  DismissAgentRequest createEmptyInstance() => DismissAgentRequest._();
+  @$core.pragma('dart2js:noInline')
+  static DismissAgentRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DismissAgentRequest>(
+          DismissAgentRequest.$_createMessage);
+  static DismissAgentRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+}
+
+class DismissAgentResponse extends $pb.GeneratedMessage {
+  factory DismissAgentResponse() => DismissAgentResponse._();
+
+  DismissAgentResponse._();
+
+  factory DismissAgentResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DismissAgentResponse()..mergeFromBuffer(data, registry);
+  factory DismissAgentResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DismissAgentResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DismissAgentResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DismissAgentResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DismissAgentResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DismissAgentResponse copyWith(void Function(DismissAgentResponse) updates) =>
+      super.copyWith((message) => updates(message as DismissAgentResponse))
+          as DismissAgentResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DismissAgentResponse() / DismissAgentResponse.new instead')
+  static DismissAgentResponse create() => DismissAgentResponse._();
+  static $pb.GeneratedMessage $_createMessage() => DismissAgentResponse._();
+  @$core.override
+  DismissAgentResponse createEmptyInstance() => DismissAgentResponse._();
+  @$core.pragma('dart2js:noInline')
+  static DismissAgentResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DismissAgentResponse>(
+          DismissAgentResponse.$_createMessage);
+  static DismissAgentResponse? _defaultInstance;
+}
+
+class WatchAgentsRequest extends $pb.GeneratedMessage {
+  factory WatchAgentsRequest() => WatchAgentsRequest._();
+
+  WatchAgentsRequest._();
+
+  factory WatchAgentsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WatchAgentsRequest()..mergeFromBuffer(data, registry);
+  factory WatchAgentsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WatchAgentsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WatchAgentsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: WatchAgentsRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchAgentsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchAgentsRequest copyWith(void Function(WatchAgentsRequest) updates) =>
+      super.copyWith((message) => updates(message as WatchAgentsRequest))
+          as WatchAgentsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use WatchAgentsRequest() / WatchAgentsRequest.new instead')
+  static WatchAgentsRequest create() => WatchAgentsRequest._();
+  static $pb.GeneratedMessage $_createMessage() => WatchAgentsRequest._();
+  @$core.override
+  WatchAgentsRequest createEmptyInstance() => WatchAgentsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static WatchAgentsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<WatchAgentsRequest>(
+          WatchAgentsRequest.$_createMessage);
+  static WatchAgentsRequest? _defaultInstance;
+}
+
+class AgentsSnapshot extends $pb.GeneratedMessage {
+  factory AgentsSnapshot({
+    $fixnum.Int64? version,
+    $core.Iterable<AgentSession>? sessions,
+  }) {
+    final result = AgentsSnapshot._();
+    if (version != null) result.version = version;
+    if (sessions != null) result.sessions.addAll(sessions);
+    return result;
+  }
+
+  AgentsSnapshot._();
+
+  factory AgentsSnapshot.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AgentsSnapshot()..mergeFromBuffer(data, registry);
+  factory AgentsSnapshot.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AgentsSnapshot()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AgentsSnapshot',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: AgentsSnapshot.$_createMessage)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'version', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..pPM<AgentSession>(2, _omitFieldNames ? '' : 'sessions',
+        subBuilder: AgentSession.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AgentsSnapshot clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AgentsSnapshot copyWith(void Function(AgentsSnapshot) updates) =>
+      super.copyWith((message) => updates(message as AgentsSnapshot))
+          as AgentsSnapshot;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use AgentsSnapshot() / AgentsSnapshot.new instead')
+  static AgentsSnapshot create() => AgentsSnapshot._();
+  static $pb.GeneratedMessage $_createMessage() => AgentsSnapshot._();
+  @$core.override
+  AgentsSnapshot createEmptyInstance() => AgentsSnapshot._();
+  @$core.pragma('dart2js:noInline')
+  static AgentsSnapshot getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AgentsSnapshot>(
+          AgentsSnapshot.$_createMessage);
+  static AgentsSnapshot? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get version => $_getI64(0);
+  @$pb.TagNumber(1)
+  set version($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<AgentSession> get sessions => $_getList(1);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

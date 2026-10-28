@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
+import '../data/agents_source.dart';
 import '../data/changes.dart';
 import '../data/workspace_source.dart';
 import '../data/worktree_changes.dart';
@@ -37,13 +38,16 @@ class AppState extends ChangeNotifier {
     Preferences? prefs,
     WorkspaceSource? workspace,
     WorktreeChanges Function(String worktreePath)? changesFor,
+    AgentsSource? agents,
   })  : prefs = prefs ?? Preferences.memory(),
         workspace = workspace ?? MockWorkspaceSource(),
+        agents = agents ?? MockAgentsSource(),
         _changesFor = changesFor,
         _mode = mode {
     _changes = changesFor == null ? MockWorktreeChanges() : NoWorktreeChanges();
     _changes.addListener(notifyListeners);
     this.workspace.addListener(_onWorkspaceChanged);
+    this.agents.addListener(notifyListeners);
     final p = this.prefs;
     final saved = p.get<String>('theme', '');
     for (final m in KumoThemeMode.values) {
@@ -503,6 +507,21 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---- Agents ----
+
+  /// Coding agents (optional): connected providers and running sessions.
+  final AgentsSource agents;
+
+  /// The Terminal view registers itself here to open daemon terminals
+  /// (agents, sign-in flows) in a pane.
+  void Function(String terminalId, String title, {bool agent})? terminalOpener;
+
+  /// Shows [terminalId] in a pane of the Terminal view.
+  void openTerminal(String terminalId, {required String title, bool agent = false}) {
+    view = KumoView.terminal;
+    terminalOpener?.call(terminalId, title, agent: agent);
+  }
+
   // ---- Terminal commands (⌘D / ⌘⇧D / ⌘W) ----
 
   /// The Terminal screen registers itself here; the window-level shortcuts
@@ -520,6 +539,9 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    agents
+      ..removeListener(notifyListeners)
+      ..dispose();
     _changes
       ..removeListener(notifyListeners)
       ..dispose();

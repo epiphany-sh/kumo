@@ -24,13 +24,22 @@ class GrpcTerminalSurface implements TerminalSurface {
       : title = _shellName,
         cwd = '~',
         _existingId = null,
+        killOnClose = true,
         _adopt = adopt {
     _run();
   }
 
   /// Re-attaches to a terminal the daemon kept running, replaying its output.
-  GrpcTerminalSurface.attach(this._engine, {required String terminalId, required String program, this.onExit})
-      : title = program.split(Platform.pathSeparator).last,
+  /// With [killOnClose] false, closing the pane only detaches (agents keep
+  /// running and are managed from the Agents view).
+  GrpcTerminalSurface.attach(
+    this._engine, {
+    required String terminalId,
+    required String program,
+    String? title,
+    this.onExit,
+    this.killOnClose = true,
+  })  : title = title ?? program.split(Platform.pathSeparator).last,
         cwd = '~',
         _existingId = terminalId,
         _adopt = null {
@@ -39,6 +48,9 @@ class GrpcTerminalSurface implements TerminalSurface {
 
   final KumoEngine _engine;
   final String? _existingId;
+
+  /// Whether closing the pane kills the process (shells) or only detaches.
+  final bool killOnClose;
   final Future<TerminalInfo?> Function()? _adopt;
 
   /// Called with the exit code when the process ends.
@@ -182,13 +194,14 @@ class GrpcTerminalSurface implements TerminalSurface {
     }
   }
 
-  /// Closing the pane kills the process in the daemon.
+  /// Closing the pane kills the process in the daemon, unless the surface
+  /// only detaches ([killOnClose]).
   @override
   void dispose() {
     if (_disposed) return;
     _disposed = true;
     final conn = _engine.current;
-    if (conn != null && _terminalId != null) unawaited(_closeRemote(conn));
+    if (killOnClose && conn != null && _terminalId != null) unawaited(_closeRemote(conn));
     _input?.close();
     _output?.cancel();
     _buffer.dispose();

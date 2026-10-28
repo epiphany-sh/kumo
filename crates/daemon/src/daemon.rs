@@ -2,6 +2,7 @@ use std::future::Future;
 use std::sync::Arc;
 
 use anyhow::Context;
+use kumo_application::agents::{AgentPorts, AgentService};
 use kumo_application::changes::{ChangesPorts, ChangesService};
 use kumo_application::daemon::HelloService;
 use kumo_application::terminal::TerminalService;
@@ -9,12 +10,13 @@ use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
 use kumo_domain::daemon::{ApiVersion, DaemonEndpoint, DiscoveryStore};
 use kumo_domain::workspace::WorktreeLocation;
 use kumo_grpc::server::{GrpcServer, Services};
+use kumo_infrastructure::agents::ShellPathLocator;
 use kumo_infrastructure::discovery::FileDiscoveryStore;
 use kumo_infrastructure::fs::LocalFileStore;
 use kumo_infrastructure::git::{FsRepoFinder, GitCli};
 use kumo_infrastructure::pty::PortablePtySystem;
 use kumo_infrastructure::security::generate_auth_token;
-use kumo_infrastructure::storage::SqliteWorkspaceStore;
+use kumo_infrastructure::storage::{SqliteAgentStore, SqliteWorkspaceStore};
 use kumo_infrastructure::watch::NotifyWatcher;
 
 use crate::DaemonConfig;
@@ -74,6 +76,17 @@ impl Daemon {
                     files: Arc::new(LocalFileStore),
                     watcher: Arc::new(NotifyWatcher),
                 },
+                Arc::clone(&workspace),
+            )),
+            agents: Arc::new(AgentService::new(
+                AgentPorts {
+                    store: Arc::new(SqliteAgentStore::open(&data_dir.join("kumo.db"))?),
+                    locator: Arc::new(match config.agent_path {
+                        Some(path) => ShellPathLocator::with_path(&home, path),
+                        None => ShellPathLocator::new(&home),
+                    }),
+                },
+                Arc::clone(&terminals),
                 workspace,
             )),
         };

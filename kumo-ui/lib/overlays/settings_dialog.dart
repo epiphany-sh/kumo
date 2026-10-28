@@ -9,6 +9,7 @@ import '../theme/palette.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
+import 'agent_settings.dart';
 
 enum SettingsTab {
   general('General', Icons.settings_outlined),
@@ -188,6 +189,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
         ),
       ],
       for (final p in page.providers) ...[const SizedBox(height: 8), _providerCard(context, s, p)],
+      if (page.custom != null) page.custom!,
       for (final sec in page.sections) ...[const SizedBox(height: 16), _Section(title: sec.$1, rows: sec.$2)],
     ];
   }
@@ -225,17 +227,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Flexible(child: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13.5, weight: FontWeight.w600, color: c.text))),
-                  if (p.isDefault && on) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      decoration: BoxDecoration(color: c.accSoft, borderRadius: BorderRadius.circular(6)),
-                      child: Text('Default', style: sans(10.5, weight: FontWeight.w600, color: c.acc, height: 1.6)),
-                    ),
-                  ],
-                ]),
+                Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13.5, weight: FontWeight.w600, color: c.text)),
                 Text(on ? p.meta : (p.offMeta ?? p.meta), maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: c.text3)),
               ]),
             ),
@@ -295,7 +287,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
   // ------------------------------------------------------------ pages
 
   _Page _page(BuildContext context, AppState s) {
-    const perm = ['Ask before edits', 'Auto-approve edits', 'Read-only until plan approved'];
     switch (_tab) {
       case SettingsTab.general:
         return _Page('General', 'How Kumo starts, updates and where it keeps its data.', sections: [
@@ -378,33 +369,12 @@ class _SettingsDialogState extends State<SettingsDialog> {
       case SettingsTab.ai:
         return _Page(
           'AI agents',
-          'Coding agents Kumo can run in your worktrees. Each one runs in its own terminal, with the ticket and linked docs as context.',
-          addLabel: 'Add custom agent',
-          addNote: 'Any CLI that takes a prompt works: Kumo runs it in the worktree’s terminal and streams its output.',
-          providers: [
-            _Provider('claude', 'CC', 'Claude Code', 'Claude account · claude-opus-5-5', 'on', isDefault: true, testNote: 'claude responded · signed in', rows: () => [
-                  _select(s, 'ai.claude.model', 'Model', null, const ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'], 'claude-opus-5-5'),
-                  _seg(s, 'ai.claude.perm', 'Permissions', 'What it may do without asking you.', perm, 'Auto-approve edits'),
-                  _select(s, 'ai.claude.parallel', 'Parallel sessions', null, const ['1', '2', '3', '4', '6'], '3'),
-                  _toggle(s, 'ai.claude.context', 'Send ticket and linked docs as context', null, true),
-                ]),
-            _Provider('codex', 'CX', 'Codex CLI', 'API key · ask before shell commands', 'on', rows: () => [
-                  _text(s, 'ai.codex.cmd', 'Command', null, 'codex', mono: true),
-                  _seg(s, 'ai.codex.perm', 'Permissions', null, const ['Ask before shell', 'Auto in worktree', 'Read-only'], 'Ask before shell'),
-                ]),
-            _Provider('gemini', 'GM', 'Gemini CLI', 'Google account · read-only until plan approved', 'on', rows: () => [
-                  _seg(s, 'ai.gemini.perm', 'Permissions', null, perm, 'Read-only until plan approved'),
-                ]),
-            _Provider('aider', 'AD', 'Aider', 'Uses your own model keys', 'missing', offMeta: 'Not found on PATH · brew install aider', rows: () => [
-                  _text(s, 'ai.aider.cmd', 'Command', null, 'aider --no-auto-commits', mono: true),
-                ]),
-          ],
+          'Coding agents Kumo can run in your worktrees, with your own sign-in: Kumo never proxies models. Each one runs in its own terminal. Optional: everything else works without them.',
+          custom: const AgentSettingsPanel(),
           sections: [
             ('Defaults', [
-              _select(s, 'ai.default', 'Default agent', 'Used by “New agent” and when starting from a ticket.', const ['Claude Code', 'Codex CLI', 'Gemini CLI'], 'Claude Code'),
               _toggle(s, 'ai.ownWorktree', 'Give every agent its own worktree', 'Agents never share a checkout, so they can’t step on each other.', true),
               _toggle(s, 'ai.notify', 'Notify me when an agent needs input', null, true),
-              _text(s, 'ai.budget', 'Monthly spend alert', 'Across API-key agents.', 'US\$ 200'),
             ]),
           ],
         );
@@ -533,17 +503,20 @@ class _SettingsDialogState extends State<SettingsDialog> {
 }
 
 class _Page {
-  _Page(this.heading, this.intro, {this.addLabel, this.addNote, this.providers = const [], this.sections = const []});
+  _Page(this.heading, this.intro, {this.addLabel, this.addNote, this.providers = const [], this.sections = const [], this.custom});
   final String heading;
   final String intro;
   final String? addLabel;
   final String? addNote;
   final List<_Provider> providers;
   final List<(String, List<Widget>)> sections;
+
+  /// A page-specific panel shown before the sections (AI agents).
+  final Widget? custom;
 }
 
 class _Provider {
-  _Provider(this.id, this.k, this.name, this.meta, this.initial, {required this.rows, this.isDefault = false, this.offMeta, this.warn, this.testNote = 'Connected · token valid'});
+  _Provider(this.id, this.k, this.name, this.meta, this.initial, {required this.rows, this.offMeta, this.warn, this.testNote = 'Connected · token valid'});
   final String id;
   final String k;
   final String name;
@@ -552,7 +525,6 @@ class _Provider {
   /// on / warn / off / missing (before the user changes it).
   final String initial;
   final List<Widget> Function() rows;
-  final bool isDefault;
   final String? offMeta;
   final String? warn;
   final String testNote;

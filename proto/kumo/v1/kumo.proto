@@ -448,3 +448,147 @@ message Commit {
 message LogResponse {
   repeated Commit commits = 1;
 }
+
+// ---------------------------------------------------------------------------
+// Agents: the user's own coding-agent CLIs, run in worktrees
+// ---------------------------------------------------------------------------
+//
+// Kumo never proxies models: a provider is a CLI the user installed and
+// signed in to (Claude Code, Codex, Gemini, Copilot, Grok… or any command).
+// Agents are optional: with none connected, everything else works.
+
+service Agents {
+  // Known CLIs (installed or not) plus the user's custom ones.
+  rpc ListProviders(ListProvidersRequest) returns (ListProvidersResponse);
+  // Creates (empty id) a custom provider or updates any provider.
+  rpc SaveProvider(SaveProviderRequest) returns (AgentProvider);
+  // Custom providers only; known ones are disabled instead.
+  rpc DeleteProvider(DeleteProviderRequest) returns (DeleteProviderResponse);
+  // Runs `<program> --version`.
+  rpc TestProvider(TestProviderRequest) returns (TestProviderResponse);
+  // Opens a terminal running the CLI's own sign-in; Kumo never sees
+  // credentials.
+  rpc LoginProvider(LoginProviderRequest) returns (LoginProviderResponse);
+  rpc Start(StartAgentRequest) returns (AgentSession);
+  // Kills the agent's process.
+  rpc Stop(StopAgentRequest) returns (StopAgentResponse);
+  // Forgets a finished session.
+  rpc Dismiss(DismissAgentRequest) returns (DismissAgentResponse);
+  // Every session now, then again whenever one changes (last wins).
+  rpc Watch(WatchAgentsRequest) returns (stream AgentsSnapshot);
+}
+
+message AgentProvider {
+  string id = 1;
+  string name = 2;
+  // Two-letter badge, e.g. "CC".
+  string short = 3;
+  string program = 4;
+  // Extra arguments, shell-quoted (e.g. "--model x").
+  string args = 5;
+  bool custom = 6;
+  bool enabled = 7;
+  bool is_default = 8;
+  // Found on the user's PATH.
+  bool installed = 9;
+  string resolved_path = 10;
+  // How to install it (known CLIs).
+  string install_hint = 11;
+  // The prompt can be passed at start; otherwise Kumo types it in.
+  bool takes_prompt_argument = 12;
+  bool has_login = 13;
+}
+
+message ListProvidersRequest {}
+
+message ListProvidersResponse {
+  repeated AgentProvider providers = 1;
+}
+
+message SaveProviderRequest {
+  // Empty: a new custom provider.
+  string id = 1;
+  string name = 2;
+  string program = 3;
+  string args = 4;
+  bool enabled = 5;
+  bool is_default = 6;
+}
+
+message DeleteProviderRequest {
+  string id = 1;
+}
+
+message DeleteProviderResponse {}
+
+message TestProviderRequest {
+  string id = 1;
+}
+
+message TestProviderResponse {
+  // e.g. "2.1.0 (Claude Code)".
+  string version = 1;
+}
+
+message LoginProviderRequest {
+  string id = 1;
+}
+
+message LoginProviderResponse {
+  string terminal_id = 1;
+}
+
+message StartAgentRequest {
+  // Empty: the default provider.
+  string provider_id = 1;
+  string worktree_path = 2;
+  string prompt = 3;
+  // Shown on the card; empty uses the prompt's first line.
+  string title = 4;
+  uint32 cols = 5;
+  uint32 rows = 6;
+}
+
+enum AgentState {
+  // Producing output.
+  AGENT_STATE_WORKING = 0;
+  // Quiet, or it rang the terminal bell / sent a notification: your turn.
+  AGENT_STATE_NEEDS_INPUT = 1;
+  AGENT_STATE_EXITED = 2;
+}
+
+message AgentSession {
+  string id = 1;
+  string provider_id = 2;
+  string provider_name = 3;
+  string short = 4;
+  string worktree_path = 5;
+  string terminal_id = 6;
+  string title = 7;
+  string prompt = 8;
+  AgentState state = 9;
+  int32 exit_code = 10;
+  uint64 started_unix_ms = 11;
+  uint64 state_since_unix_ms = 12;
+  // Last readable line of output.
+  string last_line = 13;
+}
+
+message StopAgentRequest {
+  string id = 1;
+}
+
+message StopAgentResponse {}
+
+message DismissAgentRequest {
+  string id = 1;
+}
+
+message DismissAgentResponse {}
+
+message WatchAgentsRequest {}
+
+message AgentsSnapshot {
+  uint64 version = 1;
+  repeated AgentSession sessions = 2;
+}
