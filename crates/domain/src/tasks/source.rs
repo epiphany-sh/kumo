@@ -130,12 +130,15 @@ pub enum SourceOptions {
     Bear {
         database: Option<PathBuf>,
     },
-    /// GitHub search syntax.
+    /// GitHub search syntax: what "Everyone" shows. "Mine" is the part of
+    /// it assigned to the user.
     GitHub {
         query: String,
     },
     /// `site` like `https://acme.atlassian.net`; signs in with `email` and
-    /// an API token.
+    /// an API token. `jql` is what "Everyone" shows; empty: the user's own
+    /// issues plus the recent ones of the projects they work in. "Mine" is
+    /// always what's assigned to the user.
     Jira {
         site: String,
         email: String,
@@ -148,8 +151,15 @@ pub enum SourceOptions {
 }
 
 impl SourceOptions {
-    pub const GITHUB_QUERY: &str = "is:open is:issue assignee:@me archived:false";
-    pub const JIRA_JQL: &str = "assignee = currentUser() AND (statusCategory != Done OR updated >= -14d) ORDER BY updated DESC";
+    /// Open issues the user is involved in (assigned, author, mentioned,
+    /// commented): enough to show teammates' issues next to the user's own.
+    pub const GITHUB_QUERY: &str = "is:open is:issue involves:@me archived:false";
+    /// The default before "Everyone" existed (assigned only): sources saved
+    /// with it get the current default.
+    pub const LEGACY_GITHUB_QUERY: &str = "is:open is:issue assignee:@me archived:false";
+    /// The default JQL before "Everyone" existed (assigned only): sources
+    /// saved with it behave as if they had none.
+    pub const LEGACY_JIRA_JQL: &str = "assignee = currentUser() AND (statusCategory != Done OR updated >= -14d) ORDER BY updated DESC";
 
     pub fn kind(&self) -> SourceKind {
         match self {
@@ -183,7 +193,10 @@ impl SourceOptions {
                     .map(PathBuf::from),
             },
             SourceKind::GitHub => SourceOptions::GitHub {
-                query: or_default(get("query"), Self::GITHUB_QUERY),
+                query: match get("query") {
+                    Self::LEGACY_GITHUB_QUERY => Self::GITHUB_QUERY.to_owned(),
+                    query => or_default(query, Self::GITHUB_QUERY),
+                },
             },
             SourceKind::Jira => {
                 let site = required("site", "the site URL")?;
@@ -197,7 +210,10 @@ impl SourceOptions {
                 SourceOptions::Jira {
                     site,
                     email: required("email", "the account email")?,
-                    jql: or_default(get("jql"), Self::JIRA_JQL),
+                    jql: match get("jql") {
+                        Self::LEGACY_JIRA_JQL => String::new(),
+                        jql => jql.to_owned(),
+                    },
                 }
             }
             SourceKind::Todoist => SourceOptions::Todoist {
@@ -214,11 +230,13 @@ impl SourceOptions {
                 .map(|d| ("database", d.display().to_string()))
                 .collect(),
             SourceOptions::GitHub { query } => vec![("query", query.clone())],
-            SourceOptions::Jira { site, email, jql } => vec![
-                ("site", site.clone()),
-                ("email", email.clone()),
-                ("jql", jql.clone()),
-            ],
+            SourceOptions::Jira { site, email, jql } => {
+                let mut pairs = vec![("site", site.clone()), ("email", email.clone())];
+                if !jql.is_empty() {
+                    pairs.push(("jql", jql.clone()));
+                }
+                pairs
+            }
             SourceOptions::Todoist { project } => vec![("project", project.clone())],
         };
         pairs.into_iter().map(|(k, v)| (k.to_owned(), v)).collect()
@@ -282,6 +300,40 @@ mod tests {
         );
         assert!(
             matches!(jira, SourceOptions::Jira { ref site, .. } if site == "https://acme.atlassian.net")
+        );
+    }
+
+    #[test]
+    fn old_defaults_become_the_current_ones() {
+        let jira = |jql: &str| {
+            SourceOptions::from_map(
+                SourceKind::Jira,
+                &map(&[
+                    ("site", "https://a.atlassian.net"),
+                    ("email", "a@b.c"),
+                    ("jql", jql),
+                ]),
+            )
+            .unwrap()
+        };
+        assert!(
+            matches!(jira(SourceOptions::LEGACY_JIRA_JQL), SourceOptions::Jira { jql, .. } if jql.is_empty())
+        );
+        assert!(matches!(jira(" "), SourceOptions::Jira { jql, .. } if jql.is_empty()));
+        assert!(
+            matches!(jira("project = X"), SourceOptions::Jira { jql, .. } if jql == "project = X")
+        );
+        assert!(!jira("").to_map().contains_key("jql"));
+        let github = SourceOptions::from_map(
+            SourceKind::GitHub,
+            &map(&[("query", SourceOptions::LEGACY_GITHUB_QUERY)]),
+        )
+        .unwrap();
+        assert_eq!(
+            github,
+            SourceOptions::GitHub {
+                query: SourceOptions::GITHUB_QUERY.into()
+            }
         );
     }
 

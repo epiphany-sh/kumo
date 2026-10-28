@@ -172,28 +172,24 @@ fn write_vault(vault: &Path) -> anyhow::Result<()> {
 }
 
 fn to_domain(id: &SourceId, update: &pb::TasksUpdate) -> Vec<kumo_domain::tasks::Task> {
-    use kumo_domain::tasks::{Priority, Task, TaskId};
+    use kumo_domain::tasks::{Task, TaskId};
     update
         .changed
         .iter()
         .flat_map(|c| &c.tasks)
         .enumerate()
         .map(|(n, t)| Task {
-            id: TaskId::new(id, &format!("{n}")),
             key: t.key.clone(),
-            ticket: None,
-            title: t.title.clone(),
             status: if t.status() == pb::TaskStatus::Done {
                 TaskStatus::Done
             } else {
                 TaskStatus::Todo
             },
-            priority: Priority::None,
             due: Some(t.due.clone()),
             url: Some(t.url.clone()),
             context: t.context.clone(),
             labels: t.labels.clone(),
-            updated: None,
+            ..Task::new(TaskId::new(id, &format!("{n}")), t.title.clone())
         })
         .collect()
 }

@@ -1,0 +1,89 @@
+{
+  "issues": [
+    {
+      "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+      "id": "10355",
+      "self": "https://acme.atlassian.net/rest/api/3/issue/10355",
+      "key": "PRC-11355",
+      "fields": {
+        "summary": "migraciones",
+        "status": {"name": "In Progress", "id": "3", "statusCategory": {"id": 4, "key": "indeterminate", "colorName": "yellow", "name": "In Progress"}},
+        "priority": {"name": "Low", "id": "4"},
+        "duedate": null,
+        "project": {"id": "10001", "key": "PRC", "name": "Pricing", "projectTypeKey": "software"},
+        "labels": ["graviton", "db"],
+        "updated": "2026-10-28T11:03:00.000-0300",
+        "issuetype": {"id": "10001", "name": "Story", "subtask": false, "hierarchyLevel": 0},
+        "assignee": {"accountId": "5b10ac8d82e05b22cc7d4ef5", "displayName": "Mauri Fernández", "active": true, "accountType": "atlassian"},
+        "parent": {
+          "id": "10300", "key": "PRC-11300", "self": "https://acme.atlassian.net/rest/api/3/issue/10300",
+          "fields": {
+            "summary": "Migración a Graviton",
+            "status": {"name": "In Progress", "id": "3", "statusCategory": {"id": 4, "key": "indeterminate", "name": "In Progress"}},
+            "priority": {"name": "Medium", "id": "3"},
+            "issuetype": {"id": "10000", "name": "Epic", "subtask": false, "hierarchyLevel": 1}
+          }
+        },
+        "subtasks": [
+          {"id": "10356", "key": "PRC-11356", "fields": {"summary": "Migrar job de precios", "status": {"name": "Done", "statusCategory": {"key": "done"}}, "priority": {"name": "Low"}, "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1}}},
+          {"id": "10357", "key": "PRC-11357", "fields": {"summary": "Analisis", "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}, "priority": {"name": "Low"}, "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1}}},
+          {"id": "10358", "key": "PRC-11358", "fields": {"summary": "actualizar planilla", "status": {"name": "To Do", "statusCategory": {"key": "new"}}, "priority": {"name": "Low"}, "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1}}},
+          {"id": "10359", "key": "PRC-11359", "fields": {"summary": "verificacion en entornos", "status": {"name": "To Do", "statusCategory": {"key": "new"}}, "priority": {"name": "Low"}, "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1}}}
+        ],
+        "comment": {"comments": [], "self": "https://acme.atlassian.net/rest/api/3/issue/10355/comment", "maxResults": 0, "total": 6, "startAt": 0},
+        "issuelinks": [
+          {"id": "20001", "type": {"id": "10000", "name": "Blocks", "inward": "is blocked by", "outward": "blocks"},
+           "inwardIssue": {"id": "10340", "key": "PRC-11340", "fields": {"summary": "Limpieza de ofertas de canales", "status": {"name": "Done", "statusCategory": {"key": "done"}}, "priority": {"name": "Medium"}, "issuetype": {"name": "Task", "subtask": false, "hierarchyLevel": 0}}}},
+          {"id": "20002", "type": {"id": "10003", "name": "Relates", "inward": "relates to", "outward": "relates to"},
+           "outwardIssue": {"id": "10321", "key": "PRC-11321", "fields": {"summary": "Analisis: Migracion a Envoy", "status": {"name": "Backlog", "statusCategory": {"key": "new"}}, "priority": {"name": "Medium"}, "issuetype": {"name": "Task", "subtask": false, "hierarchyLevel": 0}}}}
+        ],
+        "customfield_10016": 5.0,
+        "customfield_10028": null,
+        "customfield_10020": [
+          {"id": 41, "name": "Pricing 2026.21", "state": "closed", "boardId": 7, "goal": "", "startDate": "2026-10-07T12:00:00.000Z", "endDate": "2026-10-20T12:00:00.000Z", "completeDate": "2026-10-20T15:00:00.000Z"},
+          {"id": 42, "name": "Pricing 2026.22", "state": "active", "boardId": 7, "goal": "Graviton", "startDate": "2026-10-21T12:00:00.000Z", "endDate": "2026-11-04T12:00:00.000Z"}
+        ]
+      }
+    },
+    {
+      "id": "10398",
+      "key": "PRC-398",
+      "fields": {
+        "summary": "Rounding error on installment prices",
+        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}},
+        "priority": {"name": "High"},
+        "duedate": null,
+        "project": {"key": "PRC", "name": "Pricing"},
+        "labels": ["bug"],
+        "updated": "2026-10-28T13:00:00.000-0300",
+        "issuetype": {"name": "Bug", "subtask": false, "hierarchyLevel": 0},
+        "assignee": {"accountId": "5b10ac8d82e05b22cc7d4ef5", "displayName": "Mauri Fernández"},
+        "subtasks": [],
+        "comment": {"comments": [], "maxResults": 0, "total": 2, "startAt": 0},
+        "issuelinks": [],
+        "customfield_10016": null,
+        "customfield_10028": 2,
+        "customfield_10020": null
+      }
+    },
+    {
+      "id": "40001",
+      "key": "OPS-7",
+      "fields": {
+        "summary": "Rotate staging Kafka credentials",
+        "status": {"name": "Code Review", "statusCategory": {"key": "indeterminate"}},
+        "priority": {"name": "Medium"},
+        "duedate": "2026-11-05",
+        "project": {"key": "OPS", "name": "Operations"},
+        "labels": [],
+        "updated": "2026-10-27T10:00:00.000+0000",
+        "issuetype": {"name": "Task", "subtask": false, "hierarchyLevel": 0},
+        "assignee": {"accountId": "5b10ac8d82e05b22cc7d4ef5", "displayName": "Mauri Fernández"},
+        "subtasks": [],
+        "comment": {"comments": [], "maxResults": 0, "total": 0, "startAt": 0},
+        "issuelinks": []
+      }
+    }
+  ],
+  "isLast": true
+}

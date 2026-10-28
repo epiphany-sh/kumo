@@ -1,0 +1,85 @@
+{
+  "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+  "id": "10355",
+  "self": "https://acme.atlassian.net/rest/api/3/issue/10355",
+  "key": "PRC-11355",
+  "fields": {
+    "summary": "migraciones",
+    "status": {"name": "In Progress", "id": "3", "statusCategory": {"id": 4, "key": "indeterminate", "name": "In Progress"}},
+    "priority": {"name": "Low", "id": "4"},
+    "duedate": null,
+    "project": {"id": "10001", "key": "PRC", "name": "Pricing"},
+    "labels": ["graviton", "db"],
+    "created": "2026-10-14T13:20:00.000-0300",
+    "updated": "2026-10-28T11:03:00.000-0300",
+    "issuetype": {"id": "10001", "name": "Story", "subtask": false, "hierarchyLevel": 0},
+    "assignee": {"accountId": "5b10ac8d82e05b22cc7d4ef5", "displayName": "Mauri Fernández", "active": true},
+    "reporter": {"accountId": "557058:f1d2", "displayName": "Ana Gómez", "active": true},
+    "parent": {
+      "id": "10300", "key": "PRC-11300",
+      "fields": {
+        "summary": "Migración a Graviton",
+        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}},
+        "priority": {"name": "Medium"},
+        "issuetype": {"name": "Epic", "subtask": false, "hierarchyLevel": 1}
+      }
+    },
+    "subtasks": [
+      {"id": "10356", "key": "PRC-11356", "fields": {"summary": "Migrar job de precios", "status": {"name": "Done", "statusCategory": {"key": "done"}}, "priority": {"name": "Low"}, "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1}}},
+      {"id": "10357", "key": "PRC-11357", "fields": {"summary": "Analisis", "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}, "priority": {"name": "Low"}, "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1}}},
+      {"id": "10358", "key": "PRC-11358", "fields": {"summary": "actualizar planilla", "status": {"name": "To Do", "statusCategory": {"key": "new"}}, "priority": {"name": "Low"}, "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1}}},
+      {"id": "10359", "key": "PRC-11359", "fields": {"summary": "verificacion en entornos", "status": {"name": "To Do", "statusCategory": {"key": "new"}}, "priority": {"name": "Low"}, "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1}}}
+    ],
+    "issuelinks": [
+      {"id": "20001", "type": {"id": "10000", "name": "Blocks", "inward": "is blocked by", "outward": "blocks"},
+       "inwardIssue": {"id": "10340", "key": "PRC-11340", "fields": {"summary": "Limpieza de ofertas de canales", "status": {"name": "Done", "statusCategory": {"key": "done"}}, "priority": {"name": "Medium"}, "issuetype": {"name": "Task", "subtask": false, "hierarchyLevel": 0}}}},
+      {"id": "20002", "type": {"id": "10003", "name": "Relates", "inward": "relates to", "outward": "relates to"},
+       "outwardIssue": {"id": "10321", "key": "PRC-11321", "fields": {"summary": "Analisis: Migracion a Envoy", "status": {"name": "Backlog", "statusCategory": {"key": "new"}}, "priority": {"name": "Medium"}, "issuetype": {"name": "Task", "subtask": false, "hierarchyLevel": 0}}}},
+      {"id": "20003", "type": {"id": "10001", "name": "Cloners", "inward": "is cloned by", "outward": "clones"},
+       "outwardIssue": {"id": "10290", "key": "PRC-11290", "fields": {"summary": "migraciones (2025)", "status": {"name": "Closed", "statusCategory": {"key": "done"}}, "issuetype": {"name": "Story", "hierarchyLevel": 0}}}}
+    ],
+    "description": {
+      "type": "doc", "version": 1,
+      "content": [
+        {"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "Contexto"}]},
+        {"type": "paragraph", "content": [
+          {"type": "text", "text": "Este ticket cubre las "},
+          {"type": "text", "text": "migraciones de base", "marks": [{"type": "strong"}]},
+          {"type": "text", "text": ". "},
+          {"type": "mention", "attrs": {"id": "557058:f1d2", "text": "@Ana Gómez"}},
+          {"type": "text", "text": " confirmó la ventana."}
+        ]},
+        {"type": "mediaSingle", "attrs": {"layout": "center"}, "content": [
+          {"type": "media", "attrs": {"id": "6e7c7f2c-1a2b-4c3d-9e8f-0a1b2c3d4e5f", "type": "file", "collection": "", "alt": "graviton-rollout.png", "width": 1280, "height": 720}}
+        ]}
+      ]
+    },
+    "customfield_10050": {
+      "type": "doc", "version": 1,
+      "content": [
+        {"type": "taskList", "attrs": {"localId": "ac"}, "content": [
+          {"type": "taskItem", "attrs": {"localId": "1", "state": "DONE"}, "content": [{"type": "text", "text": "Las migraciones corren en staging sin downtime"}]},
+          {"type": "taskItem", "attrs": {"localId": "2", "state": "TODO"}, "content": [
+            {"type": "text", "text": "Los conteos de "},
+            {"type": "text", "text": "price_history", "marks": [{"type": "code"}]},
+            {"type": "text", "text": " coinciden antes y después"}
+          ]}
+        ]}
+      ]
+    },
+    "attachment": [
+      {"self": "https://acme.atlassian.net/rest/api/3/attachment/30001", "id": "30001", "filename": "graviton-rollout.png", "author": {"displayName": "Ana Gómez"}, "created": "2026-10-14T13:25:00.000-0300", "size": 421888, "mimeType": "image/png", "content": "https://acme.atlassian.net/rest/api/3/attachment/content/30001"},
+      {"self": "https://acme.atlassian.net/rest/api/3/attachment/30002", "id": "30002", "filename": "price_history_counts.csv", "size": 90112, "mimeType": "text/csv", "content": "https://acme.atlassian.net/rest/api/3/attachment/content/30002"},
+      {"self": "https://acme.atlassian.net/rest/api/3/attachment/30003", "id": "30003", "filename": "migracion-graviton.pdf", "size": 1258291, "mimeType": "application/pdf", "content": "https://acme.atlassian.net/rest/api/3/attachment/content/30003"},
+      {"self": "https://acme.atlassian.net/rest/api/3/attachment/30004", "id": "30004", "filename": "precios-hijas-2026-10-25.log", "size": 2516582, "mimeType": "text/plain", "content": "https://acme.atlassian.net/rest/api/3/attachment/content/30004"}
+    ],
+    "components": [{"id": "1", "name": "price-admin"}, {"id": "2", "name": "price-reader-v2"}],
+    "fixVersions": [{"id": "100", "name": "2026.11", "released": false}],
+    "timetracking": {"originalEstimate": "3d", "remainingEstimate": "1d 6h", "timeSpent": "1d 4h", "originalEstimateSeconds": 86400, "remainingEstimateSeconds": 50400, "timeSpentSeconds": 43200},
+    "customfield_10016": 5.0,
+    "customfield_10028": null,
+    "customfield_10020": [
+      {"id": 42, "name": "Pricing 2026.22", "state": "active", "boardId": 7, "startDate": "2026-10-21T12:00:00.000Z", "endDate": "2026-11-04T12:00:00.000Z"}
+    ]
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "type": "doc",
+  "version": 1,
+  "content": [
+    {"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "Contexto"}]},
+    {"type": "paragraph", "content": [
+      {"type": "text", "text": "Como parte de "},
+      {"type": "inlineCard", "attrs": {"url": "https://acme.atlassian.net/browse/PRC-11300"}},
+      {"type": "text", "text": " movemos "},
+      {"type": "text", "text": "Pricing", "marks": [{"type": "strong"}]},
+      {"type": "text", "text": " a "},
+      {"type": "text", "text": "Graviton", "marks": [{"type": "em"}]},
+      {"type": "text", "text": ", sin "},
+      {"type": "text", "text": "x86", "marks": [{"type": "strike"}]},
+      {"type": "text", "text": ". "},
+      {"type": "mention", "attrs": {"id": "557058:f1d2", "text": "@Ana Gómez", "accessLevel": ""}},
+      {"type": "text", "text": " confirmó la ventana "},
+      {"type": "emoji", "attrs": {"shortName": ":white_check_mark:", "id": "2705", "text": "✅"}},
+      {"type": "hardBreak"},
+      {"type": "text", "text": "Fecha: "},
+      {"type": "date", "attrs": {"timestamp": "1793318400000"}},
+      {"type": "text", "text": " · estado "},
+      {"type": "status", "attrs": {"text": "EN CURSO", "color": "blue", "localId": "s1"}}
+    ]},
+    {"type": "heading", "attrs": {"level": 3}, "content": [{"type": "text", "text": "Pasos"}]},
+    {"type": "orderedList", "attrs": {"order": 1}, "content": [
+      {"type": "listItem", "content": [
+        {"type": "paragraph", "content": [
+          {"type": "text", "text": "Congelar las escrituras del job ("},
+          {"type": "text", "text": "PRC-11356", "marks": [{"type": "link", "attrs": {"href": "https://acme.atlassian.net/browse/PRC-11356"}}]},
+          {"type": "text", "text": ")."}
+        ]}
+      ]},
+      {"type": "listItem", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "Correr las migraciones en staging:"}]},
+        {"type": "bulletList", "content": [
+          {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "por lotes de 500k filas"}]}]},
+          {"type": "listItem", "content": [{"type": "paragraph", "content": [
+            {"type": "text", "text": "comparando "},
+            {"type": "text", "text": "price_history", "marks": [{"type": "code"}]}
+          ]}]}
+        ]}
+      ]}
+    ]},
+    {"type": "taskList", "attrs": {"localId": "t1"}, "content": [
+      {"type": "taskItem", "attrs": {"localId": "a", "state": "DONE"}, "content": [
+        {"type": "text", "text": "Backup de "},
+        {"type": "text", "text": "price_history", "marks": [{"type": "code"}]}
+      ]},
+      {"type": "taskItem", "attrs": {"localId": "b", "state": "TODO"}, "content": [{"type": "text", "text": "Avisar en #pricing-oncall"}]},
+      {"type": "taskList", "attrs": {"localId": "t2"}, "content": [
+        {"type": "taskItem", "attrs": {"localId": "c", "state": "TODO"}, "content": [{"type": "text", "text": "y en el canal de deploys"}]}
+      ]}
+    ]},
+    {"type": "codeBlock", "attrs": {"language": "sql"}, "content": [
+      {"type": "text", "text": "SELECT channel_id, COUNT(*) AS prices\nFROM price_history\nGROUP BY channel_id;"}
+    ]},
+    {"type": "blockquote", "content": [
+      {"type": "paragraph", "content": [{"type": "text", "text": "Ojo con los 40 M de filas."}]},
+      {"type": "paragraph", "content": [{"type": "text", "text": "Segunda línea."}]}
+    ]},
+    {"type": "panel", "attrs": {"panelType": "warning"}, "content": [
+      {"type": "paragraph", "content": [{"type": "text", "text": "No correr en prod sin aviso."}]}
+    ]},
+    {"type": "table", "attrs": {"isNumberColumnEnabled": false, "layout": "default", "localId": "tb"}, "content": [
+      {"type": "tableRow", "content": [
+        {"type": "tableHeader", "attrs": {}, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Entorno", "marks": [{"type": "strong"}]}]}]},
+        {"type": "tableHeader", "attrs": {}, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Destino", "marks": [{"type": "strong"}]}]}]}
+      ]},
+      {"type": "tableRow", "content": [
+        {"type": "tableCell", "attrs": {}, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "staging"}]}]},
+        {"type": "tableCell", "attrs": {}, "content": [{"type": "paragraph", "content": [
+          {"type": "text", "text": "m7g.large | arm"},
+          {"type": "hardBreak"},
+          {"type": "text", "text": "hoy"}
+        ]}]}
+      ]}
+    ]},
+    {"type": "rule"},
+    {"type": "mediaSingle", "attrs": {"layout": "center", "width": 66.67}, "content": [
+      {"type": "media", "attrs": {"id": "6e7c7f2c-1a2b-4c3d-9e8f-0a1b2c3d4e5f", "type": "file", "collection": "", "alt": "graviton-rollout.png", "width": 1280, "height": 720}}
+    ]},
+    {"type": "mediaGroup", "content": [
+      {"type": "media", "attrs": {"id": "7f8e9a0b-0000-4000-8000-000000000000", "type": "file", "collection": ""}}
+    ]},
+    {"type": "expand", "attrs": {"title": "Detalle técnico"}, "content": [
+      {"type": "paragraph", "content": [{"type": "text", "text": "Instancias m7g."}]}
+    ]},
+    {"type": "blockCard", "attrs": {"url": "https://wiki.pricing.local/runbooks/migraciones"}}
+  ]
+}

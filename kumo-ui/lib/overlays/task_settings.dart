@@ -19,11 +19,11 @@ class _Field {
 List<_Field> _fields(TaskSourceKind kind) => switch (kind) {
       TaskSourceKind.obsidian => const [_Field('vault', 'Vault folder', hint: '~/Documents/Notes', mono: true)],
       TaskSourceKind.bear => const [_Field('database', 'Database', hint: 'Bear’s usual one', mono: true, optional: true)],
-      TaskSourceKind.github => const [_Field('query', 'Issues to show (GitHub search)', hint: 'is:open is:issue assignee:@me', mono: true, optional: true)],
+      TaskSourceKind.github => const [_Field('query', 'Issues for Everyone (GitHub search)', hint: 'is:open is:issue involves:@me', mono: true, optional: true)],
       TaskSourceKind.jira => const [
           _Field('site', 'Site', hint: 'https://acme.atlassian.net', mono: true),
           _Field('email', 'Account email', hint: 'you@acme.com'),
-          _Field('jql', 'Issues to show (JQL)', hint: 'assignee = currentUser() AND …', mono: true, optional: true),
+          _Field('jql', 'Issues for Everyone (JQL)', hint: 'Your projects’ open sprints and recent activity', mono: true, optional: true),
         ],
       TaskSourceKind.todoist => const [_Field('project', 'Only this project', hint: 'All open tasks', optional: true)],
     };

@@ -1,0 +1,16 @@
+{
+  "assignees": [{"id": "MDQ6VXNlcjE=", "login": "octo", "name": "Octo Cat"}],
+  "author": {"id": "MDQ6VXNlcjI=", "is_bot": false, "login": "nico", "name": "Nico Paz"},
+  "body": "The pricing client gives up on the first `502 Bad Gateway`.\r\n\r\n### Proposal\r\n- Retry idempotent `GET`s up to 3 times\r\n- Respect `Retry-After`\r\n",
+  "comments": [
+    {"id": "IC_2", "author": {"login": "tomas"}, "authorAssociation": "MEMBER", "body": "Please keep the total budget under 2 s.", "createdAt": "2026-10-27T12:00:00Z", "includesCreatedEdit": false, "isMinimized": false, "minimizedReason": "", "reactionGroups": [], "url": "https://github.com/acme/shop/issues/18#issuecomment-2", "viewerDidAuthor": false},
+    {"id": "IC_1", "author": {"login": "octo"}, "authorAssociation": "MEMBER", "body": "Taking it. It's the backoff from `price-reader-v2`.", "createdAt": "2026-10-25T09:30:00Z", "includesCreatedEdit": false, "isMinimized": false, "minimizedReason": "", "reactionGroups": [], "url": "https://github.com/acme/shop/issues/18#issuecomment-1", "viewerDidAuthor": true}
+  ],
+  "createdAt": "2026-10-24T08:00:00Z",
+  "labels": [{"id": "LA_1", "name": "bug", "description": "Something isn't working", "color": "d73a4a"}, {"id": "LA_3", "name": "api", "description": "", "color": "ededed"}],
+  "number": 18,
+  "state": "OPEN",
+  "title": "Rounding error",
+  "updatedAt": "2026-10-27T12:00:00Z",
+  "url": "https://github.com/acme/shop/issues/18"
+}

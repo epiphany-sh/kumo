@@ -68,6 +68,64 @@ pub fn set_checkbox(text: &str, id: &str, status: TaskStatus) -> Option<String> 
     None
 }
 
+/// Notes without headings can be long: the section is cut to this many
+/// lines on each side of the checkbox.
+const SECTION_REACH: usize = 40;
+
+/// The section of a note that holds zero-based `line`: from the closest
+/// heading above it to the next heading of the same or a higher level (the
+/// whole note when it has none), so a checkbox reads with its context.
+pub fn section_around(text: &str, line: usize) -> String {
+    let all: Vec<&str> = text
+        .split('\n')
+        .map(|l| l.strip_suffix('\r').unwrap_or(l))
+        .collect();
+    if line >= all.len() {
+        return String::new();
+    }
+    let mut fenced = false;
+    let levels: Vec<Option<usize>> = all
+        .iter()
+        .map(|l| {
+            let trimmed = l.trim_start();
+            if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+                fenced = !fenced;
+                return None;
+            }
+            if fenced {
+                return None;
+            }
+            heading_level(l)
+        })
+        .collect();
+    let (start, level) = (0..=line)
+        .rev()
+        .find_map(|n| levels[n].map(|level| (n, level)))
+        .unwrap_or((0, 0));
+    let end = (line + 1..all.len())
+        .find(|n| levels[*n].is_some_and(|l| level > 0 && l <= level))
+        .unwrap_or(all.len());
+    let from = start.max(line.saturating_sub(SECTION_REACH));
+    let to = end.min(line + SECTION_REACH + 1);
+    let mut section: Vec<&str> = all[from..to].to_vec();
+    if from > start && levels[start].is_some() {
+        section.insert(0, all[start]);
+    }
+    while section.last().is_some_and(|l| l.trim().is_empty()) {
+        section.pop();
+    }
+    let skip = section.iter().take_while(|l| l.trim().is_empty()).count();
+    section[skip..].join("\n")
+}
+
+/// `## Title` → 2.
+fn heading_level(line: &str) -> Option<usize> {
+    let hashes = line.len() - line.trim_start_matches('#').len();
+    let rest = &line[hashes..];
+    ((1..=6).contains(&hashes) && (rest.is_empty() || rest.starts_with([' ', '\t'])))
+        .then_some(hashes)
+}
+
 /// The part of a checkbox that identifies it: its text without metadata, so
 /// completing it (which adds `✅ <date>`) or changing its due date keeps it.
 fn identity(body: &str) -> &str {
@@ -343,6 +401,29 @@ mod tests {
             NOTE
         );
         assert_eq!(set_checkbox(NOTE, "missing", TaskStatus::Done), None);
+    }
+
+    #[test]
+    fn reads_the_section_around_a_line() {
+        let note = "# Weekly\nintro\n## Semana 44\n- [x] Mandar resumen\n- [ ] Revisar costos\n\n### Detalle\nmás\n## Semana 45\n- [ ] Otra\n";
+        assert_eq!(
+            section_around(note, 4),
+            "## Semana 44\n- [x] Mandar resumen\n- [ ] Revisar costos\n\n### Detalle\nmás"
+        );
+        assert_eq!(section_around(note, 9), "## Semana 45\n- [ ] Otra");
+        assert_eq!(
+            section_around("- [ ] a\r\n- [ ] b\r\n", 1),
+            "- [ ] a\n- [ ] b"
+        );
+        let fenced = "## A\n```\n# not a heading\n```\n- [ ] t\n";
+        assert_eq!(section_around(fenced, 4), fenced.trim_end());
+        assert_eq!(section_around("x", 3), "");
+        let long: String = (0..200).map(|n| format!("line {n}\n")).collect();
+        let cut = section_around(&long, 100);
+        assert!(
+            cut.starts_with("line 60\n") && cut.ends_with("line 140"),
+            "{cut}"
+        );
     }
 
     #[test]

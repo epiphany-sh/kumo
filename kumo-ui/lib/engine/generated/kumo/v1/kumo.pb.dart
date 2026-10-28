@@ -5765,6 +5765,19 @@ class Task extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? labels,
     $fixnum.Int64? updatedUnixMs,
     $core.String? suggestedBranch,
+    TaskType? type,
+    $core.String? typeName,
+    $core.String? sourceStatus,
+    Person? assignee,
+    $core.Iterable<TaskRelation>? relations,
+    $core.bool? mine,
+    $core.double? points,
+    $core.int? subtasksDone,
+    $core.int? subtasksTotal,
+    $core.int? commentCount,
+    TaskRef? parent,
+    $core.bool? blocked,
+    Sprint? sprint,
   }) {
     final result = Task._();
     if (id != null) result.id = id;
@@ -5779,6 +5792,19 @@ class Task extends $pb.GeneratedMessage {
     if (labels != null) result.labels.addAll(labels);
     if (updatedUnixMs != null) result.updatedUnixMs = updatedUnixMs;
     if (suggestedBranch != null) result.suggestedBranch = suggestedBranch;
+    if (type != null) result.type = type;
+    if (typeName != null) result.typeName = typeName;
+    if (sourceStatus != null) result.sourceStatus = sourceStatus;
+    if (assignee != null) result.assignee = assignee;
+    if (relations != null) result.relations.addAll(relations);
+    if (mine != null) result.mine = mine;
+    if (points != null) result.points = points;
+    if (subtasksDone != null) result.subtasksDone = subtasksDone;
+    if (subtasksTotal != null) result.subtasksTotal = subtasksTotal;
+    if (commentCount != null) result.commentCount = commentCount;
+    if (parent != null) result.parent = parent;
+    if (blocked != null) result.blocked = blocked;
+    if (sprint != null) result.sprint = sprint;
     return result;
   }
 
@@ -5811,6 +5837,30 @@ class Task extends $pb.GeneratedMessage {
         11, _omitFieldNames ? '' : 'updatedUnixMs', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOS(12, _omitFieldNames ? '' : 'suggestedBranch')
+    ..aE<TaskType>(13, _omitFieldNames ? '' : 'type',
+        enumValues: TaskType.values)
+    ..aOS(14, _omitFieldNames ? '' : 'typeName')
+    ..aOS(15, _omitFieldNames ? '' : 'sourceStatus')
+    ..aOM<Person>(16, _omitFieldNames ? '' : 'assignee',
+        subBuilder: Person.$_createMessage)
+    ..pc<TaskRelation>(
+        17, _omitFieldNames ? '' : 'relations', $pb.PbFieldType.KE,
+        valueOf: TaskRelation.valueOf,
+        enumValues: TaskRelation.values,
+        defaultEnumValue: TaskRelation.TASK_RELATION_UNSPECIFIED)
+    ..aOB(18, _omitFieldNames ? '' : 'mine')
+    ..aD(19, _omitFieldNames ? '' : 'points')
+    ..aI(20, _omitFieldNames ? '' : 'subtasksDone',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(21, _omitFieldNames ? '' : 'subtasksTotal',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(22, _omitFieldNames ? '' : 'commentCount',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<TaskRef>(23, _omitFieldNames ? '' : 'parent',
+        subBuilder: TaskRef.$_createMessage)
+    ..aOB(24, _omitFieldNames ? '' : 'blocked')
+    ..aOM<Sprint>(25, _omitFieldNames ? '' : 'sprint',
+        subBuilder: Sprint.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5940,6 +5990,1167 @@ class Task extends $pb.GeneratedMessage {
   $core.bool hasSuggestedBranch() => $_has(11);
   @$pb.TagNumber(12)
   void clearSuggestedBranch() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  TaskType get type => $_getN(12);
+  @$pb.TagNumber(13)
+  set type(TaskType value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasType() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearType() => $_clearField(13);
+
+  /// The source's own name for the type ("Story", "Sub-task").
+  @$pb.TagNumber(14)
+  $core.String get typeName => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set typeName($core.String value) => $_setString(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasTypeName() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearTypeName() => $_clearField(14);
+
+  /// The source's own status ("Code Review", "QA"); `status` is its column.
+  @$pb.TagNumber(15)
+  $core.String get sourceStatus => $_getSZ(14);
+  @$pb.TagNumber(15)
+  set sourceStatus($core.String value) => $_setString(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasSourceStatus() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearSourceStatus() => $_clearField(15);
+
+  @$pb.TagNumber(16)
+  Person get assignee => $_getN(15);
+  @$pb.TagNumber(16)
+  set assignee(Person value) => $_setField(16, value);
+  @$pb.TagNumber(16)
+  $core.bool hasAssignee() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearAssignee() => $_clearField(16);
+  @$pb.TagNumber(16)
+  Person ensureAssignee() => $_ensure(15);
+
+  /// How the task relates to the user. Today only ASSIGNED is filled; room
+  /// for REPORTED and WATCHING later.
+  @$pb.TagNumber(17)
+  $pb.PbList<TaskRelation> get relations => $_getList(16);
+
+  /// The user's own: assigned to them, or from a personal source (Obsidian,
+  /// Bear, Todoist). What "Mine" shows.
+  @$pb.TagNumber(18)
+  $core.bool get mine => $_getBF(17);
+  @$pb.TagNumber(18)
+  set mine($core.bool value) => $_setBool(17, value);
+  @$pb.TagNumber(18)
+  $core.bool hasMine() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearMine() => $_clearField(18);
+
+  /// Story points; 0 = none.
+  @$pb.TagNumber(19)
+  $core.double get points => $_getN(18);
+  @$pb.TagNumber(19)
+  set points($core.double value) => $_setDouble(18, value);
+  @$pb.TagNumber(19)
+  $core.bool hasPoints() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearPoints() => $_clearField(19);
+
+  @$pb.TagNumber(20)
+  $core.int get subtasksDone => $_getIZ(19);
+  @$pb.TagNumber(20)
+  set subtasksDone($core.int value) => $_setUnsignedInt32(19, value);
+  @$pb.TagNumber(20)
+  $core.bool hasSubtasksDone() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearSubtasksDone() => $_clearField(20);
+
+  @$pb.TagNumber(21)
+  $core.int get subtasksTotal => $_getIZ(20);
+  @$pb.TagNumber(21)
+  set subtasksTotal($core.int value) => $_setUnsignedInt32(20, value);
+  @$pb.TagNumber(21)
+  $core.bool hasSubtasksTotal() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearSubtasksTotal() => $_clearField(21);
+
+  @$pb.TagNumber(22)
+  $core.int get commentCount => $_getIZ(21);
+  @$pb.TagNumber(22)
+  set commentCount($core.int value) => $_setUnsignedInt32(21, value);
+  @$pb.TagNumber(22)
+  $core.bool hasCommentCount() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearCommentCount() => $_clearField(22);
+
+  /// Epic, or parent of a sub-task.
+  @$pb.TagNumber(23)
+  TaskRef get parent => $_getN(22);
+  @$pb.TagNumber(23)
+  set parent(TaskRef value) => $_setField(23, value);
+  @$pb.TagNumber(23)
+  $core.bool hasParent() => $_has(22);
+  @$pb.TagNumber(23)
+  void clearParent() => $_clearField(23);
+  @$pb.TagNumber(23)
+  TaskRef ensureParent() => $_ensure(22);
+
+  /// An issue that blocks this one isn't done yet.
+  @$pb.TagNumber(24)
+  $core.bool get blocked => $_getBF(23);
+  @$pb.TagNumber(24)
+  set blocked($core.bool value) => $_setBool(23, value);
+  @$pb.TagNumber(24)
+  $core.bool hasBlocked() => $_has(23);
+  @$pb.TagNumber(24)
+  void clearBlocked() => $_clearField(24);
+
+  @$pb.TagNumber(25)
+  Sprint get sprint => $_getN(24);
+  @$pb.TagNumber(25)
+  set sprint(Sprint value) => $_setField(25, value);
+  @$pb.TagNumber(25)
+  $core.bool hasSprint() => $_has(24);
+  @$pb.TagNumber(25)
+  void clearSprint() => $_clearField(25);
+  @$pb.TagNumber(25)
+  Sprint ensureSprint() => $_ensure(24);
+}
+
+class Person extends $pb.GeneratedMessage {
+  factory Person({
+    $core.String? id,
+    $core.String? name,
+    $core.String? initials,
+    $core.bool? you,
+  }) {
+    final result = Person._();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (initials != null) result.initials = initials;
+    if (you != null) result.you = you;
+    return result;
+  }
+
+  Person._();
+
+  factory Person.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Person()..mergeFromBuffer(data, registry);
+  factory Person.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Person()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Person',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: Person.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aOS(3, _omitFieldNames ? '' : 'initials')
+    ..aOB(4, _omitFieldNames ? '' : 'you')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Person clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Person copyWith(void Function(Person) updates) =>
+      super.copyWith((message) => updates(message as Person)) as Person;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Person() / Person.new instead')
+  static Person create() => Person._();
+  static $pb.GeneratedMessage $_createMessage() => Person._();
+  @$core.override
+  Person createEmptyInstance() => Person._();
+  @$core.pragma('dart2js:noInline')
+  static Person getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Person>(Person.$_createMessage);
+  static Person? _defaultInstance;
+
+  /// The source's id (Jira accountId, GitHub login).
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  /// "AG"; one letter for one-word names.
+  @$pb.TagNumber(3)
+  $core.String get initials => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set initials($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasInitials() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearInitials() => $_clearField(3);
+
+  /// The signed-in user.
+  @$pb.TagNumber(4)
+  $core.bool get you => $_getBF(3);
+  @$pb.TagNumber(4)
+  set you($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasYou() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearYou() => $_clearField(4);
+}
+
+class Sprint extends $pb.GeneratedMessage {
+  factory Sprint({
+    $core.String? name,
+    SprintState? state,
+    $fixnum.Int64? startUnixMs,
+    $fixnum.Int64? endUnixMs,
+  }) {
+    final result = Sprint._();
+    if (name != null) result.name = name;
+    if (state != null) result.state = state;
+    if (startUnixMs != null) result.startUnixMs = startUnixMs;
+    if (endUnixMs != null) result.endUnixMs = endUnixMs;
+    return result;
+  }
+
+  Sprint._();
+
+  factory Sprint.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Sprint()..mergeFromBuffer(data, registry);
+  factory Sprint.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Sprint()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Sprint',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: Sprint.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aE<SprintState>(2, _omitFieldNames ? '' : 'state',
+        enumValues: SprintState.values)
+    ..a<$fixnum.Int64>(
+        3, _omitFieldNames ? '' : 'startUnixMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..a<$fixnum.Int64>(
+        4, _omitFieldNames ? '' : 'endUnixMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Sprint clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Sprint copyWith(void Function(Sprint) updates) =>
+      super.copyWith((message) => updates(message as Sprint)) as Sprint;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Sprint() / Sprint.new instead')
+  static Sprint create() => Sprint._();
+  static $pb.GeneratedMessage $_createMessage() => Sprint._();
+  @$core.override
+  Sprint createEmptyInstance() => Sprint._();
+  @$core.pragma('dart2js:noInline')
+  static Sprint getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Sprint>(Sprint.$_createMessage);
+  static Sprint? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  SprintState get state => $_getN(1);
+  @$pb.TagNumber(2)
+  set state(SprintState value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasState() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearState() => $_clearField(2);
+
+  /// 0 = unknown.
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get startUnixMs => $_getI64(2);
+  @$pb.TagNumber(3)
+  set startUnixMs($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasStartUnixMs() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearStartUnixMs() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get endUnixMs => $_getI64(3);
+  @$pb.TagNumber(4)
+  set endUnixMs($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasEndUnixMs() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearEndUnixMs() => $_clearField(4);
+}
+
+/// Another ticket, as a detail or a card mentions it.
+class TaskRef extends $pb.GeneratedMessage {
+  factory TaskRef({
+    $core.String? id,
+    $core.String? key,
+    $core.String? title,
+    TaskType? type,
+    $core.String? sourceStatus,
+    TaskStatus? status,
+    Person? assignee,
+    $core.String? color,
+    $core.String? url,
+  }) {
+    final result = TaskRef._();
+    if (id != null) result.id = id;
+    if (key != null) result.key = key;
+    if (title != null) result.title = title;
+    if (type != null) result.type = type;
+    if (sourceStatus != null) result.sourceStatus = sourceStatus;
+    if (status != null) result.status = status;
+    if (assignee != null) result.assignee = assignee;
+    if (color != null) result.color = color;
+    if (url != null) result.url = url;
+    return result;
+  }
+
+  TaskRef._();
+
+  factory TaskRef.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TaskRef()..mergeFromBuffer(data, registry);
+  factory TaskRef.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TaskRef()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TaskRef',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TaskRef.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'key')
+    ..aOS(3, _omitFieldNames ? '' : 'title')
+    ..aE<TaskType>(4, _omitFieldNames ? '' : 'type',
+        enumValues: TaskType.values)
+    ..aOS(5, _omitFieldNames ? '' : 'sourceStatus')
+    ..aE<TaskStatus>(6, _omitFieldNames ? '' : 'status',
+        enumValues: TaskStatus.values)
+    ..aOM<Person>(7, _omitFieldNames ? '' : 'assignee',
+        subBuilder: Person.$_createMessage)
+    ..aOS(8, _omitFieldNames ? '' : 'color')
+    ..aOS(9, _omitFieldNames ? '' : 'url')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TaskRef clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TaskRef copyWith(void Function(TaskRef) updates) =>
+      super.copyWith((message) => updates(message as TaskRef)) as TaskRef;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TaskRef() / TaskRef.new instead')
+  static TaskRef create() => TaskRef._();
+  static $pb.GeneratedMessage $_createMessage() => TaskRef._();
+  @$core.override
+  TaskRef createEmptyInstance() => TaskRef._();
+  @$core.pragma('dart2js:noInline')
+  static TaskRef getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TaskRef>(TaskRef.$_createMessage);
+  static TaskRef? _defaultInstance;
+
+  /// Kumo's id ("source/external") when it's a task of a source; empty for
+  /// tickets the source didn't send (opening it asks GetTask anyway).
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get key => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set key($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKey() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKey() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get title => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set title($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTitle() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTitle() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  TaskType get type => $_getN(3);
+  @$pb.TagNumber(4)
+  set type(TaskType value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasType() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearType() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get sourceStatus => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set sourceStatus($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSourceStatus() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSourceStatus() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  TaskStatus get status => $_getN(5);
+  @$pb.TagNumber(6)
+  set status(TaskStatus value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasStatus() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearStatus() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  Person get assignee => $_getN(6);
+  @$pb.TagNumber(7)
+  set assignee(Person value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasAssignee() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearAssignee() => $_clearField(7);
+  @$pb.TagNumber(7)
+  Person ensureAssignee() => $_ensure(6);
+
+  /// Epics: a palette name ("violet", "teal", "amber"…), empty = by key.
+  @$pb.TagNumber(8)
+  $core.String get color => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set color($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasColor() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearColor() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get url => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set url($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasUrl() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearUrl() => $_clearField(9);
+}
+
+class LinkedTask extends $pb.GeneratedMessage {
+  factory LinkedTask({
+    LinkKind? kind,
+    $core.String? relation,
+    TaskRef? task,
+  }) {
+    final result = LinkedTask._();
+    if (kind != null) result.kind = kind;
+    if (relation != null) result.relation = relation;
+    if (task != null) result.task = task;
+    return result;
+  }
+
+  LinkedTask._();
+
+  factory LinkedTask.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LinkedTask()..mergeFromBuffer(data, registry);
+  factory LinkedTask.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      LinkedTask()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LinkedTask',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: LinkedTask.$_createMessage)
+    ..aE<LinkKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: LinkKind.values)
+    ..aOS(2, _omitFieldNames ? '' : 'relation')
+    ..aOM<TaskRef>(3, _omitFieldNames ? '' : 'task',
+        subBuilder: TaskRef.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LinkedTask clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LinkedTask copyWith(void Function(LinkedTask) updates) =>
+      super.copyWith((message) => updates(message as LinkedTask)) as LinkedTask;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use LinkedTask() / LinkedTask.new instead')
+  static LinkedTask create() => LinkedTask._();
+  static $pb.GeneratedMessage $_createMessage() => LinkedTask._();
+  @$core.override
+  LinkedTask createEmptyInstance() => LinkedTask._();
+  @$core.pragma('dart2js:noInline')
+  static LinkedTask getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LinkedTask>(LinkedTask.$_createMessage);
+  static LinkedTask? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  LinkKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(LinkKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  /// The source's wording ("is blocked by", "clones").
+  @$pb.TagNumber(2)
+  $core.String get relation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set relation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRelation() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRelation() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  TaskRef get task => $_getN(2);
+  @$pb.TagNumber(3)
+  set task(TaskRef value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTask() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTask() => $_clearField(3);
+  @$pb.TagNumber(3)
+  TaskRef ensureTask() => $_ensure(2);
+}
+
+class TaskAttachment extends $pb.GeneratedMessage {
+  factory TaskAttachment({
+    $core.String? name,
+    $core.String? kind,
+    $fixnum.Int64? sizeBytes,
+    $core.String? url,
+  }) {
+    final result = TaskAttachment._();
+    if (name != null) result.name = name;
+    if (kind != null) result.kind = kind;
+    if (sizeBytes != null) result.sizeBytes = sizeBytes;
+    if (url != null) result.url = url;
+    return result;
+  }
+
+  TaskAttachment._();
+
+  factory TaskAttachment.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TaskAttachment()..mergeFromBuffer(data, registry);
+  factory TaskAttachment.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TaskAttachment()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TaskAttachment',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TaskAttachment.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aOS(2, _omitFieldNames ? '' : 'kind')
+    ..a<$fixnum.Int64>(
+        3, _omitFieldNames ? '' : 'sizeBytes', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(4, _omitFieldNames ? '' : 'url')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TaskAttachment clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TaskAttachment copyWith(void Function(TaskAttachment) updates) =>
+      super.copyWith((message) => updates(message as TaskAttachment))
+          as TaskAttachment;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TaskAttachment() / TaskAttachment.new instead')
+  static TaskAttachment create() => TaskAttachment._();
+  static $pb.GeneratedMessage $_createMessage() => TaskAttachment._();
+  @$core.override
+  TaskAttachment createEmptyInstance() => TaskAttachment._();
+  @$core.pragma('dart2js:noInline')
+  static TaskAttachment getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TaskAttachment>(
+          TaskAttachment.$_createMessage);
+  static TaskAttachment? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => $_clearField(1);
+
+  /// "PNG image", "CSV", "PDF".
+  @$pb.TagNumber(2)
+  $core.String get kind => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set kind($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKind() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKind() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get sizeBytes => $_getI64(2);
+  @$pb.TagNumber(3)
+  set sizeBytes($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSizeBytes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSizeBytes() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get url => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set url($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasUrl() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearUrl() => $_clearField(4);
+}
+
+class TaskComment extends $pb.GeneratedMessage {
+  factory TaskComment({
+    Person? author,
+    $fixnum.Int64? createdUnixMs,
+    $core.String? body,
+  }) {
+    final result = TaskComment._();
+    if (author != null) result.author = author;
+    if (createdUnixMs != null) result.createdUnixMs = createdUnixMs;
+    if (body != null) result.body = body;
+    return result;
+  }
+
+  TaskComment._();
+
+  factory TaskComment.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TaskComment()..mergeFromBuffer(data, registry);
+  factory TaskComment.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TaskComment()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TaskComment',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TaskComment.$_createMessage)
+    ..aOM<Person>(1, _omitFieldNames ? '' : 'author',
+        subBuilder: Person.$_createMessage)
+    ..a<$fixnum.Int64>(
+        2, _omitFieldNames ? '' : 'createdUnixMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(3, _omitFieldNames ? '' : 'body')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TaskComment clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TaskComment copyWith(void Function(TaskComment) updates) =>
+      super.copyWith((message) => updates(message as TaskComment))
+          as TaskComment;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TaskComment() / TaskComment.new instead')
+  static TaskComment create() => TaskComment._();
+  static $pb.GeneratedMessage $_createMessage() => TaskComment._();
+  @$core.override
+  TaskComment createEmptyInstance() => TaskComment._();
+  @$core.pragma('dart2js:noInline')
+  static TaskComment getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TaskComment>(
+          TaskComment.$_createMessage);
+  static TaskComment? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Person get author => $_getN(0);
+  @$pb.TagNumber(1)
+  set author(Person value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAuthor() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAuthor() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Person ensureAuthor() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get createdUnixMs => $_getI64(1);
+  @$pb.TagNumber(2)
+  set createdUnixMs($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCreatedUnixMs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCreatedUnixMs() => $_clearField(2);
+
+  /// Markdown.
+  @$pb.TagNumber(3)
+  $core.String get body => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set body($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBody() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBody() => $_clearField(3);
+}
+
+class TimeTracking extends $pb.GeneratedMessage {
+  factory TimeTracking({
+    $core.String? estimate,
+    $core.String? logged,
+    $core.String? remaining,
+    $fixnum.Int64? estimateSeconds,
+    $fixnum.Int64? loggedSeconds,
+    $fixnum.Int64? remainingSeconds,
+  }) {
+    final result = TimeTracking._();
+    if (estimate != null) result.estimate = estimate;
+    if (logged != null) result.logged = logged;
+    if (remaining != null) result.remaining = remaining;
+    if (estimateSeconds != null) result.estimateSeconds = estimateSeconds;
+    if (loggedSeconds != null) result.loggedSeconds = loggedSeconds;
+    if (remainingSeconds != null) result.remainingSeconds = remainingSeconds;
+    return result;
+  }
+
+  TimeTracking._();
+
+  factory TimeTracking.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TimeTracking()..mergeFromBuffer(data, registry);
+  factory TimeTracking.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TimeTracking()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TimeTracking',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TimeTracking.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'estimate')
+    ..aOS(2, _omitFieldNames ? '' : 'logged')
+    ..aOS(3, _omitFieldNames ? '' : 'remaining')
+    ..a<$fixnum.Int64>(
+        4, _omitFieldNames ? '' : 'estimateSeconds', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..a<$fixnum.Int64>(
+        5, _omitFieldNames ? '' : 'loggedSeconds', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..a<$fixnum.Int64>(
+        6, _omitFieldNames ? '' : 'remainingSeconds', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TimeTracking clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TimeTracking copyWith(void Function(TimeTracking) updates) =>
+      super.copyWith((message) => updates(message as TimeTracking))
+          as TimeTracking;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TimeTracking() / TimeTracking.new instead')
+  static TimeTracking create() => TimeTracking._();
+  static $pb.GeneratedMessage $_createMessage() => TimeTracking._();
+  @$core.override
+  TimeTracking createEmptyInstance() => TimeTracking._();
+  @$core.pragma('dart2js:noInline')
+  static TimeTracking getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TimeTracking>(
+          TimeTracking.$_createMessage);
+  static TimeTracking? _defaultInstance;
+
+  /// The source's own wording ("3d", "1d 4h"), and seconds for the bar.
+  @$pb.TagNumber(1)
+  $core.String get estimate => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set estimate($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEstimate() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEstimate() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get logged => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set logged($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLogged() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLogged() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get remaining => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set remaining($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRemaining() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRemaining() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get estimateSeconds => $_getI64(3);
+  @$pb.TagNumber(4)
+  set estimateSeconds($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasEstimateSeconds() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearEstimateSeconds() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get loggedSeconds => $_getI64(4);
+  @$pb.TagNumber(5)
+  set loggedSeconds($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasLoggedSeconds() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearLoggedSeconds() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get remainingSeconds => $_getI64(5);
+  @$pb.TagNumber(6)
+  set remainingSeconds($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasRemainingSeconds() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearRemainingSeconds() => $_clearField(6);
+}
+
+class GetTaskRequest extends $pb.GeneratedMessage {
+  factory GetTaskRequest({
+    $core.String? id,
+    $core.bool? refresh,
+  }) {
+    final result = GetTaskRequest._();
+    if (id != null) result.id = id;
+    if (refresh != null) result.refresh = refresh;
+    return result;
+  }
+
+  GetTaskRequest._();
+
+  factory GetTaskRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetTaskRequest()..mergeFromBuffer(data, registry);
+  factory GetTaskRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetTaskRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetTaskRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: GetTaskRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOB(2, _omitFieldNames ? '' : 'refresh')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetTaskRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetTaskRequest copyWith(void Function(GetTaskRequest) updates) =>
+      super.copyWith((message) => updates(message as GetTaskRequest))
+          as GetTaskRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use GetTaskRequest() / GetTaskRequest.new instead')
+  static GetTaskRequest create() => GetTaskRequest._();
+  static $pb.GeneratedMessage $_createMessage() => GetTaskRequest._();
+  @$core.override
+  GetTaskRequest createEmptyInstance() => GetTaskRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetTaskRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<GetTaskRequest>(
+          GetTaskRequest.$_createMessage);
+  static GetTaskRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  /// Ask the source even if the cached detail is fresh.
+  @$pb.TagNumber(2)
+  $core.bool get refresh => $_getBF(1);
+  @$pb.TagNumber(2)
+  set refresh($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRefresh() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRefresh() => $_clearField(2);
+}
+
+class TaskDetail extends $pb.GeneratedMessage {
+  factory TaskDetail({
+    Task? task,
+    Person? reporter,
+    $fixnum.Int64? createdUnixMs,
+    $core.String? description,
+    $core.String? acceptanceCriteria,
+    $core.Iterable<TaskRef>? subtasks,
+    $core.Iterable<LinkedTask>? links,
+    $core.Iterable<TaskAttachment>? attachments,
+    $core.Iterable<TaskComment>? comments,
+    $core.Iterable<$core.String>? components,
+    $core.Iterable<$core.String>? fixVersions,
+    TimeTracking? timeTracking,
+    $fixnum.Int64? fetchedUnixMs,
+    $core.bool? stale,
+    $core.String? staleReason,
+    $core.String? location,
+  }) {
+    final result = TaskDetail._();
+    if (task != null) result.task = task;
+    if (reporter != null) result.reporter = reporter;
+    if (createdUnixMs != null) result.createdUnixMs = createdUnixMs;
+    if (description != null) result.description = description;
+    if (acceptanceCriteria != null)
+      result.acceptanceCriteria = acceptanceCriteria;
+    if (subtasks != null) result.subtasks.addAll(subtasks);
+    if (links != null) result.links.addAll(links);
+    if (attachments != null) result.attachments.addAll(attachments);
+    if (comments != null) result.comments.addAll(comments);
+    if (components != null) result.components.addAll(components);
+    if (fixVersions != null) result.fixVersions.addAll(fixVersions);
+    if (timeTracking != null) result.timeTracking = timeTracking;
+    if (fetchedUnixMs != null) result.fetchedUnixMs = fetchedUnixMs;
+    if (stale != null) result.stale = stale;
+    if (staleReason != null) result.staleReason = staleReason;
+    if (location != null) result.location = location;
+    return result;
+  }
+
+  TaskDetail._();
+
+  factory TaskDetail.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TaskDetail()..mergeFromBuffer(data, registry);
+  factory TaskDetail.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TaskDetail()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TaskDetail',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TaskDetail.$_createMessage)
+    ..aOM<Task>(1, _omitFieldNames ? '' : 'task',
+        subBuilder: Task.$_createMessage)
+    ..aOM<Person>(2, _omitFieldNames ? '' : 'reporter',
+        subBuilder: Person.$_createMessage)
+    ..a<$fixnum.Int64>(
+        3, _omitFieldNames ? '' : 'createdUnixMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(4, _omitFieldNames ? '' : 'description')
+    ..aOS(5, _omitFieldNames ? '' : 'acceptanceCriteria')
+    ..pPM<TaskRef>(6, _omitFieldNames ? '' : 'subtasks',
+        subBuilder: TaskRef.$_createMessage)
+    ..pPM<LinkedTask>(7, _omitFieldNames ? '' : 'links',
+        subBuilder: LinkedTask.$_createMessage)
+    ..pPM<TaskAttachment>(8, _omitFieldNames ? '' : 'attachments',
+        subBuilder: TaskAttachment.$_createMessage)
+    ..pPM<TaskComment>(9, _omitFieldNames ? '' : 'comments',
+        subBuilder: TaskComment.$_createMessage)
+    ..pPS(10, _omitFieldNames ? '' : 'components')
+    ..pPS(11, _omitFieldNames ? '' : 'fixVersions')
+    ..aOM<TimeTracking>(12, _omitFieldNames ? '' : 'timeTracking',
+        subBuilder: TimeTracking.$_createMessage)
+    ..a<$fixnum.Int64>(
+        13, _omitFieldNames ? '' : 'fetchedUnixMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOB(14, _omitFieldNames ? '' : 'stale')
+    ..aOS(15, _omitFieldNames ? '' : 'staleReason')
+    ..aOS(16, _omitFieldNames ? '' : 'location')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TaskDetail clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TaskDetail copyWith(void Function(TaskDetail) updates) =>
+      super.copyWith((message) => updates(message as TaskDetail)) as TaskDetail;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TaskDetail() / TaskDetail.new instead')
+  static TaskDetail create() => TaskDetail._();
+  static $pb.GeneratedMessage $_createMessage() => TaskDetail._();
+  @$core.override
+  TaskDetail createEmptyInstance() => TaskDetail._();
+  @$core.pragma('dart2js:noInline')
+  static TaskDetail getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TaskDetail>(TaskDetail.$_createMessage);
+  static TaskDetail? _defaultInstance;
+
+  /// The card's fields, as fresh as the detail.
+  @$pb.TagNumber(1)
+  Task get task => $_getN(0);
+  @$pb.TagNumber(1)
+  set task(Task value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTask() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTask() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Task ensureTask() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  Person get reporter => $_getN(1);
+  @$pb.TagNumber(2)
+  set reporter(Person value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasReporter() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearReporter() => $_clearField(2);
+  @$pb.TagNumber(2)
+  Person ensureReporter() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get createdUnixMs => $_getI64(2);
+  @$pb.TagNumber(3)
+  set createdUnixMs($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCreatedUnixMs() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCreatedUnixMs() => $_clearField(3);
+
+  /// Markdown (Jira's rich text converted).
+  @$pb.TagNumber(4)
+  $core.String get description => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set description($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDescription() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDescription() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get acceptanceCriteria => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set acceptanceCriteria($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasAcceptanceCriteria() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearAcceptanceCriteria() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $pb.PbList<TaskRef> get subtasks => $_getList(5);
+
+  @$pb.TagNumber(7)
+  $pb.PbList<LinkedTask> get links => $_getList(6);
+
+  @$pb.TagNumber(8)
+  $pb.PbList<TaskAttachment> get attachments => $_getList(7);
+
+  /// Oldest first, all of them.
+  @$pb.TagNumber(9)
+  $pb.PbList<TaskComment> get comments => $_getList(8);
+
+  @$pb.TagNumber(10)
+  $pb.PbList<$core.String> get components => $_getList(9);
+
+  @$pb.TagNumber(11)
+  $pb.PbList<$core.String> get fixVersions => $_getList(10);
+
+  @$pb.TagNumber(12)
+  TimeTracking get timeTracking => $_getN(11);
+  @$pb.TagNumber(12)
+  set timeTracking(TimeTracking value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasTimeTracking() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearTimeTracking() => $_clearField(12);
+  @$pb.TagNumber(12)
+  TimeTracking ensureTimeTracking() => $_ensure(11);
+
+  /// When the source answered.
+  @$pb.TagNumber(13)
+  $fixnum.Int64 get fetchedUnixMs => $_getI64(12);
+  @$pb.TagNumber(13)
+  set fetchedUnixMs($fixnum.Int64 value) => $_setInt64(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasFetchedUnixMs() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearFetchedUnixMs() => $_clearField(13);
+
+  /// Served from the cache: the source couldn't be reached.
+  @$pb.TagNumber(14)
+  $core.bool get stale => $_getBF(13);
+  @$pb.TagNumber(14)
+  set stale($core.bool value) => $_setBool(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasStale() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearStale() => $_clearField(14);
+
+  @$pb.TagNumber(15)
+  $core.String get staleReason => $_getSZ(14);
+  @$pb.TagNumber(15)
+  set staleReason($core.String value) => $_setString(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasStaleReason() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearStaleReason() => $_clearField(15);
+
+  /// Where a personal task lives ("Weekly.md · line 14", "Todoist · Inbox").
+  @$pb.TagNumber(16)
+  $core.String get location => $_getSZ(15);
+  @$pb.TagNumber(16)
+  set location($core.String value) => $_setString(15, value);
+  @$pb.TagNumber(16)
+  $core.bool hasLocation() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearLocation() => $_clearField(16);
 }
 
 class SourceTasks extends $pb.GeneratedMessage {

@@ -685,22 +685,57 @@ class AppState extends ChangeNotifier {
       tasks.setStatus(task.id, TaskColumn.doing).ignore();
     }
     if (!agent || created == null || !agents.live || agents.connected.isEmpty) return null;
-    final run = await agents.start(providerId: providerId, worktreePath: worktreePath, prompt: taskPrompt(task), title: '${task.key} · ${task.title}');
+    // The whole ticket when it can be had (cached, else asked for); the
+    // card's fields when the source can't answer.
+    var detail = tasks.cachedDetail(task.id);
+    if (detail == null) {
+      try {
+        detail = await tasks.getTask(task.id).timeout(const Duration(seconds: 10));
+      } on Object {
+        detail = null;
+      }
+    }
+    final run = await agents.start(providerId: providerId, worktreePath: worktreePath, prompt: taskPrompt(task, detail: detail), title: '${task.key} · ${task.title}');
     if (run == null) return 'Worktree ready, but the agent didn’t start: ${agents.error ?? 'unknown error'}';
     openTerminal(run.terminalId, title: run.title, agent: true, directory: worktreePath);
     return null;
   }
 
-  /// What an agent gets when it starts from a task.
-  static String taskPrompt(TaskEntry task) {
-    final where = [task.kind.label, if (task.context.isNotEmpty) task.context].join(' · ');
+  /// What an agent gets when it starts from a task: title, key and source,
+  /// and with the [detail] its description, acceptance criteria (its
+  /// definition of done) and comments. Attachments, subtasks and links
+  /// stay out; the link goes in so the agent can look them up.
+  static String taskPrompt(TaskEntry task, {TaskDetail? detail}) {
+    final t = detail == null || detail.task.id != task.id ? task : detail.task;
+    final where = [t.kind.label, if (t.context.isNotEmpty) t.context].join(' · ');
+    final status = t.sourceStatus.isNotEmpty ? t.sourceStatus : '';
+    final d = detail;
     return [
-      task.title,
+      t.title,
       '',
-      'Task ${task.key} ($where).',
-      if (task.labels.isNotEmpty) 'Labels: ${task.labels.join(', ')}.',
-      if (task.due.isNotEmpty) 'Due ${task.due}.',
-      if (task.url.startsWith('http')) task.url,
+      'Task ${t.key} ($where).',
+      if (status.isNotEmpty) 'Status: $status.',
+      if (t.labels.isNotEmpty) 'Labels: ${t.labels.join(', ')}.',
+      if (t.due.isNotEmpty) 'Due ${t.due}.',
+      if (t.url.startsWith('http')) t.url,
+      if (d != null && d.description.trim().isNotEmpty) ...['', '## Description', '', d.description.trim()],
+      if (d != null && d.acceptanceCriteria.trim().isNotEmpty) ...[
+        '',
+        '## Acceptance criteria',
+        '',
+        'This is the definition of done.',
+        '',
+        d.acceptanceCriteria.trim(),
+      ],
+      if (d != null && d.comments.isNotEmpty) ...[
+        '',
+        '## Comments',
+        for (final c in d.comments) ...[
+          '',
+          '${c.author.name}${c.author.you ? ' (the user)' : ''}${c.created == null ? '' : ', ${c.created!.toIso8601String().substring(0, 10)}'}:',
+          c.body.trim(),
+        ],
+      ],
     ].join('\n');
   }
 

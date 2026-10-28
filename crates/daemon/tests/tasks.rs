@@ -182,6 +182,29 @@ async fn obsidian_vault_end_to_end() {
     assert_eq!(ship.labels, ["kumo"]);
     assert_eq!(ship.suggested_branch, "feat/ship-tasks");
     assert!(board.sources[0].last_synced_unix_ms > 0);
+    // Notes are personal: every task is the user's, a plain to-do.
+    assert!(board.tasks[&source.id].iter().all(|t| t.mine));
+    assert_eq!(ship.r#type(), pb::TaskType::Todo);
+    assert_eq!(ship.assignee, None);
+
+    // The detail says where the checkbox is and what surrounds it.
+    let detail = client
+        .tasks
+        .get_task(pb::GetTaskRequest {
+            id: ship.id.clone(),
+            refresh: false,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(detail.location, "Work/Kumo.md · line 2");
+    assert_eq!(
+        detail.description,
+        "## Tasks\n- [ ] Ship tasks 📅 2026-11-02 #kumo"
+    );
+    assert!(!detail.stale && detail.fetched_unix_ms > 0);
+    let card = detail.task.unwrap();
+    assert_eq!((card.id.as_str(), card.mine), (ship.id.as_str(), true));
 
     // Marking it done rewrites the checkbox in the note.
     let done = client
@@ -198,6 +221,42 @@ async fn obsidian_vault_end_to_end() {
         std::fs::read_to_string(vault.join("Work/Kumo.md")).unwrap(),
         "## Tasks\n- [x] Ship tasks 📅 2026-11-02 #kumo\n"
     );
+    let cached = client
+        .tasks
+        .get_task(pb::GetTaskRequest {
+            id: ship.id.clone(),
+            refresh: false,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(
+        cached.task.unwrap().status(),
+        pb::TaskStatus::Done,
+        "the cached detail follows the status"
+    );
+    let refreshed = client
+        .tasks
+        .get_task(pb::GetTaskRequest {
+            id: ship.id.clone(),
+            refresh: true,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(
+        refreshed.description,
+        "## Tasks\n- [x] Ship tasks 📅 2026-11-02 #kumo"
+    );
+    let gone = client
+        .tasks
+        .get_task(pb::GetTaskRequest {
+            id: format!("{}/Work/Kumo.md#0000", source.id),
+            refresh: false,
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(gone.code(), Code::NotFound);
 
     // Editing a note elsewhere is pushed.
     write(
@@ -274,9 +333,9 @@ async fn api_sources_keep_their_token_and_report_failures() {
         .unwrap()
         .into_inner();
     assert!(source.has_secret && source.needs_secret);
-    assert_eq!(
-        source.options["jql"],
-        kumo_domain::tasks::SourceOptions::JIRA_JQL
+    assert!(
+        !source.options.contains_key("jql"),
+        "no JQL: the user's issues and their projects' recent ones"
     );
     let board = watch
         .until("sync error", |b| {
@@ -288,6 +347,17 @@ async fn api_sources_keep_their_token_and_report_failures() {
         "{}",
         board.sources[0].error
     );
+
+    // Nothing cached and the site unreachable: the detail can't be served.
+    let detail = client
+        .tasks
+        .get_task(pb::GetTaskRequest {
+            id: format!("{}/PRC-1", source.id),
+            refresh: false,
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(detail.code(), Code::Unavailable, "{}", detail.message());
 
     // Testing an edited source reuses its stored token.
     let tested = client

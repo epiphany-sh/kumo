@@ -153,6 +153,81 @@ final $typed_data.Uint8List taskPriorityDescriptor = $convert.base64Decode(
     '9MT1cQARIYChRUQVNLX1BSSU9SSVRZX01FRElVTRACEhYKElRBU0tfUFJJT1JJVFlfSElHSBAD'
     'EhgKFFRBU0tfUFJJT1JJVFlfVVJHRU5UEAQ=');
 
+@$core.Deprecated('Use taskTypeDescriptor instead')
+const TaskType$json = {
+  '1': 'TaskType',
+  '2': [
+    {'1': 'TASK_TYPE_UNSPECIFIED', '2': 0},
+    {'1': 'TASK_TYPE_STORY', '2': 1},
+    {'1': 'TASK_TYPE_BUG', '2': 2},
+    {'1': 'TASK_TYPE_TASK', '2': 3},
+    {'1': 'TASK_TYPE_SUBTASK', '2': 4},
+    {'1': 'TASK_TYPE_EPIC', '2': 5},
+    {'1': 'TASK_TYPE_ISSUE', '2': 6},
+    {'1': 'TASK_TYPE_TODO', '2': 7},
+  ],
+};
+
+/// Descriptor for `TaskType`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List taskTypeDescriptor = $convert.base64Decode(
+    'CghUYXNrVHlwZRIZChVUQVNLX1RZUEVfVU5TUEVDSUZJRUQQABITCg9UQVNLX1RZUEVfU1RPUl'
+    'kQARIRCg1UQVNLX1RZUEVfQlVHEAISEgoOVEFTS19UWVBFX1RBU0sQAxIVChFUQVNLX1RZUEVf'
+    'U1VCVEFTSxAEEhIKDlRBU0tfVFlQRV9FUElDEAUSEwoPVEFTS19UWVBFX0lTU1VFEAYSEgoOVE'
+    'FTS19UWVBFX1RPRE8QBw==');
+
+@$core.Deprecated('Use taskRelationDescriptor instead')
+const TaskRelation$json = {
+  '1': 'TaskRelation',
+  '2': [
+    {'1': 'TASK_RELATION_UNSPECIFIED', '2': 0},
+    {'1': 'TASK_RELATION_ASSIGNED', '2': 1},
+    {'1': 'TASK_RELATION_REPORTED', '2': 2},
+    {'1': 'TASK_RELATION_WATCHING', '2': 3},
+  ],
+};
+
+/// Descriptor for `TaskRelation`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List taskRelationDescriptor = $convert.base64Decode(
+    'CgxUYXNrUmVsYXRpb24SHQoZVEFTS19SRUxBVElPTl9VTlNQRUNJRklFRBAAEhoKFlRBU0tfUk'
+    'VMQVRJT05fQVNTSUdORUQQARIaChZUQVNLX1JFTEFUSU9OX1JFUE9SVEVEEAISGgoWVEFTS19S'
+    'RUxBVElPTl9XQVRDSElORxAD');
+
+@$core.Deprecated('Use sprintStateDescriptor instead')
+const SprintState$json = {
+  '1': 'SprintState',
+  '2': [
+    {'1': 'SPRINT_STATE_UNSPECIFIED', '2': 0},
+    {'1': 'SPRINT_STATE_CLOSED', '2': 1},
+    {'1': 'SPRINT_STATE_ACTIVE', '2': 2},
+    {'1': 'SPRINT_STATE_FUTURE', '2': 3},
+  ],
+};
+
+/// Descriptor for `SprintState`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List sprintStateDescriptor = $convert.base64Decode(
+    'CgtTcHJpbnRTdGF0ZRIcChhTUFJJTlRfU1RBVEVfVU5TUEVDSUZJRUQQABIXChNTUFJJTlRfU1'
+    'RBVEVfQ0xPU0VEEAESFwoTU1BSSU5UX1NUQVRFX0FDVElWRRACEhcKE1NQUklOVF9TVEFURV9G'
+    'VVRVUkUQAw==');
+
+@$core.Deprecated('Use linkKindDescriptor instead')
+const LinkKind$json = {
+  '1': 'LinkKind',
+  '2': [
+    {'1': 'LINK_KIND_OTHER', '2': 0},
+    {'1': 'LINK_KIND_BLOCKS', '2': 1},
+    {'1': 'LINK_KIND_BLOCKED_BY', '2': 2},
+    {'1': 'LINK_KIND_RELATES', '2': 3},
+    {'1': 'LINK_KIND_DUPLICATES', '2': 4},
+    {'1': 'LINK_KIND_DUPLICATED_BY', '2': 5},
+  ],
+};
+
+/// Descriptor for `LinkKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List linkKindDescriptor = $convert.base64Decode(
+    'CghMaW5rS2luZBITCg9MSU5LX0tJTkRfT1RIRVIQABIUChBMSU5LX0tJTkRfQkxPQ0tTEAESGA'
+    'oUTElOS19LSU5EX0JMT0NLRURfQlkQAhIVChFMSU5LX0tJTkRfUkVMQVRFUxADEhgKFExJTktf'
+    'S0lORF9EVVBMSUNBVEVTEAQSGwoXTElOS19LSU5EX0RVUExJQ0FURURfQlkQBQ==');
+
 @$core.Deprecated('Use ciProviderDescriptor instead')
 const CiProvider$json = {
   '1': 'CiProvider',
@@ -1623,6 +1698,65 @@ const Task$json = {
     {'1': 'labels', '3': 10, '4': 3, '5': 9, '10': 'labels'},
     {'1': 'updated_unix_ms', '3': 11, '4': 1, '5': 4, '10': 'updatedUnixMs'},
     {'1': 'suggested_branch', '3': 12, '4': 1, '5': 9, '10': 'suggestedBranch'},
+    {
+      '1': 'type',
+      '3': 13,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.TaskType',
+      '10': 'type'
+    },
+    {'1': 'type_name', '3': 14, '4': 1, '5': 9, '10': 'typeName'},
+    {'1': 'source_status', '3': 15, '4': 1, '5': 9, '10': 'sourceStatus'},
+    {
+      '1': 'assignee',
+      '3': 16,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.Person',
+      '9': 0,
+      '10': 'assignee',
+      '17': true
+    },
+    {
+      '1': 'relations',
+      '3': 17,
+      '4': 3,
+      '5': 14,
+      '6': '.kumo.v1.TaskRelation',
+      '10': 'relations'
+    },
+    {'1': 'mine', '3': 18, '4': 1, '5': 8, '10': 'mine'},
+    {'1': 'points', '3': 19, '4': 1, '5': 1, '10': 'points'},
+    {'1': 'subtasks_done', '3': 20, '4': 1, '5': 13, '10': 'subtasksDone'},
+    {'1': 'subtasks_total', '3': 21, '4': 1, '5': 13, '10': 'subtasksTotal'},
+    {'1': 'comment_count', '3': 22, '4': 1, '5': 13, '10': 'commentCount'},
+    {
+      '1': 'parent',
+      '3': 23,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.TaskRef',
+      '9': 1,
+      '10': 'parent',
+      '17': true
+    },
+    {'1': 'blocked', '3': 24, '4': 1, '5': 8, '10': 'blocked'},
+    {
+      '1': 'sprint',
+      '3': 25,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.Sprint',
+      '9': 2,
+      '10': 'sprint',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_assignee'},
+    {'1': '_parent'},
+    {'1': '_sprint'},
   ],
 };
 
@@ -1634,7 +1768,312 @@ final $typed_data.Uint8List taskDescriptor = $convert.base64Decode(
     'Fza1ByaW9yaXR5Ughwcmlvcml0eRIQCgNkdWUYByABKAlSA2R1ZRIQCgN1cmwYCCABKAlSA3Vy'
     'bBIYCgdjb250ZXh0GAkgASgJUgdjb250ZXh0EhYKBmxhYmVscxgKIAMoCVIGbGFiZWxzEiYKD3'
     'VwZGF0ZWRfdW5peF9tcxgLIAEoBFINdXBkYXRlZFVuaXhNcxIpChBzdWdnZXN0ZWRfYnJhbmNo'
-    'GAwgASgJUg9zdWdnZXN0ZWRCcmFuY2g=');
+    'GAwgASgJUg9zdWdnZXN0ZWRCcmFuY2gSJQoEdHlwZRgNIAEoDjIRLmt1bW8udjEuVGFza1R5cG'
+    'VSBHR5cGUSGwoJdHlwZV9uYW1lGA4gASgJUgh0eXBlTmFtZRIjCg1zb3VyY2Vfc3RhdHVzGA8g'
+    'ASgJUgxzb3VyY2VTdGF0dXMSMAoIYXNzaWduZWUYECABKAsyDy5rdW1vLnYxLlBlcnNvbkgAUg'
+    'hhc3NpZ25lZYgBARIzCglyZWxhdGlvbnMYESADKA4yFS5rdW1vLnYxLlRhc2tSZWxhdGlvblIJ'
+    'cmVsYXRpb25zEhIKBG1pbmUYEiABKAhSBG1pbmUSFgoGcG9pbnRzGBMgASgBUgZwb2ludHMSIw'
+    'oNc3VidGFza3NfZG9uZRgUIAEoDVIMc3VidGFza3NEb25lEiUKDnN1YnRhc2tzX3RvdGFsGBUg'
+    'ASgNUg1zdWJ0YXNrc1RvdGFsEiMKDWNvbW1lbnRfY291bnQYFiABKA1SDGNvbW1lbnRDb3VudB'
+    'ItCgZwYXJlbnQYFyABKAsyEC5rdW1vLnYxLlRhc2tSZWZIAVIGcGFyZW50iAEBEhgKB2Jsb2Nr'
+    'ZWQYGCABKAhSB2Jsb2NrZWQSLAoGc3ByaW50GBkgASgLMg8ua3Vtby52MS5TcHJpbnRIAlIGc3'
+    'ByaW50iAEBQgsKCV9hc3NpZ25lZUIJCgdfcGFyZW50QgkKB19zcHJpbnQ=');
+
+@$core.Deprecated('Use personDescriptor instead')
+const Person$json = {
+  '1': 'Person',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'initials', '3': 3, '4': 1, '5': 9, '10': 'initials'},
+    {'1': 'you', '3': 4, '4': 1, '5': 8, '10': 'you'},
+  ],
+};
+
+/// Descriptor for `Person`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List personDescriptor = $convert.base64Decode(
+    'CgZQZXJzb24SDgoCaWQYASABKAlSAmlkEhIKBG5hbWUYAiABKAlSBG5hbWUSGgoIaW5pdGlhbH'
+    'MYAyABKAlSCGluaXRpYWxzEhAKA3lvdRgEIAEoCFIDeW91');
+
+@$core.Deprecated('Use sprintDescriptor instead')
+const Sprint$json = {
+  '1': 'Sprint',
+  '2': [
+    {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
+    {
+      '1': 'state',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.SprintState',
+      '10': 'state'
+    },
+    {'1': 'start_unix_ms', '3': 3, '4': 1, '5': 4, '10': 'startUnixMs'},
+    {'1': 'end_unix_ms', '3': 4, '4': 1, '5': 4, '10': 'endUnixMs'},
+  ],
+};
+
+/// Descriptor for `Sprint`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sprintDescriptor = $convert.base64Decode(
+    'CgZTcHJpbnQSEgoEbmFtZRgBIAEoCVIEbmFtZRIqCgVzdGF0ZRgCIAEoDjIULmt1bW8udjEuU3'
+    'ByaW50U3RhdGVSBXN0YXRlEiIKDXN0YXJ0X3VuaXhfbXMYAyABKARSC3N0YXJ0VW5peE1zEh4K'
+    'C2VuZF91bml4X21zGAQgASgEUgllbmRVbml4TXM=');
+
+@$core.Deprecated('Use taskRefDescriptor instead')
+const TaskRef$json = {
+  '1': 'TaskRef',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'key', '3': 2, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'title', '3': 3, '4': 1, '5': 9, '10': 'title'},
+    {
+      '1': 'type',
+      '3': 4,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.TaskType',
+      '10': 'type'
+    },
+    {'1': 'source_status', '3': 5, '4': 1, '5': 9, '10': 'sourceStatus'},
+    {
+      '1': 'status',
+      '3': 6,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.TaskStatus',
+      '10': 'status'
+    },
+    {
+      '1': 'assignee',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.Person',
+      '9': 0,
+      '10': 'assignee',
+      '17': true
+    },
+    {'1': 'color', '3': 8, '4': 1, '5': 9, '10': 'color'},
+    {'1': 'url', '3': 9, '4': 1, '5': 9, '10': 'url'},
+  ],
+  '8': [
+    {'1': '_assignee'},
+  ],
+};
+
+/// Descriptor for `TaskRef`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List taskRefDescriptor = $convert.base64Decode(
+    'CgdUYXNrUmVmEg4KAmlkGAEgASgJUgJpZBIQCgNrZXkYAiABKAlSA2tleRIUCgV0aXRsZRgDIA'
+    'EoCVIFdGl0bGUSJQoEdHlwZRgEIAEoDjIRLmt1bW8udjEuVGFza1R5cGVSBHR5cGUSIwoNc291'
+    'cmNlX3N0YXR1cxgFIAEoCVIMc291cmNlU3RhdHVzEisKBnN0YXR1cxgGIAEoDjITLmt1bW8udj'
+    'EuVGFza1N0YXR1c1IGc3RhdHVzEjAKCGFzc2lnbmVlGAcgASgLMg8ua3Vtby52MS5QZXJzb25I'
+    'AFIIYXNzaWduZWWIAQESFAoFY29sb3IYCCABKAlSBWNvbG9yEhAKA3VybBgJIAEoCVIDdXJsQg'
+    'sKCV9hc3NpZ25lZQ==');
+
+@$core.Deprecated('Use linkedTaskDescriptor instead')
+const LinkedTask$json = {
+  '1': 'LinkedTask',
+  '2': [
+    {
+      '1': 'kind',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.LinkKind',
+      '10': 'kind'
+    },
+    {'1': 'relation', '3': 2, '4': 1, '5': 9, '10': 'relation'},
+    {
+      '1': 'task',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.TaskRef',
+      '10': 'task'
+    },
+  ],
+};
+
+/// Descriptor for `LinkedTask`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List linkedTaskDescriptor = $convert.base64Decode(
+    'CgpMaW5rZWRUYXNrEiUKBGtpbmQYASABKA4yES5rdW1vLnYxLkxpbmtLaW5kUgRraW5kEhoKCH'
+    'JlbGF0aW9uGAIgASgJUghyZWxhdGlvbhIkCgR0YXNrGAMgASgLMhAua3Vtby52MS5UYXNrUmVm'
+    'UgR0YXNr');
+
+@$core.Deprecated('Use taskAttachmentDescriptor instead')
+const TaskAttachment$json = {
+  '1': 'TaskAttachment',
+  '2': [
+    {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'kind', '3': 2, '4': 1, '5': 9, '10': 'kind'},
+    {'1': 'size_bytes', '3': 3, '4': 1, '5': 4, '10': 'sizeBytes'},
+    {'1': 'url', '3': 4, '4': 1, '5': 9, '10': 'url'},
+  ],
+};
+
+/// Descriptor for `TaskAttachment`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List taskAttachmentDescriptor = $convert.base64Decode(
+    'Cg5UYXNrQXR0YWNobWVudBISCgRuYW1lGAEgASgJUgRuYW1lEhIKBGtpbmQYAiABKAlSBGtpbm'
+    'QSHQoKc2l6ZV9ieXRlcxgDIAEoBFIJc2l6ZUJ5dGVzEhAKA3VybBgEIAEoCVIDdXJs');
+
+@$core.Deprecated('Use taskCommentDescriptor instead')
+const TaskComment$json = {
+  '1': 'TaskComment',
+  '2': [
+    {
+      '1': 'author',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.Person',
+      '10': 'author'
+    },
+    {'1': 'created_unix_ms', '3': 2, '4': 1, '5': 4, '10': 'createdUnixMs'},
+    {'1': 'body', '3': 3, '4': 1, '5': 9, '10': 'body'},
+  ],
+};
+
+/// Descriptor for `TaskComment`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List taskCommentDescriptor = $convert.base64Decode(
+    'CgtUYXNrQ29tbWVudBInCgZhdXRob3IYASABKAsyDy5rdW1vLnYxLlBlcnNvblIGYXV0aG9yEi'
+    'YKD2NyZWF0ZWRfdW5peF9tcxgCIAEoBFINY3JlYXRlZFVuaXhNcxISCgRib2R5GAMgASgJUgRi'
+    'b2R5');
+
+@$core.Deprecated('Use timeTrackingDescriptor instead')
+const TimeTracking$json = {
+  '1': 'TimeTracking',
+  '2': [
+    {'1': 'estimate', '3': 1, '4': 1, '5': 9, '10': 'estimate'},
+    {'1': 'logged', '3': 2, '4': 1, '5': 9, '10': 'logged'},
+    {'1': 'remaining', '3': 3, '4': 1, '5': 9, '10': 'remaining'},
+    {'1': 'estimate_seconds', '3': 4, '4': 1, '5': 4, '10': 'estimateSeconds'},
+    {'1': 'logged_seconds', '3': 5, '4': 1, '5': 4, '10': 'loggedSeconds'},
+    {
+      '1': 'remaining_seconds',
+      '3': 6,
+      '4': 1,
+      '5': 4,
+      '10': 'remainingSeconds'
+    },
+  ],
+};
+
+/// Descriptor for `TimeTracking`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List timeTrackingDescriptor = $convert.base64Decode(
+    'CgxUaW1lVHJhY2tpbmcSGgoIZXN0aW1hdGUYASABKAlSCGVzdGltYXRlEhYKBmxvZ2dlZBgCIA'
+    'EoCVIGbG9nZ2VkEhwKCXJlbWFpbmluZxgDIAEoCVIJcmVtYWluaW5nEikKEGVzdGltYXRlX3Nl'
+    'Y29uZHMYBCABKARSD2VzdGltYXRlU2Vjb25kcxIlCg5sb2dnZWRfc2Vjb25kcxgFIAEoBFINbG'
+    '9nZ2VkU2Vjb25kcxIrChFyZW1haW5pbmdfc2Vjb25kcxgGIAEoBFIQcmVtYWluaW5nU2Vjb25k'
+    'cw==');
+
+@$core.Deprecated('Use getTaskRequestDescriptor instead')
+const GetTaskRequest$json = {
+  '1': 'GetTaskRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'refresh', '3': 2, '4': 1, '5': 8, '10': 'refresh'},
+  ],
+};
+
+/// Descriptor for `GetTaskRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getTaskRequestDescriptor = $convert.base64Decode(
+    'Cg5HZXRUYXNrUmVxdWVzdBIOCgJpZBgBIAEoCVICaWQSGAoHcmVmcmVzaBgCIAEoCFIHcmVmcm'
+    'VzaA==');
+
+@$core.Deprecated('Use taskDetailDescriptor instead')
+const TaskDetail$json = {
+  '1': 'TaskDetail',
+  '2': [
+    {'1': 'task', '3': 1, '4': 1, '5': 11, '6': '.kumo.v1.Task', '10': 'task'},
+    {
+      '1': 'reporter',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.Person',
+      '9': 0,
+      '10': 'reporter',
+      '17': true
+    },
+    {'1': 'created_unix_ms', '3': 3, '4': 1, '5': 4, '10': 'createdUnixMs'},
+    {'1': 'description', '3': 4, '4': 1, '5': 9, '10': 'description'},
+    {
+      '1': 'acceptance_criteria',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '10': 'acceptanceCriteria'
+    },
+    {
+      '1': 'subtasks',
+      '3': 6,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.TaskRef',
+      '10': 'subtasks'
+    },
+    {
+      '1': 'links',
+      '3': 7,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.LinkedTask',
+      '10': 'links'
+    },
+    {
+      '1': 'attachments',
+      '3': 8,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.TaskAttachment',
+      '10': 'attachments'
+    },
+    {
+      '1': 'comments',
+      '3': 9,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.TaskComment',
+      '10': 'comments'
+    },
+    {'1': 'components', '3': 10, '4': 3, '5': 9, '10': 'components'},
+    {'1': 'fix_versions', '3': 11, '4': 3, '5': 9, '10': 'fixVersions'},
+    {
+      '1': 'time_tracking',
+      '3': 12,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.TimeTracking',
+      '9': 1,
+      '10': 'timeTracking',
+      '17': true
+    },
+    {'1': 'fetched_unix_ms', '3': 13, '4': 1, '5': 4, '10': 'fetchedUnixMs'},
+    {'1': 'stale', '3': 14, '4': 1, '5': 8, '10': 'stale'},
+    {'1': 'stale_reason', '3': 15, '4': 1, '5': 9, '10': 'staleReason'},
+    {'1': 'location', '3': 16, '4': 1, '5': 9, '10': 'location'},
+  ],
+  '8': [
+    {'1': '_reporter'},
+    {'1': '_time_tracking'},
+  ],
+};
+
+/// Descriptor for `TaskDetail`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List taskDetailDescriptor = $convert.base64Decode(
+    'CgpUYXNrRGV0YWlsEiEKBHRhc2sYASABKAsyDS5rdW1vLnYxLlRhc2tSBHRhc2sSMAoIcmVwb3'
+    'J0ZXIYAiABKAsyDy5rdW1vLnYxLlBlcnNvbkgAUghyZXBvcnRlcogBARImCg9jcmVhdGVkX3Vu'
+    'aXhfbXMYAyABKARSDWNyZWF0ZWRVbml4TXMSIAoLZGVzY3JpcHRpb24YBCABKAlSC2Rlc2NyaX'
+    'B0aW9uEi8KE2FjY2VwdGFuY2VfY3JpdGVyaWEYBSABKAlSEmFjY2VwdGFuY2VDcml0ZXJpYRIs'
+    'CghzdWJ0YXNrcxgGIAMoCzIQLmt1bW8udjEuVGFza1JlZlIIc3VidGFza3MSKQoFbGlua3MYBy'
+    'ADKAsyEy5rdW1vLnYxLkxpbmtlZFRhc2tSBWxpbmtzEjkKC2F0dGFjaG1lbnRzGAggAygLMhcu'
+    'a3Vtby52MS5UYXNrQXR0YWNobWVudFILYXR0YWNobWVudHMSMAoIY29tbWVudHMYCSADKAsyFC'
+    '5rdW1vLnYxLlRhc2tDb21tZW50Ughjb21tZW50cxIeCgpjb21wb25lbnRzGAogAygJUgpjb21w'
+    'b25lbnRzEiEKDGZpeF92ZXJzaW9ucxgLIAMoCVILZml4VmVyc2lvbnMSPwoNdGltZV90cmFja2'
+    'luZxgMIAEoCzIVLmt1bW8udjEuVGltZVRyYWNraW5nSAFSDHRpbWVUcmFja2luZ4gBARImCg9m'
+    'ZXRjaGVkX3VuaXhfbXMYDSABKARSDWZldGNoZWRVbml4TXMSFAoFc3RhbGUYDiABKAhSBXN0YW'
+    'xlEiEKDHN0YWxlX3JlYXNvbhgPIAEoCVILc3RhbGVSZWFzb24SGgoIbG9jYXRpb24YECABKAlS'
+    'CGxvY2F0aW9uQgsKCV9yZXBvcnRlckIQCg5fdGltZV90cmFja2luZw==');
 
 @$core.Deprecated('Use sourceTasksDescriptor instead')
 const SourceTasks$json = {

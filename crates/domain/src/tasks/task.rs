@@ -1,6 +1,9 @@
+use std::collections::BTreeSet;
 use std::fmt;
 
-use super::{SourceId, TaskError};
+use super::{
+    Person, Points, Progress, SourceId, Sprint, TaskError, TaskRef, TaskRelation, TaskType,
+};
 use crate::time::Timestamp;
 
 /// Where a task stands, as Kumo's board shows it. Each source's own states
@@ -94,9 +97,80 @@ pub struct Task {
     pub context: String,
     pub labels: Vec<String>,
     pub updated: Option<Timestamp>,
+
+    pub kind: TaskType,
+    /// The source's own name for the type ("Story", "Sub-task").
+    pub type_name: String,
+    /// The source's own status ("Code Review", "QA"); `status` is its column.
+    pub source_status: String,
+    pub assignee: Option<Person>,
+    /// How the task relates to the user (assigned, later reported or
+    /// watching too).
+    pub relations: BTreeSet<TaskRelation>,
+    /// The user's own: assigned to them, or from a personal source. What
+    /// "Mine" shows.
+    pub mine: bool,
+    pub points: Option<Points>,
+    pub subtasks: Progress,
+    pub comment_count: u32,
+    /// Epic, or parent of a sub-task.
+    pub parent: Option<TaskRef>,
+    /// An issue that blocks this one isn't done yet.
+    pub blocked: bool,
+    pub sprint: Option<Sprint>,
 }
 
 impl Task {
+    /// A task with only its id and title; the rest empty.
+    pub fn new(id: TaskId, title: impl Into<String>) -> Self {
+        Self {
+            id,
+            key: String::new(),
+            ticket: None,
+            title: title.into(),
+            status: TaskStatus::Todo,
+            priority: Priority::None,
+            due: None,
+            url: None,
+            context: String::new(),
+            labels: vec![],
+            updated: None,
+            kind: TaskType::Unknown,
+            type_name: String::new(),
+            source_status: String::new(),
+            assignee: None,
+            relations: BTreeSet::new(),
+            mine: false,
+            points: None,
+            subtasks: Progress::default(),
+            comment_count: 0,
+            parent: None,
+            blocked: false,
+            sprint: None,
+        }
+    }
+
+    /// Marks a task of a personal source (notes, a to-do app): all of it is
+    /// the user's.
+    pub fn personal(mut self) -> Self {
+        self.mine = true;
+        self.kind = TaskType::Todo;
+        self
+    }
+
+    /// Records who it's assigned to; `mine` when it's the user.
+    pub fn assigned_to(mut self, assignee: Option<Person>) -> Self {
+        let you = assignee.as_ref().is_some_and(|p| p.you);
+        if you {
+            self.relations.insert(TaskRelation::Assigned);
+        } else {
+            self.relations.remove(&TaskRelation::Assigned);
+        }
+        self.mine = you;
+        self.assignee = assignee;
+        self
+    }
+
     /// Branch to work on it: `feat/PRC-412-bulk-discounts`.
     pub fn suggested_branch(&self) -> String {
         const MAX_WORDS: usize = 6;
@@ -148,18 +222,34 @@ mod tests {
 
     fn task(ticket: Option<&str>, title: &str) -> Task {
         Task {
-            id: TaskId::parse("s/1").unwrap(),
-            key: String::new(),
             ticket: ticket.map(str::to_owned),
-            title: title.to_owned(),
-            status: TaskStatus::Todo,
-            priority: Priority::None,
-            due: None,
-            url: None,
-            context: String::new(),
-            labels: vec![],
-            updated: None,
+            ..Task::new(TaskId::parse("s/1").unwrap(), title)
         }
+    }
+
+    #[test]
+    fn initials_and_points() {
+        let initials = |name: &str| Person::new("x", name, false).initials;
+        assert_eq!(initials("Ana Gómez"), "AG");
+        assert_eq!(initials("Mauri"), "M");
+        assert_eq!(initials("  lucía de la  torre "), "LT");
+        assert_eq!(initials("octo-cat"), "O");
+        assert_eq!(initials(""), "");
+        assert_eq!(Points::from_f64(2.5).map(Points::as_f64), Some(2.5));
+        assert_eq!(Points::from_f64(0.0), None);
+        assert_eq!(Points::from_f64(f64::NAN), None);
+    }
+
+    #[test]
+    fn assignment_decides_mine() {
+        let id = TaskId::parse("s/1").unwrap();
+        let mine = Task::new(id.clone(), "x").assigned_to(Some(Person::new("1", "Ana", true)));
+        assert!(mine.mine);
+        assert!(mine.relations.contains(&TaskRelation::Assigned));
+        let theirs = mine.assigned_to(Some(Person::new("2", "Tomás", false)));
+        assert!(!theirs.mine && theirs.relations.is_empty());
+        let personal = Task::new(id, "x").personal();
+        assert!(personal.mine && personal.kind == TaskType::Todo);
     }
 
     #[test]

@@ -7,6 +7,7 @@ import 'package:kumo_ui/data/tasks_source.dart';
 import 'package:kumo_ui/overlays/task_settings.dart';
 import 'package:kumo_ui/theme/kumo_theme.dart';
 import 'package:kumo_ui/theme/palette.dart';
+import 'package:kumo_ui/views/task_detail.dart';
 import 'package:kumo_ui/views/tasks_screen.dart';
 import 'package:kumo_ui/widgets/controls.dart';
 
@@ -65,6 +66,12 @@ class _FakeTasks extends TasksSource {
 
   @override
   Future<void> unlink(String taskId, String worktreePath) async {}
+
+  @override
+  Future<TaskDetail> getTask(String id, {bool refresh = false}) async => TaskDetail(task: tasks.firstWhere((t) => t.id == id));
+
+  @override
+  TaskDetail? cachedDetail(String id) => null;
 }
 
 const _all = {TaskColumn.todo, TaskColumn.doing, TaskColumn.review, TaskColumn.done};
@@ -107,10 +114,13 @@ void main() {
     final state = AppState(demoWallpaper: true)..view = KumoView.tasks;
     await tester.pumpWidget(KumoApp(state: state));
     await tester.pump();
-    expect(find.text('Expose price history in admin API'), findsOneWidget);
-    await tester.tap(find.text('Expose price history in admin API'));
+    expect(find.text('Tasks'), findsWidgets);
+    expect(find.text('Mine · 4 sources'), findsOneWidget);
+    expect(find.text('migraciones'), findsWidgets);
+    await tester.tap(find.text('migraciones').first);
     await tester.pump();
-    expect(find.text('Start in a worktree'), findsOneWidget);
+    expect(tester.widget<TaskDetailPanel>(find.byType(TaskDetailPanel)).taskId, 'mock-JI/PRC-11355');
+    expect(find.text('↑ ↓ switch tickets · Esc closes'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -138,7 +148,7 @@ void main() {
     await tester.tap(find.text('Bulk discounts'));
     await tester.pump();
     expect(find.text('Start in a worktree'), findsOneWidget);
-    expect(find.text('feat/PRC-1-bulk-discounts'), findsOneWidget);
+    expect(find.textContaining('feat/PRC-1-bulk-discounts'), findsOneWidget, reason: 'the branch it will use');
 
     await tester.tap(find.descendant(of: find.byType(KSegmented<TaskColumn>), matching: find.text('Done')));
     await tester.pump();

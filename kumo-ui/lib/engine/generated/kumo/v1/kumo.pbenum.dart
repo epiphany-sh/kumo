@@ -242,6 +242,128 @@ class TaskPriority extends $pb.ProtobufEnum {
   const TaskPriority._(super.value, super.name);
 }
 
+class TaskType extends $pb.ProtobufEnum {
+  static const TaskType TASK_TYPE_UNSPECIFIED =
+      TaskType._(0, _omitEnumNames ? '' : 'TASK_TYPE_UNSPECIFIED');
+  static const TaskType TASK_TYPE_STORY =
+      TaskType._(1, _omitEnumNames ? '' : 'TASK_TYPE_STORY');
+  static const TaskType TASK_TYPE_BUG =
+      TaskType._(2, _omitEnumNames ? '' : 'TASK_TYPE_BUG');
+  static const TaskType TASK_TYPE_TASK =
+      TaskType._(3, _omitEnumNames ? '' : 'TASK_TYPE_TASK');
+  static const TaskType TASK_TYPE_SUBTASK =
+      TaskType._(4, _omitEnumNames ? '' : 'TASK_TYPE_SUBTASK');
+  static const TaskType TASK_TYPE_EPIC =
+      TaskType._(5, _omitEnumNames ? '' : 'TASK_TYPE_EPIC');
+
+  /// A GitHub issue.
+  static const TaskType TASK_TYPE_ISSUE =
+      TaskType._(6, _omitEnumNames ? '' : 'TASK_TYPE_ISSUE');
+
+  /// A note checkbox or a to-do (Obsidian, Bear, Todoist).
+  static const TaskType TASK_TYPE_TODO =
+      TaskType._(7, _omitEnumNames ? '' : 'TASK_TYPE_TODO');
+
+  static const $core.List<TaskType> values = <TaskType>[
+    TASK_TYPE_UNSPECIFIED,
+    TASK_TYPE_STORY,
+    TASK_TYPE_BUG,
+    TASK_TYPE_TASK,
+    TASK_TYPE_SUBTASK,
+    TASK_TYPE_EPIC,
+    TASK_TYPE_ISSUE,
+    TASK_TYPE_TODO,
+  ];
+
+  static final $core.List<TaskType?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 7);
+  static TaskType? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TaskType._(super.value, super.name);
+}
+
+class TaskRelation extends $pb.ProtobufEnum {
+  static const TaskRelation TASK_RELATION_UNSPECIFIED =
+      TaskRelation._(0, _omitEnumNames ? '' : 'TASK_RELATION_UNSPECIFIED');
+  static const TaskRelation TASK_RELATION_ASSIGNED =
+      TaskRelation._(1, _omitEnumNames ? '' : 'TASK_RELATION_ASSIGNED');
+  static const TaskRelation TASK_RELATION_REPORTED =
+      TaskRelation._(2, _omitEnumNames ? '' : 'TASK_RELATION_REPORTED');
+  static const TaskRelation TASK_RELATION_WATCHING =
+      TaskRelation._(3, _omitEnumNames ? '' : 'TASK_RELATION_WATCHING');
+
+  static const $core.List<TaskRelation> values = <TaskRelation>[
+    TASK_RELATION_UNSPECIFIED,
+    TASK_RELATION_ASSIGNED,
+    TASK_RELATION_REPORTED,
+    TASK_RELATION_WATCHING,
+  ];
+
+  static final $core.List<TaskRelation?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static TaskRelation? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TaskRelation._(super.value, super.name);
+}
+
+class SprintState extends $pb.ProtobufEnum {
+  static const SprintState SPRINT_STATE_UNSPECIFIED =
+      SprintState._(0, _omitEnumNames ? '' : 'SPRINT_STATE_UNSPECIFIED');
+  static const SprintState SPRINT_STATE_CLOSED =
+      SprintState._(1, _omitEnumNames ? '' : 'SPRINT_STATE_CLOSED');
+  static const SprintState SPRINT_STATE_ACTIVE =
+      SprintState._(2, _omitEnumNames ? '' : 'SPRINT_STATE_ACTIVE');
+  static const SprintState SPRINT_STATE_FUTURE =
+      SprintState._(3, _omitEnumNames ? '' : 'SPRINT_STATE_FUTURE');
+
+  static const $core.List<SprintState> values = <SprintState>[
+    SPRINT_STATE_UNSPECIFIED,
+    SPRINT_STATE_CLOSED,
+    SPRINT_STATE_ACTIVE,
+    SPRINT_STATE_FUTURE,
+  ];
+
+  static final $core.List<SprintState?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static SprintState? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const SprintState._(super.value, super.name);
+}
+
+class LinkKind extends $pb.ProtobufEnum {
+  static const LinkKind LINK_KIND_OTHER =
+      LinkKind._(0, _omitEnumNames ? '' : 'LINK_KIND_OTHER');
+  static const LinkKind LINK_KIND_BLOCKS =
+      LinkKind._(1, _omitEnumNames ? '' : 'LINK_KIND_BLOCKS');
+  static const LinkKind LINK_KIND_BLOCKED_BY =
+      LinkKind._(2, _omitEnumNames ? '' : 'LINK_KIND_BLOCKED_BY');
+  static const LinkKind LINK_KIND_RELATES =
+      LinkKind._(3, _omitEnumNames ? '' : 'LINK_KIND_RELATES');
+  static const LinkKind LINK_KIND_DUPLICATES =
+      LinkKind._(4, _omitEnumNames ? '' : 'LINK_KIND_DUPLICATES');
+  static const LinkKind LINK_KIND_DUPLICATED_BY =
+      LinkKind._(5, _omitEnumNames ? '' : 'LINK_KIND_DUPLICATED_BY');
+
+  static const $core.List<LinkKind> values = <LinkKind>[
+    LINK_KIND_OTHER,
+    LINK_KIND_BLOCKS,
+    LINK_KIND_BLOCKED_BY,
+    LINK_KIND_RELATES,
+    LINK_KIND_DUPLICATES,
+    LINK_KIND_DUPLICATED_BY,
+  ];
+
+  static final $core.List<LinkKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static LinkKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const LinkKind._(super.value, super.name);
+}
+
 class CiProvider extends $pb.ProtobufEnum {
   static const CiProvider CI_PROVIDER_NONE =
       CiProvider._(0, _omitEnumNames ? '' : 'CI_PROVIDER_NONE');

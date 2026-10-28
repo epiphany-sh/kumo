@@ -628,6 +628,10 @@ service Tasks {
   // Records that a task is being worked on in a worktree.
   rpc Link(LinkTaskRequest) returns (TaskLink);
   rpc Unlink(UnlinkTaskRequest) returns (UnlinkTaskResponse);
+  // The whole ticket: description, acceptance criteria, sub-tasks, links,
+  // attachments and comments. Answered from the daemon's cache when fresh
+  // (or when the source can't be reached: then `stale` is set).
+  rpc GetTask(GetTaskRequest) returns (TaskDetail);
 }
 
 enum TaskSourceKind {
@@ -699,6 +703,162 @@ message Task {
   uint64 updated_unix_ms = 11;
   // Branch to work on it, e.g. "feat/PRC-412-bulk-discounts".
   string suggested_branch = 12;
+
+  TaskType type = 13;
+  // The source's own name for the type ("Story", "Sub-task").
+  string type_name = 14;
+  // The source's own status ("Code Review", "QA"); `status` is its column.
+  string source_status = 15;
+  optional Person assignee = 16;
+  // How the task relates to the user. Today only ASSIGNED is filled; room
+  // for REPORTED and WATCHING later.
+  repeated TaskRelation relations = 17;
+  // The user's own: assigned to them, or from a personal source (Obsidian,
+  // Bear, Todoist). What "Mine" shows.
+  bool mine = 18;
+  // Story points; 0 = none.
+  double points = 19;
+  uint32 subtasks_done = 20;
+  uint32 subtasks_total = 21;
+  uint32 comment_count = 22;
+  // Epic, or parent of a sub-task.
+  optional TaskRef parent = 23;
+  // An issue that blocks this one isn't done yet.
+  bool blocked = 24;
+  optional Sprint sprint = 25;
+}
+
+enum TaskType {
+  TASK_TYPE_UNSPECIFIED = 0;
+  TASK_TYPE_STORY = 1;
+  TASK_TYPE_BUG = 2;
+  TASK_TYPE_TASK = 3;
+  TASK_TYPE_SUBTASK = 4;
+  TASK_TYPE_EPIC = 5;
+  // A GitHub issue.
+  TASK_TYPE_ISSUE = 6;
+  // A note checkbox or a to-do (Obsidian, Bear, Todoist).
+  TASK_TYPE_TODO = 7;
+}
+
+enum TaskRelation {
+  TASK_RELATION_UNSPECIFIED = 0;
+  TASK_RELATION_ASSIGNED = 1;
+  TASK_RELATION_REPORTED = 2;
+  TASK_RELATION_WATCHING = 3;
+}
+
+message Person {
+  // The source's id (Jira accountId, GitHub login).
+  string id = 1;
+  string name = 2;
+  // "AG"; one letter for one-word names.
+  string initials = 3;
+  // The signed-in user.
+  bool you = 4;
+}
+
+enum SprintState {
+  SPRINT_STATE_UNSPECIFIED = 0;
+  SPRINT_STATE_CLOSED = 1;
+  SPRINT_STATE_ACTIVE = 2;
+  SPRINT_STATE_FUTURE = 3;
+}
+
+message Sprint {
+  string name = 1;
+  SprintState state = 2;
+  // 0 = unknown.
+  uint64 start_unix_ms = 3;
+  uint64 end_unix_ms = 4;
+}
+
+// Another ticket, as a detail or a card mentions it.
+message TaskRef {
+  // Kumo's id ("source/external") when it's a task of a source; empty for
+  // tickets the source didn't send (opening it asks GetTask anyway).
+  string id = 1;
+  string key = 2;
+  string title = 3;
+  TaskType type = 4;
+  string source_status = 5;
+  TaskStatus status = 6;
+  optional Person assignee = 7;
+  // Epics: a palette name ("violet", "teal", "amber"…), empty = by key.
+  string color = 8;
+  string url = 9;
+}
+
+enum LinkKind {
+  LINK_KIND_OTHER = 0;
+  LINK_KIND_BLOCKS = 1;
+  LINK_KIND_BLOCKED_BY = 2;
+  LINK_KIND_RELATES = 3;
+  LINK_KIND_DUPLICATES = 4;
+  LINK_KIND_DUPLICATED_BY = 5;
+}
+
+message LinkedTask {
+  LinkKind kind = 1;
+  // The source's wording ("is blocked by", "clones").
+  string relation = 2;
+  TaskRef task = 3;
+}
+
+message TaskAttachment {
+  string name = 1;
+  // "PNG image", "CSV", "PDF".
+  string kind = 2;
+  uint64 size_bytes = 3;
+  string url = 4;
+}
+
+message TaskComment {
+  Person author = 1;
+  uint64 created_unix_ms = 2;
+  // Markdown.
+  string body = 3;
+}
+
+message TimeTracking {
+  // The source's own wording ("3d", "1d 4h"), and seconds for the bar.
+  string estimate = 1;
+  string logged = 2;
+  string remaining = 3;
+  uint64 estimate_seconds = 4;
+  uint64 logged_seconds = 5;
+  uint64 remaining_seconds = 6;
+}
+
+message GetTaskRequest {
+  string id = 1;
+  // Ask the source even if the cached detail is fresh.
+  bool refresh = 2;
+}
+
+message TaskDetail {
+  // The card's fields, as fresh as the detail.
+  Task task = 1;
+  optional Person reporter = 2;
+  uint64 created_unix_ms = 3;
+  // Markdown (Jira's rich text converted).
+  string description = 4;
+  string acceptance_criteria = 5;
+  repeated TaskRef subtasks = 6;
+  repeated LinkedTask links = 7;
+  repeated TaskAttachment attachments = 8;
+  // Oldest first, all of them.
+  repeated TaskComment comments = 9;
+  repeated string components = 10;
+  repeated string fix_versions = 11;
+  optional TimeTracking time_tracking = 12;
+  // When the source answered.
+  uint64 fetched_unix_ms = 13;
+  // Served from the cache: the source couldn't be reached.
+  bool stale = 14;
+  string stale_reason = 15;
+  // Where a personal task lives ("Weekly.md · line 14", "Todoist · Inbox").
+  string location = 16;
 }
 
 message SourceTasks {

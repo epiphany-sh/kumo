@@ -1,0 +1,90 @@
+{
+  "issues": [
+    {
+      "id": "10599",
+      "key": "PRC-10599",
+      "fields": {
+        "summary": "Generación automática de precios para los canales (Hijas)",
+        "status": {"name": "To Do", "statusCategory": {"key": "new"}},
+        "priority": {"name": "High"},
+        "duedate": "2026-10-26",
+        "project": {"key": "PRC", "name": "Pricing"},
+        "labels": ["canales", "hotfix", "marketplace"],
+        "updated": "2026-10-28T12:00:00.000-0300",
+        "issuetype": {"name": "Bug", "subtask": false, "hierarchyLevel": 0},
+        "assignee": null,
+        "subtasks": [],
+        "comment": {"comments": [], "maxResults": 0, "total": 14, "startAt": 0},
+        "issuelinks": [
+          {"id": "20010", "type": {"id": "10002", "name": "Duplicate", "inward": "is duplicated by", "outward": "duplicates"},
+           "outwardIssue": {"key": "PRC-10577", "fields": {"summary": "Precios duplicados en canal Hijas", "status": {"name": "Done", "statusCategory": {"key": "done"}}, "issuetype": {"name": "Bug", "hierarchyLevel": 0}}}}
+        ],
+        "customfield_10016": 3,
+        "customfield_10020": [
+          {"id": 41, "name": "Pricing 2026.21", "state": "closed", "startDate": "2026-10-07T12:00:00.000Z", "endDate": "2026-10-20T12:00:00.000Z"}
+        ]
+      }
+    },
+    {
+      "id": "10354",
+      "key": "PRC-11354",
+      "fields": {
+        "summary": "Migracion a Graviton (Parte 4/4)",
+        "status": {"name": "To Do", "statusCategory": {"key": "new"}},
+        "priority": {"name": "Low"},
+        "project": {"key": "PRC", "name": "Pricing"},
+        "labels": [],
+        "updated": "2026-10-27T18:00:00.000-0300",
+        "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1},
+        "assignee": {"accountId": "5b10ac8d82e05b22cc7d4ef5", "displayName": "Mauri Fernández"},
+        "parent": {"key": "PRC-11300", "fields": {"summary": "Migración a Graviton", "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}, "issuetype": {"name": "Epic", "hierarchyLevel": 1}}},
+        "subtasks": [],
+        "comment": {"comments": [], "maxResults": 0, "total": 1, "startAt": 0},
+        "issuelinks": [
+          {"id": "20020", "type": {"id": "10000", "name": "Blocks", "inward": "is blocked by", "outward": "blocks"},
+           "inwardIssue": {"key": "PRC-11355", "fields": {"summary": "migraciones", "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}, "issuetype": {"name": "Story", "hierarchyLevel": 0}}}}
+        ]
+      }
+    },
+    {
+      "id": "10366",
+      "key": "PRC-11366",
+      "fields": {
+        "summary": "Alertas de margen negativo en Grafana",
+        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}},
+        "priority": {"name": "Medium"},
+        "project": {"key": "PRC", "name": "Pricing"},
+        "labels": ["observability"],
+        "updated": "2026-10-28T09:00:00.000-0300",
+        "issuetype": {"name": "Task", "subtask": false, "hierarchyLevel": 0},
+        "assignee": {"accountId": "61f0c0ffee", "displayName": "Nico"},
+        "subtasks": [],
+        "comment": {"comments": [], "maxResults": 0, "total": 1, "startAt": 0},
+        "issuelinks": [],
+        "customfield_10016": 3,
+        "customfield_10020": [
+          {"id": 42, "name": "Pricing 2026.22", "state": "active", "startDate": "2026-10-21T12:00:00.000Z", "endDate": "2026-11-04T12:00:00.000Z"},
+          {"id": 43, "name": "Pricing 2026.23", "state": "future", "startDate": "2026-11-05T12:00:00.000Z", "endDate": "2026-11-18T12:00:00.000Z"}
+        ]
+      }
+    },
+    {
+      "id": "10355",
+      "key": "PRC-11355",
+      "fields": {
+        "summary": "migraciones",
+        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}},
+        "priority": {"name": "Low"},
+        "project": {"key": "PRC", "name": "Pricing"},
+        "labels": ["graviton", "db"],
+        "updated": "2026-10-28T11:03:00.000-0300",
+        "issuetype": {"name": "Story", "subtask": false, "hierarchyLevel": 0},
+        "assignee": {"accountId": "5b10ac8d82e05b22cc7d4ef5", "displayName": "Mauri Fernández"},
+        "subtasks": [],
+        "comment": {"comments": [], "maxResults": 0, "total": 6, "startAt": 0},
+        "issuelinks": []
+      }
+    }
+  ],
+  "isLast": true
+}

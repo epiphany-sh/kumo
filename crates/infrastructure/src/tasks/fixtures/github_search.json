@@ -1,0 +1,41 @@
+[
+  {
+    "assignees": [{"id": "MDQ6VXNlcjE=", "is_bot": false, "login": "Octo", "type": "User", "url": "https://github.com/octo"}],
+    "author": {"id": "MDQ6VXNlcjI=", "is_bot": false, "login": "nico", "type": "User", "url": "https://github.com/nico"},
+    "commentsCount": 3,
+    "isPullRequest": false,
+    "labels": [{"color": "d73a4a", "description": "Something isn't working", "id": "LA_1", "name": "bug"}, {"color": "ededed", "description": "", "id": "LA_2", "name": "priority: high"}],
+    "number": 18,
+    "repository": {"name": "shop", "nameWithOwner": "acme/shop"},
+    "state": "open",
+    "title": "Rounding error",
+    "updatedAt": "2026-10-27T10:00:00Z",
+    "url": "https://github.com/acme/shop/issues/18"
+  },
+  {
+    "assignees": [{"id": "MDQ6VXNlcjM=", "is_bot": false, "login": "tomas", "type": "User", "url": "https://github.com/tomas"}],
+    "author": {"id": "MDQ6VXNlcjE=", "is_bot": false, "login": "octo", "type": "User", "url": "https://github.com/octo"},
+    "commentsCount": 0,
+    "isPullRequest": false,
+    "labels": [],
+    "number": 7,
+    "repository": {"name": "zen-engine", "nameWithOwner": "pricing/zen-engine"},
+    "state": "open",
+    "title": "Retry on 502 from pricing API",
+    "updatedAt": "2026-10-26T09:00:00Z",
+    "url": "https://github.com/pricing/zen-engine/issues/7"
+  },
+  {
+    "assignees": [],
+    "author": {"id": "MDQ6VXNlcjE=", "is_bot": false, "login": "octo", "type": "User", "url": "https://github.com/octo"},
+    "commentsCount": 1,
+    "isPullRequest": true,
+    "labels": [],
+    "number": 19,
+    "repository": {"name": "shop", "nameWithOwner": "acme/shop"},
+    "state": "open",
+    "title": "A PR",
+    "updatedAt": "2026-10-27T10:00:00Z",
+    "url": "https://github.com/acme/shop/pull/19"
+  }
+]

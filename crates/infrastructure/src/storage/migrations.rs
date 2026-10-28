@@ -63,7 +63,33 @@ const STEPS: &[&str] = &[
         created     INTEGER NOT NULL,
         PRIMARY KEY (task_id, worktree)
     );",
+    // 4: richer task cards and cached ticket details
+    "ALTER TABLE tasks ADD COLUMN kind INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE tasks ADD COLUMN type_name TEXT NOT NULL DEFAULT '';
+    ALTER TABLE tasks ADD COLUMN source_status TEXT NOT NULL DEFAULT '';
+    ALTER TABLE tasks ADD COLUMN assignee TEXT;
+    ALTER TABLE tasks ADD COLUMN relations TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE tasks ADD COLUMN mine INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE tasks ADD COLUMN points INTEGER;
+    ALTER TABLE tasks ADD COLUMN subtasks_done INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE tasks ADD COLUMN subtasks_total INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE tasks ADD COLUMN comment_count INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE tasks ADD COLUMN parent TEXT;
+    ALTER TABLE tasks ADD COLUMN blocked INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE tasks ADD COLUMN sprint TEXT;
+    CREATE TABLE task_details (
+        source_id   TEXT NOT NULL REFERENCES task_sources(id) ON DELETE CASCADE,
+        external_id TEXT NOT NULL,
+        detail      TEXT NOT NULL,
+        fetched     INTEGER NOT NULL,
+        PRIMARY KEY (source_id, external_id)
+    );",
 ];
+
+#[cfg(test)]
+pub(super) fn steps() -> &'static [&'static str] {
+    STEPS
+}
 
 pub(super) fn migrate(conn: &mut Connection) -> rusqlite::Result<()> {
     let current: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;

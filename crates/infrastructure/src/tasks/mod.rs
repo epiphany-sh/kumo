@@ -6,6 +6,7 @@
 //! - [`JiraConnector`]: Jira Cloud's REST API.
 //! - [`TodoistConnector`]: Todoist's API.
 
+mod adf;
 mod bear;
 pub(crate) mod dates;
 mod github;

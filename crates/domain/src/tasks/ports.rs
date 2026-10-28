@@ -4,7 +4,8 @@
 use std::path::PathBuf;
 
 use super::{
-    SourceId, SourceKind, SourceOptions, Task, TaskError, TaskLink, TaskSource, TaskStatus,
+    SourceId, SourceKind, SourceOptions, Task, TaskDetail, TaskError, TaskId, TaskLink, TaskSource,
+    TaskStatus,
 };
 
 /// The local cache: sources, their last fetched tasks and the links to
@@ -22,6 +23,12 @@ pub trait TaskStore: Send + Sync + 'static {
     /// Links are keyed by task and worktree.
     fn save_link(&self, link: &TaskLink) -> Result<(), TaskError>;
     fn delete_link(&self, link: &TaskLink) -> Result<(), TaskError>;
+    /// The last detail read for a task, with when it was read.
+    fn detail(&self, id: &TaskId) -> Result<Option<TaskDetail>, TaskError>;
+    /// Replaces the cached detail of `detail.task`.
+    fn save_detail(&self, detail: &TaskDetail) -> Result<(), TaskError>;
+    /// Forgets every cached detail of `source` (it now reads elsewhere).
+    fn delete_details(&self, source: &SourceId) -> Result<(), TaskError>;
 }
 
 /// API tokens, in the OS keychain.
@@ -52,6 +59,20 @@ pub trait TaskConnector: Send + Sync + 'static {
         task: &Task,
         status: TaskStatus,
     ) -> Result<(), TaskError>;
+    /// The whole ticket `id`. `known` is the board's copy, when it's on the
+    /// board (linked tickets and parents may not be). By default, only
+    /// what the card says.
+    fn detail(
+        &self,
+        _source: &TaskSource,
+        _secret: Option<&str>,
+        id: &TaskId,
+        known: Option<&Task>,
+    ) -> Result<TaskDetail, TaskError> {
+        known
+            .map(|task| TaskDetail::basic(task.clone()))
+            .ok_or_else(|| TaskError::UnknownTask(id.to_string()))
+    }
     /// Checks the options and credentials; says who or what it reached.
     fn test(&self, source: &TaskSource, secret: Option<&str>) -> Result<String, TaskError>;
     /// Files whose changes mean the tasks changed (local sources).

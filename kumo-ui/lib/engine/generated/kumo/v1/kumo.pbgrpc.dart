@@ -1265,6 +1265,16 @@ class TasksClient extends $grpc.Client {
     return $createUnaryCall(_$unlink, request, options: options);
   }
 
+  /// The whole ticket: description, acceptance criteria, sub-tasks, links,
+  /// attachments and comments. Answered from the daemon's cache when fresh
+  /// (or when the source can't be reached: then `stale` is set).
+  $grpc.ResponseFuture<$0.TaskDetail> getTask(
+    $0.GetTaskRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getTask, request, options: options);
+  }
+
   // method descriptors
 
   static final _$watch =
@@ -1311,6 +1321,10 @@ class TasksClient extends $grpc.Client {
           '/kumo.v1.Tasks/Unlink',
           ($0.UnlinkTaskRequest value) => value.writeToBuffer(),
           $0.UnlinkTaskResponse.fromBuffer);
+  static final _$getTask = $grpc.ClientMethod<$0.GetTaskRequest, $0.TaskDetail>(
+      '/kumo.v1.Tasks/GetTask',
+      ($0.GetTaskRequest value) => value.writeToBuffer(),
+      $0.TaskDetail.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Tasks')
@@ -1386,6 +1400,13 @@ abstract class TasksServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.UnlinkTaskRequest.fromBuffer(value),
         ($0.UnlinkTaskResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.GetTaskRequest, $0.TaskDetail>(
+        'GetTask',
+        getTask_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.GetTaskRequest.fromBuffer(value),
+        ($0.TaskDetail value) => value.writeToBuffer()));
   }
 
   $async.Stream<$0.TasksUpdate> watch_Pre($grpc.ServiceCall $call,
@@ -1460,6 +1481,14 @@ abstract class TasksServiceBase extends $grpc.Service {
 
   $async.Future<$0.UnlinkTaskResponse> unlink(
       $grpc.ServiceCall call, $0.UnlinkTaskRequest request);
+
+  $async.Future<$0.TaskDetail> getTask_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.GetTaskRequest> $request) async {
+    return getTask($call, await $request);
+  }
+
+  $async.Future<$0.TaskDetail> getTask(
+      $grpc.ServiceCall call, $0.GetTaskRequest request);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Pipelines')

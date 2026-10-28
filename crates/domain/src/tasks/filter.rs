@@ -63,21 +63,15 @@ fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tasks::{Priority, TaskId};
+    use crate::tasks::TaskId;
 
     fn task(id: &str, title: &str, status: TaskStatus, labels: &[&str]) -> Task {
         Task {
-            id: TaskId::parse(id).unwrap(),
             key: "PRC-1".into(),
-            ticket: None,
-            title: title.into(),
             status,
-            priority: Priority::None,
-            due: None,
-            url: None,
             context: "pricing".into(),
             labels: labels.iter().map(|l| (*l).to_owned()).collect(),
-            updated: None,
+            ..Task::new(TaskId::parse(id).unwrap(), title)
         }
     }
 

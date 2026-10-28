@@ -3,13 +3,20 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use kumo_domain::tasks::{
-    Priority, SourceId, SourceKind, SourceOptions, Task, TaskError, TaskId, TaskLink, TaskSource,
-    TaskStatus, TaskStore,
+    Points, Progress, SourceId, SourceKind, SourceOptions, Task, TaskDetail, TaskError, TaskId,
+    TaskLink, TaskSource, TaskStore,
 };
 use kumo_domain::time::Timestamp;
-use rusqlite::{Connection, Row, params};
+use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use super::migrations;
+use super::task_json::{
+    PersonJson, SprintJson, TaskRefJson, detail_from_json, detail_to_json, priority_code,
+    priority_from, relations_from, relations_to, status_code, status_from, type_code, type_from,
+};
+
+/// Details nobody opened for this long are dropped from the cache.
+const DETAIL_KEPT_FOR_NANOS: u64 = 30 * 24 * 3600 * 1_000_000_000;
 
 /// [`TaskStore`] on the same SQLite file as the workspace: the cache the
 /// Tasks view is served from.
@@ -101,7 +108,9 @@ impl TaskStore for SqliteTaskStore {
         let conn = self.lock();
         let mut stmt = conn
             .prepare_cached(
-                "SELECT external_id, key, ticket, title, status, priority, due, url, context, labels, updated
+                "SELECT external_id, key, ticket, title, status, priority, due, url, context, labels, updated,
+                     kind, type_name, source_status, assignee, relations, mine, points, subtasks_done,
+                     subtasks_total, comment_count, parent, blocked, sprint
                  FROM tasks WHERE source_id = ?1 ORDER BY position",
             )
             .map_err(store_error)?;
@@ -119,12 +128,35 @@ impl TaskStore for SqliteTaskStore {
             let mut insert = tx
                 .prepare_cached(
                     "INSERT OR REPLACE INTO tasks (source_id, external_id, key, ticket, title, status, priority,
-                         due, url, context, labels, updated, position)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                         due, url, context, labels, updated, position, kind, type_name, source_status,
+                         assignee, relations, mine, points, subtasks_done, subtasks_total, comment_count,
+                         parent, blocked, sprint)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17,
+                         ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)",
                 )
                 .map_err(store_error)?;
             for (position, task) in (0_i64..).zip(tasks) {
                 let labels = serde_json::to_string(&task.labels).map_err(store_error)?;
+                let assignee = task
+                    .assignee
+                    .as_ref()
+                    .map(|p| serde_json::to_string(&PersonJson::to(p)))
+                    .transpose()
+                    .map_err(store_error)?;
+                let parent = task
+                    .parent
+                    .as_ref()
+                    .map(|r| serde_json::to_string(&TaskRefJson::to(r)))
+                    .transpose()
+                    .map_err(store_error)?;
+                let sprint = task
+                    .sprint
+                    .as_ref()
+                    .map(|s| serde_json::to_string(&SprintJson::to(s)))
+                    .transpose()
+                    .map_err(store_error)?;
+                let relations =
+                    serde_json::to_string(&relations_to(&task.relations)).map_err(store_error)?;
                 insert
                     .execute(params![
                         source.as_str(),
@@ -140,6 +172,19 @@ impl TaskStore for SqliteTaskStore {
                         labels,
                         task.updated.map(|t| nanos_to_sql(t.as_unix_nanos())),
                         position,
+                        type_code(task.kind),
+                        task.type_name,
+                        task.source_status,
+                        assignee,
+                        relations,
+                        task.mine,
+                        task.points.map(Points::hundredths),
+                        task.subtasks.done,
+                        task.subtasks.total,
+                        task.comment_count,
+                        parent,
+                        task.blocked,
+                        sprint,
                     ])
                     .map_err(store_error)?;
             }
@@ -203,6 +248,64 @@ impl TaskStore for SqliteTaskStore {
             .map(drop)
             .map_err(store_error)
     }
+
+    fn detail(&self, id: &TaskId) -> Result<Option<TaskDetail>, TaskError> {
+        let source = id.source();
+        let row: Option<(String, i64)> = self
+            .lock()
+            .query_row(
+                "SELECT detail, fetched FROM task_details WHERE source_id = ?1 AND external_id = ?2",
+                params![source.as_str(), id.external()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(store_error)?;
+        Ok(row.and_then(|(json, fetched)| {
+            let fetched = Timestamp::from_unix_nanos(nanos_from_sql(fetched));
+            // Unreadable (written by another version): as if there were none.
+            detail_from_json(&source, &json, fetched)
+                .inspect_err(
+                    |error| tracing::debug!(%error, task = %id, "dropping a cached task detail"),
+                )
+                .ok()
+        }))
+    }
+
+    fn save_detail(&self, detail: &TaskDetail) -> Result<(), TaskError> {
+        let json = detail_to_json(detail).map_err(store_error)?;
+        let id = &detail.task.id;
+        let fetched = detail.fetched.as_unix_nanos();
+        let mut conn = self.lock();
+        let tx = conn.transaction().map_err(store_error)?;
+        tx.execute(
+            "INSERT INTO task_details (source_id, external_id, detail, fetched) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(source_id, external_id) DO UPDATE SET detail = excluded.detail,
+                 fetched = excluded.fetched",
+            params![
+                id.source().as_str(),
+                id.external(),
+                json,
+                nanos_to_sql(fetched)
+            ],
+        )
+        .map_err(store_error)?;
+        tx.execute(
+            "DELETE FROM task_details WHERE fetched < ?1",
+            [nanos_to_sql(fetched.saturating_sub(DETAIL_KEPT_FOR_NANOS))],
+        )
+        .map_err(store_error)?;
+        tx.commit().map_err(store_error)
+    }
+
+    fn delete_details(&self, source: &SourceId) -> Result<(), TaskError> {
+        self.lock()
+            .execute(
+                "DELETE FROM task_details WHERE source_id = ?1",
+                [source.as_str()],
+            )
+            .map(drop)
+            .map_err(store_error)
+    }
 }
 
 fn source_from(
@@ -223,11 +326,11 @@ fn source_from(
 
 fn task_from(source: &SourceId, row: &Row<'_>) -> rusqlite::Result<Task> {
     let labels: String = row.get(9)?;
+    let relations: String = row.get(15)?;
+    let json = |at: usize| -> rusqlite::Result<Option<String>> { row.get(at) };
     Ok(Task {
-        id: TaskId::new(source, &row.get::<_, String>(0)?),
         key: row.get(1)?,
         ticket: row.get(2)?,
-        title: row.get(3)?,
         status: status_from(row.get(4)?),
         priority: priority_from(row.get(5)?),
         due: row.get(6)?,
@@ -237,45 +340,34 @@ fn task_from(source: &SourceId, row: &Row<'_>) -> rusqlite::Result<Task> {
         updated: row
             .get::<_, Option<i64>>(10)?
             .map(|n| Timestamp::from_unix_nanos(nanos_from_sql(n))),
+        kind: type_from(row.get(11)?),
+        type_name: row.get(12)?,
+        source_status: row.get(13)?,
+        assignee: json(14)?
+            .and_then(|j| serde_json::from_str::<PersonJson>(&j).ok())
+            .map(PersonJson::into_person),
+        relations: relations_from(
+            &serde_json::from_str::<Vec<i64>>(&relations).unwrap_or_default(),
+        ),
+        mine: row.get(16)?,
+        points: row.get::<_, Option<u32>>(17)?.map(Points::from_hundredths),
+        subtasks: Progress {
+            done: row.get(18)?,
+            total: row.get(19)?,
+        },
+        comment_count: row.get(20)?,
+        parent: json(21)?
+            .and_then(|j| serde_json::from_str::<TaskRefJson>(&j).ok())
+            .map(TaskRefJson::into_ref),
+        blocked: row.get(22)?,
+        sprint: json(23)?
+            .and_then(|j| serde_json::from_str::<SprintJson>(&j).ok())
+            .map(SprintJson::into_sprint),
+        ..Task::new(
+            TaskId::new(source, &row.get::<_, String>(0)?),
+            row.get::<_, String>(3)?,
+        )
     })
-}
-
-fn status_code(status: TaskStatus) -> i64 {
-    match status {
-        TaskStatus::Todo => 0,
-        TaskStatus::Doing => 1,
-        TaskStatus::Review => 2,
-        TaskStatus::Done => 3,
-    }
-}
-
-fn status_from(code: i64) -> TaskStatus {
-    match code {
-        1 => TaskStatus::Doing,
-        2 => TaskStatus::Review,
-        3 => TaskStatus::Done,
-        _ => TaskStatus::Todo,
-    }
-}
-
-fn priority_code(priority: Priority) -> i64 {
-    match priority {
-        Priority::None => 0,
-        Priority::Low => 1,
-        Priority::Medium => 2,
-        Priority::High => 3,
-        Priority::Urgent => 4,
-    }
-}
-
-fn priority_from(code: i64) -> Priority {
-    match code {
-        1 => Priority::Low,
-        2 => Priority::Medium,
-        3 => Priority::High,
-        4 => Priority::Urgent,
-        _ => Priority::None,
-    }
 }
 
 fn nanos_to_sql(nanos: u64) -> i64 {
@@ -293,6 +385,10 @@ fn store_error(error: impl std::fmt::Display) -> TaskError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kumo_domain::tasks::{
+        Attachment, Comment, LinkKind, LinkedTask, Person, Priority, Sprint, SprintState, TaskRef,
+        TaskStatus, TaskType, TimeTracking,
+    };
 
     fn source(id: &str, vault: &str) -> TaskSource {
         TaskSource {
@@ -306,11 +402,18 @@ mod tests {
     }
 
     fn task(source: &SourceId, external: &str, title: &str) -> Task {
+        let parent = TaskRef {
+            id: Some(TaskId::new(source, "PRC-1")),
+            kind: TaskType::Epic,
+            source_status: "In Progress".into(),
+            status: TaskStatus::Doing,
+            color: "violet".into(),
+            url: Some("https://x/browse/PRC-1".into()),
+            ..TaskRef::new("PRC-1", "Graviton")
+        };
         Task {
-            id: TaskId::new(source, external),
             key: "Inbox".into(),
             ticket: Some("PRC-1".into()),
-            title: title.into(),
             status: TaskStatus::Review,
             priority: Priority::High,
             due: Some("2026-11-02".into()),
@@ -318,7 +421,124 @@ mod tests {
             context: "notes".into(),
             labels: vec!["work".into(), "q4".into()],
             updated: Some(Timestamp::from_unix_nanos(1_700_000_000_000_000_000)),
+            kind: TaskType::Story,
+            type_name: "Story".into(),
+            source_status: "Code Review".into(),
+            points: Points::from_f64(2.5),
+            subtasks: Progress { done: 2, total: 4 },
+            comment_count: 6,
+            parent: Some(parent),
+            blocked: true,
+            sprint: Some(Sprint {
+                name: "Pricing 2026.22".into(),
+                state: SprintState::Active,
+                start: Some(Timestamp::from_unix_nanos(1)),
+                end: None,
+            }),
+            ..Task::new(TaskId::new(source, external), title)
         }
+        .assigned_to(Some(Person::new("acc-1", "Mauri", true)))
+    }
+
+    fn detail(task: Task, fetched: u64) -> TaskDetail {
+        let theirs = Person::new("acc-2", "Ana Gómez", false);
+        TaskDetail {
+            reporter: Some(theirs.clone()),
+            created: Some(Timestamp::from_unix_nanos(7)),
+            description: "## Contexto\n- [x] uno".into(),
+            acceptance_criteria: "- [ ] dos".into(),
+            subtasks: vec![TaskRef {
+                assignee: Some(theirs.clone()),
+                ..TaskRef::new("PRC-2", "Sub")
+            }],
+            links: vec![LinkedTask {
+                kind: LinkKind::BlockedBy,
+                relation: "is blocked by".into(),
+                task: TaskRef::new("PRC-3", "Blocker"),
+            }],
+            attachments: vec![Attachment {
+                name: "a.png".into(),
+                kind: "PNG image".into(),
+                size_bytes: 412,
+                url: Some("https://x/a.png".into()),
+            }],
+            comments: vec![Comment {
+                author: Some(theirs),
+                created: Some(Timestamp::from_unix_nanos(9)),
+                body: "**ok**".into(),
+            }],
+            components: vec!["price-admin".into()],
+            fix_versions: vec!["2026.11".into()],
+            time_tracking: Some(TimeTracking {
+                estimate: "3d".into(),
+                estimate_seconds: 86_400,
+                ..TimeTracking::default()
+            }),
+            location: "Weekly.md · line 3".into(),
+            fetched: Timestamp::from_unix_nanos(fetched),
+            stale: None,
+            ..TaskDetail::basic(task)
+        }
+    }
+
+    #[test]
+    fn caches_details_until_their_source_goes() {
+        let store = SqliteTaskStore::in_memory().unwrap();
+        let a = source("a", "/vault");
+        store.save_source(&a).unwrap();
+        let now = Timestamp::now().as_unix_nanos();
+        let first = detail(task(&a.id, "PRC-9", "Nine"), now);
+        assert_eq!(store.detail(&first.task.id).unwrap(), None);
+        store.save_detail(&first).unwrap();
+        assert_eq!(store.detail(&first.task.id).unwrap(), Some(first.clone()));
+
+        let again = TaskDetail {
+            description: "changed".into(),
+            ..first.clone()
+        };
+        store.save_detail(&again).unwrap();
+        assert_eq!(store.detail(&first.task.id).unwrap(), Some(again));
+
+        // Saving prunes details nobody opened in a month.
+        let old = detail(task(&a.id, "PRC-8", "Old"), 1);
+        store.save_detail(&old).unwrap();
+        store.save_detail(&first).unwrap();
+        assert_eq!(store.detail(&old.task.id).unwrap(), None);
+
+        store.delete_details(&a.id).unwrap();
+        assert_eq!(store.detail(&first.task.id).unwrap(), None);
+        store.save_detail(&first).unwrap();
+        store.delete_source(&a.id).unwrap();
+        assert_eq!(
+            store.detail(&first.task.id).unwrap(),
+            None,
+            "goes with its source"
+        );
+    }
+
+    #[test]
+    fn upgrades_a_cache_written_before_rich_cards() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kumo.db");
+        {
+            let conn = Connection::open(&path).unwrap();
+            // Schema step 3, as the previous version left it.
+            let steps = migrations::steps();
+            for step in &steps[..3] {
+                conn.execute_batch(step).unwrap();
+            }
+            conn.pragma_update(None, "user_version", 3).unwrap();
+            conn.execute_batch(
+                "INSERT INTO task_sources VALUES ('a', 'obsidian', 'V', '{\"vault\":\"/v\"}', 1, 1);
+                 INSERT INTO tasks VALUES ('a', 'n.md#1', 'n', NULL, 'Old one', 0, 0, NULL, NULL, '', '[]', NULL, 0);",
+            )
+            .unwrap();
+        }
+        let store = SqliteTaskStore::open(&path).unwrap();
+        let tasks = store.tasks(&SourceId::parse("a").unwrap()).unwrap();
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].title, "Old one");
+        assert_eq!((tasks[0].kind, tasks[0].mine), (TaskType::Unknown, false));
     }
 
     #[test]

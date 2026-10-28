@@ -16,8 +16,8 @@ pub use error::{
 };
 pub use pipelines::{ci_problem_to, host_info_to, pipelines_snapshot_to};
 pub use tasks::{
-    detected_to, source_options_from, source_to, task_link_to, task_status_from, task_to,
-    tasks_update_to,
+    detected_to, source_options_from, source_to, task_detail_to, task_link_to, task_status_from,
+    task_to, tasks_update_to,
 };
 pub use terminal::{launch_spec_from, size_from, terminal_info_to, terminal_output_to};
 pub use workspace::{candidate_to, snapshot_to, worktree_to};

@@ -6,9 +6,10 @@ use std::time::Duration;
 
 use kumo_domain::changes::{ChangeWatcher, ChangesError, WatchGuard};
 use kumo_domain::tasks::{
-    Detected, Priority, SecretStore, SourceId, SourceKind, SourceOptions, Task, TaskConnector,
+    Detected, SecretStore, SourceId, SourceKind, SourceOptions, Task, TaskConnector, TaskDetail,
     TaskError, TaskId, TaskLink, TaskSource, TaskStatus, TaskStore,
 };
+use kumo_domain::time::Timestamp;
 use tokio::sync::watch;
 
 use super::{TaskBoard, TaskPorts, TaskService, TaskTiming};
@@ -20,6 +21,7 @@ struct MemStore {
     sources: Mutex<Vec<TaskSource>>,
     tasks: Mutex<HashMap<SourceId, Vec<Task>>>,
     links: Mutex<Vec<TaskLink>>,
+    details: Mutex<HashMap<TaskId, TaskDetail>>,
 }
 
 impl TaskStore for MemStore {
@@ -71,6 +73,23 @@ impl TaskStore for MemStore {
             .retain(|l| !(l.task == link.task && l.worktree == link.worktree));
         Ok(())
     }
+    fn detail(&self, id: &TaskId) -> Result<Option<TaskDetail>, TaskError> {
+        Ok(self.details.lock().unwrap().get(id).cloned())
+    }
+    fn save_detail(&self, detail: &TaskDetail) -> Result<(), TaskError> {
+        self.details
+            .lock()
+            .unwrap()
+            .insert(detail.task.id.clone(), detail.clone());
+        Ok(())
+    }
+    fn delete_details(&self, source: &SourceId) -> Result<(), TaskError> {
+        self.details
+            .lock()
+            .unwrap()
+            .retain(|id, _| &id.source() != source);
+        Ok(())
+    }
 }
 
 #[derive(Default)]
@@ -101,6 +120,8 @@ struct FakeConnector {
     fail_write: AtomicBool,
     fetches: AtomicUsize,
     secrets_seen: Mutex<Vec<Option<String>>>,
+    details: AtomicUsize,
+    fail_detail: Mutex<Option<TaskError>>,
 }
 
 impl FakeConnector {
@@ -112,6 +133,8 @@ impl FakeConnector {
             fail_write: AtomicBool::new(false),
             fetches: AtomicUsize::new(0),
             secrets_seen: Mutex::new(vec![]),
+            details: AtomicUsize::new(0),
+            fail_detail: Mutex::new(None),
         })
     }
 }
@@ -153,6 +176,26 @@ impl TaskConnector for FakeConnector {
             }
         }
         Ok(())
+    }
+    fn detail(
+        &self,
+        _source: &TaskSource,
+        _secret: Option<&str>,
+        id: &TaskId,
+        known: Option<&Task>,
+    ) -> Result<TaskDetail, TaskError> {
+        let n = self.details.fetch_add(1, Ordering::SeqCst) + 1;
+        if let Some(error) = self.fail_detail.lock().unwrap().clone() {
+            return Err(error);
+        }
+        let task = known
+            .cloned()
+            .ok_or_else(|| TaskError::UnknownTask(id.to_string()))?;
+        Ok(TaskDetail {
+            description: format!("read {n}"),
+            fetched: Timestamp::from_unix_nanos(1),
+            ..TaskDetail::basic(task)
+        })
     }
     fn test(&self, source: &TaskSource, secret: Option<&str>) -> Result<String, TaskError> {
         Ok(format!("{} via {}", source.kind(), secret.unwrap_or("-")))
@@ -200,17 +243,9 @@ impl ChangeWatcher for ManualWatcher {
 
 fn task(source: &SourceId, title: &str, status: TaskStatus) -> Task {
     Task {
-        id: TaskId::new(source, &title.replace(' ', "-")),
         key: "K".into(),
-        ticket: None,
-        title: title.into(),
         status,
-        priority: Priority::None,
-        due: None,
-        url: None,
-        context: String::new(),
-        labels: vec![],
-        updated: None,
+        ..Task::new(TaskId::new(source, &title.replace(' ', "-")), title)
     }
 }
 
@@ -487,4 +522,120 @@ async fn links_tasks_to_worktrees_and_detects_unconfigured_sources() {
     service.unlink(&id, "/wt/a".as_ref()).await.unwrap();
     assert!(service.board().links.is_empty());
     assert!(f.store.links().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn details_come_from_the_cache_while_fresh() {
+    let f = Fixture::new();
+    let service = f.service().await;
+    let view = service
+        .save_source(None, "Vault", vault("/vault"), true, None)
+        .await
+        .unwrap();
+    let mut rx = service.watch();
+    let board = until(&mut rx, "sync", |b| b.task_count() == 1).await;
+    let id = board.sources[0].tasks[0].id.clone();
+
+    let first = service.get_task(&id, false).await.unwrap();
+    assert_eq!(first.description, "read 1");
+    assert_eq!(first.stale, None);
+    assert!(
+        Timestamp::now().since(first.fetched) < Duration::from_secs(5),
+        "stamped when read, whatever the connector said"
+    );
+    assert_eq!(f.store.detail(&id).unwrap().unwrap().description, "read 1");
+
+    let again = service.get_task(&id, false).await.unwrap();
+    assert_eq!(again.description, "read 1", "served from the cache");
+    assert_eq!(f.notes.details.load(Ordering::SeqCst), 1);
+
+    let refreshed = service.get_task(&id, true).await.unwrap();
+    assert_eq!(refreshed.description, "read 2");
+
+    // Older than a couple of minutes: asked again.
+    let mut old = refreshed.clone();
+    old.fetched = Timestamp::from_unix_nanos(Timestamp::now().as_unix_nanos() - 180_000_000_000);
+    f.store.save_detail(&old).unwrap();
+    assert_eq!(
+        service.get_task(&id, false).await.unwrap().description,
+        "read 3"
+    );
+
+    // A status written back shows in the cached detail too.
+    service.set_status(&id, TaskStatus::Done).await.unwrap();
+    let cached = service.get_task(&id, false).await.unwrap();
+    assert_eq!(cached.task.status, TaskStatus::Done);
+    assert_eq!(f.notes.details.load(Ordering::SeqCst), 3);
+
+    // Pointing the source elsewhere forgets its details.
+    service
+        .save_source(Some(view.source.id), "Vault", vault("/other"), true, None)
+        .await
+        .unwrap();
+    assert_eq!(f.store.detail(&id).unwrap(), None);
+}
+
+#[tokio::test]
+async fn details_fall_back_to_the_cache_when_the_source_is_unreachable() {
+    let f = Fixture::new();
+    let service = f.service().await;
+    service
+        .save_source(None, "Vault", vault("/vault"), true, None)
+        .await
+        .unwrap();
+    let mut rx = service.watch();
+    let board = until(&mut rx, "sync", |b| b.task_count() == 1).await;
+    let id = board.sources[0].tasks[0].id.clone();
+
+    // Nothing cached: the error is the answer.
+    *f.notes.fail_detail.lock().unwrap() =
+        Some(TaskError::Unavailable("can't reach the vault".into()));
+    let error = service.get_task(&id, false).await.unwrap_err();
+    assert_eq!(
+        error,
+        TaskError::Unavailable("can't reach the vault".into())
+    );
+
+    *f.notes.fail_detail.lock().unwrap() = None;
+    let fresh = service.get_task(&id, false).await.unwrap();
+
+    for failure in [
+        TaskError::Unavailable(format!(
+            "can't reach Jira (acme.atlassian.net): {}\nmore",
+            "x".repeat(300)
+        )),
+        TaskError::Auth("Jira rejected the credentials".into()),
+    ] {
+        *f.notes.fail_detail.lock().unwrap() = Some(failure.clone());
+        let stale = service.get_task(&id, true).await.unwrap();
+        assert_eq!(stale.description, fresh.description);
+        assert_eq!(
+            stale.fetched, fresh.fetched,
+            "when the source last answered"
+        );
+        let reason = stale.stale.unwrap();
+        assert!(
+            reason.chars().count() <= 160 && !reason.contains('\n'),
+            "{reason}"
+        );
+        assert!(
+            failure
+                .to_string()
+                .starts_with(reason.trim_end_matches('…')),
+            "{reason}"
+        );
+    }
+
+    // A ticket that's gone isn't served from the cache.
+    *f.notes.fail_detail.lock().unwrap() = Some(TaskError::UnknownTask(id.to_string()));
+    assert!(matches!(
+        service.get_task(&id, true).await,
+        Err(TaskError::UnknownTask(_))
+    ));
+
+    let other = TaskId::parse("nope/x").unwrap();
+    assert!(matches!(
+        service.get_task(&other, false).await,
+        Err(TaskError::UnknownSource(_))
+    ));
 }

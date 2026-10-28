@@ -1,0 +1,9 @@
+{
+  "issues": [
+    {"id": "10356", "key": "PRC-11356", "fields": {"summary": "Migrar job de precios", "status": {"name": "Done", "statusCategory": {"key": "done"}}, "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1}, "assignee": {"accountId": "5b10ac8d82e05b22cc7d4ef5", "displayName": "Mauri Fernández"}}},
+    {"id": "10357", "key": "PRC-11357", "fields": {"summary": "Analisis", "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}, "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1}, "assignee": {"accountId": "5b10ac8d82e05b22cc7d4ef5", "displayName": "Mauri Fernández"}}},
+    {"id": "10358", "key": "PRC-11358", "fields": {"summary": "actualizar planilla", "status": {"name": "To Do", "statusCategory": {"key": "new"}}, "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1}, "assignee": {"accountId": "557058:f1d2", "displayName": "Ana Gómez"}}},
+    {"id": "10359", "key": "PRC-11359", "fields": {"summary": "verificacion en entornos", "status": {"name": "To Do", "statusCategory": {"key": "new"}}, "issuetype": {"name": "Sub-task", "subtask": true, "hierarchyLevel": -1}, "assignee": null}}
+  ],
+  "isLast": true
+}

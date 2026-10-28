@@ -22,6 +22,9 @@ class EngineTasksSource extends TasksSource {
   List<TaskLinkInfo> _links = const [];
   String? _error;
 
+  /// Details fetched this session, shown at once when a ticket reopens.
+  final _details = <String, TaskDetail>{};
+
   /// Moves shown before the daemon confirms them: task id → column.
   final _pending = <String, TaskColumn>{};
 
@@ -236,7 +239,116 @@ class EngineTasksSource extends TasksSource {
         labels: List.of(t.labels),
         updated: _time(t.updatedUnixMs.toInt()),
         suggestedBranch: t.suggestedBranch,
+        type: taskTypeFrom(t.type),
+        typeName: t.typeName,
+        sourceStatus: t.sourceStatus,
+        assignee: t.hasAssignee() ? personFrom(t.assignee) : null,
+        relations: {
+          for (final r in t.relations)
+            if (r == pb.TaskRelation.TASK_RELATION_ASSIGNED)
+              TaskRelation.assigned
+            else if (r == pb.TaskRelation.TASK_RELATION_REPORTED)
+              TaskRelation.reported
+            else if (r == pb.TaskRelation.TASK_RELATION_WATCHING)
+              TaskRelation.watching,
+        },
+        mine: t.mine,
+        points: t.points,
+        subtasksDone: t.subtasksDone,
+        subtasksTotal: t.subtasksTotal,
+        commentCount: t.commentCount,
+        parent: t.hasParent() ? taskRefFrom(t.parent) : null,
+        blocked: t.blocked,
+        sprint: t.hasSprint() ? sprintFrom(t.sprint) : null,
       );
+
+  /// A ticket's detail over the wire, with its card's fields.
+  static TaskDetail detailFrom(pb.TaskDetail d, TaskSourceKind kind) => TaskDetail(
+        task: _task(d.task, kind),
+        reporter: d.hasReporter() ? personFrom(d.reporter) : null,
+        created: _time(d.createdUnixMs.toInt()),
+        description: d.description,
+        acceptanceCriteria: d.acceptanceCriteria,
+        subtasks: [for (final s in d.subtasks) taskRefFrom(s)],
+        links: [
+          for (final l in d.links)
+            LinkedTask(
+              kind: switch (l.kind) {
+                pb.LinkKind.LINK_KIND_BLOCKS => LinkKind.blocks,
+                pb.LinkKind.LINK_KIND_BLOCKED_BY => LinkKind.blockedBy,
+                pb.LinkKind.LINK_KIND_RELATES => LinkKind.relates,
+                pb.LinkKind.LINK_KIND_DUPLICATES => LinkKind.duplicates,
+                pb.LinkKind.LINK_KIND_DUPLICATED_BY => LinkKind.duplicatedBy,
+                _ => LinkKind.other,
+              },
+              relation: l.relation,
+              task: taskRefFrom(l.task),
+            ),
+        ],
+        attachments: [for (final a in d.attachments) TaskAttachment(name: a.name, kind: a.kind, sizeBytes: a.sizeBytes.toInt(), url: a.url)],
+        comments: [for (final c in d.comments) TaskComment(author: personFrom(c.author), created: _time(c.createdUnixMs.toInt()), body: c.body)],
+        components: List.of(d.components),
+        fixVersions: List.of(d.fixVersions),
+        timeTracking: d.hasTimeTracking()
+            ? TimeTracking(
+                estimate: d.timeTracking.estimate,
+                logged: d.timeTracking.logged,
+                remaining: d.timeTracking.remaining,
+                estimateSeconds: d.timeTracking.estimateSeconds.toInt(),
+                loggedSeconds: d.timeTracking.loggedSeconds.toInt(),
+                remainingSeconds: d.timeTracking.remainingSeconds.toInt(),
+              )
+            : null,
+        fetched: _time(d.fetchedUnixMs.toInt()),
+        stale: d.stale,
+        staleReason: d.staleReason,
+        location: d.location,
+      );
+
+  static TaskType taskTypeFrom(pb.TaskType t) => switch (t) {
+        pb.TaskType.TASK_TYPE_STORY => TaskType.story,
+        pb.TaskType.TASK_TYPE_BUG => TaskType.bug,
+        pb.TaskType.TASK_TYPE_SUBTASK => TaskType.subtask,
+        pb.TaskType.TASK_TYPE_EPIC => TaskType.epic,
+        pb.TaskType.TASK_TYPE_ISSUE => TaskType.issue,
+        pb.TaskType.TASK_TYPE_TODO => TaskType.todo,
+        _ => TaskType.task,
+      };
+
+  static TaskPerson personFrom(pb.Person p) => TaskPerson(id: p.id, name: p.name, initials: p.initials, you: p.you);
+
+  static TaskSprint sprintFrom(pb.Sprint s) => TaskSprint(
+        name: s.name,
+        state: switch (s.state) {
+          pb.SprintState.SPRINT_STATE_CLOSED => SprintState.closed,
+          pb.SprintState.SPRINT_STATE_FUTURE => SprintState.future,
+          _ => SprintState.active,
+        },
+        start: _time(s.startUnixMs.toInt()),
+        end: _time(s.endUnixMs.toInt()),
+      );
+
+  static TaskRef taskRefFrom(pb.TaskRef r) => TaskRef(
+        id: r.id,
+        key: r.key,
+        title: r.title,
+        type: taskTypeFrom(r.type),
+        sourceStatus: r.sourceStatus,
+        column: _column(r.status),
+        assignee: r.hasAssignee() ? personFrom(r.assignee) : null,
+        color: r.color,
+        url: r.url,
+      );
+
+  @override
+  Future<TaskDetail> getTask(String id, {bool refresh = false}) async {
+    final answer = await _call((c) => c.getTask(pb.GetTaskRequest(id: id, refresh: refresh)));
+    final kind = source(answer.task.sourceId)?.kind ?? TaskSourceKind.obsidian;
+    return _details[id] = detailFrom(answer, kind);
+  }
+
+  @override
+  TaskDetail? cachedDetail(String id) => _details[id];
 
   @override
   void dispose() {

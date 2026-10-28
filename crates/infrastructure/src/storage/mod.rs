@@ -2,6 +2,7 @@
 
 mod agent_store;
 mod migrations;
+mod task_json;
 mod task_store;
 mod workspace_store;
 

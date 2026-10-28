@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
-import 'mock_data.dart';
+import 'mock_task_details.dart';
+import 'mock_tasks.dart';
 import 'models.dart';
 
 /// The tools tasks come from.
@@ -64,6 +65,168 @@ class DetectedSourceInfo {
   final Map<String, String> options;
 }
 
+/// What kind of ticket a task is (its icon on the card).
+enum TaskType { story, bug, task, subtask, epic, issue, todo }
+
+/// How a task relates to the user. "Mine" is [assigned] today; [reported]
+/// and [watching] are room for later.
+enum TaskRelation { assigned, reported, watching }
+
+/// Someone in a source: an assignee, a reporter, a comment's author.
+@immutable
+class TaskPerson {
+  const TaskPerson({required this.id, required this.name, this.initials = '', this.you = false});
+
+  /// The source's id (Jira accountId, GitHub login).
+  final String id;
+  final String name;
+
+  /// "AG"; one letter for one-word names.
+  final String initials;
+
+  /// The signed-in user.
+  final bool you;
+}
+
+enum SprintState { closed, active, future }
+
+@immutable
+class TaskSprint {
+  const TaskSprint({required this.name, required this.state, this.start, this.end});
+  final String name;
+  final SprintState state;
+  final DateTime? start;
+  final DateTime? end;
+}
+
+/// Another ticket, as a card or a detail mentions it (epic, parent,
+/// sub-task, linked issue).
+@immutable
+class TaskRef {
+  const TaskRef({
+    this.id = '',
+    required this.key,
+    required this.title,
+    this.type = TaskType.task,
+    this.sourceStatus = '',
+    this.column = TaskColumn.todo,
+    this.assignee,
+    this.color = '',
+    this.url = '',
+  });
+
+  /// Kumo's id ("source/external") when known; empty otherwise (opening it
+  /// asks [TasksSource.getTask] with `<sourceId>/<key>`).
+  final String id;
+  final String key;
+  final String title;
+  final TaskType type;
+  final String sourceStatus;
+  final TaskColumn column;
+  final TaskPerson? assignee;
+
+  /// Epics: a palette name ("violet", "teal", "amber"…); empty = by key.
+  final String color;
+  final String url;
+}
+
+enum LinkKind { other, blocks, blockedBy, relates, duplicates, duplicatedBy }
+
+@immutable
+class LinkedTask {
+  const LinkedTask({required this.kind, required this.relation, required this.task});
+  final LinkKind kind;
+
+  /// The source's wording ("is blocked by").
+  final String relation;
+  final TaskRef task;
+}
+
+@immutable
+class TaskAttachment {
+  const TaskAttachment({required this.name, this.kind = '', this.sizeBytes = 0, this.url = ''});
+  final String name;
+
+  /// "PNG image", "CSV", "PDF".
+  final String kind;
+  final int sizeBytes;
+  final String url;
+}
+
+@immutable
+class TaskComment {
+  const TaskComment({required this.author, this.created, required this.body});
+  final TaskPerson author;
+  final DateTime? created;
+
+  /// Markdown.
+  final String body;
+}
+
+@immutable
+class TimeTracking {
+  const TimeTracking({this.estimate = '', this.logged = '', this.remaining = '', this.estimateSeconds = 0, this.loggedSeconds = 0, this.remainingSeconds = 0});
+
+  /// The source's own wording ("3d", "1d 4h"); seconds for the bar.
+  final String estimate;
+  final String logged;
+  final String remaining;
+  final int estimateSeconds;
+  final int loggedSeconds;
+  final int remainingSeconds;
+}
+
+/// The whole ticket ([TasksSource.getTask]).
+@immutable
+class TaskDetail {
+  const TaskDetail({
+    required this.task,
+    this.reporter,
+    this.created,
+    this.description = '',
+    this.acceptanceCriteria = '',
+    this.subtasks = const [],
+    this.links = const [],
+    this.attachments = const [],
+    this.comments = const [],
+    this.components = const [],
+    this.fixVersions = const [],
+    this.timeTracking,
+    this.fetched,
+    this.stale = false,
+    this.staleReason = '',
+    this.location = '',
+  });
+
+  /// The card's fields, as fresh as the detail.
+  final TaskEntry task;
+  final TaskPerson? reporter;
+  final DateTime? created;
+
+  /// Markdown.
+  final String description;
+  final String acceptanceCriteria;
+  final List<TaskRef> subtasks;
+  final List<LinkedTask> links;
+  final List<TaskAttachment> attachments;
+
+  /// Oldest first, all of them.
+  final List<TaskComment> comments;
+  final List<String> components;
+  final List<String> fixVersions;
+  final TimeTracking? timeTracking;
+
+  /// When the source answered.
+  final DateTime? fetched;
+
+  /// Served from the daemon's cache: the source couldn't be reached.
+  final bool stale;
+  final String staleReason;
+
+  /// Where a personal task lives ("Weekly.md · line 14", "Todoist · Inbox").
+  final String location;
+}
+
 /// One task, whatever tool it lives in.
 @immutable
 class TaskEntry {
@@ -81,6 +244,19 @@ class TaskEntry {
     this.labels = const [],
     this.updated,
     this.suggestedBranch = '',
+    this.type = TaskType.task,
+    this.typeName = '',
+    this.sourceStatus = '',
+    this.assignee,
+    this.relations = const {},
+    this.mine = true,
+    this.points = 0,
+    this.subtasksDone = 0,
+    this.subtasksTotal = 0,
+    this.commentCount = 0,
+    this.parent,
+    this.blocked = false,
+    this.sprint,
   });
 
   final String id;
@@ -103,6 +279,35 @@ class TaskEntry {
   final DateTime? updated;
   final String suggestedBranch;
 
+  final TaskType type;
+
+  /// The source's own name for the type ("Story", "Sub-task").
+  final String typeName;
+
+  /// The source's own status ("Code Review", "QA"); [column] is where the
+  /// board puts it. Cards show it only when it says more than the column.
+  final String sourceStatus;
+  final TaskPerson? assignee;
+  final Set<TaskRelation> relations;
+
+  /// The user's: assigned to them, or from a personal source (Obsidian,
+  /// Bear, Todoist). What "Mine" shows.
+  final bool mine;
+
+  /// Story points; 0 = none.
+  final double points;
+  final int subtasksDone;
+  final int subtasksTotal;
+  final int commentCount;
+
+  /// Epic, or parent of a sub-task.
+  final TaskRef? parent;
+
+  /// An issue that blocks this one isn't done yet.
+  final bool blocked;
+  final TaskSprint? sprint;
+
+  /// Moved on the board: the source's status is unknown until it answers.
   TaskEntry withColumn(TaskColumn column) => TaskEntry(
         id: id,
         sourceId: sourceId,
@@ -117,6 +322,19 @@ class TaskEntry {
         labels: labels,
         updated: updated,
         suggestedBranch: suggestedBranch,
+        type: type,
+        typeName: typeName,
+        sourceStatus: column == this.column ? sourceStatus : '',
+        assignee: assignee,
+        relations: relations,
+        mine: mine,
+        points: points,
+        subtasksDone: subtasksDone,
+        subtasksTotal: subtasksTotal,
+        commentCount: commentCount,
+        parent: parent,
+        blocked: blocked,
+        sprint: sprint,
       );
 }
 
@@ -169,55 +387,37 @@ abstract class TasksSource extends ChangeNotifier {
 
   Future<void> link(String taskId, {required String worktreePath, required String branch});
   Future<void> unlink(String taskId, String worktreePath);
+
+  /// The whole ticket. Answered from the daemon's cache when fresh, or when
+  /// the source can't be reached ([TaskDetail.stale]); throws a readable
+  /// message when there's nothing to show. [refresh] asks the source anyway.
+  Future<TaskDetail> getTask(String id, {bool refresh = false});
+
+  /// The last detail fetched for [id] in this session, to show at once
+  /// while [getTask] answers.
+  TaskDetail? cachedDetail(String id);
 }
 
-/// The design canvas: the mock board (Jira, ClickUp, Trello, Todoist).
+/// The design canvas: the board and ticket details of the approved Tasks
+/// design ([MockTasks], [MockTaskDetails]).
 class MockTasksSource extends TasksSource {
-  MockTasksSource() {
-    for (final t in Mock.tasks) {
-      _tasks.add(TaskEntry(
-        id: 'mock-${t.src}/${t.key}-${_tasks.length}',
-        sourceId: 'mock-${t.src}',
-        kind: switch (t.src) { 'JI' => TaskSourceKind.jira, 'TD' => TaskSourceKind.todoist, _ => TaskSourceKind.obsidian },
-        key: t.key,
-        title: t.title,
-        column: t.col,
-        priority: switch (t.prio) { 'High' => TaskPriority.high, 'Med' => TaskPriority.medium, _ => TaskPriority.low },
-        context: t.meta,
-        suggestedBranch: t.branch ?? 'feat/${t.key}',
-      ));
-      if (t.branch != null) {
-        _links.add(TaskLinkInfo(taskId: _tasks.last.id, worktreePath: '~/wt/${t.branch}', branch: t.branch!));
-      }
-    }
+  MockTasksSource({this.latency = Duration.zero}) {
+    _tasks.addAll(MockTasks.tasks());
+    _links.addAll(MockTasks.links(_tasks));
   }
+
+  /// How long [getTask] takes, to see the loading state.
+  final Duration latency;
 
   final _tasks = <TaskEntry>[];
   final _links = <TaskLinkInfo>[];
-
-  static const _all = {TaskColumn.todo, TaskColumn.doing, TaskColumn.review, TaskColumn.done};
+  final _details = <String, TaskDetail>{};
 
   @override
   bool get live => false;
 
   @override
-  List<TaskSourceInfo> get sources => [
-        for (final (k, name, kind) in const [
-          ('JI', 'Jira', TaskSourceKind.jira),
-          ('CU', 'ClickUp', TaskSourceKind.obsidian),
-          ('TR', 'Trello', TaskSourceKind.obsidian),
-          ('TD', 'Todoist', TaskSourceKind.todoist),
-        ])
-          TaskSourceInfo(
-            id: 'mock-$k',
-            kind: kind,
-            name: name,
-            hasSecret: true,
-            writable: _all,
-            lastSynced: DateTime.now().subtract(const Duration(minutes: 1)),
-            taskCount: _tasks.where((t) => t.sourceId == 'mock-$k').length,
-          ),
-      ];
+  List<TaskSourceInfo> get sources => MockTasks.sources(_tasks);
 
   @override
   List<TaskEntry> get tasks => List.unmodifiable(_tasks);
@@ -257,4 +457,17 @@ class MockTasksSource extends TasksSource {
     _links.removeWhere((l) => l.taskId == taskId && l.worktreePath == worktreePath);
     notifyListeners();
   }
+
+  @override
+  Future<TaskDetail> getTask(String id, {bool refresh = false}) async {
+    if (latency > Duration.zero) await Future<void>.delayed(latency);
+    final designed = MockTaskDetails.of(_tasks)[id];
+    final task = _tasks.where((t) => t.id == id).firstOrNull;
+    final detail = designed ?? (task == null ? null : MockTaskDetails.basic(task));
+    if (detail == null) throw 'Unknown task $id';
+    return _details[id] = detail;
+  }
+
+  @override
+  TaskDetail? cachedDetail(String id) => _details[id];
 }

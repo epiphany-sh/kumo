@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use kumo_domain::changes::{ChangeWatcher, WatchGuard};
 use kumo_domain::tasks::{
-    Detected, SecretStore, SourceId, SourceOptions, Task, TaskConnector, TaskError, TaskId,
-    TaskLink, TaskSource, TaskStatus, TaskStore,
+    Detected, SecretStore, SourceId, SourceOptions, Task, TaskConnector, TaskDetail, TaskError,
+    TaskId, TaskLink, TaskSource, TaskStatus, TaskStore,
 };
 use kumo_domain::time::Timestamp;
 use tokio::sync::{Notify, watch};
@@ -224,6 +224,7 @@ impl TaskService {
             if options_changed {
                 // They came from somewhere else.
                 store.replace_tasks(&saved.id, &[])?;
+                store.delete_details(&saved.id)?;
             }
             if saved.enabled {
                 store.tasks(&saved.id)
@@ -414,12 +415,78 @@ impl TaskService {
         match written {
             Ok(()) => {
                 self.persist_tasks(&source.id).await;
+                self.patch_detail(id, status).await;
                 Ok(updated)
             }
             Err(error) => {
                 self.replace_task(&task, Some(status));
                 Err(error)
             }
+        }
+    }
+
+    /// The whole ticket. A detail read less than [`DETAIL_FRESH_FOR`] ago
+    /// is served from the cache unless `refresh`; when the source can't be
+    /// reached, the cached one is served marked stale.
+    ///
+    /// [`DETAIL_FRESH_FOR`]: kumo_domain::tasks::DETAIL_FRESH_FOR
+    pub async fn get_task(&self, id: &TaskId, refresh: bool) -> Result<TaskDetail, TaskError> {
+        let (source, known) = {
+            let board = self.lock();
+            let view = board
+                .source(&id.source())
+                .filter(|v| v.source.enabled)
+                .ok_or_else(|| TaskError::UnknownSource(id.source().to_string()))?;
+            let known = view.tasks.iter().find(|t| &t.id == id).cloned();
+            (view.source.clone(), known)
+        };
+        let store = Arc::clone(&self.ports.store);
+        let key = id.clone();
+        let cached = blocking(move || store.detail(&key)).await?;
+        if let Some(cached) = &cached
+            && !refresh
+            && cached.is_fresh(Timestamp::now())
+        {
+            return Ok(cached.clone());
+        }
+
+        let fetched = async {
+            let secret = self.secret(&source.id).await?;
+            if source.kind().needs_secret() && secret.is_none() {
+                return Err(TaskError::Auth(format!(
+                    "add your {} API token in Settings › Tasks",
+                    source.kind()
+                )));
+            }
+            let connector = self.connector(&source)?;
+            let (reading, key) = (source.clone(), id.clone());
+            let mut detail = blocking(move || {
+                connector.detail(&reading, secret.as_deref(), &key, known.as_ref())
+            })
+            .await?;
+            detail.fetched = Timestamp::now();
+            detail.stale = None;
+            Ok(detail)
+        }
+        .await;
+
+        match (fetched, cached) {
+            (Ok(detail), _) => {
+                let store = Arc::clone(&self.ports.store);
+                let saved = detail.clone();
+                if let Err(error) = blocking(move || store.save_detail(&saved)).await {
+                    tracing::warn!(%error, "couldn't cache a task's detail");
+                }
+                Ok(detail)
+            }
+            (Err(error), Some(cached)) if unreachable(&error) => {
+                tracing::debug!(task = %id, %error, "serving a cached task detail");
+                Ok(TaskDetail {
+                    stale: Some(short(&error.to_string())),
+                    ..cached
+                })
+            }
+            (Err(error), _) => Err(error),
         }
     }
 
@@ -582,6 +649,22 @@ impl TaskService {
         });
     }
 
+    /// Keeps a cached detail in step with a status Kumo wrote back.
+    async fn patch_detail(&self, id: &TaskId, status: TaskStatus) {
+        let (store, key) = (Arc::clone(&self.ports.store), id.clone());
+        let patched = blocking(move || match store.detail(&key)? {
+            Some(mut detail) if detail.task.status != status => {
+                detail.task.status = status;
+                store.save_detail(&detail)
+            }
+            _ => Ok(()),
+        })
+        .await;
+        if let Err(error) = patched {
+            tracing::warn!(%error, "couldn't update a cached task detail");
+        }
+    }
+
     async fn persist_tasks(&self, id: &SourceId) {
         let Some(tasks) = self.lock().source(id).map(|v| Arc::clone(&v.tasks)) else {
             return;
@@ -651,6 +734,24 @@ async fn watch_files(
             None
         }
         Err(_) => None,
+    }
+}
+
+/// The source couldn't be asked (offline, down, signed out): the cache is
+/// still the best answer.
+fn unreachable(error: &TaskError) -> bool {
+    matches!(error, TaskError::Unavailable(_) | TaskError::Auth(_))
+}
+
+/// The first line of an error, cut to fit a notice.
+fn short(message: &str) -> String {
+    const MAX: usize = 160;
+    let line = message.lines().next().unwrap_or_default().trim();
+    if line.chars().count() <= MAX {
+        line.to_owned()
+    } else {
+        let cut: String = line.chars().take(MAX - 1).collect();
+        format!("{}…", cut.trim_end())
     }
 }
 

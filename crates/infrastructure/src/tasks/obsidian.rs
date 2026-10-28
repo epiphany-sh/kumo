@@ -8,8 +8,8 @@ use std::sync::{Mutex, PoisonError};
 use std::time::SystemTime;
 
 use kumo_domain::tasks::{
-    Checkbox, Detected, SourceId, SourceKind, SourceOptions, Task, TaskConnector, TaskError,
-    TaskId, TaskSource, TaskStatus, parse_checkboxes, set_checkbox,
+    Checkbox, Detected, SourceId, SourceKind, SourceOptions, Task, TaskConnector, TaskDetail,
+    TaskError, TaskId, TaskSource, TaskStatus, parse_checkboxes, section_around, set_checkbox,
 };
 
 /// Notes bigger than this are skipped (exports, logs pasted in a note).
@@ -150,6 +150,51 @@ impl TaskConnector for ObsidianConnector {
         Ok(())
     }
 
+    /// The checkbox with the section of the note it's in.
+    fn detail(
+        &self,
+        source: &TaskSource,
+        _secret: Option<&str>,
+        id: &TaskId,
+        _known: Option<&Task>,
+    ) -> Result<TaskDetail, TaskError> {
+        let vault = Self::vault(source)?;
+        let (note, checkbox) = id
+            .external()
+            .rsplit_once('#')
+            .ok_or_else(|| TaskError::UnknownTask(id.to_string()))?;
+        let note = safe_note(note)?;
+        let text = match fs::read_to_string(vault.join(note)) {
+            Ok(text) => text,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound && vault.is_dir() => {
+                return Err(TaskError::UnknownTask(id.to_string()));
+            }
+            Err(e) => {
+                return Err(TaskError::Unavailable(format!(
+                    "can't read {}: {e}",
+                    note.display()
+                )));
+            }
+        };
+        let found = parse_checkboxes(&text)
+            .into_iter()
+            .find(|b| b.id == checkbox)
+            .ok_or_else(|| TaskError::UnknownTask(id.to_string()))?;
+        let vault_name = vault
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        Ok(TaskDetail {
+            description: section_around(&text, found.line),
+            location: format!(
+                "{} · line {}",
+                note.to_string_lossy().replace('\\', "/"),
+                found.line + 1
+            ),
+            ..TaskDetail::basic(to_task(&source.id, &vault_name, note, &found))
+        })
+    }
+
     fn test(&self, source: &TaskSource, secret: Option<&str>) -> Result<String, TaskError> {
         let vault = Self::vault(source)?;
         if !vault.join(".obsidian").is_dir() && !vault.is_dir() {
@@ -256,10 +301,7 @@ fn to_task(source: &SourceId, vault: &str, note: &Path, b: &Checkbox) -> Task {
         .unwrap_or_default();
     let relative = note.to_string_lossy().replace('\\', "/");
     Task {
-        id: TaskId::new(source, &format!("{relative}#{}", b.id)),
         key: note_name,
-        ticket: None,
-        title: b.title.clone(),
         status: b.status,
         priority: b.priority,
         due: b.due.clone(),
@@ -270,8 +312,12 @@ fn to_task(source: &SourceId, vault: &str, note: &Path, b: &Checkbox) -> Task {
         )),
         context: folder,
         labels: b.tags.clone(),
-        updated: None,
+        ..Task::new(
+            TaskId::new(source, &format!("{relative}#{}", b.id)),
+            b.title.clone(),
+        )
     }
+    .personal()
 }
 
 /// A relative path inside the vault (task ids come from clients).
@@ -412,6 +458,42 @@ mod tests {
     }
 
     #[test]
+    fn details_say_where_the_checkbox_is_and_what_surrounds_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let vault = dir.path().join("Vault");
+        write(
+            &vault.join("Weekly.md"),
+            "# Weekly\n\n## Semana 44\n- [x] Mandar resumen\n- [ ] Revisar costos de AWS 📅 2026-10-31\n\n## Semana 45\n- [ ] Otra\n",
+        );
+        let connector = ObsidianConnector::new(dir.path());
+        let src = source(&vault);
+        let tasks = connector.fetch(&src, None).unwrap();
+        let aws = tasks
+            .iter()
+            .find(|t| t.title == "Revisar costos de AWS")
+            .unwrap();
+        assert!(aws.mine && aws.kind == kumo_domain::tasks::TaskType::Todo);
+        let detail = connector.detail(&src, None, &aws.id, Some(aws)).unwrap();
+        assert_eq!(detail.location, "Weekly.md · line 5");
+        assert_eq!(
+            detail.description,
+            "## Semana 44\n- [x] Mandar resumen\n- [ ] Revisar costos de AWS 📅 2026-10-31"
+        );
+        assert_eq!(&detail.task, aws);
+
+        let gone = TaskId::new(&src.id, "Weekly.md#0000");
+        assert!(matches!(
+            connector.detail(&src, None, &gone, None),
+            Err(TaskError::UnknownTask(_))
+        ));
+        let outside = TaskId::new(&src.id, "../x.md#0000");
+        assert!(matches!(
+            connector.detail(&src, None, &outside, None),
+            Err(TaskError::UnknownTask(_))
+        ));
+    }
+
+    #[test]
     fn refuses_paths_outside_the_vault() {
         let dir = tempfile::tempdir().unwrap();
         let connector = ObsidianConnector::new(dir.path());
@@ -420,19 +502,7 @@ mod tests {
             .fetch(&src, None)
             .unwrap()
             .pop()
-            .unwrap_or_else(|| Task {
-                id: TaskId::new(&src.id, "../outside.md#abc"),
-                key: String::new(),
-                ticket: None,
-                title: String::new(),
-                status: TaskStatus::Todo,
-                priority: Default::default(),
-                due: None,
-                url: None,
-                context: String::new(),
-                labels: vec![],
-                updated: None,
-            });
+            .unwrap_or_else(|| Task::new(TaskId::new(&src.id, "../outside.md#abc"), ""));
         assert!(matches!(
             connector.set_status(&src, None, &task, TaskStatus::Done),
             Err(TaskError::UnknownTask(_))

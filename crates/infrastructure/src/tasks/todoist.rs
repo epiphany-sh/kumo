@@ -4,8 +4,8 @@
 use std::path::PathBuf;
 
 use kumo_domain::tasks::{
-    Detected, Priority, SourceKind, SourceOptions, Task, TaskConnector, TaskError, TaskId,
-    TaskSource, TaskStatus,
+    Comment, Detected, Person, Priority, SourceKind, SourceOptions, Task, TaskConnector,
+    TaskDetail, TaskError, TaskId, TaskSource, TaskStatus,
 };
 use kumo_domain::time::Timestamp;
 use serde_json::{Value, json};
@@ -14,6 +14,8 @@ use super::dates::{date_part, parse_timestamp};
 use super::http::Http;
 
 const API: &str = "https://api.todoist.com/api/v1";
+/// Comment pages read for one task (50 each).
+const MAX_COMMENT_PAGES: usize = 4;
 
 #[derive(Debug)]
 pub struct TodoistConnector {
@@ -43,6 +45,56 @@ impl TodoistConnector {
             &format!("Bearer {token}"),
             form,
         )
+    }
+
+    fn get(&self, token: Option<&str>, path: &str) -> Result<Value, TaskError> {
+        let token = token.ok_or_else(|| TaskError::Auth("enter your Todoist API token".into()))?;
+        self.http
+            .get(&format!("{}{path}", self.api), &format!("Bearer {token}"))
+    }
+
+    /// Every comment of a task, oldest first; best effort (a task reads
+    /// fine without them).
+    fn comments(&self, token: Option<&str>, id: &str, owner: Option<&str>) -> Vec<Comment> {
+        let mut comments = Vec::new();
+        let mut cursor: Option<String> = None;
+        for _ in 0..MAX_COMMENT_PAGES {
+            let path = match &cursor {
+                Some(c) => format!("/comments?task_id={id}&limit=50&cursor={}", encode(c)),
+                None => format!("/comments?task_id={id}&limit=50"),
+            };
+            let Ok(page) = self.get(token, &path) else {
+                break;
+            };
+            comments.extend(list(&page, "results").filter_map(|c| {
+                let uid = c
+                    .get("posted_uid")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                let you = owner.is_some_and(|o| o == uid);
+                Some(Comment {
+                    author: Some(Person::new(
+                        uid,
+                        if you { "You" } else { "Collaborator" },
+                        you,
+                    )),
+                    created: c
+                        .get("posted_at")
+                        .and_then(Value::as_str)
+                        .and_then(parse_timestamp),
+                    body: c.get("content")?.as_str()?.to_owned(),
+                })
+            }));
+            cursor = page
+                .get("next_cursor")
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+            if cursor.is_none() {
+                break;
+            }
+        }
+        comments.sort_by_key(|c| c.created);
+        comments
     }
 
     fn project(source: &TaskSource) -> Result<&str, TaskError> {
@@ -132,6 +184,47 @@ impl TaskConnector for TodoistConnector {
         }
     }
 
+    /// The task's description and comments.
+    fn detail(
+        &self,
+        source: &TaskSource,
+        secret: Option<&str>,
+        id: &TaskId,
+        known: Option<&Task>,
+    ) -> Result<TaskDetail, TaskError> {
+        let external = id.external();
+        if !external
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
+            return Err(TaskError::UnknownTask(id.to_string()));
+        }
+        let item = self.get(secret, &format!("/tasks/{external}"))?;
+        let project = known.map(|t| t.key.as_str()).unwrap_or_default();
+        let task = to_task(source, &item, project)
+            .ok_or_else(|| TaskError::Source("Todoist answered a task without content".into()))?;
+        let owner = item.get("user_id").and_then(Value::as_str);
+        Ok(TaskDetail {
+            description: item
+                .get("description")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_owned(),
+            comments: self.comments(secret, external, owner),
+            location: if project.is_empty() {
+                "Todoist".to_owned()
+            } else {
+                format!("Todoist · {project}")
+            },
+            created: item
+                .get("added_at")
+                .and_then(Value::as_str)
+                .and_then(parse_timestamp),
+            ..TaskDetail::basic(task)
+        })
+    }
+
     fn test(&self, source: &TaskSource, secret: Option<&str>) -> Result<String, TaskError> {
         Self::project(source)?;
         let data = self.sync(
@@ -171,38 +264,58 @@ fn flag(item: &Value, key: &str) -> bool {
 
 fn to_task(source: &TaskSource, item: &Value, project: &str) -> Option<Task> {
     let id = item.get("id")?.as_str()?;
-    Some(Task {
-        id: TaskId::new(&source.id, id),
-        key: project.to_owned(),
-        ticket: None,
-        title: item.get("content")?.as_str()?.to_owned(),
-        status: if flag(item, "checked") {
-            TaskStatus::Done
-        } else {
-            TaskStatus::Todo
-        },
-        // Todoist counts up: 4 is the red "P1".
-        priority: match item.get("priority").and_then(Value::as_u64) {
-            Some(4) => Priority::Urgent,
-            Some(3) => Priority::High,
-            Some(2) => Priority::Medium,
-            _ => Priority::None,
-        },
-        due: item
-            .pointer("/due/date")
-            .and_then(Value::as_str)
-            .and_then(date_part),
-        url: Some(format!("https://app.todoist.com/app/task/{id}")),
-        context: String::new(),
-        labels: list(item, "labels")
-            .filter_map(|l| l.as_str().map(str::to_owned))
-            .collect(),
-        updated: item
-            .get("updated_at")
-            .or_else(|| item.get("added_at"))
-            .and_then(Value::as_str)
-            .and_then(parse_timestamp),
-    })
+    Some(
+        Task {
+            key: project.to_owned(),
+            status: if flag(item, "checked") {
+                TaskStatus::Done
+            } else {
+                TaskStatus::Todo
+            },
+            // Todoist counts up: 4 is the red "P1".
+            priority: match item.get("priority").and_then(Value::as_u64) {
+                Some(4) => Priority::Urgent,
+                Some(3) => Priority::High,
+                Some(2) => Priority::Medium,
+                _ => Priority::None,
+            },
+            due: item
+                .pointer("/due/date")
+                .and_then(Value::as_str)
+                .and_then(date_part),
+            url: Some(format!("https://app.todoist.com/app/task/{id}")),
+            labels: list(item, "labels")
+                .filter_map(|l| l.as_str().map(str::to_owned))
+                .collect(),
+            updated: item
+                .get("updated_at")
+                .or_else(|| item.get("added_at"))
+                .and_then(Value::as_str)
+                .and_then(parse_timestamp),
+            comment_count: item
+                .get("note_count")
+                .and_then(Value::as_u64)
+                .and_then(|n| u32::try_from(n).ok())
+                .unwrap_or(0),
+            ..Task::new(
+                TaskId::new(&source.id, id),
+                item.get("content")?.as_str()?.to_owned(),
+            )
+        }
+        .personal(),
+    )
+}
+
+/// Percent-encodes a query value.
+fn encode(raw: &str) -> String {
+    raw.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                char::from(b).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -226,6 +339,28 @@ mod tests {
         TestServer::start(|r| {
             if r.header("authorization") != Some("Bearer tok") {
                 return (401, String::new());
+            }
+            if r.path == "/tasks/t1" {
+                return (
+                    200,
+                    json!({"id": "t1", "content": "Rotate Kafka credentials", "description": "Old ones expire on **Friday**.\n",
+                           "project_id": "p1", "priority": 4, "checked": false, "user_id": "u1",
+                           "added_at": "2026-10-20T10:00:00.000000Z", "updated_at": "2026-10-27T10:00:00.000000Z"})
+                    .to_string(),
+                );
+            }
+            if r.path.starts_with("/comments?task_id=t1") {
+                let page = if r.path.contains("cursor=c2") {
+                    json!({"results": [{"id": "c2", "content": "Rotated staging", "posted_at": "2026-10-26T10:00:00Z", "posted_uid": "u2"}],
+                           "next_cursor": null})
+                } else {
+                    json!({"results": [{"id": "c1", "content": "Ask ops", "posted_at": "2026-10-25T10:00:00Z", "posted_uid": "u1"}],
+                           "next_cursor": "c2"})
+                };
+                return (200, page.to_string());
+            }
+            if r.path.starts_with("/tasks/") {
+                return (404, json!({"error": "Task not found"}).to_string());
             }
             if let Some(commands) = r.form("commands") {
                 let commands: Value = serde_json::from_str(&commands).unwrap();
@@ -294,6 +429,37 @@ mod tests {
             connector.test(&source(""), Some("tok")).unwrap(),
             "signed in as Ana"
         );
+    }
+
+    #[test]
+    fn details_bring_the_description_and_comments() {
+        let server = server();
+        let connector = TodoistConnector::with_api(&server.url);
+        let tasks = connector.fetch(&source(""), Some("tok")).unwrap();
+        assert!(tasks.iter().all(|t| t.mine));
+        let detail = connector
+            .detail(&source(""), Some("tok"), &tasks[0].id, Some(&tasks[0]))
+            .unwrap();
+        assert_eq!(detail.description, "Old ones expire on **Friday**.");
+        assert_eq!(detail.location, "Todoist · Inbox");
+        let comments: Vec<_> = detail
+            .comments
+            .iter()
+            .map(|c| (c.body.as_str(), c.author.as_ref().unwrap().you))
+            .collect();
+        assert_eq!(comments, [("Ask ops", true), ("Rotated staging", false)]);
+        assert_eq!(detail.task.title, "Rotate Kafka credentials");
+
+        let missing = TaskId::new(&source("").id, "nope");
+        assert!(matches!(
+            connector.detail(&source(""), Some("tok"), &missing, None),
+            Err(TaskError::Source(_))
+        ));
+        let sneaky = TaskId::new(&source("").id, "../sync");
+        assert!(matches!(
+            connector.detail(&source(""), Some("tok"), &sneaky, None),
+            Err(TaskError::UnknownTask(_))
+        ));
     }
 
     #[test]

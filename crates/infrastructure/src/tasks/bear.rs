@@ -4,8 +4,8 @@
 use std::path::{Path, PathBuf};
 
 use kumo_domain::tasks::{
-    Detected, SourceKind, SourceOptions, Task, TaskConnector, TaskError, TaskId, TaskSource,
-    TaskStatus, parse_checkboxes,
+    Checkbox, Detected, SourceId, SourceKind, SourceOptions, Task, TaskConnector, TaskDetail,
+    TaskError, TaskId, TaskSource, TaskStatus, parse_checkboxes, section_around,
 };
 use kumo_domain::time::Timestamp;
 use rusqlite::{Connection, OpenFlags};
@@ -46,32 +46,44 @@ impl TaskConnector for BearConnector {
 
     fn fetch(&self, source: &TaskSource, _secret: Option<&str>) -> Result<Vec<Task>, TaskError> {
         let database = self.database(source)?;
-        let notes = read_notes(&database)?;
+        let notes = read_notes(&database, None)?;
         Ok(notes
-            .into_iter()
+            .iter()
             .flat_map(|note| {
-                let updated = note.modified.and_then(|seconds| {
-                    let unix = (seconds + CORE_DATA_EPOCH as f64) * 1e9;
-                    (unix >= 0.0).then(|| Timestamp::from_unix_nanos(unix as u64))
-                });
                 parse_checkboxes(&note.text)
                     .into_iter()
-                    .map(move |b| Task {
-                        id: TaskId::new(&source.id, &format!("{}#{}", note.id, b.id)),
-                        key: note.title.clone(),
-                        ticket: None,
-                        title: b.title,
-                        status: b.status,
-                        priority: b.priority,
-                        due: b.due,
-                        url: Some(format!("bear://x-callback-url/open-note?id={}", note.id)),
-                        context: String::new(),
-                        labels: b.tags,
-                        updated,
-                    })
+                    .map(|b| to_task(&source.id, note, b))
                     .collect::<Vec<_>>()
             })
             .collect())
+    }
+
+    /// The checkbox with the section of the note it's in.
+    fn detail(
+        &self,
+        source: &TaskSource,
+        _secret: Option<&str>,
+        id: &TaskId,
+        _known: Option<&Task>,
+    ) -> Result<TaskDetail, TaskError> {
+        let database = self.database(source)?;
+        let (note_id, checkbox) = id
+            .external()
+            .rsplit_once('#')
+            .ok_or_else(|| TaskError::UnknownTask(id.to_string()))?;
+        let note = read_notes(&database, Some(note_id))?
+            .pop()
+            .ok_or_else(|| TaskError::UnknownTask(id.to_string()))?;
+        let found = parse_checkboxes(&note.text)
+            .into_iter()
+            .find(|b| b.id == checkbox)
+            .ok_or_else(|| TaskError::UnknownTask(id.to_string()))?;
+        let (line, description) = (found.line, section_around(&note.text, found.line));
+        Ok(TaskDetail {
+            description,
+            location: format!("{} · line {}", note.title, line + 1),
+            ..TaskDetail::basic(to_task(&source.id, &note, found))
+        })
     }
 
     fn set_status(
@@ -117,6 +129,27 @@ impl TaskConnector for BearConnector {
     }
 }
 
+fn to_task(source: &SourceId, note: &Note, b: Checkbox) -> Task {
+    let updated = note.modified.and_then(|seconds| {
+        let unix = (seconds + CORE_DATA_EPOCH as f64) * 1e9;
+        (unix >= 0.0).then(|| Timestamp::from_unix_nanos(unix as u64))
+    });
+    Task {
+        key: note.title.clone(),
+        status: b.status,
+        priority: b.priority,
+        due: b.due,
+        url: Some(format!("bear://x-callback-url/open-note?id={}", note.id)),
+        labels: b.tags,
+        updated,
+        ..Task::new(
+            TaskId::new(source, &format!("{}#{}", note.id, b.id)),
+            b.title,
+        )
+    }
+    .personal()
+}
+
 struct Note {
     id: String,
     title: String,
@@ -125,9 +158,10 @@ struct Note {
     modified: Option<f64>,
 }
 
-/// Notes that aren't trashed, archived, deleted or encrypted. Columns are
-/// checked first: Bear's schema is its own and changes between versions.
-fn read_notes(database: &Path) -> Result<Vec<Note>, TaskError> {
+/// Notes that aren't trashed, archived, deleted or encrypted (only `only`,
+/// when given). Columns are checked first: Bear's schema is its own and
+/// changes between versions.
+fn read_notes(database: &Path, only: Option<&str>) -> Result<Vec<Note>, TaskError> {
     if !database.is_file() {
         return Err(TaskError::Unavailable(format!(
             "Bear's database isn't at {}: is Bear installed?",
@@ -161,14 +195,20 @@ fn read_notes(database: &Path) -> Result<Vec<Note>, TaskError> {
     } else {
         "NULL"
     };
+    let one = if only.is_some() {
+        " AND ZUNIQUEIDENTIFIER = ?1"
+    } else {
+        ""
+    };
     let sql = format!(
         "SELECT ZUNIQUEIDENTIFIER, COALESCE(ZTITLE, ''), ZTEXT, {modified} FROM ZSFNOTE
-         WHERE ZTEXT LIKE '%[%]%' AND ZUNIQUEIDENTIFIER IS NOT NULL{hidden}
+         WHERE ZTEXT LIKE '%[%]%' AND ZUNIQUEIDENTIFIER IS NOT NULL{hidden}{one}
          ORDER BY {modified} DESC"
     );
+    let params: Vec<&str> = only.into_iter().collect();
     conn.prepare(&sql)
         .and_then(|mut stmt| {
-            stmt.query_map([], |row| {
+            stmt.query_map(rusqlite::params_from_iter(params), |row| {
                 Ok(Note {
                     id: row.get(0)?,
                     title: row.get(1)?,
@@ -252,6 +292,20 @@ mod tests {
             Err(TaskError::Unsupported { .. })
         ));
         assert_eq!(connector.watched_paths(&source), [dir.path().to_owned()]);
+        assert!(tasks.iter().all(|t| t.mine));
+
+        let detail = connector.detail(&source, None, &tasks[1].id, None).unwrap();
+        assert_eq!(detail.location, "Groceries · line 3");
+        assert_eq!(
+            detail.description,
+            "# Groceries\n- [ ] Milk #home\n- [x] Bread"
+        );
+        assert_eq!(detail.task, tasks[1]);
+        let trashed = TaskId::new(&source.id, "N-2#x");
+        assert!(matches!(
+            connector.detail(&source, None, &trashed, None),
+            Err(TaskError::UnknownTask(_))
+        ));
     }
 
     #[test]

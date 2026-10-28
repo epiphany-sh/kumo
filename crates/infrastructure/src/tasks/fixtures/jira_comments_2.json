@@ -1,0 +1,76 @@
+{
+ "startAt": 4,
+ "maxResults": 4,
+ "total": 6,
+ "comments": [
+  {
+   "self": "https://acme.atlassian.net/rest/api/3/issue/10355/comment/5",
+   "id": "5",
+   "author": {
+    "accountId": "557058:f1d2",
+    "displayName": "Ana Gómez",
+    "active": true
+   },
+   "body": {
+    "type": "doc",
+    "version": 1,
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "mention",
+        "attrs": {
+         "id": "5b10ac8d82e05b22cc7d4ef5",
+         "text": "@Mauri Fernández"
+        }
+       },
+       {
+        "type": "text",
+        "text": " ¿llegamos con staging antes del jueves?"
+       }
+      ]
+     }
+    ]
+   },
+   "updateAuthor": {
+    "accountId": "557058:f1d2",
+    "displayName": "Ana Gómez"
+   },
+   "created": "2026-10-27T10:00:00.000-0300",
+   "updated": "2026-10-27T10:00:00.000-0300",
+   "jsdPublic": true
+  },
+  {
+   "self": "https://acme.atlassian.net/rest/api/3/issue/10355/comment/6",
+   "id": "6",
+   "author": {
+    "accountId": "5b10ac8d82e05b22cc7d4ef5",
+    "displayName": "Mauri Fernández",
+    "active": true
+   },
+   "body": {
+    "type": "doc",
+    "version": 1,
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Sí, staging hoy a la tarde."
+       }
+      ]
+     }
+    ]
+   },
+   "updateAuthor": {
+    "accountId": "5b10ac8d82e05b22cc7d4ef5",
+    "displayName": "Mauri Fernández"
+   },
+   "created": "2026-10-28T09:00:00.000-0300",
+   "updated": "2026-10-28T09:00:00.000-0300",
+   "jsdPublic": true
+  }
+ ]
+}

@@ -11,8 +11,8 @@ use tokio_stream::wrappers::WatchStream;
 use tonic::{Request, Response, Status};
 
 use crate::mapping::{
-    detected_to, source_options_from, source_to, task_link_to, task_status_from, task_to,
-    tasks_status_from, tasks_update_to,
+    detected_to, source_options_from, source_to, task_detail_to, task_link_to, task_status_from,
+    task_to, tasks_status_from, tasks_update_to,
 };
 
 type UpdateStream = Pin<Box<dyn Stream<Item = Result<pb::TasksUpdate, Status>> + Send>>;
@@ -145,6 +145,20 @@ impl pb::tasks_server::Tasks for TasksGrpc {
             .await
             .map_err(tasks_status_from)?;
         Ok(Response::new(task_link_to(&link)))
+    }
+
+    async fn get_task(
+        &self,
+        request: Request<pb::GetTaskRequest>,
+    ) -> Result<Response<pb::TaskDetail>, Status> {
+        let r = request.into_inner();
+        let id = TaskId::parse(&r.id).map_err(tasks_status_from)?;
+        let detail = self
+            .service
+            .get_task(&id, r.refresh)
+            .await
+            .map_err(tasks_status_from)?;
+        Ok(Response::new(task_detail_to(&detail)))
     }
 
     async fn unlink(

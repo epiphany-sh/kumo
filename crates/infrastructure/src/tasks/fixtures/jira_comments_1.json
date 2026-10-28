@@ -1,0 +1,157 @@
+{
+ "startAt": 0,
+ "maxResults": 4,
+ "total": 6,
+ "comments": [
+  {
+   "self": "https://acme.atlassian.net/rest/api/3/issue/10355/comment/1",
+   "id": "1",
+   "author": {
+    "accountId": "557058:f1d2",
+    "displayName": "Ana Gómez",
+    "active": true
+   },
+   "body": {
+    "type": "doc",
+    "version": 1,
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Te lo asigno para este sprint. La ventana es el "
+       },
+       {
+        "type": "text",
+        "text": "jueves 30 a las 22 h",
+        "marks": [
+         {
+          "type": "strong"
+         }
+        ]
+       },
+       {
+        "type": "text",
+        "text": "."
+       }
+      ]
+     }
+    ]
+   },
+   "updateAuthor": {
+    "accountId": "557058:f1d2",
+    "displayName": "Ana Gómez"
+   },
+   "created": "2026-10-22T10:00:00.000-0300",
+   "updated": "2026-10-22T10:00:00.000-0300",
+   "jsdPublic": true
+  },
+  {
+   "self": "https://acme.atlassian.net/rest/api/3/issue/10355/comment/2",
+   "id": "2",
+   "author": {
+    "accountId": "5f00aa",
+    "displayName": "Tomás",
+    "active": true
+   },
+   "body": {
+    "type": "doc",
+    "version": 1,
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Ojo que "
+       },
+       {
+        "type": "text",
+        "text": "price_history",
+        "marks": [
+         {
+          "type": "code"
+         }
+        ]
+       },
+       {
+        "type": "text",
+        "text": " tiene unos 40 M de filas."
+       }
+      ]
+     }
+    ]
+   },
+   "updateAuthor": {
+    "accountId": "5f00aa",
+    "displayName": "Tomás"
+   },
+   "created": "2026-10-23T10:00:00.000-0300",
+   "updated": "2026-10-23T10:00:00.000-0300",
+   "jsdPublic": true
+  },
+  {
+   "self": "https://acme.atlassian.net/rest/api/3/issue/10355/comment/3",
+   "id": "3",
+   "author": {
+    "accountId": "5b10ac8d82e05b22cc7d4ef5",
+    "displayName": "Mauri Fernández",
+    "active": true
+   },
+   "body": {
+    "type": "doc",
+    "version": 1,
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Dale, lo parto en lotes de 500k."
+       }
+      ]
+     }
+    ]
+   },
+   "updateAuthor": {
+    "accountId": "5b10ac8d82e05b22cc7d4ef5",
+    "displayName": "Mauri Fernández"
+   },
+   "created": "2026-10-24T10:00:00.000-0300",
+   "updated": "2026-10-24T10:00:00.000-0300",
+   "jsdPublic": true
+  },
+  {
+   "self": "https://acme.atlassian.net/rest/api/3/issue/10355/comment/4",
+   "id": "4",
+   "author": {
+    "accountId": "6a11bb",
+    "displayName": "Lucía",
+    "active": true
+   },
+   "body": {
+    "type": "doc",
+    "version": 1,
+    "content": [
+     {
+      "type": "paragraph",
+      "content": [
+       {
+        "type": "text",
+        "text": "Ya cerré PRC-11340."
+       }
+      ]
+     }
+    ]
+   },
+   "updateAuthor": {
+    "accountId": "6a11bb",
+    "displayName": "Lucía"
+   },
+   "created": "2026-10-26T10:00:00.000-0300",
+   "updated": "2026-10-26T10:00:00.000-0300",
+   "jsdPublic": true
+  }
+ ]
+}
