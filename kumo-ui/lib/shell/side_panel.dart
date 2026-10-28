@@ -88,9 +88,19 @@ class _SourceControlTabState extends State<_SourceControlTab> {
   bool _searching = false;
   final Set<String> _collapsed = {};
 
-  static const _generated = 'feat(discount): bulk discounts by category\n\n'
-      'Batch upsert with pgx CopyFrom, BulkDiscount validation and the\n'
-      'price.discounts.bulk.v1 consumer. Refs PRC-412.';
+  /// A first message from the changed files: what changed, and where.
+  static String _draft(List<ChangedFile> files) {
+    String verb(String kind) => switch (kind) { 'A' || 'U' => 'Add', 'D' => 'Delete', 'R' => 'Rename', _ => 'Update' };
+    if (files.length == 1) return '${verb(files.first.kind)} ${files.first.path}';
+    final verbs = {for (final f in files) verb(f.kind)};
+    final dirs = {for (final f in files) f.path.contains('/') ? f.path.substring(0, f.path.lastIndexOf('/')) : ''};
+    final where = dirs.length == 1 && dirs.first.isNotEmpty ? ' in ${dirs.first}' : '';
+    return [
+      '${verbs.length == 1 ? verbs.first : 'Update'} ${files.length} files$where',
+      '',
+      for (final f in files) '- ${verb(f.kind)} ${f.path}',
+    ].join('\n');
+  }
 
   @override
   void initState() {
@@ -126,19 +136,22 @@ class _SourceControlTabState extends State<_SourceControlTab> {
     final onBranch = s.branchChanges;
     final q = _query.text.trim().toLowerCase();
     bool match(ChangedFile f) => q.isEmpty || f.path.toLowerCase().contains(q);
-    final ahead = s.commitsAhead;
+    final git = s.changes;
+    final ahead = git.ahead;
+    final base = git.base.isEmpty ? 'its base' : git.base;
 
     return ListView(padding: const EdgeInsets.fromLTRB(14, 12, 14, 14), children: [
       Row(children: [
-        KButton(
-          label: 'PR #521',
-          icon: KIcons.pullRequest,
-          height: 30,
-          fontSize: 12.5,
-          trailing: TagChip('Draft', color: c.text2),
-          onTap: () => s.view = KumoView.git,
+        Icon(KIcons.branch, size: 15, color: c.text2),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            git.branch.isEmpty ? 'No worktree' : git.branch,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: mono(12.5, weight: FontWeight.w500, color: c.text),
+          ),
         ),
-        const Spacer(),
         KIconButton(
           icon: KIcons.search,
           label: 'Filter files',
@@ -157,17 +170,19 @@ class _SourceControlTabState extends State<_SourceControlTab> {
               position: belowOf(btn),
               alignRight: true,
               builder: (context, close) => KMenuPanel(width: 200, children: [
-                KMenuItem(icon: KIcons.download, label: 'Fetch', onTap: close),
-                KMenuItem(icon: KIcons.download, label: 'Pull', onTap: close),
-                KMenuItem(
-                  icon: KIcons.upload,
-                  label: 'Push',
-                  onTap: () {
-                    close();
-                    s.push();
-                  },
-                ),
-                KMenuItem(icon: KIcons.save, label: 'Stash changes', onTap: close),
+                for (final (icon, label, action) in [
+                  (Icons.refresh_rounded, 'Fetch', s.fetch),
+                  (KIcons.download, git.behind > 0 ? 'Pull ↓${git.behind}' : 'Pull', s.pull),
+                  (KIcons.upload, !git.pushed ? 'Publish branch' : (ahead > 0 ? 'Push ↑$ahead' : 'Push'), s.push),
+                ])
+                  KMenuItem(
+                    icon: icon,
+                    label: label,
+                    onTap: () {
+                      close();
+                      action();
+                    },
+                  ),
                 const KMenuDivider(),
                 KMenuItem(
                   icon: KIcons.external,
@@ -186,27 +201,23 @@ class _SourceControlTabState extends State<_SourceControlTab> {
         const SizedBox(height: 10),
         _Field(controller: _query, hint: 'Filter changed files', autofocus: true),
       ],
-      const SizedBox(height: 12),
-      Text('feat/PRC-412-bulk-discounts', style: mono(12.5, weight: FontWeight.w500, color: c.text)),
-      const SizedBox(height: 6),
-      Row(children: [
-        Icon(KIcons.arrowRight, size: 13, color: c.text3),
-        const SizedBox(width: 7),
-        Tooltip(
-          message: 'Upstream branch',
-          child: Text(
-            'origin/main',
-            style: mono(12, color: c.text2, decoration: TextDecoration.underline).copyWith(decorationStyle: TextDecorationStyle.dotted, decorationColor: c.text3),
+      if (git.base.isNotEmpty) ...[
+        const SizedBox(height: 6),
+        Row(children: [
+          Icon(KIcons.arrowRight, size: 13, color: c.text3),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Tooltip(
+              message: 'Compared with',
+              child: Text(git.base, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(12, color: c.text2)),
+            ),
           ),
-        ),
-        const Spacer(),
-        Tooltip(
-          message: ahead > 0 ? '$ahead commits ahead of origin/main' : 'Up to date with origin/main',
-          child: Text('↑$ahead', style: mono(11.5, color: c.text3)),
-        ),
-        const SizedBox(width: 4),
-        KIconButton(icon: KIcons.external, label: 'Open branch on GitHub', size: 24, iconSize: 14, onTap: () {}),
-      ]),
+          Tooltip(
+            message: '$ahead to push · ${git.behind} to pull${git.pushed ? '' : ' · not published yet'}',
+            child: Text('↑$ahead ↓${git.behind}', style: mono(11.5, color: c.text3)),
+          ),
+        ]),
+      ],
       const SizedBox(height: 12),
       CallbackShortcuts(
         bindings: {
@@ -245,10 +256,12 @@ class _SourceControlTabState extends State<_SourceControlTab> {
               icon: KIcons.sparkle,
               label: 'Generate message from the changes',
               color: c.acc,
-              onTap: () => setState(() {
-                _msg.text = _generated;
-                _needMsg = false;
-              }),
+              onTap: pending.isEmpty
+                  ? null
+                  : () => setState(() {
+                        _msg.text = _draft(pending);
+                        _needMsg = false;
+                      }),
             ),
           ),
         ]),
@@ -258,7 +271,13 @@ class _SourceControlTabState extends State<_SourceControlTab> {
         Text('Write a message, or generate one with the ✦ button.', style: sans(11.5, color: c.warn)),
       ],
       const SizedBox(height: 10),
-      _CommitButton(enabled: pending.isNotEmpty, onCommit: _commit),
+      _CommitButton(
+        enabled: pending.isNotEmpty,
+        onCommit: _commit,
+        // Nothing to commit: the button pushes what was committed.
+        push: pending.isEmpty && s.canPush ? (!git.pushed ? 'Publish branch' : 'Push ↑$ahead') : null,
+        onPush: s.push,
+      ),
       if (s.commitNotice != null) ...[
         const SizedBox(height: 10),
         Container(
@@ -268,7 +287,7 @@ class _SourceControlTabState extends State<_SourceControlTab> {
             Icon(KIcons.check, size: 14, color: c.ok),
             const SizedBox(width: 6),
             Expanded(child: Text(s.commitNotice!, style: sans(12, color: c.text2))),
-            KButton(label: 'Undo', kind: KButtonKind.ghost, height: 26, fontSize: 12, onTap: s.undoCommit),
+            if (s.canUndoCommit) KButton(label: 'Undo', kind: KButtonKind.ghost, height: 26, fontSize: 12, onTap: s.undoCommit),
           ]),
         ),
       ],
@@ -288,18 +307,21 @@ class _SourceControlTabState extends State<_SourceControlTab> {
         files: onBranch.where(match).toList(),
         open: !_collapsed.contains('branch'),
         onToggle: () => setState(() => _collapsed.contains('branch') ? _collapsed.remove('branch') : _collapsed.add('branch')),
-        empty: q.isNotEmpty && onBranch.isNotEmpty ? 'No files match “$q”.' : 'No commits ahead of origin/main.',
+        empty: q.isNotEmpty && onBranch.isNotEmpty ? 'No files match “$q”.' : 'No commits ahead of $base.',
         onViewAll: onBranch.isEmpty ? null : () => s.openAllFiles(onBranch.map((f) => f.path)),
       ),
     ]);
   }
 }
 
-/// Commit button with a ⌄ menu: Commit & Push, Commit & Create PR, Amend.
+/// Commit button with a ⌄ menu: Commit & Push, Amend. With nothing to
+/// commit and commits to push, it pushes ([push] is its label).
 class _CommitButton extends StatelessWidget {
-  const _CommitButton({required this.enabled, required this.onCommit});
+  const _CommitButton({required this.enabled, required this.onCommit, this.push, required this.onPush});
   final bool enabled;
   final void Function(String how) onCommit;
+  final String? push;
+  final VoidCallback onPush;
 
   @override
   Widget build(BuildContext context) {
@@ -310,27 +332,30 @@ class _CommitButton extends StatelessWidget {
       child: Row(children: [
         Expanded(
           child: KPressable(
-            onTap: enabled ? () => onCommit('commit') : null,
-            semanticLabel: enabled ? 'Commit' : 'Nothing to commit',
-            builder: (context, hover, focus) => Container(
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: enabled && hover ? c.tile : null,
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(KIcons.check, size: 15, color: enabled ? c.text : c.text3),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    enabled ? 'Commit' : 'Nothing to commit',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(12.5, weight: FontWeight.w600, color: enabled ? c.text : c.text3),
-                  ),
+            onTap: enabled ? () => onCommit('commit') : (push != null ? onPush : null),
+            semanticLabel: enabled ? 'Commit' : (push ?? 'Nothing to commit'),
+            builder: (context, hover, focus) {
+              final on = enabled || push != null;
+              return Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: on && hover ? c.tile : null,
+                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
                 ),
-              ]),
-            ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(enabled || push == null ? KIcons.check : KIcons.upload, size: 15, color: on ? c.text : c.text3),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      enabled ? 'Commit' : (push ?? 'Nothing to commit'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(12.5, weight: FontWeight.w600, color: on ? c.text : c.text3),
+                    ),
+                  ),
+                ]),
+              );
+            },
           ),
         ),
         Container(width: 1, color: c.chipBorder),
@@ -341,9 +366,9 @@ class _CommitButton extends StatelessWidget {
               position: belowOf(btn),
               alignRight: true,
               builder: (context, close) => KMenuPanel(width: 220, children: [
-                for (final (label, key, how) in const [('Commit & Push', '⇧⌘↩', 'push'), ('Commit & Create PR', null, 'pr'), ('Amend last commit', null, 'amend')])
+                for (final (label, key, how) in const [('Commit & Push', '⇧⌘↩', 'push'), ('Amend last commit', null, 'amend')])
                   KMenuItem(
-                    icon: how == 'amend' ? KIcons.rename : (how == 'pr' ? KIcons.pullRequest : KIcons.upload),
+                    icon: how == 'amend' ? KIcons.rename : KIcons.upload,
                     label: label,
                     shortcut: key,
                     onTap: () {

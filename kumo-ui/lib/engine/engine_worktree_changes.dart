@@ -231,21 +231,21 @@ class EngineWorktreeChanges extends ui.WorktreeChanges {
 
   // ---- Actions ----
 
-  PathsRequest _paths(String path) => PathsRequest(worktreePath: worktree, paths: [path]);
+  PathsRequest _paths(List<String> paths) => PathsRequest(worktreePath: worktree, paths: paths);
 
   @override
-  void stage(String path) => _act((git) => git.stage(_paths(path))).ignore();
+  void stage(List<String> paths) => _act((git) => git.stage(_paths(paths))).ignore();
 
   @override
-  void unstage(String path) => _act((git) => git.unstage(_paths(path))).ignore();
+  void unstage(List<String> paths) => _act((git) => git.unstage(_paths(paths))).ignore();
 
   @override
-  Future<void> restore(String path) => _act((git) => git.restore(_paths(path)));
+  Future<void> restore(String path) => _act((git) => git.restore(_paths([path])));
 
   @override
   Future<void> resolveConflict(String path, String keep, String text) async {
     await write(path, text);
-    if (_error == null) await _act((git) => git.stage(_paths(path)));
+    if (_error == null) await _act((git) => git.stage(_paths([path])));
   }
 
   @override
@@ -260,6 +260,12 @@ class EngineWorktreeChanges extends ui.WorktreeChanges {
 
   @override
   Future<void> push() => _act((git) => git.push(WorktreeRequest(worktreePath: worktree)));
+
+  @override
+  Future<void> fetch() => _act((git) => git.fetch(WorktreeRequest(worktreePath: worktree)));
+
+  @override
+  Future<void> pull() => _act((git) => git.pull(WorktreeRequest(worktreePath: worktree)));
 
   @override
   Future<void> undoLastCommit() => _act((git) => git.undoLastCommit(WorktreeRequest(worktreePath: worktree)));

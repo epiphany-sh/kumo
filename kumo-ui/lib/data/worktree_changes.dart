@@ -82,8 +82,9 @@ abstract class WorktreeChanges extends ChangeNotifier {
 
   // ---- Actions ----
 
-  void stage(String path);
-  void unstage(String path);
+  /// Stages / unstages [paths] in one go.
+  void stage(List<String> paths);
+  void unstage(List<String> paths);
 
   /// Back to HEAD (restores a deleted file).
   Future<void> restore(String path);
@@ -96,6 +97,12 @@ abstract class WorktreeChanges extends ChangeNotifier {
   Future<String?> commit(String message, {bool all = false, bool amend = false, bool push = false});
 
   Future<void> push();
+
+  /// Updates the remote branches ([behind] then counts what's new).
+  Future<void> fetch();
+
+  /// Brings in the upstream's commits, fast-forward only.
+  Future<void> pull();
   Future<void> undoLastCommit();
 
   /// Latest commits; null when the source has no history (mocks).
@@ -175,9 +182,9 @@ class MockWorktreeChanges extends WorktreeChanges {
       };
 
   @override
-  void stage(String path) => _wc.stage(path);
+  void stage(List<String> paths) => paths.forEach(_wc.stage);
   @override
-  void unstage(String path) => _wc.unstage(path);
+  void unstage(List<String> paths) => paths.forEach(_wc.unstage);
 
   @override
   Future<void> restore(String path) async => _wc.restore();
@@ -205,6 +212,12 @@ class MockWorktreeChanges extends WorktreeChanges {
     _pushed = true;
     notifyListeners();
   }
+
+  @override
+  Future<void> fetch() async {}
+
+  @override
+  Future<void> pull() async {}
 
   @override
   Future<void> undoLastCommit() async {
@@ -293,9 +306,9 @@ class NoWorktreeChanges extends WorktreeChanges {
   @override
   Future<Map<int, bool>> marks(String path) async => const {};
   @override
-  void stage(String path) {}
+  void stage(List<String> paths) {}
   @override
-  void unstage(String path) {}
+  void unstage(List<String> paths) {}
   @override
   Future<void> restore(String path) async {}
   @override
@@ -304,6 +317,10 @@ class NoWorktreeChanges extends WorktreeChanges {
   Future<String?> commit(String message, {bool all = false, bool amend = false, bool push = false}) async => null;
   @override
   Future<void> push() async {}
+  @override
+  Future<void> fetch() async {}
+  @override
+  Future<void> pull() async {}
   @override
   Future<void> undoLastCommit() async {}
   @override

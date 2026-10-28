@@ -35,7 +35,7 @@ Qué es real hoy y qué sigue siendo mock:
 |---|---|
 | Terminales (shells) | Real: PTYs en `kumod`, render en grilla de celdas. Un espacio de terminales por worktree: al elegir o crear uno se ve el suyo, con una shell parada en su carpeta; los demás siguen corriendo |
 | Namespaces, repos y worktrees | Real: `Workspace` en `kumod`, persistido en `kumo.db` (SQLite) |
-| Files, cambios de git, diffs, commit, push, historial | Real: `Git` en `kumod`; el estado se actualiza solo (file watcher) |
+| Files, cambios de git, diffs, stage, commit, push, pull, fetch, historial | Real: `Git` en `kumod`; el estado se actualiza solo (file watcher). Pull solo por fast-forward |
 | Gráfico de ramas del historial, panel Diff de la vista Git | Mock |
 | Agentes | Real: `Agents` en `kumod` con tus propios CLIs (Claude Code, Codex, Gemini, Copilot, Grok, OpenCode, Cursor, Aider, Qwen, Amp o cualquier comando). Opcional: se conectan en Settings › AI agents |
 | Tareas | Real: `Tasks` en `kumod` con Obsidian, Bear (solo lectura), GitHub Issues (vía `gh`), Jira y Todoist. Caché local en `kumo.db`, tokens en el llavero del sistema. Se conectan en Settings › Tasks; desde una tarea se crea un worktree con un agente |

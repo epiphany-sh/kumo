@@ -53,9 +53,8 @@ class _FilesScreenState extends State<FilesScreen> {
   Object? _marksKey;
   List<TreeNode> _tree = const [];
   List<String>? _treeOf;
-  String? _lastCommit;
   final _caret = ValueNotifier<(int, int)>((1, 1));
-  final _commitMsg = TextEditingController(text: 'feat(discount): bulk discounts by category (PRC-412)');
+  final _commitMsg = TextEditingController();
   List<String> _tabs = const [];
   String? _active;
   bool _changedOnly = false;
@@ -83,7 +82,6 @@ class _FilesScreenState extends State<FilesScreen> {
     _resolved.clear();
     _marks.clear();
     _treeOf = null;
-    _lastCommit = null;
     _tabs = [for (final p in _initialTabs) if (git.files.contains(p)) p];
     _active = _tabs.firstOrNull;
   }
@@ -190,13 +188,9 @@ class _FilesScreenState extends State<FilesScreen> {
     });
   }
 
-  Future<void> _commit() async {
-    final n = _git.stagedList.length;
-    final sha = await _git.commit(_commitMsg.text);
-    if (!mounted) return;
-    setState(() => _lastCommit = sha == null
-        ? 'Commit failed: ${_git.error ?? 'nothing to commit'}'
-        : 'Committed $n ${n == 1 ? 'file' : 'files'} as $sha · not pushed yet');
+  /// Commits the staged files (the side panel commits every change).
+  void _commit() {
+    if (AppScope.read(context).commit(_commitMsg.text, all: false)) _commitMsg.clear();
   }
 
   @override
@@ -504,10 +498,12 @@ class _FilesScreenState extends State<FilesScreen> {
       ('Changes', _git.unstagedChanges, 'changes', c.text),
       ('Untracked', _git.untracked, 'untracked', c.text),
     ].where((s) => s.$2.isNotEmpty).toList();
-    final canCommit = _git.canCommit;
+    final s = AppScope.of(context);
+    final unstaged = [..._git.unstagedChanges, ..._git.untracked];
+    final canCommit = _git.canCommit && _commitMsg.text.trim().isNotEmpty;
     final hint = _git.conflicts.isNotEmpty
         ? 'Resolve the merge conflict before committing'
-        : (_git.stagedList.isNotEmpty ? 'Commits to ${_git.branch}' : (_lastCommit ?? 'Stage files to commit'));
+        : (s.commitNotice ?? (_git.stagedList.isEmpty ? 'Stage files to commit' : (canCommit ? 'Commits to ${_git.branch}' : 'Write a commit message')));
     return GlassPanel(
       padding: const EdgeInsets.fromLTRB(10, 14, 10, 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -515,7 +511,12 @@ class _FilesScreenState extends State<FilesScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Row(children: [
             Expanded(child: Text('SOURCE CONTROL', style: microLabel(c))),
-            Text('↑${_git.ahead} ↓${_git.behind}', style: mono(11, color: c.text2)),
+            Tooltip(
+              message: '${_git.ahead} to push · ${_git.behind} to pull',
+              child: Text('↑${_git.ahead} ↓${_git.behind}', style: mono(11, color: c.text2)),
+            ),
+            const SizedBox(width: 2),
+            KIconButton(icon: Icons.refresh_rounded, label: 'Fetch', size: 24, iconSize: 14, onTap: s.fetch),
           ]),
         ),
         const SizedBox(height: 10),
@@ -529,6 +530,7 @@ class _FilesScreenState extends State<FilesScreen> {
               decoration: BoxDecoration(color: c.chip, borderRadius: BorderRadius.circular(11), border: Border.all(color: c.chipBorder)),
               child: TextField(
                 controller: _commitMsg,
+                onChanged: (_) => setState(() {}),
                 minLines: 2,
                 maxLines: 4,
                 style: sans(12.5, color: c.text, height: 1.4),
@@ -544,7 +546,35 @@ class _FilesScreenState extends State<FilesScreen> {
               onTap: canCommit ? _commit : null,
             ),
             const SizedBox(height: 6),
-            Text(hint, style: sans(11.5, color: _git.conflicts.isNotEmpty ? c.err : c.text3)),
+            Row(children: [
+              Expanded(
+                child: KButton(
+                  label: _git.behind > 0 ? 'Pull ↓${_git.behind}' : 'Pull',
+                  icon: KIcons.download,
+                  expand: true,
+                  height: 30,
+                  fontSize: 12,
+                  onTap: _git.behind > 0 ? s.pull : null,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: KButton(
+                  label: !_git.pushed ? 'Publish branch' : (_git.ahead > 0 ? 'Push ↑${_git.ahead}' : 'Push'),
+                  icon: KIcons.upload,
+                  expand: true,
+                  height: 30,
+                  fontSize: 12,
+                  onTap: s.canPush ? s.push : null,
+                ),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            Row(children: [
+              Expanded(child: Text(hint, style: sans(11.5, color: _git.conflicts.isNotEmpty ? c.err : c.text3))),
+              if (unstaged.isNotEmpty)
+                KButton(label: 'Stage all', icon: KIcons.add, kind: KButtonKind.ghost, height: 26, fontSize: 12, onTap: () => _git.stage(unstaged)),
+            ]),
           ]),
         ),
         const SizedBox(height: 12),
@@ -555,6 +585,14 @@ class _FilesScreenState extends State<FilesScreen> {
                 padding: const EdgeInsets.fromLTRB(6, 0, 6, 4),
                 child: Row(children: [
                   Expanded(child: Text(title, style: sans(11.5, weight: FontWeight.w600, color: color))),
+                  if (mode != 'conflict')
+                    KIconButton(
+                      icon: mode == 'staged' ? KIcons.remove : KIcons.add,
+                      label: mode == 'staged' ? 'Unstage all' : (mode == 'untracked' ? 'Stage all untracked' : 'Stage all changes'),
+                      size: 22,
+                      iconSize: 14,
+                      onTap: () => mode == 'staged' ? _git.unstage(List.of(items)) : _git.stage(List.of(items)),
+                    ),
                   Text('${items.length}', style: sans(11.5, color: c.text3)),
                 ]),
               ),
@@ -588,7 +626,10 @@ class _FilesScreenState extends State<FilesScreen> {
               child: Row(children: [
                 SizedBox(width: 22, child: Text(li.badge, textAlign: TextAlign.center, style: mono(8.5, weight: FontWeight.w700, color: langColor(c, li.lang, li.badge)))),
                 const SizedBox(width: 6),
-                Text(name, style: sans(12.5, color: col).copyWith(decoration: s == GitStatus.deleted ? TextDecoration.lineThrough : null)),
+                Flexible(
+                  flex: 2,
+                  child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: col).copyWith(decoration: s == GitStatus.deleted ? TextDecoration.lineThrough : null)),
+                ),
                 const SizedBox(width: 6),
                 Expanded(child: Text(parts.join('/'), maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11, color: c.text3))),
                 Text(s?.letter ?? '', style: mono(10.5, weight: FontWeight.w700, color: col)),
@@ -602,7 +643,7 @@ class _FilesScreenState extends State<FilesScreen> {
             label: '${mode == 'staged' ? 'Unstage' : 'Stage'} $name',
             size: 24,
             iconSize: 14,
-            onTap: () => mode == 'staged' ? _git.unstage(path) : _git.stage(path),
+            onTap: () => mode == 'staged' ? _git.unstage([path]) : _git.stage([path]),
           ),
       ]),
     );

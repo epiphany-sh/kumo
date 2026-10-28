@@ -396,3 +396,53 @@ async fn push_sets_the_upstream_and_restore_discards_changes() {
         "hello\nworld\n"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_sees_new_commits_and_pull_fast_forwards() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let remote = daemon.home().join("remote.git");
+    std::process::Command::new("git")
+        .args(["init", "-q", "--bare"])
+        .arg(&remote)
+        .output()
+        .unwrap();
+    let wt = feature_worktree(&daemon, &mut client).await;
+    git(
+        &wt,
+        &["remote", "add", "origin", &remote.display().to_string()],
+    );
+    let push = pb::WorktreeRequest {
+        worktree_path: request(&wt),
+    };
+    client.git.push(push.clone()).await.unwrap();
+
+    // Someone else pushes to the branch.
+    let other = daemon.home().join("other");
+    git(
+        &daemon.home(),
+        &[
+            "clone",
+            "-q",
+            "-b",
+            "feat/x",
+            &remote.display().to_string(),
+            &other.display().to_string(),
+        ],
+    );
+    git(&other, &["config", "user.email", "other@kumo.dev"]);
+    git(&other, &["config", "user.name", "Other"]);
+    std::fs::write(other.join("theirs.txt"), "hi\n").unwrap();
+    git(&other, &["add", "."]);
+    git(&other, &["commit", "-q", "-m", "theirs"]);
+    git(&other, &["push", "-q"]);
+
+    client.git.fetch(push.clone()).await.unwrap();
+    let s = status(&mut client, &wt).await;
+    assert_eq!((s.ahead, s.behind), (0, 1));
+
+    client.git.pull(push).await.unwrap();
+    let s = status(&mut client, &wt).await;
+    assert_eq!((s.ahead, s.behind), (0, 0));
+    assert!(wt.join("theirs.txt").exists());
+}

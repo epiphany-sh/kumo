@@ -188,6 +188,28 @@ impl pb::git_server::Git for GitGrpc {
         )
     }
 
+    async fn fetch(
+        &self,
+        request: Request<pb::WorktreeRequest>,
+    ) -> Result<Response<pb::GitActionResponse>, Status> {
+        done(
+            self.service
+                .fetch(&path(request.into_inner().worktree_path))
+                .await,
+        )
+    }
+
+    async fn pull(
+        &self,
+        request: Request<pb::WorktreeRequest>,
+    ) -> Result<Response<pb::GitActionResponse>, Status> {
+        done(
+            self.service
+                .pull(&path(request.into_inner().worktree_path))
+                .await,
+        )
+    }
+
     async fn undo_last_commit(
         &self,
         request: Request<pb::WorktreeRequest>,

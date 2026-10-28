@@ -169,6 +169,14 @@ impl ChangesService {
         self.on_worktree(worktree, |git, wt| git.push(wt)).await
     }
 
+    pub async fn fetch(&self, worktree: &Path) -> Result<(), ChangesError> {
+        self.on_worktree(worktree, |git, wt| git.fetch(wt)).await
+    }
+
+    pub async fn pull(&self, worktree: &Path) -> Result<(), ChangesError> {
+        self.on_worktree(worktree, |git, wt| git.pull(wt)).await
+    }
+
     pub async fn undo_last_commit(&self, worktree: &Path) -> Result<(), ChangesError> {
         self.on_worktree(worktree, |git, wt| git.undo_last_commit(wt))
             .await

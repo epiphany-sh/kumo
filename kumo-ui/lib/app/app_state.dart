@@ -464,10 +464,17 @@ class AppState extends ChangeNotifier {
     _changes = path == null ? NoWorktreeChanges() : factory(path);
     _changes.addListener(notifyListeners);
     _commitNotice = null;
+    _canUndoCommit = false;
   }
 
+  /// What the last commit, push, pull or fetch did (or is doing).
   String? _commitNotice;
   String? get commitNotice => _commitNotice;
+
+  /// Whether [commitNotice] is about a commit that can still be undone
+  /// (not once it was pushed).
+  bool _canUndoCommit = false;
+  bool get canUndoCommit => _canUndoCommit;
 
   /// Git answers asynchronously; ignore answers that arrive after disposal.
   bool _disposed = false;
@@ -483,46 +490,66 @@ class AppState extends ChangeNotifier {
   /// A changed file of this worktree, uncommitted or on the branch.
   ChangedFile? changedFile(String path) => [...pendingChanges, ...branchChanges].where((f) => f.path == path).firstOrNull;
 
-  /// Commits every change; [how] is commit / push / pr / amend. Returns false
-  /// when there is nothing to commit or no message. Optimistic: the notice
-  /// shows at once and gets the sha (or the error) when git answers.
-  bool commit(String message, {String how = 'commit'}) {
-    final pending = pendingChanges;
-    if (pending.isEmpty || message.trim().isEmpty) return false;
-    final n = '${pending.length} ${pending.length == 1 ? 'file' : 'files'}';
-    final push = how == 'push' || how == 'pr';
+  /// Commits every change ([all]) or the staged ones; [how] is commit /
+  /// push / amend. Returns false when there is nothing to commit or no
+  /// message. Optimistic: the notice shows at once and gets the sha (or the
+  /// error) when git answers.
+  bool commit(String message, {String how = 'commit', bool all = true}) {
+    final count = all ? pendingChanges.length : _changes.stagedList.length;
+    if (count == 0 || message.trim().isEmpty) return false;
+    final n = '$count ${count == 1 ? 'file' : 'files'}';
+    final push = how == 'push';
     _commitNotice = how == 'amend' ? 'Amending with $n…' : 'Committed $n${push ? ', pushing…' : ''}';
-    final committing = _changes.commit(message, all: true, amend: how == 'amend', push: push);
+    _canUndoCommit = false;
+    final changes = _changes;
+    final committing = changes.commit(message, all: all, amend: how == 'amend', push: push);
     notifyListeners();
     committing.then((sha) {
-      if (_disposed) return;
+      if (_disposed || !identical(changes, _changes)) return;
+      _canUndoCommit = sha != null && !push;
       _commitNotice = sha == null
-          ? 'Commit failed: ${_changes.error ?? 'unknown error'}'
+          ? 'Commit failed: ${changes.error ?? 'unknown error'}'
           : switch (how) {
               'push' => 'Committed $n as $sha and pushed',
-              'pr' => 'Committed $n as $sha and pushed. Opening the PR comes with the GitHub integration.',
               'amend' => 'Amended $sha with $n',
-              _ => 'Committed $n as $sha',
+              _ => 'Committed $n as $sha · not pushed yet',
             };
       notifyListeners();
     });
     return true;
   }
 
+  /// Whether there is something to push: commits ahead, or a branch that
+  /// was never pushed.
+  bool get canPush => _changes.branch.isNotEmpty && (_changes.ahead > 0 || !_changes.pushed);
+
   void push() {
-    if (_changes.ahead == 0 && _changes.pushed) return;
-    _commitNotice = 'Pushing…';
+    if (!canPush) return;
+    _sync('Pushing…', _changes.push, (c) => 'Pushed ${c.branch}', 'Push');
+  }
+
+  void pull() => _sync('Pulling…', _changes.pull, (c) => 'Pulled into ${c.branch}', 'Pull');
+
+  void fetch() => _sync('Fetching…', _changes.fetch, (_) => 'Fetched', 'Fetch');
+
+  /// Runs a remote git action with its notice: [doing] now, then [done] or
+  /// why [what] failed.
+  void _sync(String doing, Future<void> Function() run, String Function(WorktreeChanges changes) done, String what) {
+    final changes = _changes;
+    _commitNotice = doing;
+    _canUndoCommit = false;
     notifyListeners();
-    _changes.push().then((_) {
-      if (_disposed) return;
-      final error = _changes.error;
-      _commitNotice = error == null ? 'Pushed ${_changes.branch}' : 'Push failed: $error';
+    run().then((_) {
+      if (_disposed || !identical(changes, _changes)) return;
+      final error = changes.error;
+      _commitNotice = error == null ? done(changes) : '$what failed: $error';
       notifyListeners();
     });
   }
 
   void undoCommit() {
     _commitNotice = null;
+    _canUndoCommit = false;
     _changes.undoLastCommit();
     notifyListeners();
   }

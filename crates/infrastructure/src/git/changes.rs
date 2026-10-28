@@ -24,6 +24,21 @@ impl GitCli {
         self.exec(worktree, args).map_err(ChangesError::Git)
     }
 
+    /// The remote of the branch's upstream; `origin` without one.
+    fn remote_of(&self, worktree: &Path) -> String {
+        self.exec(
+            worktree,
+            ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+        )
+        .ok()
+        .and_then(|u| {
+            u.trim()
+                .split_once('/')
+                .map(|(remote, _)| remote.to_owned())
+        })
+        .unwrap_or_else(|| "origin".to_owned())
+    }
+
     /// `args -- paths`.
     fn git_paths(
         &self,
@@ -274,20 +289,19 @@ impl GitChanges for GitCli {
     }
 
     fn push(&self, worktree: &Path) -> Result<(), ChangesError> {
-        let remote = self
-            .exec(
-                worktree,
-                ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
-            )
-            .ok()
-            .and_then(|u| {
-                u.trim()
-                    .split_once('/')
-                    .map(|(remote, _)| remote.to_owned())
-            })
-            .unwrap_or_else(|| "origin".to_owned());
+        let remote = self.remote_of(worktree);
         self.git(worktree, ["push", "-q", "--set-upstream", &remote, "HEAD"])
             .map(drop)
+    }
+
+    fn fetch(&self, worktree: &Path) -> Result<(), ChangesError> {
+        let remote = self.remote_of(worktree);
+        self.git(worktree, ["fetch", "-q", "--prune", &remote])
+            .map(drop)
+    }
+
+    fn pull(&self, worktree: &Path) -> Result<(), ChangesError> {
+        self.git(worktree, ["pull", "-q", "--ff-only"]).map(drop)
     }
 
     fn undo_last_commit(&self, worktree: &Path) -> Result<(), ChangesError> {

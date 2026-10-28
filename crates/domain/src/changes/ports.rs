@@ -23,6 +23,12 @@ pub trait GitChanges: Send + Sync + 'static {
     fn restore(&self, worktree: &Path, paths: &[RelativePath]) -> Result<(), ChangesError>;
     fn commit(&self, worktree: &Path, options: &CommitOptions) -> Result<CommitInfo, ChangesError>;
     fn push(&self, worktree: &Path) -> Result<(), ChangesError>;
+    /// Updates the remote branches from the branch's remote (`origin` when
+    /// it has no upstream).
+    fn fetch(&self, worktree: &Path) -> Result<(), ChangesError>;
+    /// Brings in the upstream's commits, only by fast-forward: it never
+    /// creates a merge commit.
+    fn pull(&self, worktree: &Path) -> Result<(), ChangesError>;
     fn undo_last_commit(&self, worktree: &Path) -> Result<(), ChangesError>;
     fn log(&self, worktree: &Path, limit: usize) -> Result<Vec<CommitInfo>, ChangesError>;
     /// Folders whose changes affect the status: the worktree and its git dir.

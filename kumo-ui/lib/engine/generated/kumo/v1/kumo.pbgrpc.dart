@@ -559,6 +559,21 @@ class GitClient extends $grpc.Client {
     return $createUnaryCall(_$push, request, options: options);
   }
 
+  $grpc.ResponseFuture<$0.GitActionResponse> fetch(
+    $0.WorktreeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$fetch, request, options: options);
+  }
+
+  /// `git pull --ff-only`: fails instead of creating a merge commit.
+  $grpc.ResponseFuture<$0.GitActionResponse> pull(
+    $0.WorktreeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$pull, request, options: options);
+  }
+
   /// `git reset --soft HEAD~1`: the changes stay, staged.
   $grpc.ResponseFuture<$0.GitActionResponse> undoLastCommit(
     $0.WorktreeRequest request, {
@@ -623,6 +638,16 @@ class GitClient extends $grpc.Client {
   static final _$push =
       $grpc.ClientMethod<$0.WorktreeRequest, $0.GitActionResponse>(
           '/kumo.v1.Git/Push',
+          ($0.WorktreeRequest value) => value.writeToBuffer(),
+          $0.GitActionResponse.fromBuffer);
+  static final _$fetch =
+      $grpc.ClientMethod<$0.WorktreeRequest, $0.GitActionResponse>(
+          '/kumo.v1.Git/Fetch',
+          ($0.WorktreeRequest value) => value.writeToBuffer(),
+          $0.GitActionResponse.fromBuffer);
+  static final _$pull =
+      $grpc.ClientMethod<$0.WorktreeRequest, $0.GitActionResponse>(
+          '/kumo.v1.Git/Pull',
           ($0.WorktreeRequest value) => value.writeToBuffer(),
           $0.GitActionResponse.fromBuffer);
   static final _$undoLastCommit =
@@ -708,6 +733,20 @@ abstract class GitServiceBase extends $grpc.Service {
     $addMethod($grpc.ServiceMethod<$0.WorktreeRequest, $0.GitActionResponse>(
         'Push',
         push_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.WorktreeRequest.fromBuffer(value),
+        ($0.GitActionResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.WorktreeRequest, $0.GitActionResponse>(
+        'Fetch',
+        fetch_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.WorktreeRequest.fromBuffer(value),
+        ($0.GitActionResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.WorktreeRequest, $0.GitActionResponse>(
+        'Pull',
+        pull_Pre,
         false,
         false,
         ($core.List<$core.int> value) => $0.WorktreeRequest.fromBuffer(value),
@@ -806,6 +845,22 @@ abstract class GitServiceBase extends $grpc.Service {
   }
 
   $async.Future<$0.GitActionResponse> push(
+      $grpc.ServiceCall call, $0.WorktreeRequest request);
+
+  $async.Future<$0.GitActionResponse> fetch_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WorktreeRequest> $request) async {
+    return fetch($call, await $request);
+  }
+
+  $async.Future<$0.GitActionResponse> fetch(
+      $grpc.ServiceCall call, $0.WorktreeRequest request);
+
+  $async.Future<$0.GitActionResponse> pull_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WorktreeRequest> $request) async {
+    return pull($call, await $request);
+  }
+
+  $async.Future<$0.GitActionResponse> pull(
       $grpc.ServiceCall call, $0.WorktreeRequest request);
 
   $async.Future<$0.GitActionResponse> undoLastCommit_Pre(

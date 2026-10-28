@@ -306,6 +306,9 @@ service Git {
   rpc Restore(PathsRequest) returns (GitActionResponse);
   rpc Commit(CommitRequest) returns (CommitResponse);
   rpc Push(WorktreeRequest) returns (GitActionResponse);
+  rpc Fetch(WorktreeRequest) returns (GitActionResponse);
+  // `git pull --ff-only`: fails instead of creating a merge commit.
+  rpc Pull(WorktreeRequest) returns (GitActionResponse);
   // `git reset --soft HEAD~1`: the changes stay, staged.
   rpc UndoLastCommit(WorktreeRequest) returns (GitActionResponse);
   rpc Log(LogRequest) returns (LogResponse);
