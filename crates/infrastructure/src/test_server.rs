@@ -1,12 +1,13 @@
 //! A tiny HTTP server for connector tests: answers each request with what
-//! the route function returns and records the requests.
+//! the route function returns (status, headers, body) and records the
+//! requests.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
-pub(super) struct Request {
+pub(crate) struct Request {
     pub method: String,
     pub path: String,
     pub headers: Vec<(String, String)>,
@@ -34,13 +35,22 @@ impl Request {
     }
 }
 
-pub(super) struct TestServer {
+pub(crate) struct TestServer {
     pub url: String,
     requests: Arc<Mutex<Vec<Request>>>,
 }
 
 impl TestServer {
     pub fn start(route: impl Fn(&Request) -> (u16, String) + Send + Sync + 'static) -> Self {
+        Self::with_headers(move |request| {
+            let (status, body) = route(request);
+            (status, Vec::new(), body)
+        })
+    }
+
+    pub fn with_headers(
+        route: impl Fn(&Request) -> (u16, Vec<(String, String)>, String) + Send + Sync + 'static,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
         let requests = Arc::new(Mutex::new(Vec::new()));
@@ -51,10 +61,14 @@ impl TestServer {
                 let Some(request) = read_request(&mut stream) else {
                     continue;
                 };
-                let (status, body) = route(&request);
+                let (status, headers, body) = route(&request);
                 seen.lock().unwrap().push(request);
+                let extra: String = headers
+                    .iter()
+                    .map(|(name, value)| format!("{name}: {value}\r\n"))
+                    .collect();
                 let response = format!(
-                    "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\n{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
                     body.len()
                 );
                 let _ = stream.write_all(response.as_bytes());

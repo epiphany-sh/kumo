@@ -39,7 +39,8 @@ Qué es real hoy y qué sigue siendo mock:
 | Gráfico de ramas del historial, panel Diff de la vista Git | Mock |
 | Agentes | Real: `Agents` en `kumod` con tus propios CLIs (Claude Code, Codex, Gemini, Copilot, Grok, OpenCode, Cursor, Aider, Qwen, Amp o cualquier comando). Opcional: se conectan en Settings › AI agents |
 | Tareas | Real: `Tasks` en `kumod` con Obsidian, Bear (solo lectura), GitHub Issues (vía `gh`), Jira y Todoist. Caché local en `kumo.db`, tokens en el llavero del sistema. Se conectan en Settings › Tasks; desde una tarea se crea un worktree con un agente |
-| PRs, pipelines, docs, resto de integraciones | Mock |
+| Pipelines | Real: `Pipelines` en `kumod` lee GitHub Actions, GitLab CI y Bitbucket Pipelines de la rama del worktree (cada 10 s con un run en curso, cada 60 s si no; ETag para no gastar rate limit). Se conecta en Settings › Repositories: un token por host en el llavero o, en GitHub, iniciando sesión con `gh` (abre `gh auth login` en una terminal) |
+| PRs, docs, resto de integraciones | Mock |
 
 El daemon vive más que la UI: si cerrás la app, las terminales siguen corriendo
 y al reabrirla la UI se vuelve a enganchar a ellas con replay.
@@ -99,16 +100,20 @@ kumo/
 │   │       │                   DaemonEndpoint, puerto DiscoveryStore
 │   │       ├── tasks/          Task, TaskSource, SourceOptions, TaskFilter, checkboxes de Markdown,
 │   │       │                   puertos TaskConnector/TaskStore/SecretStore
+│   │       ├── pipelines/      CiRun, CiJob, CiProblem (qué puede hacer el usuario), CiHost, puertos
+│   │       │                   CiClient/HostTokens/TokenFallback/BranchReader
 │   │       └── time.rs         Timestamp
 │   ├── application/            kumo-application: casos de uso
 │   │   └── src/
 │   │       ├── terminal/       TerminalService (open/attach/close/list), registry,
 │   │       │   └── session/    TerminalSession: hilos de I/O, pump (coalescing), hub (replay + suscriptores)
 │   │       ├── tasks/          TaskService: tablero desde la caché, sync en segundo plano, estados, vínculos
+│   │       ├── pipelines/      PipelinesService: un poller por worktree observado, backoff, re-run, tokens
 │   │       └── daemon/         HelloService (handshake de versión)
 │   ├── infrastructure/         kumo-infrastructure: adaptadores del SO
 │   │   └── src/{pty, discovery, security}/   portable-pty, daemon.json (0600, atómico), token aleatorio
 │   │       src/tasks/          conectores: Obsidian, Bear, GitHub (gh), Jira, Todoist
+│   │       src/ci/             GitHub Actions, GitLab CI, Bitbucket Pipelines; errores HTTP → CiProblem
 │   │       src/secrets/        tokens en Keychain / Credential Manager
 │   ├── proto/                  kumo-proto: código generado (tonic/prost), nada más
 │   ├── grpc/                   kumo-grpc: servicios tonic, auth Bearer, mapeo proto↔dominio, server y client

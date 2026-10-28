@@ -3,7 +3,7 @@
 use kumo_domain::time::Timestamp;
 
 /// `2026-10-28T14:03:11.123Z`, `…+02:00` or `…+0200`.
-pub(super) fn parse_timestamp(raw: &str) -> Option<Timestamp> {
+pub(crate) fn parse_timestamp(raw: &str) -> Option<Timestamp> {
     let b = raw.trim().as_bytes();
     if b.len() < 19 || b[4] != b'-' || b[7] != b'-' || !matches!(b[10], b'T' | b' ') {
         return None;

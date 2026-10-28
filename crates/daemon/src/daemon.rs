@@ -5,15 +5,18 @@ use anyhow::Context;
 use kumo_application::agents::{AgentPorts, AgentService};
 use kumo_application::changes::{ChangesPorts, ChangesService};
 use kumo_application::daemon::HelloService;
+use kumo_application::pipelines::{PipelinesPorts, PipelinesService, PipelinesTiming};
 use kumo_application::tasks::{TaskPorts, TaskService, TaskTiming};
 use kumo_application::terminal::TerminalService;
 use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
 use kumo_domain::agents::ProgramLocator;
 use kumo_domain::daemon::{ApiVersion, DaemonEndpoint, DiscoveryStore};
+use kumo_domain::pipelines::HostTokens;
 use kumo_domain::tasks::{SecretStore, TaskConnector};
 use kumo_domain::workspace::WorktreeLocation;
 use kumo_grpc::server::{GrpcServer, Services};
 use kumo_infrastructure::agents::ShellPathLocator;
+use kumo_infrastructure::ci::{BitbucketPipelines, GhTokenFallback, GitHubActions, GitLabCi};
 use kumo_infrastructure::discovery::FileDiscoveryStore;
 use kumo_infrastructure::fs::LocalFileStore;
 use kumo_infrastructure::git::{FsRepoFinder, GitCli};
@@ -77,10 +80,18 @@ impl Daemon {
             Some(path) => ShellPathLocator::with_path(&home, path),
             None => ShellPathLocator::new(&home),
         });
-        let secrets: Arc<dyn SecretStore> = match config.secrets {
-            SecretsBackend::Keychain => Arc::new(KeychainSecretStore::new()),
-            SecretsBackend::Memory => Arc::new(MemorySecretStore::default()),
-        };
+        // One keychain for task sources and repository hosts.
+        let (secrets, host_tokens): (Arc<dyn SecretStore>, Arc<dyn HostTokens>) =
+            match config.secrets {
+                SecretsBackend::Keychain => {
+                    let keychain = Arc::new(KeychainSecretStore::new());
+                    (keychain.clone(), keychain)
+                }
+                SecretsBackend::Memory => {
+                    let memory = Arc::new(MemorySecretStore::default());
+                    (memory.clone(), memory)
+                }
+            };
         let connectors: Vec<Arc<dyn TaskConnector>> = vec![
             Arc::new(ObsidianConnector::new(&home)),
             Arc::new(BearConnector::new(&home)),
@@ -98,6 +109,22 @@ impl Daemon {
             TaskTiming::default(),
         )
         .await?;
+
+        let pipelines = Arc::new(PipelinesService::new(
+            PipelinesPorts {
+                clients: vec![
+                    Arc::new(GitHubActions::default()),
+                    Arc::new(GitLabCi::default()),
+                    Arc::new(BitbucketPipelines::default()),
+                ],
+                tokens: host_tokens,
+                fallback: Arc::new(GhTokenFallback::new(Arc::clone(&locator))),
+                branches: Arc::new(GitCli::default()),
+                terminals: Arc::clone(&terminals) as _,
+            },
+            PipelinesTiming::default(),
+            workspace.watch(),
+        ));
 
         let services = Services {
             hello: HelloService::new(env!("CARGO_PKG_VERSION")),
@@ -120,6 +147,7 @@ impl Daemon {
                 workspace,
             )),
             tasks,
+            pipelines,
         };
         let server = GrpcServer::bind(config.listen, token.clone(), services).await?;
 

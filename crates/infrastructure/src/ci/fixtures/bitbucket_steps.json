@@ -1,0 +1,27 @@
+{
+  "page": 1,
+  "pagelen": 100,
+  "values": [
+    {
+      "type": "pipeline_step",
+      "uuid": "{0a1b2c3d-0000-4000-8000-000000000001}",
+      "name": "Build and test",
+      "started_on": "2026-10-28T13:40:10.000000+00:00",
+      "completed_on": "2026-10-28T13:45:10.000000+00:00",
+      "duration_in_seconds": 300,
+      "state": {
+        "name": "COMPLETED",
+        "result": { "name": "FAILED" }
+      }
+    },
+    {
+      "type": "pipeline_step",
+      "uuid": "{0a1b2c3d-0000-4000-8000-000000000002}",
+      "name": "Deploy to staging",
+      "state": {
+        "name": "COMPLETED",
+        "result": { "name": "NOT_RUN" }
+      }
+    }
+  ]
+}

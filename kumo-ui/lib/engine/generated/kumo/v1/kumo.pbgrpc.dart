@@ -1461,3 +1461,239 @@ abstract class TasksServiceBase extends $grpc.Service {
   $async.Future<$0.UnlinkTaskResponse> unlink(
       $grpc.ServiceCall call, $0.UnlinkTaskRequest request);
 }
+
+@$pb.GrpcServiceName('kumo.v1.Pipelines')
+class PipelinesClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  PipelinesClient(super.channel, {super.options, super.interceptors});
+
+  /// The latest run of the worktree's branch, pushed whenever it changes.
+  /// The first message is the first answer (or problem).
+  $grpc.ResponseStream<$0.PipelinesSnapshot> watch(
+    $0.WatchPipelinesRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createStreamingCall(_$watch, $async.Stream.fromIterable([request]),
+        options: options);
+  }
+
+  /// Asks the provider now; returns once the new snapshot was pushed.
+  $grpc.ResponseFuture<$0.PipelinesActionResponse> refresh(
+    $0.WorktreeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$refresh, request, options: options);
+  }
+
+  /// Re-runs the failed jobs of a run (Bitbucket: a new pipeline for the
+  /// same commit).
+  $grpc.ResponseFuture<$0.PipelinesActionResponse> rerunFailed(
+    $0.RerunFailedRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$rerunFailed, request, options: options);
+  }
+
+  /// Hosts of the workspace's repositories, and whether each has a token.
+  $grpc.ResponseFuture<$0.ListHostsResponse> listHosts(
+    $0.ListHostsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$listHosts, request, options: options);
+  }
+
+  /// Saves the host's token in the keychain; an empty token removes it.
+  $grpc.ResponseFuture<$0.CiHostInfo> saveHostToken(
+    $0.SaveHostTokenRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$saveHostToken, request, options: options);
+  }
+
+  /// Checks a token (the given one, or the saved one when empty).
+  $grpc.ResponseFuture<$0.TestHostResponse> testHost(
+    $0.TestHostRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$testHost, request, options: options);
+  }
+
+  /// Opens a terminal running `gh auth login` for a GitHub host; once it's
+  /// signed in, the host's pipelines are asked again on their own. Kumo
+  /// never sees what's typed there.
+  $grpc.ResponseFuture<$0.SignInWithGhResponse> signInWithGh(
+    $0.SignInWithGhRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$signInWithGh, request, options: options);
+  }
+
+  // method descriptors
+
+  static final _$watch =
+      $grpc.ClientMethod<$0.WatchPipelinesRequest, $0.PipelinesSnapshot>(
+          '/kumo.v1.Pipelines/Watch',
+          ($0.WatchPipelinesRequest value) => value.writeToBuffer(),
+          $0.PipelinesSnapshot.fromBuffer);
+  static final _$refresh =
+      $grpc.ClientMethod<$0.WorktreeRequest, $0.PipelinesActionResponse>(
+          '/kumo.v1.Pipelines/Refresh',
+          ($0.WorktreeRequest value) => value.writeToBuffer(),
+          $0.PipelinesActionResponse.fromBuffer);
+  static final _$rerunFailed =
+      $grpc.ClientMethod<$0.RerunFailedRequest, $0.PipelinesActionResponse>(
+          '/kumo.v1.Pipelines/RerunFailed',
+          ($0.RerunFailedRequest value) => value.writeToBuffer(),
+          $0.PipelinesActionResponse.fromBuffer);
+  static final _$listHosts =
+      $grpc.ClientMethod<$0.ListHostsRequest, $0.ListHostsResponse>(
+          '/kumo.v1.Pipelines/ListHosts',
+          ($0.ListHostsRequest value) => value.writeToBuffer(),
+          $0.ListHostsResponse.fromBuffer);
+  static final _$saveHostToken =
+      $grpc.ClientMethod<$0.SaveHostTokenRequest, $0.CiHostInfo>(
+          '/kumo.v1.Pipelines/SaveHostToken',
+          ($0.SaveHostTokenRequest value) => value.writeToBuffer(),
+          $0.CiHostInfo.fromBuffer);
+  static final _$testHost =
+      $grpc.ClientMethod<$0.TestHostRequest, $0.TestHostResponse>(
+          '/kumo.v1.Pipelines/TestHost',
+          ($0.TestHostRequest value) => value.writeToBuffer(),
+          $0.TestHostResponse.fromBuffer);
+  static final _$signInWithGh =
+      $grpc.ClientMethod<$0.SignInWithGhRequest, $0.SignInWithGhResponse>(
+          '/kumo.v1.Pipelines/SignInWithGh',
+          ($0.SignInWithGhRequest value) => value.writeToBuffer(),
+          $0.SignInWithGhResponse.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Pipelines')
+abstract class PipelinesServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.Pipelines';
+
+  PipelinesServiceBase() {
+    $addMethod(
+        $grpc.ServiceMethod<$0.WatchPipelinesRequest, $0.PipelinesSnapshot>(
+            'Watch',
+            watch_Pre,
+            false,
+            true,
+            ($core.List<$core.int> value) =>
+                $0.WatchPipelinesRequest.fromBuffer(value),
+            ($0.PipelinesSnapshot value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.WorktreeRequest, $0.PipelinesActionResponse>(
+            'Refresh',
+            refresh_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.WorktreeRequest.fromBuffer(value),
+            ($0.PipelinesActionResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.RerunFailedRequest, $0.PipelinesActionResponse>(
+            'RerunFailed',
+            rerunFailed_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.RerunFailedRequest.fromBuffer(value),
+            ($0.PipelinesActionResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ListHostsRequest, $0.ListHostsResponse>(
+        'ListHosts',
+        listHosts_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.ListHostsRequest.fromBuffer(value),
+        ($0.ListHostsResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.SaveHostTokenRequest, $0.CiHostInfo>(
+        'SaveHostToken',
+        saveHostToken_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.SaveHostTokenRequest.fromBuffer(value),
+        ($0.CiHostInfo value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.TestHostRequest, $0.TestHostResponse>(
+        'TestHost',
+        testHost_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.TestHostRequest.fromBuffer(value),
+        ($0.TestHostResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.SignInWithGhRequest, $0.SignInWithGhResponse>(
+            'SignInWithGh',
+            signInWithGh_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.SignInWithGhRequest.fromBuffer(value),
+            ($0.SignInWithGhResponse value) => value.writeToBuffer()));
+  }
+
+  $async.Stream<$0.PipelinesSnapshot> watch_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WatchPipelinesRequest> $request) async* {
+    yield* watch($call, await $request);
+  }
+
+  $async.Stream<$0.PipelinesSnapshot> watch(
+      $grpc.ServiceCall call, $0.WatchPipelinesRequest request);
+
+  $async.Future<$0.PipelinesActionResponse> refresh_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WorktreeRequest> $request) async {
+    return refresh($call, await $request);
+  }
+
+  $async.Future<$0.PipelinesActionResponse> refresh(
+      $grpc.ServiceCall call, $0.WorktreeRequest request);
+
+  $async.Future<$0.PipelinesActionResponse> rerunFailed_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.RerunFailedRequest> $request) async {
+    return rerunFailed($call, await $request);
+  }
+
+  $async.Future<$0.PipelinesActionResponse> rerunFailed(
+      $grpc.ServiceCall call, $0.RerunFailedRequest request);
+
+  $async.Future<$0.ListHostsResponse> listHosts_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ListHostsRequest> $request) async {
+    return listHosts($call, await $request);
+  }
+
+  $async.Future<$0.ListHostsResponse> listHosts(
+      $grpc.ServiceCall call, $0.ListHostsRequest request);
+
+  $async.Future<$0.CiHostInfo> saveHostToken_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.SaveHostTokenRequest> $request) async {
+    return saveHostToken($call, await $request);
+  }
+
+  $async.Future<$0.CiHostInfo> saveHostToken(
+      $grpc.ServiceCall call, $0.SaveHostTokenRequest request);
+
+  $async.Future<$0.TestHostResponse> testHost_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.TestHostRequest> $request) async {
+    return testHost($call, await $request);
+  }
+
+  $async.Future<$0.TestHostResponse> testHost(
+      $grpc.ServiceCall call, $0.TestHostRequest request);
+
+  $async.Future<$0.SignInWithGhResponse> signInWithGh_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.SignInWithGhRequest> $request) async {
+    return signInWithGh($call, await $request);
+  }
+
+  $async.Future<$0.SignInWithGhResponse> signInWithGh(
+      $grpc.ServiceCall call, $0.SignInWithGhRequest request);
+}

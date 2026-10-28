@@ -66,13 +66,13 @@ void main() {
 
   test('widgets reorder like ReorderableListView', () {
     final s = AppState();
-    s.reorderWidget(0, 3); // agent to the end
-    expect(s.widgets, [InspectorWidget.changes, InspectorWidget.context, InspectorWidget.agent]);
+    s.reorderWidget(0, 4); // agent to the end
+    expect(s.widgets, [InspectorWidget.pipelines, InspectorWidget.changes, InspectorWidget.context, InspectorWidget.agent]);
     s.moveWidget(InspectorWidget.agent, -1);
     expect(s.widgets.last, InspectorWidget.context);
     s.addWidget(InspectorWidget.tests);
     s.removeWidget(InspectorWidget.changes);
-    expect(s.widgets, [InspectorWidget.agent, InspectorWidget.context, InspectorWidget.tests]);
+    expect(s.widgets, [InspectorWidget.pipelines, InspectorWidget.agent, InspectorWidget.context, InspectorWidget.tests]);
     expect(s.availableWidgets, containsAll([InspectorWidget.changes, InspectorWidget.pullRequest, InspectorWidget.activity]));
     s.dispose();
   });

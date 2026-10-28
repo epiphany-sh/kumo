@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
 import '../data/changes.dart';
+import '../data/pipelines_source.dart';
+import '../overlays/settings_dialog.dart';
+import '../platform/open_url.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/context_menu.dart';
 import '../widgets/controls.dart';
@@ -876,6 +879,7 @@ Widget _widgetBody(InspectorWidget w) => switch (w) {
       InspectorWidget.agent => const _AgentWidget(),
       InspectorWidget.changes => const _ChangesWidget(),
       InspectorWidget.context => const _ContextWidget(),
+      InspectorWidget.pipelines => const _PipelinesWidget(),
       InspectorWidget.tests => const _TestsWidget(),
       InspectorWidget.pullRequest => const _PrWidget(),
       InspectorWidget.activity => const _ActivityWidget(),
@@ -935,6 +939,7 @@ IconData _iconOf(InspectorWidget w) => switch (w) {
       InspectorWidget.agent => KIcons.agent,
       InspectorWidget.changes => KIcons.file,
       InspectorWidget.context => KIcons.docs,
+      InspectorWidget.pipelines => KIcons.cluster,
       InspectorWidget.tests => KIcons.flask,
       InspectorWidget.pullRequest => KIcons.pullRequest,
       InspectorWidget.activity => KIcons.activity,
@@ -1081,6 +1086,250 @@ class _ContextWidget extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// CI runs of the selected worktree's branch, from its repository's host
+/// (GitHub Actions, GitLab CI, Bitbucket Pipelines). Problems — a token
+/// without access, an expired one, an outage — read as plain sentences with
+/// the fix one click away; the provider's own words show small underneath.
+class _PipelinesWidget extends StatelessWidget {
+  const _PipelinesWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    final p = s.pipelines;
+    final provider = p.provider;
+    final run = p.latest;
+    final problem = p.problem;
+    final stale = problem != null && problem.keepsLastRun;
+    final (pill, pillColor, pillBg) = switch (run?.state) {
+      _ when stale => ('Stale', c.warn, c.warnSoft),
+      CiState.running => ('Running', c.acc, c.accSoft),
+      CiState.queued => ('Queued', c.text2, c.tile),
+      CiState.passed => ('Passed', c.ok, c.okSoft),
+      CiState.failed => ('Failed', c.err, c.errSoft),
+      CiState.canceled => ('Canceled', c.text2, c.tile),
+      CiState.skipped => ('Skipped', c.text2, c.tile),
+      null => ('', c.text2, c.tile),
+    };
+    final checked = p.checkedAt == null ? 'not checked yet' : 'checked ${_ago(p.checkedAt!)}';
+    void settings() => showSettingsDialog(context, initial: SettingsTab.repos);
+
+    final actions = <Widget>[];
+    void action(String label, VoidCallback? onTap, {bool primary = false}) {
+      if (actions.isNotEmpty) actions.add(const SizedBox(width: 8));
+      actions.add(Expanded(
+        child: primary
+            ? KButton.primary(label: label, height: 30, fontSize: 12, expand: true, onTap: onTap)
+            : KButton(label: label, height: 30, fontSize: 12, expand: true, onTap: onTap),
+      ));
+    }
+
+    final busy = p.busy;
+    if (problem != null && provider != null) {
+      switch (problem.kind) {
+        case CiProblemKind.notConnected:
+          action('Connect ${provider.hostName}', settings, primary: true);
+        case CiProblemKind.unauthorized:
+          action('Renew token', settings, primary: true);
+          action('Retry', busy ? null : p.refresh);
+        case CiProblemKind.forbidden:
+          action('Fix token in Settings', settings, primary: true);
+          action('Retry', busy ? null : p.refresh);
+        case CiProblemKind.notPushed:
+          action('Publish branch', s.canPush && !busy ? s.push : null, primary: true);
+        case CiProblemKind.notFound:
+        case CiProblemKind.rateLimited:
+        case CiProblemKind.unreachable:
+          action('Retry now', busy ? null : p.refresh);
+        case CiProblemKind.unsupported:
+          break;
+      }
+    } else if (run != null && provider != null) {
+      if (run.state.finished && run.hasFailedJobs) action('Re-run failed jobs', busy ? null : p.rerunFailed, primary: true);
+      action('Open in ${provider.label}', run.url.isEmpty ? null : () => openUrl(run.url));
+    }
+
+    return Section(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Icon(KIcons.cluster, size: 15, color: pill.isEmpty ? (problem != null && problem.needsSettings ? c.err : c.text2) : pillColor),
+          const SizedBox(width: 8),
+          Expanded(child: Text('Pipelines', style: sans(12.5, weight: FontWeight.w600, color: c.text))),
+          if (pill.isNotEmpty) ...[Pill(label: pill, color: pillColor, background: pillBg), const SizedBox(width: 4)],
+          KIconButton(icon: KIcons.refresh, label: 'Refresh · $checked', size: 24, iconSize: 14, onTap: busy || provider == null ? null : p.refresh),
+        ]),
+        if (provider != null) ...[
+          const SizedBox(height: 2),
+          Row(children: [
+            TagChip(provider.host),
+            const SizedBox(width: 6),
+            Text(provider.label, style: sans(11.5, color: c.text3)),
+            Text(' · ', style: sans(11.5, color: c.text3)),
+            Flexible(child: Text(p.branch, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11.5, color: c.text3))),
+          ]),
+        ],
+        const SizedBox(height: 8),
+        if (provider == null && problem == null)
+          Text('Select a worktree to see its pipelines.', style: sans(12, color: c.text3))
+        else if (p.loading && run == null && problem == null)
+          Text('Asking ${provider?.label ?? 'the CI'}…', style: sans(12, color: c.text3)),
+        if (run != null) ...[
+          // One line: a long label (`run #8812 · attempt 2`) ellipsizes
+          // instead of overflowing the panel.
+          Text.rich(
+            TextSpan(children: [
+              TextSpan(text: '${run.label} · ${run.shortSha}', style: mono(11.5, color: c.text2)),
+              const WidgetSpan(child: SizedBox(width: 8)),
+              TextSpan(text: _runNote(run), style: sans(11.5, color: c.text3)),
+            ]),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          for (final j in run.jobs) _JobRow(job: j, stale: stale),
+        ],
+        if (problem != null) ...[
+          if (run != null) const SizedBox(height: 6),
+          _ProblemBox(problem: problem, provider: provider ?? CiProvider.githubActions, repo: p.repo),
+        ],
+        if (busy) ...[
+          const SizedBox(height: 6),
+          Text(problem != null ? 'Checking ${provider?.hostName ?? ''}…' : 'Asking ${provider?.label ?? 'the CI'}…', style: sans(11.5, color: c.acc)),
+        ],
+        if (p.actionError != null) ...[
+          const SizedBox(height: 6),
+          Text(p.actionError!, style: sans(11.5, color: c.err)),
+        ],
+        if (actions.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Row(children: actions),
+        ],
+      ]),
+    );
+  }
+
+  static String _runNote(CiRun run) {
+    final total = run.jobs.length;
+    final at = run.createdAt == null ? '' : 'started ${_ago(run.createdAt!)}';
+    final progress = switch (run.state) {
+      CiState.running || CiState.queued => '${run.done} of $total jobs done',
+      CiState.failed => run.finishedAt != null && run.createdAt != null ? 'failed after ${_dur(run.finishedAt!.difference(run.createdAt!))}' : 'failed',
+      CiState.passed => run.finishedAt != null && run.createdAt != null ? 'took ${_dur(run.finishedAt!.difference(run.createdAt!))}' : 'passed',
+      _ => run.state.name,
+    };
+    return [if (at.isNotEmpty) at, progress].join(' · ');
+  }
+}
+
+class _JobRow extends StatelessWidget {
+  const _JobRow({required this.job, required this.stale});
+  final CiJob job;
+  final bool stale;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final (color, bg, glyph) = switch (job.state) {
+      CiState.passed => (c.ok, c.okSoft, KIcons.check),
+      CiState.failed => (c.err, c.errSoft, KIcons.close),
+      CiState.running => (c.acc, c.accSoft, null),
+      _ => (c.text3, c.tile, null),
+    };
+    final time = switch (job.state) {
+      CiState.running => job.startedAt == null || stale ? 'running' : 'running ${_dur(DateTime.now().difference(job.startedAt!))}',
+      CiState.queued => 'waiting',
+      CiState.skipped => 'skipped',
+      CiState.canceled => 'canceled',
+      _ => job.duration == null ? '' : _dur(job.duration!),
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Container(
+            width: 16,
+            height: 16,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+            child: glyph != null ? Icon(glyph, size: 11, color: color) : (job.state == CiState.running ? Dot(color, size: 5) : null),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(job.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11.5, color: c.text2))),
+          const SizedBox(width: 8),
+          Text(time, style: mono(11, color: job.state == CiState.failed ? c.err : (job.state == CiState.running ? c.acc : c.text3))),
+        ]),
+        if (job.state == CiState.failed && (job.failure ?? '').isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(left: 24, top: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(color: c.errSoft, borderRadius: BorderRadius.circular(8)),
+            child: Text(job.failure!, style: mono(11, color: c.text2, height: 1.45)),
+          ),
+      ]),
+    );
+  }
+}
+
+class _ProblemBox extends StatelessWidget {
+  const _ProblemBox({required this.problem, required this.provider, required this.repo});
+  final CiProblem problem;
+  final CiProvider provider;
+  final String repo;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final (title, body) = describeCiProblem(problem, provider, repo: repo);
+    final (color, bg, icon) = switch (problem.kind) {
+      CiProblemKind.unauthorized || CiProblemKind.forbidden => (c.err, c.errSoft, KIcons.lock),
+      CiProblemKind.rateLimited || CiProblemKind.unreachable => (c.warn, c.warnSoft, KIcons.cloudOff),
+      CiProblemKind.notConnected => (c.text, c.tile, KIcons.plug),
+      CiProblemKind.notPushed => (c.text, c.tile, KIcons.upload),
+      _ => (c.text, c.tile, KIcons.info),
+    };
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 15, color: color)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: sans(12, weight: FontWeight.w600, color: color)),
+              const SizedBox(height: 3),
+              Text(body, style: sans(12, color: c.text2, height: 1.45)),
+              if (problem.detail.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(problem.detail, style: mono(10.5, color: c.text3)),
+              ],
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+String _ago(DateTime t) {
+  final d = DateTime.now().difference(t);
+  if (d.inSeconds < 10) return 'just now';
+  if (d.inSeconds < 60) return '${d.inSeconds} s ago';
+  if (d.inMinutes < 60) return '${d.inMinutes} min ago';
+  if (d.inHours < 24) return '${d.inHours} h ago';
+  return '${d.inDays} d ago';
+}
+
+String _dur(Duration d) {
+  if (d.inSeconds < 60) return '${d.inSeconds}s';
+  final m = d.inMinutes, sec = d.inSeconds % 60;
+  if (m < 60) return sec == 0 ? '${m}m' : '${m}m ${sec.toString().padLeft(2, '0')}s';
+  return '${d.inHours}h ${(m % 60).toString().padLeft(2, '0')}m';
 }
 
 class _TestsWidget extends StatelessWidget {

@@ -242,5 +242,115 @@ class TaskPriority extends $pb.ProtobufEnum {
   const TaskPriority._(super.value, super.name);
 }
 
+class CiProvider extends $pb.ProtobufEnum {
+  static const CiProvider CI_PROVIDER_NONE =
+      CiProvider._(0, _omitEnumNames ? '' : 'CI_PROVIDER_NONE');
+  static const CiProvider CI_PROVIDER_GITHUB_ACTIONS =
+      CiProvider._(1, _omitEnumNames ? '' : 'CI_PROVIDER_GITHUB_ACTIONS');
+  static const CiProvider CI_PROVIDER_GITLAB_CI =
+      CiProvider._(2, _omitEnumNames ? '' : 'CI_PROVIDER_GITLAB_CI');
+  static const CiProvider CI_PROVIDER_BITBUCKET_PIPELINES =
+      CiProvider._(3, _omitEnumNames ? '' : 'CI_PROVIDER_BITBUCKET_PIPELINES');
+
+  static const $core.List<CiProvider> values = <CiProvider>[
+    CI_PROVIDER_NONE,
+    CI_PROVIDER_GITHUB_ACTIONS,
+    CI_PROVIDER_GITLAB_CI,
+    CI_PROVIDER_BITBUCKET_PIPELINES,
+  ];
+
+  static final $core.List<CiProvider?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static CiProvider? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const CiProvider._(super.value, super.name);
+}
+
+class CiState extends $pb.ProtobufEnum {
+  static const CiState CI_STATE_QUEUED =
+      CiState._(0, _omitEnumNames ? '' : 'CI_STATE_QUEUED');
+  static const CiState CI_STATE_RUNNING =
+      CiState._(1, _omitEnumNames ? '' : 'CI_STATE_RUNNING');
+  static const CiState CI_STATE_PASSED =
+      CiState._(2, _omitEnumNames ? '' : 'CI_STATE_PASSED');
+  static const CiState CI_STATE_FAILED =
+      CiState._(3, _omitEnumNames ? '' : 'CI_STATE_FAILED');
+  static const CiState CI_STATE_CANCELED =
+      CiState._(4, _omitEnumNames ? '' : 'CI_STATE_CANCELED');
+  static const CiState CI_STATE_SKIPPED =
+      CiState._(5, _omitEnumNames ? '' : 'CI_STATE_SKIPPED');
+
+  static const $core.List<CiState> values = <CiState>[
+    CI_STATE_QUEUED,
+    CI_STATE_RUNNING,
+    CI_STATE_PASSED,
+    CI_STATE_FAILED,
+    CI_STATE_CANCELED,
+    CI_STATE_SKIPPED,
+  ];
+
+  static final $core.List<CiState?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static CiState? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const CiState._(super.value, super.name);
+}
+
+class CiProblemKind extends $pb.ProtobufEnum {
+  static const CiProblemKind CI_PROBLEM_KIND_UNSPECIFIED =
+      CiProblemKind._(0, _omitEnumNames ? '' : 'CI_PROBLEM_KIND_UNSPECIFIED');
+
+  /// No token for the host.
+  static const CiProblemKind CI_PROBLEM_KIND_NOT_CONNECTED =
+      CiProblemKind._(1, _omitEnumNames ? '' : 'CI_PROBLEM_KIND_NOT_CONNECTED');
+
+  /// 401: the token expired or was revoked.
+  static const CiProblemKind CI_PROBLEM_KIND_UNAUTHORIZED =
+      CiProblemKind._(2, _omitEnumNames ? '' : 'CI_PROBLEM_KIND_UNAUTHORIZED');
+
+  /// 403: the token can't read pipelines (see missing_scope).
+  static const CiProblemKind CI_PROBLEM_KIND_FORBIDDEN =
+      CiProblemKind._(3, _omitEnumNames ? '' : 'CI_PROBLEM_KIND_FORBIDDEN');
+  static const CiProblemKind CI_PROBLEM_KIND_NOT_FOUND =
+      CiProblemKind._(4, _omitEnumNames ? '' : 'CI_PROBLEM_KIND_NOT_FOUND');
+
+  /// 429, or 403 with no requests left (see retry_at).
+  static const CiProblemKind CI_PROBLEM_KIND_RATE_LIMITED =
+      CiProblemKind._(5, _omitEnumNames ? '' : 'CI_PROBLEM_KIND_RATE_LIMITED');
+
+  /// Timeouts, DNS, 5xx.
+  static const CiProblemKind CI_PROBLEM_KIND_UNREACHABLE =
+      CiProblemKind._(6, _omitEnumNames ? '' : 'CI_PROBLEM_KIND_UNREACHABLE');
+
+  /// The branch has no upstream yet (see commits_waiting).
+  static const CiProblemKind CI_PROBLEM_KIND_NOT_PUSHED =
+      CiProblemKind._(7, _omitEnumNames ? '' : 'CI_PROBLEM_KIND_NOT_PUSHED');
+
+  /// The repository's host has no supported CI (or no remote).
+  static const CiProblemKind CI_PROBLEM_KIND_UNSUPPORTED =
+      CiProblemKind._(8, _omitEnumNames ? '' : 'CI_PROBLEM_KIND_UNSUPPORTED');
+
+  static const $core.List<CiProblemKind> values = <CiProblemKind>[
+    CI_PROBLEM_KIND_UNSPECIFIED,
+    CI_PROBLEM_KIND_NOT_CONNECTED,
+    CI_PROBLEM_KIND_UNAUTHORIZED,
+    CI_PROBLEM_KIND_FORBIDDEN,
+    CI_PROBLEM_KIND_NOT_FOUND,
+    CI_PROBLEM_KIND_RATE_LIMITED,
+    CI_PROBLEM_KIND_UNREACHABLE,
+    CI_PROBLEM_KIND_NOT_PUSHED,
+    CI_PROBLEM_KIND_UNSUPPORTED,
+  ];
+
+  static final $core.List<CiProblemKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 8);
+  static CiProblemKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const CiProblemKind._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

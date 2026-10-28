@@ -1,0 +1,20 @@
+[
+  {
+    "path": ".github",
+    "start_line": 1,
+    "end_line": 1,
+    "annotation_level": "failure",
+    "title": "",
+    "message": "Process completed with exit code 1.",
+    "raw_details": null
+  },
+  {
+    "path": "internal/discount/bulk_test.go",
+    "start_line": 88,
+    "end_line": 88,
+    "annotation_level": "failure",
+    "title": "TestBulkUpsert",
+    "message": "expected 3 rows, got 2\n\nError Trace: bulk_test.go:88",
+    "raw_details": null
+  }
+]

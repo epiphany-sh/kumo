@@ -7140,6 +7140,1235 @@ class UnlinkTaskResponse extends $pb.GeneratedMessage {
   static UnlinkTaskResponse? _defaultInstance;
 }
 
+class WatchPipelinesRequest extends $pb.GeneratedMessage {
+  factory WatchPipelinesRequest({
+    $core.String? worktreePath,
+  }) {
+    final result = WatchPipelinesRequest._();
+    if (worktreePath != null) result.worktreePath = worktreePath;
+    return result;
+  }
+
+  WatchPipelinesRequest._();
+
+  factory WatchPipelinesRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WatchPipelinesRequest()..mergeFromBuffer(data, registry);
+  factory WatchPipelinesRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WatchPipelinesRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WatchPipelinesRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: WatchPipelinesRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'worktreePath')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchPipelinesRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchPipelinesRequest copyWith(
+          void Function(WatchPipelinesRequest) updates) =>
+      super.copyWith((message) => updates(message as WatchPipelinesRequest))
+          as WatchPipelinesRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use WatchPipelinesRequest() / WatchPipelinesRequest.new instead')
+  static WatchPipelinesRequest create() => WatchPipelinesRequest._();
+  static $pb.GeneratedMessage $_createMessage() => WatchPipelinesRequest._();
+  @$core.override
+  WatchPipelinesRequest createEmptyInstance() => WatchPipelinesRequest._();
+  @$core.pragma('dart2js:noInline')
+  static WatchPipelinesRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<WatchPipelinesRequest>(
+          WatchPipelinesRequest.$_createMessage);
+  static WatchPipelinesRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get worktreePath => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set worktreePath($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasWorktreePath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearWorktreePath() => $_clearField(1);
+}
+
+class PipelinesSnapshot extends $pb.GeneratedMessage {
+  factory PipelinesSnapshot({
+    CiProvider? provider,
+    $core.String? repo,
+    $core.String? branch,
+    CiRun? latest,
+    CiProblem? problem,
+    $fixnum.Int64? checkedAt,
+  }) {
+    final result = PipelinesSnapshot._();
+    if (provider != null) result.provider = provider;
+    if (repo != null) result.repo = repo;
+    if (branch != null) result.branch = branch;
+    if (latest != null) result.latest = latest;
+    if (problem != null) result.problem = problem;
+    if (checkedAt != null) result.checkedAt = checkedAt;
+    return result;
+  }
+
+  PipelinesSnapshot._();
+
+  factory PipelinesSnapshot.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PipelinesSnapshot()..mergeFromBuffer(data, registry);
+  factory PipelinesSnapshot.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PipelinesSnapshot()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PipelinesSnapshot',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: PipelinesSnapshot.$_createMessage)
+    ..aE<CiProvider>(1, _omitFieldNames ? '' : 'provider',
+        enumValues: CiProvider.values)
+    ..aOS(2, _omitFieldNames ? '' : 'repo')
+    ..aOS(3, _omitFieldNames ? '' : 'branch')
+    ..aOM<CiRun>(4, _omitFieldNames ? '' : 'latest',
+        subBuilder: CiRun.$_createMessage)
+    ..aOM<CiProblem>(5, _omitFieldNames ? '' : 'problem',
+        subBuilder: CiProblem.$_createMessage)
+    ..aInt64(6, _omitFieldNames ? '' : 'checkedAt')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PipelinesSnapshot clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PipelinesSnapshot copyWith(void Function(PipelinesSnapshot) updates) =>
+      super.copyWith((message) => updates(message as PipelinesSnapshot))
+          as PipelinesSnapshot;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PipelinesSnapshot() / PipelinesSnapshot.new instead')
+  static PipelinesSnapshot create() => PipelinesSnapshot._();
+  static $pb.GeneratedMessage $_createMessage() => PipelinesSnapshot._();
+  @$core.override
+  PipelinesSnapshot createEmptyInstance() => PipelinesSnapshot._();
+  @$core.pragma('dart2js:noInline')
+  static PipelinesSnapshot getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PipelinesSnapshot>(
+          PipelinesSnapshot.$_createMessage);
+  static PipelinesSnapshot? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  CiProvider get provider => $_getN(0);
+  @$pb.TagNumber(1)
+  set provider(CiProvider value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProvider() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProvider() => $_clearField(1);
+
+  /// "owner/name" on the host.
+  @$pb.TagNumber(2)
+  $core.String get repo => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set repo($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRepo() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRepo() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get branch => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set branch($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBranch() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBranch() => $_clearField(3);
+
+  /// The latest run; with a rate-limited or unreachable problem, the last
+  /// one seen.
+  @$pb.TagNumber(4)
+  CiRun get latest => $_getN(3);
+  @$pb.TagNumber(4)
+  set latest(CiRun value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasLatest() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearLatest() => $_clearField(4);
+  @$pb.TagNumber(4)
+  CiRun ensureLatest() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  CiProblem get problem => $_getN(4);
+  @$pb.TagNumber(5)
+  set problem(CiProblem value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasProblem() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearProblem() => $_clearField(5);
+  @$pb.TagNumber(5)
+  CiProblem ensureProblem() => $_ensure(4);
+
+  /// When the provider last answered (Unix ms, 0 = never).
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get checkedAt => $_getI64(5);
+  @$pb.TagNumber(6)
+  set checkedAt($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCheckedAt() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCheckedAt() => $_clearField(6);
+}
+
+class CiRun extends $pb.GeneratedMessage {
+  factory CiRun({
+    $core.String? id,
+    $core.String? label,
+    $core.String? shortSha,
+    $core.String? title,
+    CiState? state,
+    $fixnum.Int64? createdAt,
+    $fixnum.Int64? finishedAt,
+    $core.String? url,
+    $core.Iterable<CiJob>? jobs,
+  }) {
+    final result = CiRun._();
+    if (id != null) result.id = id;
+    if (label != null) result.label = label;
+    if (shortSha != null) result.shortSha = shortSha;
+    if (title != null) result.title = title;
+    if (state != null) result.state = state;
+    if (createdAt != null) result.createdAt = createdAt;
+    if (finishedAt != null) result.finishedAt = finishedAt;
+    if (url != null) result.url = url;
+    if (jobs != null) result.jobs.addAll(jobs);
+    return result;
+  }
+
+  CiRun._();
+
+  factory CiRun.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CiRun()..mergeFromBuffer(data, registry);
+  factory CiRun.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CiRun()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CiRun',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: CiRun.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'label')
+    ..aOS(3, _omitFieldNames ? '' : 'shortSha')
+    ..aOS(4, _omitFieldNames ? '' : 'title')
+    ..aE<CiState>(5, _omitFieldNames ? '' : 'state', enumValues: CiState.values)
+    ..aInt64(6, _omitFieldNames ? '' : 'createdAt')
+    ..aInt64(7, _omitFieldNames ? '' : 'finishedAt')
+    ..aOS(8, _omitFieldNames ? '' : 'url')
+    ..pPM<CiJob>(9, _omitFieldNames ? '' : 'jobs',
+        subBuilder: CiJob.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CiRun clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CiRun copyWith(void Function(CiRun) updates) =>
+      super.copyWith((message) => updates(message as CiRun)) as CiRun;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CiRun() / CiRun.new instead')
+  static CiRun create() => CiRun._();
+  static $pb.GeneratedMessage $_createMessage() => CiRun._();
+  @$core.override
+  CiRun createEmptyInstance() => CiRun._();
+  @$core.pragma('dart2js:noInline')
+  static CiRun getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CiRun>(CiRun.$_createMessage);
+  static CiRun? _defaultInstance;
+
+  /// The provider's id, for RerunFailed.
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  /// What the provider calls it: "run #8812", "pipeline #4417".
+  @$pb.TagNumber(2)
+  $core.String get label => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set label($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLabel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLabel() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get shortSha => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set shortSha($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasShortSha() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearShortSha() => $_clearField(3);
+
+  /// Subject of the commit it ran for.
+  @$pb.TagNumber(4)
+  $core.String get title => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set title($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTitle() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTitle() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  CiState get state => $_getN(4);
+  @$pb.TagNumber(5)
+  set state(CiState value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasState() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearState() => $_clearField(5);
+
+  /// Unix ms, 0 = unknown.
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get createdAt => $_getI64(5);
+  @$pb.TagNumber(6)
+  set createdAt($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCreatedAt() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCreatedAt() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get finishedAt => $_getI64(6);
+  @$pb.TagNumber(7)
+  set finishedAt($fixnum.Int64 value) => $_setInt64(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasFinishedAt() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearFinishedAt() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get url => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set url($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasUrl() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearUrl() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $pb.PbList<CiJob> get jobs => $_getList(8);
+}
+
+class CiJob extends $pb.GeneratedMessage {
+  factory CiJob({
+    $core.String? name,
+    CiState? state,
+    $fixnum.Int64? durationMs,
+    $fixnum.Int64? startedAt,
+    $core.String? failure,
+    $core.String? url,
+  }) {
+    final result = CiJob._();
+    if (name != null) result.name = name;
+    if (state != null) result.state = state;
+    if (durationMs != null) result.durationMs = durationMs;
+    if (startedAt != null) result.startedAt = startedAt;
+    if (failure != null) result.failure = failure;
+    if (url != null) result.url = url;
+    return result;
+  }
+
+  CiJob._();
+
+  factory CiJob.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CiJob()..mergeFromBuffer(data, registry);
+  factory CiJob.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CiJob()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CiJob',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: CiJob.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aE<CiState>(2, _omitFieldNames ? '' : 'state', enumValues: CiState.values)
+    ..aInt64(3, _omitFieldNames ? '' : 'durationMs')
+    ..aInt64(4, _omitFieldNames ? '' : 'startedAt')
+    ..aOS(5, _omitFieldNames ? '' : 'failure')
+    ..aOS(6, _omitFieldNames ? '' : 'url')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CiJob clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CiJob copyWith(void Function(CiJob) updates) =>
+      super.copyWith((message) => updates(message as CiJob)) as CiJob;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CiJob() / CiJob.new instead')
+  static CiJob create() => CiJob._();
+  static $pb.GeneratedMessage $_createMessage() => CiJob._();
+  @$core.override
+  CiJob createEmptyInstance() => CiJob._();
+  @$core.pragma('dart2js:noInline')
+  static CiJob getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CiJob>(CiJob.$_createMessage);
+  static CiJob? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  CiState get state => $_getN(1);
+  @$pb.TagNumber(2)
+  set state(CiState value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasState() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearState() => $_clearField(2);
+
+  /// Finished jobs; 0 = unknown.
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get durationMs => $_getI64(2);
+  @$pb.TagNumber(3)
+  set durationMs($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDurationMs() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDurationMs() => $_clearField(3);
+
+  /// Unix ms, 0 = not started.
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get startedAt => $_getI64(3);
+  @$pb.TagNumber(4)
+  set startedAt($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasStartedAt() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearStartedAt() => $_clearField(4);
+
+  /// First useful line of the error, for failed jobs (best effort).
+  @$pb.TagNumber(5)
+  $core.String get failure => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set failure($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasFailure() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearFailure() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get url => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set url($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasUrl() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearUrl() => $_clearField(6);
+}
+
+class CiProblem extends $pb.GeneratedMessage {
+  factory CiProblem({
+    CiProblemKind? kind,
+    $core.String? detail,
+    $core.String? missingScope,
+    $fixnum.Int64? retryAt,
+    $core.int? commitsWaiting,
+  }) {
+    final result = CiProblem._();
+    if (kind != null) result.kind = kind;
+    if (detail != null) result.detail = detail;
+    if (missingScope != null) result.missingScope = missingScope;
+    if (retryAt != null) result.retryAt = retryAt;
+    if (commitsWaiting != null) result.commitsWaiting = commitsWaiting;
+    return result;
+  }
+
+  CiProblem._();
+
+  factory CiProblem.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CiProblem()..mergeFromBuffer(data, registry);
+  factory CiProblem.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CiProblem()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CiProblem',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: CiProblem.$_createMessage)
+    ..aE<CiProblemKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: CiProblemKind.values)
+    ..aOS(2, _omitFieldNames ? '' : 'detail')
+    ..aOS(3, _omitFieldNames ? '' : 'missingScope')
+    ..aInt64(4, _omitFieldNames ? '' : 'retryAt')
+    ..aI(5, _omitFieldNames ? '' : 'commitsWaiting',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CiProblem clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CiProblem copyWith(void Function(CiProblem) updates) =>
+      super.copyWith((message) => updates(message as CiProblem)) as CiProblem;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CiProblem() / CiProblem.new instead')
+  static CiProblem create() => CiProblem._();
+  static $pb.GeneratedMessage $_createMessage() => CiProblem._();
+  @$core.override
+  CiProblem createEmptyInstance() => CiProblem._();
+  @$core.pragma('dart2js:noInline')
+  static CiProblem getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CiProblem>(CiProblem.$_createMessage);
+  static CiProblem? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  CiProblemKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(CiProblemKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  /// The provider's answer, short: "HTTP 403 · Resource not accessible by
+  /// personal access token". Never contains a token.
+  @$pb.TagNumber(2)
+  $core.String get detail => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set detail($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDetail() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDetail() => $_clearField(2);
+
+  /// The permission the token lacks, when the provider says which.
+  @$pb.TagNumber(3)
+  $core.String get missingScope => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set missingScope($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMissingScope() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMissingScope() => $_clearField(3);
+
+  /// When the daemon tries again on its own (Unix ms, 0 = unknown).
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get retryAt => $_getI64(3);
+  @$pb.TagNumber(4)
+  set retryAt($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRetryAt() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRetryAt() => $_clearField(4);
+
+  /// Local commits waiting for the first push.
+  @$pb.TagNumber(5)
+  $core.int get commitsWaiting => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set commitsWaiting($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCommitsWaiting() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCommitsWaiting() => $_clearField(5);
+}
+
+class RerunFailedRequest extends $pb.GeneratedMessage {
+  factory RerunFailedRequest({
+    $core.String? worktreePath,
+    $core.String? runId,
+  }) {
+    final result = RerunFailedRequest._();
+    if (worktreePath != null) result.worktreePath = worktreePath;
+    if (runId != null) result.runId = runId;
+    return result;
+  }
+
+  RerunFailedRequest._();
+
+  factory RerunFailedRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RerunFailedRequest()..mergeFromBuffer(data, registry);
+  factory RerunFailedRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RerunFailedRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RerunFailedRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: RerunFailedRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'worktreePath')
+    ..aOS(2, _omitFieldNames ? '' : 'runId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RerunFailedRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RerunFailedRequest copyWith(void Function(RerunFailedRequest) updates) =>
+      super.copyWith((message) => updates(message as RerunFailedRequest))
+          as RerunFailedRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use RerunFailedRequest() / RerunFailedRequest.new instead')
+  static RerunFailedRequest create() => RerunFailedRequest._();
+  static $pb.GeneratedMessage $_createMessage() => RerunFailedRequest._();
+  @$core.override
+  RerunFailedRequest createEmptyInstance() => RerunFailedRequest._();
+  @$core.pragma('dart2js:noInline')
+  static RerunFailedRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RerunFailedRequest>(
+          RerunFailedRequest.$_createMessage);
+  static RerunFailedRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get worktreePath => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set worktreePath($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasWorktreePath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearWorktreePath() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get runId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set runId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRunId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRunId() => $_clearField(2);
+}
+
+class PipelinesActionResponse extends $pb.GeneratedMessage {
+  factory PipelinesActionResponse() => PipelinesActionResponse._();
+
+  PipelinesActionResponse._();
+
+  factory PipelinesActionResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PipelinesActionResponse()..mergeFromBuffer(data, registry);
+  factory PipelinesActionResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PipelinesActionResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PipelinesActionResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: PipelinesActionResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PipelinesActionResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PipelinesActionResponse copyWith(
+          void Function(PipelinesActionResponse) updates) =>
+      super.copyWith((message) => updates(message as PipelinesActionResponse))
+          as PipelinesActionResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PipelinesActionResponse() / PipelinesActionResponse.new instead')
+  static PipelinesActionResponse create() => PipelinesActionResponse._();
+  static $pb.GeneratedMessage $_createMessage() => PipelinesActionResponse._();
+  @$core.override
+  PipelinesActionResponse createEmptyInstance() => PipelinesActionResponse._();
+  @$core.pragma('dart2js:noInline')
+  static PipelinesActionResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PipelinesActionResponse>(
+          PipelinesActionResponse.$_createMessage);
+  static PipelinesActionResponse? _defaultInstance;
+}
+
+class ListHostsRequest extends $pb.GeneratedMessage {
+  factory ListHostsRequest() => ListHostsRequest._();
+
+  ListHostsRequest._();
+
+  factory ListHostsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListHostsRequest()..mergeFromBuffer(data, registry);
+  factory ListHostsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListHostsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListHostsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ListHostsRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListHostsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListHostsRequest copyWith(void Function(ListHostsRequest) updates) =>
+      super.copyWith((message) => updates(message as ListHostsRequest))
+          as ListHostsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ListHostsRequest() / ListHostsRequest.new instead')
+  static ListHostsRequest create() => ListHostsRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListHostsRequest._();
+  @$core.override
+  ListHostsRequest createEmptyInstance() => ListHostsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListHostsRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ListHostsRequest>(
+          ListHostsRequest.$_createMessage);
+  static ListHostsRequest? _defaultInstance;
+}
+
+class ListHostsResponse extends $pb.GeneratedMessage {
+  factory ListHostsResponse({
+    $core.Iterable<CiHostInfo>? hosts,
+  }) {
+    final result = ListHostsResponse._();
+    if (hosts != null) result.hosts.addAll(hosts);
+    return result;
+  }
+
+  ListHostsResponse._();
+
+  factory ListHostsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListHostsResponse()..mergeFromBuffer(data, registry);
+  factory ListHostsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListHostsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListHostsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ListHostsResponse.$_createMessage)
+    ..pPM<CiHostInfo>(1, _omitFieldNames ? '' : 'hosts',
+        subBuilder: CiHostInfo.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListHostsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListHostsResponse copyWith(void Function(ListHostsResponse) updates) =>
+      super.copyWith((message) => updates(message as ListHostsResponse))
+          as ListHostsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ListHostsResponse() / ListHostsResponse.new instead')
+  static ListHostsResponse create() => ListHostsResponse._();
+  static $pb.GeneratedMessage $_createMessage() => ListHostsResponse._();
+  @$core.override
+  ListHostsResponse createEmptyInstance() => ListHostsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListHostsResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ListHostsResponse>(
+          ListHostsResponse.$_createMessage);
+  static ListHostsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<CiHostInfo> get hosts => $_getList(0);
+}
+
+class CiHostInfo extends $pb.GeneratedMessage {
+  factory CiHostInfo({
+    $core.String? host,
+    CiProvider? provider,
+    $core.bool? hasToken,
+    $core.bool? usesGh,
+    $core.Iterable<$core.String>? repos,
+    $core.String? ghAccount,
+    $core.bool? ghAvailable,
+  }) {
+    final result = CiHostInfo._();
+    if (host != null) result.host = host;
+    if (provider != null) result.provider = provider;
+    if (hasToken != null) result.hasToken = hasToken;
+    if (usesGh != null) result.usesGh = usesGh;
+    if (repos != null) result.repos.addAll(repos);
+    if (ghAccount != null) result.ghAccount = ghAccount;
+    if (ghAvailable != null) result.ghAvailable = ghAvailable;
+    return result;
+  }
+
+  CiHostInfo._();
+
+  factory CiHostInfo.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CiHostInfo()..mergeFromBuffer(data, registry);
+  factory CiHostInfo.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CiHostInfo()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CiHostInfo',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: CiHostInfo.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'host')
+    ..aE<CiProvider>(2, _omitFieldNames ? '' : 'provider',
+        enumValues: CiProvider.values)
+    ..aOB(3, _omitFieldNames ? '' : 'hasToken')
+    ..aOB(4, _omitFieldNames ? '' : 'usesGh')
+    ..pPS(5, _omitFieldNames ? '' : 'repos')
+    ..aOS(6, _omitFieldNames ? '' : 'ghAccount')
+    ..aOB(7, _omitFieldNames ? '' : 'ghAvailable')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CiHostInfo clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CiHostInfo copyWith(void Function(CiHostInfo) updates) =>
+      super.copyWith((message) => updates(message as CiHostInfo)) as CiHostInfo;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use CiHostInfo() / CiHostInfo.new instead')
+  static CiHostInfo create() => CiHostInfo._();
+  static $pb.GeneratedMessage $_createMessage() => CiHostInfo._();
+  @$core.override
+  CiHostInfo createEmptyInstance() => CiHostInfo._();
+  @$core.pragma('dart2js:noInline')
+  static CiHostInfo getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CiHostInfo>(CiHostInfo.$_createMessage);
+  static CiHostInfo? _defaultInstance;
+
+  /// "github.com", "gitlab.example.com".
+  @$pb.TagNumber(1)
+  $core.String get host => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set host($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasHost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHost() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  CiProvider get provider => $_getN(1);
+  @$pb.TagNumber(2)
+  set provider(CiProvider value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasProvider() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearProvider() => $_clearField(2);
+
+  /// A token is saved in the keychain.
+  @$pb.TagNumber(3)
+  $core.bool get hasToken => $_getBF(2);
+  @$pb.TagNumber(3)
+  set hasToken($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasHasToken() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearHasToken() => $_clearField(3);
+
+  /// No saved token, but the gh CLI is signed in to the host.
+  @$pb.TagNumber(4)
+  $core.bool get usesGh => $_getBF(3);
+  @$pb.TagNumber(4)
+  set usesGh($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasUsesGh() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearUsesGh() => $_clearField(4);
+
+  /// Repositories of the workspace on this host ("owner/name").
+  @$pb.TagNumber(5)
+  $pb.PbList<$core.String> get repos => $_getList(4);
+
+  /// The account gh is signed in as on the host, when it is.
+  @$pb.TagNumber(6)
+  $core.String get ghAccount => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set ghAccount($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasGhAccount() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearGhAccount() => $_clearField(6);
+
+  /// gh is installed and can sign in to this host (GitHub hosts).
+  @$pb.TagNumber(7)
+  $core.bool get ghAvailable => $_getBF(6);
+  @$pb.TagNumber(7)
+  set ghAvailable($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasGhAvailable() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearGhAvailable() => $_clearField(7);
+}
+
+class SignInWithGhRequest extends $pb.GeneratedMessage {
+  factory SignInWithGhRequest({
+    $core.String? host,
+  }) {
+    final result = SignInWithGhRequest._();
+    if (host != null) result.host = host;
+    return result;
+  }
+
+  SignInWithGhRequest._();
+
+  factory SignInWithGhRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SignInWithGhRequest()..mergeFromBuffer(data, registry);
+  factory SignInWithGhRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SignInWithGhRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SignInWithGhRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SignInWithGhRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'host')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SignInWithGhRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SignInWithGhRequest copyWith(void Function(SignInWithGhRequest) updates) =>
+      super.copyWith((message) => updates(message as SignInWithGhRequest))
+          as SignInWithGhRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use SignInWithGhRequest() / SignInWithGhRequest.new instead')
+  static SignInWithGhRequest create() => SignInWithGhRequest._();
+  static $pb.GeneratedMessage $_createMessage() => SignInWithGhRequest._();
+  @$core.override
+  SignInWithGhRequest createEmptyInstance() => SignInWithGhRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SignInWithGhRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SignInWithGhRequest>(
+          SignInWithGhRequest.$_createMessage);
+  static SignInWithGhRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get host => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set host($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasHost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHost() => $_clearField(1);
+}
+
+class SignInWithGhResponse extends $pb.GeneratedMessage {
+  factory SignInWithGhResponse({
+    $core.String? terminalId,
+  }) {
+    final result = SignInWithGhResponse._();
+    if (terminalId != null) result.terminalId = terminalId;
+    return result;
+  }
+
+  SignInWithGhResponse._();
+
+  factory SignInWithGhResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SignInWithGhResponse()..mergeFromBuffer(data, registry);
+  factory SignInWithGhResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SignInWithGhResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SignInWithGhResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SignInWithGhResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'terminalId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SignInWithGhResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SignInWithGhResponse copyWith(void Function(SignInWithGhResponse) updates) =>
+      super.copyWith((message) => updates(message as SignInWithGhResponse))
+          as SignInWithGhResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SignInWithGhResponse() / SignInWithGhResponse.new instead')
+  static SignInWithGhResponse create() => SignInWithGhResponse._();
+  static $pb.GeneratedMessage $_createMessage() => SignInWithGhResponse._();
+  @$core.override
+  SignInWithGhResponse createEmptyInstance() => SignInWithGhResponse._();
+  @$core.pragma('dart2js:noInline')
+  static SignInWithGhResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SignInWithGhResponse>(
+          SignInWithGhResponse.$_createMessage);
+  static SignInWithGhResponse? _defaultInstance;
+
+  /// The terminal running `gh auth login`, to show.
+  @$pb.TagNumber(1)
+  $core.String get terminalId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set terminalId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTerminalId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTerminalId() => $_clearField(1);
+}
+
+class SaveHostTokenRequest extends $pb.GeneratedMessage {
+  factory SaveHostTokenRequest({
+    $core.String? host,
+    $core.String? token,
+  }) {
+    final result = SaveHostTokenRequest._();
+    if (host != null) result.host = host;
+    if (token != null) result.token = token;
+    return result;
+  }
+
+  SaveHostTokenRequest._();
+
+  factory SaveHostTokenRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SaveHostTokenRequest()..mergeFromBuffer(data, registry);
+  factory SaveHostTokenRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SaveHostTokenRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SaveHostTokenRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SaveHostTokenRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'host')
+    ..aOS(2, _omitFieldNames ? '' : 'token')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SaveHostTokenRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SaveHostTokenRequest copyWith(void Function(SaveHostTokenRequest) updates) =>
+      super.copyWith((message) => updates(message as SaveHostTokenRequest))
+          as SaveHostTokenRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SaveHostTokenRequest() / SaveHostTokenRequest.new instead')
+  static SaveHostTokenRequest create() => SaveHostTokenRequest._();
+  static $pb.GeneratedMessage $_createMessage() => SaveHostTokenRequest._();
+  @$core.override
+  SaveHostTokenRequest createEmptyInstance() => SaveHostTokenRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SaveHostTokenRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SaveHostTokenRequest>(
+          SaveHostTokenRequest.$_createMessage);
+  static SaveHostTokenRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get host => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set host($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasHost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHost() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get token => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set token($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearToken() => $_clearField(2);
+}
+
+class TestHostRequest extends $pb.GeneratedMessage {
+  factory TestHostRequest({
+    $core.String? host,
+    $core.String? token,
+  }) {
+    final result = TestHostRequest._();
+    if (host != null) result.host = host;
+    if (token != null) result.token = token;
+    return result;
+  }
+
+  TestHostRequest._();
+
+  factory TestHostRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TestHostRequest()..mergeFromBuffer(data, registry);
+  factory TestHostRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TestHostRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TestHostRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TestHostRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'host')
+    ..aOS(2, _omitFieldNames ? '' : 'token')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestHostRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestHostRequest copyWith(void Function(TestHostRequest) updates) =>
+      super.copyWith((message) => updates(message as TestHostRequest))
+          as TestHostRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TestHostRequest() / TestHostRequest.new instead')
+  static TestHostRequest create() => TestHostRequest._();
+  static $pb.GeneratedMessage $_createMessage() => TestHostRequest._();
+  @$core.override
+  TestHostRequest createEmptyInstance() => TestHostRequest._();
+  @$core.pragma('dart2js:noInline')
+  static TestHostRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TestHostRequest>(
+          TestHostRequest.$_createMessage);
+  static TestHostRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get host => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set host($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasHost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHost() => $_clearField(1);
+
+  /// Empty: test the saved one.
+  @$pb.TagNumber(2)
+  $core.String get token => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set token($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearToken() => $_clearField(2);
+}
+
+class TestHostResponse extends $pb.GeneratedMessage {
+  factory TestHostResponse({
+    $core.String? message,
+    CiProblem? problem,
+  }) {
+    final result = TestHostResponse._();
+    if (message != null) result.message = message;
+    if (problem != null) result.problem = problem;
+    return result;
+  }
+
+  TestHostResponse._();
+
+  factory TestHostResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TestHostResponse()..mergeFromBuffer(data, registry);
+  factory TestHostResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TestHostResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TestHostResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TestHostResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'message')
+    ..aOM<CiProblem>(2, _omitFieldNames ? '' : 'problem',
+        subBuilder: CiProblem.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestHostResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestHostResponse copyWith(void Function(TestHostResponse) updates) =>
+      super.copyWith((message) => updates(message as TestHostResponse))
+          as TestHostResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TestHostResponse() / TestHostResponse.new instead')
+  static TestHostResponse create() => TestHostResponse._();
+  static $pb.GeneratedMessage $_createMessage() => TestHostResponse._();
+  @$core.override
+  TestHostResponse createEmptyInstance() => TestHostResponse._();
+  @$core.pragma('dart2js:noInline')
+  static TestHostResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TestHostResponse>(
+          TestHostResponse.$_createMessage);
+  static TestHostResponse? _defaultInstance;
+
+  /// "Signed in as ana" on success.
+  @$pb.TagNumber(1)
+  $core.String get message => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set message($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMessage() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMessage() => $_clearField(1);
+
+  /// Set when the token doesn't work.
+  @$pb.TagNumber(2)
+  CiProblem get problem => $_getN(1);
+  @$pb.TagNumber(2)
+  set problem(CiProblem value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasProblem() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearProblem() => $_clearField(2);
+  @$pb.TagNumber(2)
+  CiProblem ensureProblem() => $_ensure(1);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

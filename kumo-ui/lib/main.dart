@@ -3,7 +3,9 @@ import 'package:flutter/widgets.dart';
 import 'app/app_state.dart';
 import 'app/kumo_app.dart';
 import 'app/preferences.dart';
+import 'data/pipelines_source.dart';
 import 'engine/engine_agents_source.dart';
+import 'engine/engine_pipelines_source.dart';
 import 'engine/engine_tasks_source.dart';
 import 'engine/engine_workspace_source.dart';
 import 'engine/engine_worktree_changes.dart';
@@ -22,6 +24,9 @@ Future<void> main() async {
     changesFor: (worktree) => EngineWorktreeChanges(engine, worktree),
     agents: EngineAgentsSource(engine),
     tasks: EngineTasksSource(engine),
+    pipelinesFor: ({required repo, required worktree, required worktreePath}) =>
+        EnginePipelinesSource(engine, worktreePath, provider: CiProvider.ofHost(repo.host), branch: worktree.branch),
+    ciHosts: EngineCiHostsSource(engine),
   );
   runApp(KumoApp(state: state, engine: engine));
 }

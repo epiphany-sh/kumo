@@ -1,0 +1,52 @@
+[
+  {
+    "id": 7710023,
+    "status": "manual",
+    "stage": "deploy",
+    "name": "deploy:staging",
+    "ref": "feat/PRC-412-bulk-discounts",
+    "created_at": "2026-10-28T14:03:11.500Z",
+    "started_at": null,
+    "finished_at": null,
+    "duration": null,
+    "web_url": "https://gitlab.fravega.com/pricing/price-admin/-/jobs/7710023",
+    "commit": {
+      "id": "9a7c3e1f00112233445566778899aabbccddeeff",
+      "short_id": "9a7c3e1f",
+      "title": "fix: rounding in bulk discounts"
+    }
+  },
+  {
+    "id": 7710022,
+    "status": "running",
+    "stage": "test",
+    "name": "integration",
+    "started_at": "2026-10-28T14:08:51.000Z",
+    "finished_at": null,
+    "duration": 66.2,
+    "web_url": "https://gitlab.fravega.com/pricing/price-admin/-/jobs/7710022",
+    "commit": { "title": "fix: rounding in bulk discounts" }
+  },
+  {
+    "id": 7710021,
+    "status": "failed",
+    "stage": "test",
+    "name": "unit",
+    "started_at": "2026-10-28T14:05:10.000Z",
+    "finished_at": "2026-10-28T14:07:50.000Z",
+    "duration": 160.4,
+    "web_url": "https://gitlab.fravega.com/pricing/price-admin/-/jobs/7710021",
+    "commit": { "title": "fix: rounding in bulk discounts" }
+  },
+  {
+    "id": 7710020,
+    "status": "success",
+    "stage": "build",
+    "name": "build",
+    "started_at": "2026-10-28T14:03:20.000Z",
+    "finished_at": "2026-10-28T14:04:32.000Z",
+    "duration": 72.0,
+    "web_url": "https://gitlab.fravega.com/pricing/price-admin/-/jobs/7710020",
+    "commit": { "title": "fix: rounding in bulk discounts" }
+  }
+]

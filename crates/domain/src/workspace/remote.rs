@@ -48,6 +48,14 @@ impl Remote {
     }
 }
 
+impl Remote {
+    /// The host's domain (`github.com`), lowercase; None for local paths.
+    pub fn domain(&self) -> Option<String> {
+        let (domain, _) = split_url(self.url.trim());
+        (!domain.is_empty()).then(|| domain.to_ascii_lowercase())
+    }
+}
+
 /// (host, path) of a remote URL.
 fn split_url(url: &str) -> (&str, Option<&str>) {
     if let Some((_, rest)) = url.split_once("://") {

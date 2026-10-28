@@ -12,6 +12,7 @@
 //! - [`secrets`]: API tokens in the OS keychain.
 
 pub mod agents;
+pub mod ci;
 pub mod discovery;
 pub mod fs;
 pub mod git;
@@ -21,3 +22,6 @@ pub mod security;
 pub mod storage;
 pub mod tasks;
 pub mod watch;
+
+#[cfg(test)]
+mod test_server;

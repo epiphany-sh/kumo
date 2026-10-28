@@ -791,3 +791,184 @@ message UnlinkTaskRequest {
 }
 
 message UnlinkTaskResponse {}
+
+// ---------------------------------------------------------------------------
+// Pipelines: CI runs of a worktree's branch
+// ---------------------------------------------------------------------------
+//
+// The daemon polls the repository's CI (GitHub Actions, GitLab CI, Bitbucket
+// Pipelines) with the host's token from the keychain, while someone watches:
+// every 10 s while a run is queued or running, every 60 s otherwise, slower
+// on errors. Problems come as a kind plus the provider's own short detail;
+// the UI words them.
+
+service Pipelines {
+  // The latest run of the worktree's branch, pushed whenever it changes.
+  // The first message is the first answer (or problem).
+  rpc Watch(WatchPipelinesRequest) returns (stream PipelinesSnapshot);
+  // Asks the provider now; returns once the new snapshot was pushed.
+  rpc Refresh(WorktreeRequest) returns (PipelinesActionResponse);
+  // Re-runs the failed jobs of a run (Bitbucket: a new pipeline for the
+  // same commit).
+  rpc RerunFailed(RerunFailedRequest) returns (PipelinesActionResponse);
+
+  // Hosts of the workspace's repositories, and whether each has a token.
+  rpc ListHosts(ListHostsRequest) returns (ListHostsResponse);
+  // Saves the host's token in the keychain; an empty token removes it.
+  rpc SaveHostToken(SaveHostTokenRequest) returns (CiHostInfo);
+  // Checks a token (the given one, or the saved one when empty).
+  rpc TestHost(TestHostRequest) returns (TestHostResponse);
+  // Opens a terminal running `gh auth login` for a GitHub host; once it's
+  // signed in, the host's pipelines are asked again on their own. Kumo
+  // never sees what's typed there.
+  rpc SignInWithGh(SignInWithGhRequest) returns (SignInWithGhResponse);
+}
+
+enum CiProvider {
+  CI_PROVIDER_NONE = 0;
+  CI_PROVIDER_GITHUB_ACTIONS = 1;
+  CI_PROVIDER_GITLAB_CI = 2;
+  CI_PROVIDER_BITBUCKET_PIPELINES = 3;
+}
+
+enum CiState {
+  CI_STATE_QUEUED = 0;
+  CI_STATE_RUNNING = 1;
+  CI_STATE_PASSED = 2;
+  CI_STATE_FAILED = 3;
+  CI_STATE_CANCELED = 4;
+  CI_STATE_SKIPPED = 5;
+}
+
+enum CiProblemKind {
+  CI_PROBLEM_KIND_UNSPECIFIED = 0;
+  // No token for the host.
+  CI_PROBLEM_KIND_NOT_CONNECTED = 1;
+  // 401: the token expired or was revoked.
+  CI_PROBLEM_KIND_UNAUTHORIZED = 2;
+  // 403: the token can't read pipelines (see missing_scope).
+  CI_PROBLEM_KIND_FORBIDDEN = 3;
+  CI_PROBLEM_KIND_NOT_FOUND = 4;
+  // 429, or 403 with no requests left (see retry_at).
+  CI_PROBLEM_KIND_RATE_LIMITED = 5;
+  // Timeouts, DNS, 5xx.
+  CI_PROBLEM_KIND_UNREACHABLE = 6;
+  // The branch has no upstream yet (see commits_waiting).
+  CI_PROBLEM_KIND_NOT_PUSHED = 7;
+  // The repository's host has no supported CI (or no remote).
+  CI_PROBLEM_KIND_UNSUPPORTED = 8;
+}
+
+message WatchPipelinesRequest {
+  string worktree_path = 1;
+}
+
+message PipelinesSnapshot {
+  CiProvider provider = 1;
+  // "owner/name" on the host.
+  string repo = 2;
+  string branch = 3;
+  // The latest run; with a rate-limited or unreachable problem, the last
+  // one seen.
+  optional CiRun latest = 4;
+  optional CiProblem problem = 5;
+  // When the provider last answered (Unix ms, 0 = never).
+  int64 checked_at = 6;
+}
+
+message CiRun {
+  // The provider's id, for RerunFailed.
+  string id = 1;
+  // What the provider calls it: "run #8812", "pipeline #4417".
+  string label = 2;
+  string short_sha = 3;
+  // Subject of the commit it ran for.
+  string title = 4;
+  CiState state = 5;
+  // Unix ms, 0 = unknown.
+  int64 created_at = 6;
+  int64 finished_at = 7;
+  string url = 8;
+  repeated CiJob jobs = 9;
+}
+
+message CiJob {
+  string name = 1;
+  CiState state = 2;
+  // Finished jobs; 0 = unknown.
+  int64 duration_ms = 3;
+  // Unix ms, 0 = not started.
+  int64 started_at = 4;
+  // First useful line of the error, for failed jobs (best effort).
+  string failure = 5;
+  string url = 6;
+}
+
+message CiProblem {
+  CiProblemKind kind = 1;
+  // The provider's answer, short: "HTTP 403 · Resource not accessible by
+  // personal access token". Never contains a token.
+  string detail = 2;
+  // The permission the token lacks, when the provider says which.
+  string missing_scope = 3;
+  // When the daemon tries again on its own (Unix ms, 0 = unknown).
+  int64 retry_at = 4;
+  // Local commits waiting for the first push.
+  uint32 commits_waiting = 5;
+}
+
+message RerunFailedRequest {
+  string worktree_path = 1;
+  string run_id = 2;
+}
+
+message PipelinesActionResponse {}
+
+message ListHostsRequest {}
+
+message ListHostsResponse {
+  repeated CiHostInfo hosts = 1;
+}
+
+message CiHostInfo {
+  // "github.com", "gitlab.example.com".
+  string host = 1;
+  CiProvider provider = 2;
+  // A token is saved in the keychain.
+  bool has_token = 3;
+  // No saved token, but the gh CLI is signed in to the host.
+  bool uses_gh = 4;
+  // Repositories of the workspace on this host ("owner/name").
+  repeated string repos = 5;
+  // The account gh is signed in as on the host, when it is.
+  string gh_account = 6;
+  // gh is installed and can sign in to this host (GitHub hosts).
+  bool gh_available = 7;
+}
+
+message SignInWithGhRequest {
+  string host = 1;
+}
+
+message SignInWithGhResponse {
+  // The terminal running `gh auth login`, to show.
+  string terminal_id = 1;
+}
+
+message SaveHostTokenRequest {
+  string host = 1;
+  string token = 2;
+}
+
+message TestHostRequest {
+  string host = 1;
+  // Empty: test the saved one.
+  string token = 2;
+}
+
+message TestHostResponse {
+  // "Signed in as ana" on success.
+  string message = 1;
+  // Set when the token doesn't work.
+  optional CiProblem problem = 2;
+}

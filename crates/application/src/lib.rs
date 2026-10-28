@@ -13,6 +13,7 @@
 pub mod agents;
 pub mod changes;
 pub mod daemon;
+pub mod pipelines;
 pub mod tasks;
 pub mod terminal;
 pub mod workspace;

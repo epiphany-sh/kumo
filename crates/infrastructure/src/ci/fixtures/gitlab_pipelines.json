@@ -1,0 +1,14 @@
+[
+  {
+    "id": 991204417,
+    "iid": 4417,
+    "project_id": 3412,
+    "sha": "9a7c3e1f00112233445566778899aabbccddeeff",
+    "ref": "feat/PRC-412-bulk-discounts",
+    "status": "running",
+    "source": "push",
+    "created_at": "2026-10-28T14:03:11.402Z",
+    "updated_at": "2026-10-28T14:09:57.117Z",
+    "web_url": "https://gitlab.fravega.com/pricing/price-admin/-/pipelines/991204417"
+  }
+]

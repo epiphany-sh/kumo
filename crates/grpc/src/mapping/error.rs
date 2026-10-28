@@ -1,5 +1,6 @@
 use kumo_domain::agents::AgentError;
 use kumo_domain::changes::ChangesError;
+use kumo_domain::pipelines::PipelinesError;
 use kumo_domain::tasks::TaskError;
 use kumo_domain::terminal::TerminalError;
 use kumo_domain::workspace::WorkspaceError;
@@ -80,5 +81,18 @@ pub fn tasks_status_from(error: TaskError) -> Status {
         TaskError::Conflict(_) => Status::aborted(message),
         TaskError::Unavailable(_) => Status::unavailable(message),
         TaskError::Store(_) | TaskError::Secret(_) => Status::internal(message),
+    }
+}
+
+pub fn pipelines_status_from(error: PipelinesError) -> Status {
+    let message = error.to_string();
+    match error {
+        PipelinesError::UnknownWorktree(_) | PipelinesError::UnknownHost(_) => {
+            Status::not_found(message)
+        }
+        PipelinesError::Invalid(_) => Status::invalid_argument(message),
+        PipelinesError::Secret(_) => Status::internal(message),
+        PipelinesError::Ci(problem) if problem.keeps_last_run() => Status::unavailable(message),
+        PipelinesError::Ci(_) => Status::failed_precondition(message),
     }
 }

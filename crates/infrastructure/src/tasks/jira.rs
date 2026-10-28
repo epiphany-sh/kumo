@@ -243,8 +243,8 @@ fn is_issue_key(key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::super::test_server::TestServer;
     use super::*;
+    use crate::test_server::TestServer;
     use kumo_domain::tasks::SourceId;
 
     fn source(site: &str) -> TaskSource {

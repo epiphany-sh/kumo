@@ -10,6 +10,7 @@ import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
 import 'agent_settings.dart';
+import 'host_settings.dart';
 import 'task_settings.dart';
 
 enum SettingsTab {
@@ -80,6 +81,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
         autofocus: true,
         child: Semantics(
           scopesRoute: true,
+          explicitChildNodes: true,
           namesRoute: true,
           label: 'Settings',
           child: SizedBox(
@@ -124,7 +126,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                       for (final t in SettingsTab.values) ...[
                         if (t == SettingsTab.ai) Container(width: 1, height: 34, margin: const EdgeInsets.symmetric(horizontal: 8), color: c.divider),
-                        _TabButton(tab: t, selected: t == _tab, badge: t == SettingsTab.repos && _gitlabWarn(context), onTap: () => setState(() {
+                        _TabButton(tab: t, selected: t == _tab, onTap: () => setState(() {
                           _tab = t;
                           _open = null;
                           _showAddNote = false;
@@ -155,7 +157,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
     );
   }
 
-  bool _gitlabWarn(BuildContext context) => AppScope.of(context).setting<String>('conn.gitlab', 'warn') == 'warn';
 
   // ------------------------------------------------------------ content
 
@@ -202,7 +203,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     final expanded = on && _open == p.id;
     final (status, statusColor) = switch (state) {
       'on' => ('Connected', c.ok),
-      'warn' => (p.warn ?? 'Needs attention', c.warn),
+      'warn' => ('Needs attention', c.warn),
       'missing' => ('Not installed', c.text3),
       _ => ('Not connected', c.text3),
     };
@@ -388,30 +389,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
       case SettingsTab.repos:
         return _Page(
           'Repositories',
-          'Git hosts for cloning, pull requests and pipelines. Credentials stay in the macOS Keychain.',
-          addLabel: 'Add host',
-          addNote: 'Self-managed GitLab, GitHub Enterprise and Gitea work too: add the host URL and a token.',
-          providers: [
-            _Provider('github', 'GH', 'GitHub', 'Signed in · org fravega · 14 repos', 'on', testNote: 'API reachable', rows: () => [
-                  _seg(s, 'repos.github.auth', 'Sign-in method', null, const ['GitHub app', 'Token', 'gh CLI'], 'GitHub app'),
-                  _toggle(s, 'repos.github.draft', 'Open pull requests as drafts', null, true),
-                  _select(s, 'repos.github.reviewers', 'Reviewers', null, const ['From CODEOWNERS', 'Ask every time', 'None'], 'From CODEOWNERS'),
-                ]),
-            _Provider('gitlab', 'GL', 'GitLab', 'gitlab.fravega.com (self-managed) · 6 repos', 'warn', warn: 'Token expires in 12 days', testNote: 'Reachable · token valid 12 more days', rows: () => [
-                  _text(s, 'repos.gitlab.host', 'Host', null, 'https://gitlab.fravega.com', mono: true),
-                  _Row(
-                    label: 'Access token',
-                    desc: 'Expires in 12 days. Kumo needs api and read_repository scopes.',
-                    control: KButton(label: 'Mark renewed', height: 30, fontSize: 12.5, onTap: () => s.setSetting('conn.gitlab', 'on')),
-                  ),
-                ]),
-            _Provider('bitbucket', 'BB', 'Bitbucket', 'Workspace fravega-identity · 2 repos', 'on', rows: () => [
-                  _toggle(s, 'repos.bitbucket.pipelines', 'Show Pipelines status', null, true),
-                ]),
-            _Provider('ghe', 'GE', 'GitHub Enterprise', 'Your company’s GitHub server', 'off', rows: () => [
-                  _text(s, 'repos.ghe.host', 'Host', null, 'https://github.example.com', mono: true),
-                ]),
-          ],
+          'Tokens for the hosts of your repositories, so the Pipelines widget shows their CI. One per host, kept in the macOS Keychain.',
+          custom: const HostTokensPanel(),
           sections: [
             ('Where code lives', [
               _text(s, 'repos.clone', 'Clone into', null, '~/dev', mono: true),
@@ -489,7 +468,7 @@ class _Page {
 }
 
 class _Provider {
-  _Provider(this.id, this.k, this.name, this.meta, this.initial, {required this.rows, this.warn, this.testNote = 'Connected · token valid'});
+  _Provider(this.id, this.k, this.name, this.meta, this.initial, {required this.rows, this.testNote = 'Connected · token valid'});
   final String id;
   final String k;
   final String name;
@@ -498,17 +477,15 @@ class _Provider {
   /// on / warn / off / missing (before the user changes it).
   final String initial;
   final List<Widget> Function() rows;
-  final String? warn;
   final String testNote;
 }
 
 // ------------------------------------------------------------ pieces
 
 class _TabButton extends StatelessWidget {
-  const _TabButton({required this.tab, required this.selected, required this.onTap, this.badge = false});
+  const _TabButton({required this.tab, required this.selected, required this.onTap});
   final SettingsTab tab;
   final bool selected;
-  final bool badge;
   final VoidCallback onTap;
 
   @override
@@ -532,7 +509,6 @@ class _TabButton extends StatelessWidget {
               Text(tab.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, weight: FontWeight.w500, color: selected ? c.text : c.text2)),
             ]),
           ),
-          if (badge) Positioned(top: 8, right: 24, child: Dot(c.warn)),
         ]),
       ),
     );

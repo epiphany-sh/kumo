@@ -1,0 +1,28 @@
+{
+  "page": 1,
+  "pagelen": 1,
+  "size": 132,
+  "values": [
+    {
+      "type": "pipeline",
+      "uuid": "{6b1e0a52-3a4f-4f0e-9a9c-2b5d0f1e7c11}",
+      "build_number": 132,
+      "creator": { "display_name": "Ana" },
+      "repository": { "full_name": "fravega-identity/users-api" },
+      "target": {
+        "type": "pipeline_ref_target",
+        "ref_type": "branch",
+        "ref_name": "feat/audit-log",
+        "commit": { "type": "commit", "hash": "c0ffee1234567890abcdef1234567890abcdef12" }
+      },
+      "state": {
+        "name": "COMPLETED",
+        "type": "pipeline_state_completed",
+        "result": { "name": "FAILED", "type": "pipeline_state_completed_failed" }
+      },
+      "created_on": "2026-10-28T13:40:00.123456+00:00",
+      "completed_on": "2026-10-28T13:46:30.000000+00:00",
+      "duration_in_seconds": 390
+    }
+  ]
+}

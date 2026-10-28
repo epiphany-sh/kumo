@@ -207,8 +207,8 @@ fn to_task(source: &TaskSource, item: &Value, project: &str) -> Option<Task> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::test_server::TestServer;
     use super::*;
+    use crate::test_server::TestServer;
     use kumo_domain::tasks::SourceId;
 
     fn source(project: &str) -> TaskSource {

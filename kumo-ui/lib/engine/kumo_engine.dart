@@ -20,7 +20,8 @@ class EngineConnection {
         workspace = WorkspaceClient(channel, options: auth),
         git = GitClient(channel, options: auth),
         agents = AgentsClient(channel, options: auth),
-        tasks = TasksClient(channel, options: auth);
+        tasks = TasksClient(channel, options: auth),
+        pipelines = PipelinesClient(channel, options: auth);
 
   final ClientChannel channel;
   final DaemonEndpoint endpoint;
@@ -31,6 +32,7 @@ class EngineConnection {
   final GitClient git;
   final AgentsClient agents;
   final TasksClient tasks;
+  final PipelinesClient pipelines;
 }
 
 /// Discovers or launches the daemon, handshakes and hands out the

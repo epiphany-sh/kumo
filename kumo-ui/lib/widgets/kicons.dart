@@ -64,4 +64,8 @@ abstract final class KIcons {
   static const flask = Icons.science_outlined;
   static const activity = Icons.timeline_rounded;
   static const sidePanel = Icons.view_sidebar_outlined;
+  static const refresh = Icons.refresh_rounded;
+  static const lock = Icons.lock_outline_rounded;
+  static const cloudOff = Icons.cloud_off_rounded;
+  static const plug = Icons.power_outlined;
 }

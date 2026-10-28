@@ -153,6 +153,67 @@ final $typed_data.Uint8List taskPriorityDescriptor = $convert.base64Decode(
     '9MT1cQARIYChRUQVNLX1BSSU9SSVRZX01FRElVTRACEhYKElRBU0tfUFJJT1JJVFlfSElHSBAD'
     'EhgKFFRBU0tfUFJJT1JJVFlfVVJHRU5UEAQ=');
 
+@$core.Deprecated('Use ciProviderDescriptor instead')
+const CiProvider$json = {
+  '1': 'CiProvider',
+  '2': [
+    {'1': 'CI_PROVIDER_NONE', '2': 0},
+    {'1': 'CI_PROVIDER_GITHUB_ACTIONS', '2': 1},
+    {'1': 'CI_PROVIDER_GITLAB_CI', '2': 2},
+    {'1': 'CI_PROVIDER_BITBUCKET_PIPELINES', '2': 3},
+  ],
+};
+
+/// Descriptor for `CiProvider`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List ciProviderDescriptor = $convert.base64Decode(
+    'CgpDaVByb3ZpZGVyEhQKEENJX1BST1ZJREVSX05PTkUQABIeChpDSV9QUk9WSURFUl9HSVRIVU'
+    'JfQUNUSU9OUxABEhkKFUNJX1BST1ZJREVSX0dJVExBQl9DSRACEiMKH0NJX1BST1ZJREVSX0JJ'
+    'VEJVQ0tFVF9QSVBFTElORVMQAw==');
+
+@$core.Deprecated('Use ciStateDescriptor instead')
+const CiState$json = {
+  '1': 'CiState',
+  '2': [
+    {'1': 'CI_STATE_QUEUED', '2': 0},
+    {'1': 'CI_STATE_RUNNING', '2': 1},
+    {'1': 'CI_STATE_PASSED', '2': 2},
+    {'1': 'CI_STATE_FAILED', '2': 3},
+    {'1': 'CI_STATE_CANCELED', '2': 4},
+    {'1': 'CI_STATE_SKIPPED', '2': 5},
+  ],
+};
+
+/// Descriptor for `CiState`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List ciStateDescriptor = $convert.base64Decode(
+    'CgdDaVN0YXRlEhMKD0NJX1NUQVRFX1FVRVVFRBAAEhQKEENJX1NUQVRFX1JVTk5JTkcQARITCg'
+    '9DSV9TVEFURV9QQVNTRUQQAhITCg9DSV9TVEFURV9GQUlMRUQQAxIVChFDSV9TVEFURV9DQU5D'
+    'RUxFRBAEEhQKEENJX1NUQVRFX1NLSVBQRUQQBQ==');
+
+@$core.Deprecated('Use ciProblemKindDescriptor instead')
+const CiProblemKind$json = {
+  '1': 'CiProblemKind',
+  '2': [
+    {'1': 'CI_PROBLEM_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'CI_PROBLEM_KIND_NOT_CONNECTED', '2': 1},
+    {'1': 'CI_PROBLEM_KIND_UNAUTHORIZED', '2': 2},
+    {'1': 'CI_PROBLEM_KIND_FORBIDDEN', '2': 3},
+    {'1': 'CI_PROBLEM_KIND_NOT_FOUND', '2': 4},
+    {'1': 'CI_PROBLEM_KIND_RATE_LIMITED', '2': 5},
+    {'1': 'CI_PROBLEM_KIND_UNREACHABLE', '2': 6},
+    {'1': 'CI_PROBLEM_KIND_NOT_PUSHED', '2': 7},
+    {'1': 'CI_PROBLEM_KIND_UNSUPPORTED', '2': 8},
+  ],
+};
+
+/// Descriptor for `CiProblemKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List ciProblemKindDescriptor = $convert.base64Decode(
+    'Cg1DaVByb2JsZW1LaW5kEh8KG0NJX1BST0JMRU1fS0lORF9VTlNQRUNJRklFRBAAEiEKHUNJX1'
+    'BST0JMRU1fS0lORF9OT1RfQ09OTkVDVEVEEAESIAocQ0lfUFJPQkxFTV9LSU5EX1VOQVVUSE9S'
+    'SVpFRBACEh0KGUNJX1BST0JMRU1fS0lORF9GT1JCSURERU4QAxIdChlDSV9QUk9CTEVNX0tJTk'
+    'RfTk9UX0ZPVU5EEAQSIAocQ0lfUFJPQkxFTV9LSU5EX1JBVEVfTElNSVRFRBAFEh8KG0NJX1BS'
+    'T0JMRU1fS0lORF9VTlJFQUNIQUJMRRAGEh4KGkNJX1BST0JMRU1fS0lORF9OT1RfUFVTSEVEEA'
+    'cSHwobQ0lfUFJPQkxFTV9LSU5EX1VOU1VQUE9SVEVEEAg=');
+
 @$core.Deprecated('Use helloRequestDescriptor instead')
 const HelloRequest$json = {
   '1': 'HelloRequest',
@@ -1937,3 +1998,310 @@ const UnlinkTaskResponse$json = {
 /// Descriptor for `UnlinkTaskResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List unlinkTaskResponseDescriptor =
     $convert.base64Decode('ChJVbmxpbmtUYXNrUmVzcG9uc2U=');
+
+@$core.Deprecated('Use watchPipelinesRequestDescriptor instead')
+const WatchPipelinesRequest$json = {
+  '1': 'WatchPipelinesRequest',
+  '2': [
+    {'1': 'worktree_path', '3': 1, '4': 1, '5': 9, '10': 'worktreePath'},
+  ],
+};
+
+/// Descriptor for `WatchPipelinesRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List watchPipelinesRequestDescriptor = $convert.base64Decode(
+    'ChVXYXRjaFBpcGVsaW5lc1JlcXVlc3QSIwoNd29ya3RyZWVfcGF0aBgBIAEoCVIMd29ya3RyZW'
+    'VQYXRo');
+
+@$core.Deprecated('Use pipelinesSnapshotDescriptor instead')
+const PipelinesSnapshot$json = {
+  '1': 'PipelinesSnapshot',
+  '2': [
+    {
+      '1': 'provider',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.CiProvider',
+      '10': 'provider'
+    },
+    {'1': 'repo', '3': 2, '4': 1, '5': 9, '10': 'repo'},
+    {'1': 'branch', '3': 3, '4': 1, '5': 9, '10': 'branch'},
+    {
+      '1': 'latest',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.CiRun',
+      '9': 0,
+      '10': 'latest',
+      '17': true
+    },
+    {
+      '1': 'problem',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.CiProblem',
+      '9': 1,
+      '10': 'problem',
+      '17': true
+    },
+    {'1': 'checked_at', '3': 6, '4': 1, '5': 3, '10': 'checkedAt'},
+  ],
+  '8': [
+    {'1': '_latest'},
+    {'1': '_problem'},
+  ],
+};
+
+/// Descriptor for `PipelinesSnapshot`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pipelinesSnapshotDescriptor = $convert.base64Decode(
+    'ChFQaXBlbGluZXNTbmFwc2hvdBIvCghwcm92aWRlchgBIAEoDjITLmt1bW8udjEuQ2lQcm92aW'
+    'RlclIIcHJvdmlkZXISEgoEcmVwbxgCIAEoCVIEcmVwbxIWCgZicmFuY2gYAyABKAlSBmJyYW5j'
+    'aBIrCgZsYXRlc3QYBCABKAsyDi5rdW1vLnYxLkNpUnVuSABSBmxhdGVzdIgBARIxCgdwcm9ibG'
+    'VtGAUgASgLMhIua3Vtby52MS5DaVByb2JsZW1IAVIHcHJvYmxlbYgBARIdCgpjaGVja2VkX2F0'
+    'GAYgASgDUgljaGVja2VkQXRCCQoHX2xhdGVzdEIKCghfcHJvYmxlbQ==');
+
+@$core.Deprecated('Use ciRunDescriptor instead')
+const CiRun$json = {
+  '1': 'CiRun',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'label', '3': 2, '4': 1, '5': 9, '10': 'label'},
+    {'1': 'short_sha', '3': 3, '4': 1, '5': 9, '10': 'shortSha'},
+    {'1': 'title', '3': 4, '4': 1, '5': 9, '10': 'title'},
+    {
+      '1': 'state',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.CiState',
+      '10': 'state'
+    },
+    {'1': 'created_at', '3': 6, '4': 1, '5': 3, '10': 'createdAt'},
+    {'1': 'finished_at', '3': 7, '4': 1, '5': 3, '10': 'finishedAt'},
+    {'1': 'url', '3': 8, '4': 1, '5': 9, '10': 'url'},
+    {'1': 'jobs', '3': 9, '4': 3, '5': 11, '6': '.kumo.v1.CiJob', '10': 'jobs'},
+  ],
+};
+
+/// Descriptor for `CiRun`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ciRunDescriptor = $convert.base64Decode(
+    'CgVDaVJ1bhIOCgJpZBgBIAEoCVICaWQSFAoFbGFiZWwYAiABKAlSBWxhYmVsEhsKCXNob3J0X3'
+    'NoYRgDIAEoCVIIc2hvcnRTaGESFAoFdGl0bGUYBCABKAlSBXRpdGxlEiYKBXN0YXRlGAUgASgO'
+    'MhAua3Vtby52MS5DaVN0YXRlUgVzdGF0ZRIdCgpjcmVhdGVkX2F0GAYgASgDUgljcmVhdGVkQX'
+    'QSHwoLZmluaXNoZWRfYXQYByABKANSCmZpbmlzaGVkQXQSEAoDdXJsGAggASgJUgN1cmwSIgoE'
+    'am9icxgJIAMoCzIOLmt1bW8udjEuQ2lKb2JSBGpvYnM=');
+
+@$core.Deprecated('Use ciJobDescriptor instead')
+const CiJob$json = {
+  '1': 'CiJob',
+  '2': [
+    {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
+    {
+      '1': 'state',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.CiState',
+      '10': 'state'
+    },
+    {'1': 'duration_ms', '3': 3, '4': 1, '5': 3, '10': 'durationMs'},
+    {'1': 'started_at', '3': 4, '4': 1, '5': 3, '10': 'startedAt'},
+    {'1': 'failure', '3': 5, '4': 1, '5': 9, '10': 'failure'},
+    {'1': 'url', '3': 6, '4': 1, '5': 9, '10': 'url'},
+  ],
+};
+
+/// Descriptor for `CiJob`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ciJobDescriptor = $convert.base64Decode(
+    'CgVDaUpvYhISCgRuYW1lGAEgASgJUgRuYW1lEiYKBXN0YXRlGAIgASgOMhAua3Vtby52MS5DaV'
+    'N0YXRlUgVzdGF0ZRIfCgtkdXJhdGlvbl9tcxgDIAEoA1IKZHVyYXRpb25NcxIdCgpzdGFydGVk'
+    'X2F0GAQgASgDUglzdGFydGVkQXQSGAoHZmFpbHVyZRgFIAEoCVIHZmFpbHVyZRIQCgN1cmwYBi'
+    'ABKAlSA3VybA==');
+
+@$core.Deprecated('Use ciProblemDescriptor instead')
+const CiProblem$json = {
+  '1': 'CiProblem',
+  '2': [
+    {
+      '1': 'kind',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.CiProblemKind',
+      '10': 'kind'
+    },
+    {'1': 'detail', '3': 2, '4': 1, '5': 9, '10': 'detail'},
+    {'1': 'missing_scope', '3': 3, '4': 1, '5': 9, '10': 'missingScope'},
+    {'1': 'retry_at', '3': 4, '4': 1, '5': 3, '10': 'retryAt'},
+    {'1': 'commits_waiting', '3': 5, '4': 1, '5': 13, '10': 'commitsWaiting'},
+  ],
+};
+
+/// Descriptor for `CiProblem`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ciProblemDescriptor = $convert.base64Decode(
+    'CglDaVByb2JsZW0SKgoEa2luZBgBIAEoDjIWLmt1bW8udjEuQ2lQcm9ibGVtS2luZFIEa2luZB'
+    'IWCgZkZXRhaWwYAiABKAlSBmRldGFpbBIjCg1taXNzaW5nX3Njb3BlGAMgASgJUgxtaXNzaW5n'
+    'U2NvcGUSGQoIcmV0cnlfYXQYBCABKANSB3JldHJ5QXQSJwoPY29tbWl0c193YWl0aW5nGAUgAS'
+    'gNUg5jb21taXRzV2FpdGluZw==');
+
+@$core.Deprecated('Use rerunFailedRequestDescriptor instead')
+const RerunFailedRequest$json = {
+  '1': 'RerunFailedRequest',
+  '2': [
+    {'1': 'worktree_path', '3': 1, '4': 1, '5': 9, '10': 'worktreePath'},
+    {'1': 'run_id', '3': 2, '4': 1, '5': 9, '10': 'runId'},
+  ],
+};
+
+/// Descriptor for `RerunFailedRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List rerunFailedRequestDescriptor = $convert.base64Decode(
+    'ChJSZXJ1bkZhaWxlZFJlcXVlc3QSIwoNd29ya3RyZWVfcGF0aBgBIAEoCVIMd29ya3RyZWVQYX'
+    'RoEhUKBnJ1bl9pZBgCIAEoCVIFcnVuSWQ=');
+
+@$core.Deprecated('Use pipelinesActionResponseDescriptor instead')
+const PipelinesActionResponse$json = {
+  '1': 'PipelinesActionResponse',
+};
+
+/// Descriptor for `PipelinesActionResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pipelinesActionResponseDescriptor =
+    $convert.base64Decode('ChdQaXBlbGluZXNBY3Rpb25SZXNwb25zZQ==');
+
+@$core.Deprecated('Use listHostsRequestDescriptor instead')
+const ListHostsRequest$json = {
+  '1': 'ListHostsRequest',
+};
+
+/// Descriptor for `ListHostsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listHostsRequestDescriptor =
+    $convert.base64Decode('ChBMaXN0SG9zdHNSZXF1ZXN0');
+
+@$core.Deprecated('Use listHostsResponseDescriptor instead')
+const ListHostsResponse$json = {
+  '1': 'ListHostsResponse',
+  '2': [
+    {
+      '1': 'hosts',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.CiHostInfo',
+      '10': 'hosts'
+    },
+  ],
+};
+
+/// Descriptor for `ListHostsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listHostsResponseDescriptor = $convert.base64Decode(
+    'ChFMaXN0SG9zdHNSZXNwb25zZRIpCgVob3N0cxgBIAMoCzITLmt1bW8udjEuQ2lIb3N0SW5mb1'
+    'IFaG9zdHM=');
+
+@$core.Deprecated('Use ciHostInfoDescriptor instead')
+const CiHostInfo$json = {
+  '1': 'CiHostInfo',
+  '2': [
+    {'1': 'host', '3': 1, '4': 1, '5': 9, '10': 'host'},
+    {
+      '1': 'provider',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.CiProvider',
+      '10': 'provider'
+    },
+    {'1': 'has_token', '3': 3, '4': 1, '5': 8, '10': 'hasToken'},
+    {'1': 'uses_gh', '3': 4, '4': 1, '5': 8, '10': 'usesGh'},
+    {'1': 'repos', '3': 5, '4': 3, '5': 9, '10': 'repos'},
+    {'1': 'gh_account', '3': 6, '4': 1, '5': 9, '10': 'ghAccount'},
+    {'1': 'gh_available', '3': 7, '4': 1, '5': 8, '10': 'ghAvailable'},
+  ],
+};
+
+/// Descriptor for `CiHostInfo`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ciHostInfoDescriptor = $convert.base64Decode(
+    'CgpDaUhvc3RJbmZvEhIKBGhvc3QYASABKAlSBGhvc3QSLwoIcHJvdmlkZXIYAiABKA4yEy5rdW'
+    '1vLnYxLkNpUHJvdmlkZXJSCHByb3ZpZGVyEhsKCWhhc190b2tlbhgDIAEoCFIIaGFzVG9rZW4S'
+    'FwoHdXNlc19naBgEIAEoCFIGdXNlc0doEhQKBXJlcG9zGAUgAygJUgVyZXBvcxIdCgpnaF9hY2'
+    'NvdW50GAYgASgJUglnaEFjY291bnQSIQoMZ2hfYXZhaWxhYmxlGAcgASgIUgtnaEF2YWlsYWJs'
+    'ZQ==');
+
+@$core.Deprecated('Use signInWithGhRequestDescriptor instead')
+const SignInWithGhRequest$json = {
+  '1': 'SignInWithGhRequest',
+  '2': [
+    {'1': 'host', '3': 1, '4': 1, '5': 9, '10': 'host'},
+  ],
+};
+
+/// Descriptor for `SignInWithGhRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List signInWithGhRequestDescriptor = $convert
+    .base64Decode('ChNTaWduSW5XaXRoR2hSZXF1ZXN0EhIKBGhvc3QYASABKAlSBGhvc3Q=');
+
+@$core.Deprecated('Use signInWithGhResponseDescriptor instead')
+const SignInWithGhResponse$json = {
+  '1': 'SignInWithGhResponse',
+  '2': [
+    {'1': 'terminal_id', '3': 1, '4': 1, '5': 9, '10': 'terminalId'},
+  ],
+};
+
+/// Descriptor for `SignInWithGhResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List signInWithGhResponseDescriptor = $convert.base64Decode(
+    'ChRTaWduSW5XaXRoR2hSZXNwb25zZRIfCgt0ZXJtaW5hbF9pZBgBIAEoCVIKdGVybWluYWxJZA'
+    '==');
+
+@$core.Deprecated('Use saveHostTokenRequestDescriptor instead')
+const SaveHostTokenRequest$json = {
+  '1': 'SaveHostTokenRequest',
+  '2': [
+    {'1': 'host', '3': 1, '4': 1, '5': 9, '10': 'host'},
+    {'1': 'token', '3': 2, '4': 1, '5': 9, '10': 'token'},
+  ],
+};
+
+/// Descriptor for `SaveHostTokenRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List saveHostTokenRequestDescriptor = $convert.base64Decode(
+    'ChRTYXZlSG9zdFRva2VuUmVxdWVzdBISCgRob3N0GAEgASgJUgRob3N0EhQKBXRva2VuGAIgAS'
+    'gJUgV0b2tlbg==');
+
+@$core.Deprecated('Use testHostRequestDescriptor instead')
+const TestHostRequest$json = {
+  '1': 'TestHostRequest',
+  '2': [
+    {'1': 'host', '3': 1, '4': 1, '5': 9, '10': 'host'},
+    {'1': 'token', '3': 2, '4': 1, '5': 9, '10': 'token'},
+  ],
+};
+
+/// Descriptor for `TestHostRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List testHostRequestDescriptor = $convert.base64Decode(
+    'Cg9UZXN0SG9zdFJlcXVlc3QSEgoEaG9zdBgBIAEoCVIEaG9zdBIUCgV0b2tlbhgCIAEoCVIFdG'
+    '9rZW4=');
+
+@$core.Deprecated('Use testHostResponseDescriptor instead')
+const TestHostResponse$json = {
+  '1': 'TestHostResponse',
+  '2': [
+    {'1': 'message', '3': 1, '4': 1, '5': 9, '10': 'message'},
+    {
+      '1': 'problem',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.CiProblem',
+      '9': 0,
+      '10': 'problem',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_problem'},
+  ],
+};
+
+/// Descriptor for `TestHostResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List testHostResponseDescriptor = $convert.base64Decode(
+    'ChBUZXN0SG9zdFJlc3BvbnNlEhgKB21lc3NhZ2UYASABKAlSB21lc3NhZ2USMQoHcHJvYmxlbR'
+    'gCIAEoCzISLmt1bW8udjEuQ2lQcm9ibGVtSABSB3Byb2JsZW2IAQFCCgoIX3Byb2JsZW0=');

@@ -1,0 +1,9 @@
+[0KRunning with gitlab-runner 17.5.0 (abc123)
+section_start:1761660310:step_script[0K[0K[36;1mExecuting "step_script" stage of the job script[0;m
+[32;1m$ go test ./...[0;m
+ok  	pricing/internal/catalog	0.412s
+--- FAIL: TestRoundBulk (0.00s)
+    round_test.go:41: expected 10.45, got 10.44
+FAIL
+FAIL	pricing/internal/discount	0.233s
+section_end:1761660470:step_script[0K[31;1mERROR: Job failed: exit code 1[0;m

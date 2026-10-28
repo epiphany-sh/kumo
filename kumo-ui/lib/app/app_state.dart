@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../data/agents_source.dart';
+import '../data/ci_hosts_source.dart';
+import '../data/pipelines_source.dart';
 import '../data/tasks_source.dart';
 import '../data/changes.dart';
 import '../data/workspace_source.dart';
@@ -32,7 +34,10 @@ class AppState extends ChangeNotifier {
   ///
   /// [workspace] provides namespaces, repos and worktrees, and [changesFor]
   /// the git state of the selected worktree (by absolute path): the daemon
-  /// in the app, the design mocks when omitted (tests).
+  /// in the app, the design mocks when omitted (tests). [pipelinesFor] gives
+  /// the CI runs of the selected worktree's branch; without it, the design
+  /// mocks ([MockPipelinesSource]) stand in. [ciHosts] keeps the hosts'
+  /// tokens (Settings › Repositories).
   AppState({
     KumoThemeMode mode = KumoThemeMode.dark,
     this.demoWallpaper = false,
@@ -41,14 +46,19 @@ class AppState extends ChangeNotifier {
     WorktreeChanges Function(String worktreePath)? changesFor,
     AgentsSource? agents,
     TasksSource? tasks,
+    PipelinesFactory? pipelinesFor,
+    CiHostsSource? ciHosts,
   })  : prefs = prefs ?? Preferences.memory(),
         workspace = workspace ?? MockWorkspaceSource(),
         agents = agents ?? MockAgentsSource(),
         tasks = tasks ?? MockTasksSource(),
         _changesFor = changesFor,
+        _pipelinesFor = pipelinesFor ?? mockPipelinesFor,
+        ciHosts = ciHosts ?? MockCiHostsSource(),
         _mode = mode {
     _changes = changesFor == null ? MockWorktreeChanges() : NoWorktreeChanges();
     _changes.addListener(notifyListeners);
+    _bindPipelines();
     this.workspace.addListener(_onWorkspaceChanged);
     this.agents.addListener(notifyListeners);
     final p = this.prefs;
@@ -122,6 +132,7 @@ class AppState extends ChangeNotifier {
     activeWorktree = branch;
     activeWorktreePath = path;
     _bindChanges();
+    _bindPipelines();
     notifyListeners();
   }
 
@@ -153,6 +164,7 @@ class AppState extends ChangeNotifier {
       }
     }
     _bindChanges();
+    _bindPipelines();
     notifyListeners();
   }
 
@@ -352,7 +364,7 @@ class AppState extends ChangeNotifier {
 
   // ---- Inspector widgets (the Widgets tab) ----
 
-  List<InspectorWidget> _widgets = const [InspectorWidget.agent, InspectorWidget.changes, InspectorWidget.context];
+  List<InspectorWidget> _widgets = const [InspectorWidget.agent, InspectorWidget.pipelines, InspectorWidget.changes, InspectorWidget.context];
   List<InspectorWidget> get widgets => List.unmodifiable(_widgets);
   List<InspectorWidget> get availableWidgets => [for (final w in InspectorWidget.values) if (!_widgets.contains(w)) w];
 
@@ -561,7 +573,13 @@ class AppState extends ChangeNotifier {
 
   void push() {
     if (!canPush) return;
-    _sync('Pushing…', _changes.push, (c) => 'Pushed ${c.branch}', 'Push');
+    final changes = _changes;
+    final pipelines = _pipelines;
+    Future<void> run() => changes.push().then((_) {
+          // A first push starts the branch's pipelines.
+          if (changes.error == null && identical(pipelines, _pipelines)) pipelines.branchPushed();
+        });
+    _sync('Pushing…', run, (c) => 'Pushed ${c.branch}', 'Push');
   }
 
   void pull() => _sync('Pulling…', _changes.pull, (c) => 'Pulled into ${c.branch}', 'Pull');
@@ -588,6 +606,33 @@ class AppState extends ChangeNotifier {
     _canUndoCommit = false;
     _changes.undoLastCommit();
     notifyListeners();
+  }
+
+  // ---- Pipelines of the current worktree ----
+
+  final PipelinesFactory _pipelinesFor;
+  PipelinesSource _pipelines = NoPipelines();
+  String? _pipelinesKey;
+
+  /// CI runs of the selected worktree's branch (the Pipelines widget).
+  PipelinesSource get pipelines => _pipelines;
+
+  /// The repository hosts' tokens, for pipelines.
+  final CiHostsSource ciHosts;
+
+  /// Follows the selection: one [PipelinesSource] per worktree.
+  void _bindPipelines() {
+    final repo = activeRepo;
+    final entry = activeWorktreeEntry;
+    final path = entry == null ? null : workspace.absolutePathOf(entry);
+    final key = repo == null || entry == null ? null : '${repo.id}|${entry.branch}|${path ?? ''}';
+    if (key == _pipelinesKey) return;
+    _pipelinesKey = key;
+    _pipelines
+      ..removeListener(notifyListeners)
+      ..dispose();
+    _pipelines = repo == null || entry == null ? NoPipelines() : _pipelinesFor(repo: repo, worktree: entry, worktreePath: path ?? '');
+    _pipelines.addListener(notifyListeners);
   }
 
   // ---- Agents ----
@@ -683,6 +728,9 @@ class AppState extends ChangeNotifier {
     _changes
       ..removeListener(notifyListeners)
       ..dispose();
+    _pipelines
+      ..removeListener(notifyListeners)
+      ..dispose();
     workspace
       ..removeListener(_onWorkspaceChanged)
       ..dispose();
@@ -708,6 +756,7 @@ enum InspectorWidget {
   agent('Agent', 'Ticket, plan steps, review and pause'),
   changes('Changes', 'Uncommitted files; click one to open its diff'),
   context('Context', 'Tickets and docs sent to the agent'),
+  pipelines('Pipelines', 'CI runs of this branch on GitHub, GitLab or Bitbucket'),
   tests('Tests', 'Latest gotestsum run for this worktree'),
   pullRequest('Pull request', 'Checks and reviewers of this branch’s PR'),
   activity('Activity', 'What the agent did, as a timeline');
@@ -737,4 +786,21 @@ class AppScope extends InheritedNotifier<AppState> {
     final scope = context.getInheritedWidgetOfExactType<AppScope>();
     return scope!.notifier!;
   }
+}
+
+/// Builds the [PipelinesSource] of a worktree: [worktreePath] is absolute
+/// (empty for mocks).
+typedef PipelinesFactory = PipelinesSource Function({required Repo repo, required Worktree worktree, required String worktreePath});
+
+/// The design mocks, per worktree: a running pipeline, or "no pipelines
+/// yet" for a branch that was never pushed.
+PipelinesSource mockPipelinesFor({required Repo repo, required Worktree worktree, required String worktreePath}) {
+  final provider = CiProvider.ofHost(repo.host);
+  return MockPipelinesSource(
+    provider: provider,
+    repo: repo.name,
+    branch: worktree.branch,
+    scenario: worktree.everPushed ? MockPipelinesScenario.running : MockPipelinesScenario.notPushed,
+    unpushed: worktree.unpushed,
+  );
 }
