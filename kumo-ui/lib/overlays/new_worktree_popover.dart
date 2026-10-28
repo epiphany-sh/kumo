@@ -8,12 +8,14 @@ import '../data/tasks_source.dart';
 import '../data/workspace_source.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
+import '../widgets/floating_panel.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
 
 enum _Source { ticket, fresh, existing }
 
-/// "New worktree" popover anchored to the sidebar +. Mirrors the canvas:
+/// "New worktree" panel opened from the sidebar +, centered and draggable by
+/// its header. Mirrors the canvas:
 /// start from a ticket / new branch / existing branch, optional agent, ⌘↩.
 class NewWorktreePopover extends StatefulWidget {
   const NewWorktreePopover({super.key, required this.onClose, this.repo = 'price-admin'});
@@ -217,23 +219,25 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
       child: GlassOverlay(
         width: 384,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-          Row(children: [
-            Container(
-              width: 30,
-              height: 30,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: c.accSoft, borderRadius: BorderRadius.circular(10)),
-              child: Icon(KIcons.branch, size: 16, color: c.acc),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('New worktree', style: sans(14, weight: FontWeight.w600, color: c.text)),
-                Text('$_repoName · ${Mock.hostNames[_repoEntry?.host] ?? 'Local'}', style: sans(11.5, color: c.text3)),
-              ]),
-            ),
-            KIconButton(icon: KIcons.close, label: 'Close', onTap: widget.onClose),
-          ]),
+          FloatingPanelHandle(
+            child: Row(children: [
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: c.accSoft, borderRadius: BorderRadius.circular(10)),
+                child: Icon(KIcons.branch, size: 16, color: c.acc),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('New worktree', style: sans(14, weight: FontWeight.w600, color: c.text)),
+                  Text('$_repoName · ${Mock.hostNames[_repoEntry?.host] ?? 'Local'}', style: sans(11.5, color: c.text3)),
+                ]),
+              ),
+              KIconButton(icon: KIcons.close, label: 'Close', onTap: widget.onClose),
+            ]),
+          ),
           const SizedBox(height: 14),
           if (!_created) ..._form() else ..._done(),
         ]),

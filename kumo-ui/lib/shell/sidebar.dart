@@ -549,7 +549,8 @@ class _RepoGroupState extends State<_RepoGroup> {
               const SizedBox(width: 2),
               AnchoredPopover(
                 openSignal: widget.signal ? s.newWorktreeRequests : null,
-                offset: const Offset(14, -30),
+                floating: true,
+                positionKey: NewWorktreePopover,
                 triggerBuilder: (context, toggle, open) => KIconButton(
                   icon: KIcons.add,
                   label: widget.signal ? 'New worktree in ${r.name} (⇧⌘N)' : 'New worktree in ${r.name}',
