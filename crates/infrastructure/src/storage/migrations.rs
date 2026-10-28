@@ -31,6 +31,38 @@ const STEPS: &[&str] = &[
         is_default  INTEGER NOT NULL DEFAULT 0,
         position    INTEGER NOT NULL
     );",
+    // 3: tasks
+    "CREATE TABLE task_sources (
+        id          TEXT PRIMARY KEY,
+        kind        TEXT NOT NULL,
+        name        TEXT NOT NULL,
+        options     TEXT NOT NULL,
+        enabled     INTEGER NOT NULL DEFAULT 1,
+        position    INTEGER NOT NULL
+    );
+    CREATE TABLE tasks (
+        source_id   TEXT NOT NULL REFERENCES task_sources(id) ON DELETE CASCADE,
+        external_id TEXT NOT NULL,
+        key         TEXT NOT NULL,
+        ticket      TEXT,
+        title       TEXT NOT NULL,
+        status      INTEGER NOT NULL,
+        priority    INTEGER NOT NULL,
+        due         TEXT,
+        url         TEXT,
+        context     TEXT NOT NULL,
+        labels      TEXT NOT NULL,
+        updated     INTEGER,
+        position    INTEGER NOT NULL,
+        PRIMARY KEY (source_id, external_id)
+    );
+    CREATE TABLE task_links (
+        task_id     TEXT NOT NULL,
+        worktree    TEXT NOT NULL,
+        branch      TEXT NOT NULL,
+        created     INTEGER NOT NULL,
+        PRIMARY KEY (task_id, worktree)
+    );",
 ];
 
 pub(super) fn migrate(conn: &mut Connection) -> rusqlite::Result<()> {

@@ -8,7 +8,7 @@ use bytes::Bytes;
 use kumo_domain::daemon::DaemonEndpoint;
 use kumo_grpc::client::KumoClient;
 use kumo_proto::v1 as pb;
-use kumod::{Daemon, DaemonConfig};
+use kumod::{Daemon, DaemonConfig, SecretsBackend};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -62,6 +62,8 @@ pub fn test_config(dir: &std::path::Path) -> DaemonConfig {
         data_dir: Some(dir.join("data")),
         home: Some(dir.join("home")),
         agent_path: Some(bin.display().to_string()),
+        // Never the real keychain.
+        secrets: SecretsBackend::Memory,
         ..Default::default()
     }
 }

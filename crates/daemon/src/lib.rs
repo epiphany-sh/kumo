@@ -8,5 +8,5 @@ mod config;
 mod daemon;
 mod single_instance;
 
-pub use config::DaemonConfig;
+pub use config::{DaemonConfig, SecretsBackend};
 pub use daemon::Daemon;

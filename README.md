@@ -38,7 +38,8 @@ Qué es real hoy y qué sigue siendo mock:
 | Files, cambios de git, diffs, commit, push, historial | Real: `Git` en `kumod`; el estado se actualiza solo (file watcher) |
 | Gráfico de ramas del historial, panel Diff de la vista Git | Mock |
 | Agentes | Real: `Agents` en `kumod` con tus propios CLIs (Claude Code, Codex, Gemini, Copilot, Grok, OpenCode, Cursor, Aider, Qwen, Amp o cualquier comando). Opcional: se conectan en Settings › AI agents |
-| Tareas, PRs, pipelines, docs, integraciones | Mock (M4) |
+| Tareas | Real: `Tasks` en `kumod` con Obsidian, Bear (solo lectura), GitHub Issues (vía `gh`), Jira y Todoist. Caché local en `kumo.db`, tokens en el llavero del sistema. Se conectan en Settings › Tasks; desde una tarea se crea un worktree con un agente |
+| PRs, pipelines, docs, resto de integraciones | Mock |
 
 El daemon vive más que la UI: si cerrás la app, las terminales siguen corriendo
 y al reabrirla la UI se vuelve a enganchar a ellas con replay.
@@ -76,7 +77,8 @@ cargo build --release --workspace && ./target/release/kumo-bench all
 ```
 
 `kumo-bench` levanta su propio `kumod` en un directorio temporal. Modos:
-`hello`, `echo`, `throughput`, `all`. Resultados en [`docs/perf/`](docs/perf/).
+`hello`, `echo`, `throughput`, `tasks` (10.000 tareas: abrir, cargar de la caché y filtrar), `all`.
+Resultados en [`docs/perf/`](docs/perf/).
 
 ## Estructura
 
@@ -95,18 +97,23 @@ kumo/
 │   │       │                   ReplayBuffer, ExitStatus, TerminalStatus, puertos PtySystem/PtyMaster/…
 │   │       ├── daemon/         ApiVersion, AuthToken, ListenAddress (solo loopback),
 │   │       │                   DaemonEndpoint, puerto DiscoveryStore
+│   │       ├── tasks/          Task, TaskSource, SourceOptions, TaskFilter, checkboxes de Markdown,
+│   │       │                   puertos TaskConnector/TaskStore/SecretStore
 │   │       └── time.rs         Timestamp
 │   ├── application/            kumo-application: casos de uso
 │   │   └── src/
 │   │       ├── terminal/       TerminalService (open/attach/close/list), registry,
 │   │       │   └── session/    TerminalSession: hilos de I/O, pump (coalescing), hub (replay + suscriptores)
+│   │       ├── tasks/          TaskService: tablero desde la caché, sync en segundo plano, estados, vínculos
 │   │       └── daemon/         HelloService (handshake de versión)
 │   ├── infrastructure/         kumo-infrastructure: adaptadores del SO
 │   │   └── src/{pty, discovery, security}/   portable-pty, daemon.json (0600, atómico), token aleatorio
+│   │       src/tasks/          conectores: Obsidian, Bear, GitHub (gh), Jira, Todoist
+│   │       src/secrets/        tokens en Keychain / Credential Manager
 │   ├── proto/                  kumo-proto: código generado (tonic/prost), nada más
 │   ├── grpc/                   kumo-grpc: servicios tonic, auth Bearer, mapeo proto↔dominio, server y client
 │   ├── daemon/                 kumod: composition root + binario + tests de integración (tests/)
-│   └── bench/                  kumo-bench (hello/echo/throughput) y kumo-echo (helper para Windows)
+│   └── bench/                  kumo-bench (hello/echo/throughput/tasks) y kumo-echo (helper para Windows)
 ├── docs/adr/                   decisiones, una por archivo
 ├── docs/perf/                  resultados de benchmarks con fecha, máquina y SO
 └── kumo-ui/                    Flutter desktop (M1)
@@ -121,6 +128,8 @@ Dependencias entre crates: `domain ← application ← {infrastructure, grpc} �
   - `daemon_endpoint.dart` lee `daemon.json`; `daemon_launcher.dart` busca y lanza `kumod`.
   - `kumo_engine.dart`: handshake `Hello` con token y versión; `grpc_terminal_surface.dart`
     implementa `TerminalSurface` sobre `Terminals.Open` + `Attach` (bidi).
+- Tareas: `lib/data/tasks_source.dart` (interfaz + mock), `lib/engine/engine_tasks_source.dart`
+  (`Tasks.Watch`), `lib/views/tasks_screen.dart` (tablero) y `lib/overlays/task_settings.dart` (Settings › Tasks).
 - `lib/terminal/ansi_screen.dart`: parser ANSI mínimo (M1). En M2 lo reemplaza el emulador en el daemon.
 - `lib/terminal/grid_renderer.dart`: render en grilla de celdas. Fondos a alto de celda, texto anclado a
   `columna × ancho`, íconos centrados por celda, ancho doble (`cell_width.dart`), y powerline / box drawing /

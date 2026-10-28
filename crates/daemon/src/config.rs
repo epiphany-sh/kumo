@@ -16,5 +16,16 @@ pub struct DaemonConfig {
     /// PATH used to find agent CLIs. `None` reads the login shell's (tests
     /// pass their own).
     pub agent_path: Option<String>,
+    /// Where API tokens of task sources are kept.
+    pub secrets: SecretsBackend,
     pub session: SessionConfig,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SecretsBackend {
+    /// The OS keychain.
+    #[default]
+    Keychain,
+    /// In memory, gone when the daemon stops (tests).
+    Memory,
 }

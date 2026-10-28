@@ -1,7 +1,8 @@
-//! Benchmark scenarios (kumo.md §10, M0).
+//! Benchmark scenarios (kumo.md §10: M0 terminals, M4 tasks).
 
 pub mod echo;
 pub mod hello;
+pub mod tasks;
 pub mod throughput;
 
 use crate::daemon_process::sibling_binary;

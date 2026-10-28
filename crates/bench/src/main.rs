@@ -52,6 +52,8 @@ enum Scenario {
     },
     /// Sustained terminal output.
     Throughput,
+    /// Listing and filtering 10,000 tasks from the local cache.
+    Tasks,
     /// All of the above with default parameters.
     All,
 }
@@ -76,10 +78,12 @@ async fn main() -> anyhow::Result<()> {
             pause_ms,
         } => scenarios::echo::run(&mut client, iterations, warmup, pause_ms).await?,
         Scenario::Throughput => scenarios::throughput::run(&mut client).await?,
+        Scenario::Tasks => scenarios::tasks::run(&mut client).await?,
         Scenario::All => {
             scenarios::hello::run(&mut client, 10_000, 1_000).await?;
             scenarios::echo::run(&mut client, 1_000, 100, 2).await?;
             scenarios::throughput::run(&mut client).await?;
+            scenarios::tasks::run(&mut client).await?;
         }
     }
     Ok(())

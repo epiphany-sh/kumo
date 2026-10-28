@@ -7,11 +7,13 @@
 //! - [`changes`]: changes, files and history of one worktree.
 //! - [`terminal`]: PTY-backed terminal sessions, their output and lifecycle.
 //! - [`daemon`]: daemon identity, security and discovery rules.
+//! - [`tasks`]: tasks from the user's tools, cached locally.
 //! - [`workspace`]: namespaces, git repositories and their worktrees.
 
 pub mod agents;
 pub mod changes;
 pub mod daemon;
+pub mod tasks;
 pub mod terminal;
 pub mod time;
 pub mod workspace;

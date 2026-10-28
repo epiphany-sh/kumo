@@ -59,6 +59,13 @@ hdrhistogram = "7.6.0"
 tempfile = "3.27.0"
 rusqlite = { version = "0.41.0", features = ["bundled"] }
 notify = "8.2.1"
+# Task sources: blocking HTTP on the OS's TLS (Security.framework, SChannel),
+# and API tokens in the OS keychain.
+ureq = { version = "3.5.0", default-features = false, features = ["native-tls-no-default", "json", "gzip"] }
+base64 = "0.23.1"
+keyring-core = "1.0.1"
+apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
+windows-native-keyring-store = "1.1.0"
 libc = "0.2"
 windows-sys = "0.61.2"
 

@@ -1,5 +1,6 @@
 use kumo_domain::agents::AgentError;
 use kumo_domain::changes::ChangesError;
+use kumo_domain::tasks::TaskError;
 use kumo_domain::terminal::TerminalError;
 use kumo_domain::workspace::WorkspaceError;
 use tonic::Status;
@@ -63,5 +64,21 @@ pub fn agents_status_from(error: AgentError) -> Status {
         | AgentError::Test(_)
         | AgentError::Launch(_) => Status::failed_precondition(message),
         AgentError::Store(_) => Status::internal(message),
+    }
+}
+
+/// Maps a task error; messages are written for the user. Credential
+/// problems are not `UNAUTHENTICATED`: that one means the daemon's token.
+pub fn tasks_status_from(error: TaskError) -> Status {
+    let message = error.to_string();
+    match error {
+        TaskError::UnknownSource(_) | TaskError::UnknownTask(_) => Status::not_found(message),
+        TaskError::Invalid(_) => Status::invalid_argument(message),
+        TaskError::Unsupported { .. } | TaskError::Auth(_) | TaskError::Source(_) => {
+            Status::failed_precondition(message)
+        }
+        TaskError::Conflict(_) => Status::aborted(message),
+        TaskError::Unavailable(_) => Status::unavailable(message),
+        TaskError::Store(_) | TaskError::Secret(_) => Status::internal(message),
     }
 }
