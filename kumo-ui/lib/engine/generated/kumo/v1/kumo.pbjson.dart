@@ -84,6 +84,21 @@ final $typed_data.Uint8List diffLineKindDescriptor = $convert.base64Decode(
     'CgxEaWZmTGluZUtpbmQSGgoWRElGRl9MSU5FX0tJTkRfQ09OVEVYVBAAEhgKFERJRkZfTElORV'
     '9LSU5EX0FEREVEEAESGgoWRElGRl9MSU5FX0tJTkRfREVMRVRFRBAC');
 
+@$core.Deprecated('Use agentStateDescriptor instead')
+const AgentState$json = {
+  '1': 'AgentState',
+  '2': [
+    {'1': 'AGENT_STATE_WORKING', '2': 0},
+    {'1': 'AGENT_STATE_NEEDS_INPUT', '2': 1},
+    {'1': 'AGENT_STATE_EXITED', '2': 2},
+  ],
+};
+
+/// Descriptor for `AgentState`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List agentStateDescriptor = $convert.base64Decode(
+    'CgpBZ2VudFN0YXRlEhcKE0FHRU5UX1NUQVRFX1dPUktJTkcQABIbChdBR0VOVF9TVEFURV9ORU'
+    'VEU19JTlBVVBABEhYKEkFHRU5UX1NUQVRFX0VYSVRFRBAC');
+
 @$core.Deprecated('Use helloRequestDescriptor instead')
 const HelloRequest$json = {
   '1': 'HelloRequest',
@@ -1099,3 +1114,294 @@ const LogResponse$json = {
 final $typed_data.Uint8List logResponseDescriptor = $convert.base64Decode(
     'CgtMb2dSZXNwb25zZRIpCgdjb21taXRzGAEgAygLMg8ua3Vtby52MS5Db21taXRSB2NvbW1pdH'
     'M=');
+
+@$core.Deprecated('Use agentProviderDescriptor instead')
+const AgentProvider$json = {
+  '1': 'AgentProvider',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'short', '3': 3, '4': 1, '5': 9, '10': 'short'},
+    {'1': 'program', '3': 4, '4': 1, '5': 9, '10': 'program'},
+    {'1': 'args', '3': 5, '4': 1, '5': 9, '10': 'args'},
+    {'1': 'custom', '3': 6, '4': 1, '5': 8, '10': 'custom'},
+    {'1': 'enabled', '3': 7, '4': 1, '5': 8, '10': 'enabled'},
+    {'1': 'is_default', '3': 8, '4': 1, '5': 8, '10': 'isDefault'},
+    {'1': 'installed', '3': 9, '4': 1, '5': 8, '10': 'installed'},
+    {'1': 'resolved_path', '3': 10, '4': 1, '5': 9, '10': 'resolvedPath'},
+    {'1': 'install_hint', '3': 11, '4': 1, '5': 9, '10': 'installHint'},
+    {
+      '1': 'takes_prompt_argument',
+      '3': 12,
+      '4': 1,
+      '5': 8,
+      '10': 'takesPromptArgument'
+    },
+    {'1': 'has_login', '3': 13, '4': 1, '5': 8, '10': 'hasLogin'},
+  ],
+};
+
+/// Descriptor for `AgentProvider`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List agentProviderDescriptor = $convert.base64Decode(
+    'Cg1BZ2VudFByb3ZpZGVyEg4KAmlkGAEgASgJUgJpZBISCgRuYW1lGAIgASgJUgRuYW1lEhQKBX'
+    'Nob3J0GAMgASgJUgVzaG9ydBIYCgdwcm9ncmFtGAQgASgJUgdwcm9ncmFtEhIKBGFyZ3MYBSAB'
+    'KAlSBGFyZ3MSFgoGY3VzdG9tGAYgASgIUgZjdXN0b20SGAoHZW5hYmxlZBgHIAEoCFIHZW5hYm'
+    'xlZBIdCgppc19kZWZhdWx0GAggASgIUglpc0RlZmF1bHQSHAoJaW5zdGFsbGVkGAkgASgIUglp'
+    'bnN0YWxsZWQSIwoNcmVzb2x2ZWRfcGF0aBgKIAEoCVIMcmVzb2x2ZWRQYXRoEiEKDGluc3RhbG'
+    'xfaGludBgLIAEoCVILaW5zdGFsbEhpbnQSMgoVdGFrZXNfcHJvbXB0X2FyZ3VtZW50GAwgASgI'
+    'UhN0YWtlc1Byb21wdEFyZ3VtZW50EhsKCWhhc19sb2dpbhgNIAEoCFIIaGFzTG9naW4=');
+
+@$core.Deprecated('Use listProvidersRequestDescriptor instead')
+const ListProvidersRequest$json = {
+  '1': 'ListProvidersRequest',
+};
+
+/// Descriptor for `ListProvidersRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listProvidersRequestDescriptor =
+    $convert.base64Decode('ChRMaXN0UHJvdmlkZXJzUmVxdWVzdA==');
+
+@$core.Deprecated('Use listProvidersResponseDescriptor instead')
+const ListProvidersResponse$json = {
+  '1': 'ListProvidersResponse',
+  '2': [
+    {
+      '1': 'providers',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.AgentProvider',
+      '10': 'providers'
+    },
+  ],
+};
+
+/// Descriptor for `ListProvidersResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listProvidersResponseDescriptor = $convert.base64Decode(
+    'ChVMaXN0UHJvdmlkZXJzUmVzcG9uc2USNAoJcHJvdmlkZXJzGAEgAygLMhYua3Vtby52MS5BZ2'
+    'VudFByb3ZpZGVyUglwcm92aWRlcnM=');
+
+@$core.Deprecated('Use saveProviderRequestDescriptor instead')
+const SaveProviderRequest$json = {
+  '1': 'SaveProviderRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'program', '3': 3, '4': 1, '5': 9, '10': 'program'},
+    {'1': 'args', '3': 4, '4': 1, '5': 9, '10': 'args'},
+    {'1': 'enabled', '3': 5, '4': 1, '5': 8, '10': 'enabled'},
+    {'1': 'is_default', '3': 6, '4': 1, '5': 8, '10': 'isDefault'},
+  ],
+};
+
+/// Descriptor for `SaveProviderRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List saveProviderRequestDescriptor = $convert.base64Decode(
+    'ChNTYXZlUHJvdmlkZXJSZXF1ZXN0Eg4KAmlkGAEgASgJUgJpZBISCgRuYW1lGAIgASgJUgRuYW'
+    '1lEhgKB3Byb2dyYW0YAyABKAlSB3Byb2dyYW0SEgoEYXJncxgEIAEoCVIEYXJncxIYCgdlbmFi'
+    'bGVkGAUgASgIUgdlbmFibGVkEh0KCmlzX2RlZmF1bHQYBiABKAhSCWlzRGVmYXVsdA==');
+
+@$core.Deprecated('Use deleteProviderRequestDescriptor instead')
+const DeleteProviderRequest$json = {
+  '1': 'DeleteProviderRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+  ],
+};
+
+/// Descriptor for `DeleteProviderRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteProviderRequestDescriptor = $convert
+    .base64Decode('ChVEZWxldGVQcm92aWRlclJlcXVlc3QSDgoCaWQYASABKAlSAmlk');
+
+@$core.Deprecated('Use deleteProviderResponseDescriptor instead')
+const DeleteProviderResponse$json = {
+  '1': 'DeleteProviderResponse',
+};
+
+/// Descriptor for `DeleteProviderResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteProviderResponseDescriptor =
+    $convert.base64Decode('ChZEZWxldGVQcm92aWRlclJlc3BvbnNl');
+
+@$core.Deprecated('Use testProviderRequestDescriptor instead')
+const TestProviderRequest$json = {
+  '1': 'TestProviderRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+  ],
+};
+
+/// Descriptor for `TestProviderRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List testProviderRequestDescriptor = $convert
+    .base64Decode('ChNUZXN0UHJvdmlkZXJSZXF1ZXN0Eg4KAmlkGAEgASgJUgJpZA==');
+
+@$core.Deprecated('Use testProviderResponseDescriptor instead')
+const TestProviderResponse$json = {
+  '1': 'TestProviderResponse',
+  '2': [
+    {'1': 'version', '3': 1, '4': 1, '5': 9, '10': 'version'},
+  ],
+};
+
+/// Descriptor for `TestProviderResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List testProviderResponseDescriptor =
+    $convert.base64Decode(
+        'ChRUZXN0UHJvdmlkZXJSZXNwb25zZRIYCgd2ZXJzaW9uGAEgASgJUgd2ZXJzaW9u');
+
+@$core.Deprecated('Use loginProviderRequestDescriptor instead')
+const LoginProviderRequest$json = {
+  '1': 'LoginProviderRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+  ],
+};
+
+/// Descriptor for `LoginProviderRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List loginProviderRequestDescriptor = $convert
+    .base64Decode('ChRMb2dpblByb3ZpZGVyUmVxdWVzdBIOCgJpZBgBIAEoCVICaWQ=');
+
+@$core.Deprecated('Use loginProviderResponseDescriptor instead')
+const LoginProviderResponse$json = {
+  '1': 'LoginProviderResponse',
+  '2': [
+    {'1': 'terminal_id', '3': 1, '4': 1, '5': 9, '10': 'terminalId'},
+  ],
+};
+
+/// Descriptor for `LoginProviderResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List loginProviderResponseDescriptor = $convert.base64Decode(
+    'ChVMb2dpblByb3ZpZGVyUmVzcG9uc2USHwoLdGVybWluYWxfaWQYASABKAlSCnRlcm1pbmFsSW'
+    'Q=');
+
+@$core.Deprecated('Use startAgentRequestDescriptor instead')
+const StartAgentRequest$json = {
+  '1': 'StartAgentRequest',
+  '2': [
+    {'1': 'provider_id', '3': 1, '4': 1, '5': 9, '10': 'providerId'},
+    {'1': 'worktree_path', '3': 2, '4': 1, '5': 9, '10': 'worktreePath'},
+    {'1': 'prompt', '3': 3, '4': 1, '5': 9, '10': 'prompt'},
+    {'1': 'title', '3': 4, '4': 1, '5': 9, '10': 'title'},
+    {'1': 'cols', '3': 5, '4': 1, '5': 13, '10': 'cols'},
+    {'1': 'rows', '3': 6, '4': 1, '5': 13, '10': 'rows'},
+  ],
+};
+
+/// Descriptor for `StartAgentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List startAgentRequestDescriptor = $convert.base64Decode(
+    'ChFTdGFydEFnZW50UmVxdWVzdBIfCgtwcm92aWRlcl9pZBgBIAEoCVIKcHJvdmlkZXJJZBIjCg'
+    '13b3JrdHJlZV9wYXRoGAIgASgJUgx3b3JrdHJlZVBhdGgSFgoGcHJvbXB0GAMgASgJUgZwcm9t'
+    'cHQSFAoFdGl0bGUYBCABKAlSBXRpdGxlEhIKBGNvbHMYBSABKA1SBGNvbHMSEgoEcm93cxgGIA'
+    'EoDVIEcm93cw==');
+
+@$core.Deprecated('Use agentSessionDescriptor instead')
+const AgentSession$json = {
+  '1': 'AgentSession',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'provider_id', '3': 2, '4': 1, '5': 9, '10': 'providerId'},
+    {'1': 'provider_name', '3': 3, '4': 1, '5': 9, '10': 'providerName'},
+    {'1': 'short', '3': 4, '4': 1, '5': 9, '10': 'short'},
+    {'1': 'worktree_path', '3': 5, '4': 1, '5': 9, '10': 'worktreePath'},
+    {'1': 'terminal_id', '3': 6, '4': 1, '5': 9, '10': 'terminalId'},
+    {'1': 'title', '3': 7, '4': 1, '5': 9, '10': 'title'},
+    {'1': 'prompt', '3': 8, '4': 1, '5': 9, '10': 'prompt'},
+    {
+      '1': 'state',
+      '3': 9,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.AgentState',
+      '10': 'state'
+    },
+    {'1': 'exit_code', '3': 10, '4': 1, '5': 5, '10': 'exitCode'},
+    {'1': 'started_unix_ms', '3': 11, '4': 1, '5': 4, '10': 'startedUnixMs'},
+    {
+      '1': 'state_since_unix_ms',
+      '3': 12,
+      '4': 1,
+      '5': 4,
+      '10': 'stateSinceUnixMs'
+    },
+    {'1': 'last_line', '3': 13, '4': 1, '5': 9, '10': 'lastLine'},
+  ],
+};
+
+/// Descriptor for `AgentSession`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List agentSessionDescriptor = $convert.base64Decode(
+    'CgxBZ2VudFNlc3Npb24SDgoCaWQYASABKAlSAmlkEh8KC3Byb3ZpZGVyX2lkGAIgASgJUgpwcm'
+    '92aWRlcklkEiMKDXByb3ZpZGVyX25hbWUYAyABKAlSDHByb3ZpZGVyTmFtZRIUCgVzaG9ydBgE'
+    'IAEoCVIFc2hvcnQSIwoNd29ya3RyZWVfcGF0aBgFIAEoCVIMd29ya3RyZWVQYXRoEh8KC3Rlcm'
+    '1pbmFsX2lkGAYgASgJUgp0ZXJtaW5hbElkEhQKBXRpdGxlGAcgASgJUgV0aXRsZRIWCgZwcm9t'
+    'cHQYCCABKAlSBnByb21wdBIpCgVzdGF0ZRgJIAEoDjITLmt1bW8udjEuQWdlbnRTdGF0ZVIFc3'
+    'RhdGUSGwoJZXhpdF9jb2RlGAogASgFUghleGl0Q29kZRImCg9zdGFydGVkX3VuaXhfbXMYCyAB'
+    'KARSDXN0YXJ0ZWRVbml4TXMSLQoTc3RhdGVfc2luY2VfdW5peF9tcxgMIAEoBFIQc3RhdGVTaW'
+    '5jZVVuaXhNcxIbCglsYXN0X2xpbmUYDSABKAlSCGxhc3RMaW5l');
+
+@$core.Deprecated('Use stopAgentRequestDescriptor instead')
+const StopAgentRequest$json = {
+  '1': 'StopAgentRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+  ],
+};
+
+/// Descriptor for `StopAgentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List stopAgentRequestDescriptor =
+    $convert.base64Decode('ChBTdG9wQWdlbnRSZXF1ZXN0Eg4KAmlkGAEgASgJUgJpZA==');
+
+@$core.Deprecated('Use stopAgentResponseDescriptor instead')
+const StopAgentResponse$json = {
+  '1': 'StopAgentResponse',
+};
+
+/// Descriptor for `StopAgentResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List stopAgentResponseDescriptor =
+    $convert.base64Decode('ChFTdG9wQWdlbnRSZXNwb25zZQ==');
+
+@$core.Deprecated('Use dismissAgentRequestDescriptor instead')
+const DismissAgentRequest$json = {
+  '1': 'DismissAgentRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+  ],
+};
+
+/// Descriptor for `DismissAgentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List dismissAgentRequestDescriptor = $convert
+    .base64Decode('ChNEaXNtaXNzQWdlbnRSZXF1ZXN0Eg4KAmlkGAEgASgJUgJpZA==');
+
+@$core.Deprecated('Use dismissAgentResponseDescriptor instead')
+const DismissAgentResponse$json = {
+  '1': 'DismissAgentResponse',
+};
+
+/// Descriptor for `DismissAgentResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List dismissAgentResponseDescriptor =
+    $convert.base64Decode('ChREaXNtaXNzQWdlbnRSZXNwb25zZQ==');
+
+@$core.Deprecated('Use watchAgentsRequestDescriptor instead')
+const WatchAgentsRequest$json = {
+  '1': 'WatchAgentsRequest',
+};
+
+/// Descriptor for `WatchAgentsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List watchAgentsRequestDescriptor =
+    $convert.base64Decode('ChJXYXRjaEFnZW50c1JlcXVlc3Q=');
+
+@$core.Deprecated('Use agentsSnapshotDescriptor instead')
+const AgentsSnapshot$json = {
+  '1': 'AgentsSnapshot',
+  '2': [
+    {'1': 'version', '3': 1, '4': 1, '5': 4, '10': 'version'},
+    {
+      '1': 'sessions',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.AgentSession',
+      '10': 'sessions'
+    },
+  ],
+};
+
+/// Descriptor for `AgentsSnapshot`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List agentsSnapshotDescriptor = $convert.base64Decode(
+    'Cg5BZ2VudHNTbmFwc2hvdBIYCgd2ZXJzaW9uGAEgASgEUgd2ZXJzaW9uEjEKCHNlc3Npb25zGA'
+    'IgAygLMhUua3Vtby52MS5BZ2VudFNlc3Npb25SCHNlc3Npb25z');

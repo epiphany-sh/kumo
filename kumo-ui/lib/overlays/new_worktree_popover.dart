@@ -126,6 +126,27 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
     return remote ? branch.substring(branch.indexOf('/') + 1) : branch;
   }
 
+  /// Starts the chosen agent in the new worktree and opens its terminal.
+  /// From a ticket, the ticket is the prompt.
+  Future<void> _startAgent(AppState s, String worktree) async {
+    final connected = s.agents.connected;
+    if (!s.agents.live || connected.isEmpty) return;
+    final provider = connected.any((p) => p.id == _agent) ? _agent : connected.first.id;
+    final prompt = _src == _Source.ticket ? _tickets.firstWhere((t) => t.$1 == _ticket).$2 : '';
+    final run = await s.agents.start(providerId: provider, worktreePath: worktree, prompt: prompt);
+    if (run != null) {
+      s.openTerminal(run.terminalId, title: run.title, agent: true);
+    } else if (mounted) {
+      setState(() => _error = 'Worktree created, but the agent didn’t start: ${s.agents.error ?? 'unknown error'}');
+    }
+  }
+
+  /// Agents offered by the switch: the connected ones (the canvas values
+  /// in the mock).
+  List<(String, String)> _agentOptions(AppState s) => s.agents.live
+      ? [for (final p in s.agents.connected) (p.id, p.name)]
+      : const [('claude', 'Claude Code · auto-approve edits'), ('codex', 'Codex · ask before shell'), ('gemini', 'Gemini CLI')];
+
   Future<void> _create() async {
     if (_busy) return;
     final s = AppScope.read(context);
@@ -148,7 +169,10 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
         path: _path.text,
       );
       final created = s.workspace.repo(repo.id)?.worktrees.where((w) => w.branch == branch).firstOrNull;
-      if (created != null) s.selectWorktree(created.branch, path: created.path);
+      if (created != null) {
+        s.selectWorktree(created.branch, path: created.path);
+        if (_agentOn) await _startAgent(s, s.workspace.absolutePathOf(created));
+      }
     } on Object catch (e) {
       if (mounted) {
         setState(() {
@@ -286,12 +310,15 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
             ),
             KSwitch(value: _agentOn, onChanged: (v) => setState(() => _agentOn = v), label: 'Start an agent'),
           ]),
-          if (_agentOn) ...[
+          if (_agentOn && _agentOptions(AppScope.of(context)).isEmpty) ...[
+            const SizedBox(height: 8),
+            Text('No agent connected yet: connect one in Settings › AI agents.', style: sans(11.5, color: p.text3)),
+          ] else if (_agentOn) ...[
             const SizedBox(height: 10),
             KSelect<String>(
               label: 'Agent',
-              value: _agent,
-              items: const [('claude', 'Claude Code · auto-approve edits'), ('codex', 'Codex · ask before shell'), ('gemini', 'Gemini CLI')],
+              value: _agentOptions(AppScope.of(context)).any((o) => o.$1 == _agent) ? _agent : _agentOptions(AppScope.of(context)).first.$1,
+              items: _agentOptions(AppScope.of(context)),
               onChanged: (v) => setState(() => _agent = v),
             ),
           ],

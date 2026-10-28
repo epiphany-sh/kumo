@@ -37,7 +37,8 @@ Qué es real hoy y qué sigue siendo mock:
 | Namespaces, repos y worktrees | Real: `Workspace` en `kumod`, persistido en `kumo.db` (SQLite) |
 | Files, cambios de git, diffs, commit, push, historial | Real: `Git` en `kumod`; el estado se actualiza solo (file watcher) |
 | Gráfico de ramas del historial, panel Diff de la vista Git | Mock |
-| Agentes, tareas, PRs, pipelines, docs, integraciones | Mock (M3 / M4) |
+| Agentes | Real: `Agents` en `kumod` con tus propios CLIs (Claude Code, Codex, Gemini, Copilot, Grok, OpenCode, Cursor, Aider, Qwen, Amp o cualquier comando). Opcional: se conectan en Settings › AI agents |
+| Tareas, PRs, pipelines, docs, integraciones | Mock (M4) |
 
 El daemon vive más que la UI: si cerrás la app, las terminales siguen corriendo
 y al reabrirla la UI se vuelve a enganchar a ellas con replay.
