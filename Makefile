@@ -7,7 +7,9 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-CARGO   ?= cargo
+# rustup installs to ~/.cargo/bin: use it when a shell opened before the
+# install (or a GUI) doesn't have it on PATH.
+CARGO   ?= $(or $(shell command -v cargo 2>/dev/null),$(wildcard $(HOME)/.cargo/bin/cargo),cargo)
 FLUTTER ?= flutter
 DART    ?= dart
 UI      := kumo-ui
