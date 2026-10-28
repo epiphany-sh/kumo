@@ -262,10 +262,10 @@ class _GitScreenState extends State<GitScreen> {
         ]);
       }),
       status: [
-        if (source.fetchedAt case final at?) StatusText('Fetched all remotes ${_rel(at)}'),
+        if (source.fetchedAt case final at?) Flexible(child: StatusText('Fetched all remotes ${_rel(at)}', flexible: true)),
         if (source.prsSupported) StatusText('$open open ${open == 1 ? terms.prOne : terms.prShort}'),
         const Spacer(),
-        if (source.statusNote case final note?) StatusText(note),
+        if (source.statusNote case final note?) Flexible(child: StatusText(note, flexible: true)),
         StatusText(
           provider == null ? 'No CI' : (noAccess ? '${provider.label} · no access' : provider.label),
           icon: KIcons.cluster,
@@ -308,7 +308,7 @@ class _RepoMenuItem extends StatelessWidget {
                 Flexible(child: Text(repo.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, weight: FontWeight.w500, color: c.text))),
                 if (isContext) ...[
                   const SizedBox(width: 6),
-                  Text('current worktree', style: sans(10.5, color: c.text3)),
+                  Flexible(child: Text('current worktree', maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis, style: sans(10.5, color: c.text3))),
                 ],
               ]),
               const SizedBox(height: 1),
