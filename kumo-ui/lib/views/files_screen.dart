@@ -20,8 +20,11 @@ Color gitColor(KumoPalette c, GitStatus? s) => switch (s) {
     };
 
 Color langColor(KumoPalette c, Lang l, String badge) => switch (l) {
-      Lang.go => c.synType,
-      Lang.yaml => c.synKw,
+      Lang.go || Lang.dart || Lang.c => c.synType,
+      Lang.rust || Lang.swift || Lang.java => c.warn,
+      Lang.ts || Lang.kotlin || Lang.proto => c.synFn,
+      Lang.python || Lang.toml || Lang.sql => c.synStr,
+      Lang.yaml || Lang.shell => c.synKw,
       Lang.json => c.synNum,
       Lang.makefile => c.warn,
       Lang.plain when badge == 'SUM' => c.synType,
