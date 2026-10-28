@@ -249,6 +249,12 @@ class _FilesScreenState extends State<FilesScreen> {
     final c = context.c;
     final s = AppScope.of(context);
     if (!identical(s.changes, _bound)) _bind(s.changes);
+    // "Open in the editor" from a file view: that file comes to the front.
+    final asked = s.takeEditRequest();
+    if (asked != null) {
+      if (!_tabs.contains(asked)) _tabs = [..._tabs, asked];
+      _active = asked;
+    }
     final active = _active;
     final info = active == null ? null : langOf(active);
     final conflicts = _git.conflicts.length;

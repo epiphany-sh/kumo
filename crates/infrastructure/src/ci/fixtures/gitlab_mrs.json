@@ -1,0 +1,28 @@
+[
+  {
+    "iid": 231,
+    "title": "perf: warm cache on deploy",
+    "state": "opened",
+    "draft": false,
+    "source_branch": "perf/cache-warmup",
+    "target_branch": "main",
+    "author": { "username": "mauri", "name": "Mauri" },
+    "reviewers": [ { "username": "mauri", "name": "Mauri" }, { "username": "tomas", "name": "Tomás" } ],
+    "web_url": "https://gitlab.fravega.com/pricing/price-reader-v2/-/merge_requests/231",
+    "user_notes_count": 3,
+    "created_at": "2026-10-26T09:00:00.000Z",
+    "updated_at": "2026-10-28T12:00:00.000Z"
+  },
+  {
+    "iid": 229,
+    "title": "Draft: chore: bump pgx",
+    "state": "opened",
+    "draft": true,
+    "source_branch": "chore/pgx",
+    "target_branch": "main",
+    "author": { "username": "nico", "name": "Nico" },
+    "reviewers": [],
+    "web_url": "https://gitlab.fravega.com/pricing/price-reader-v2/-/merge_requests/229",
+    "user_notes_count": 0
+  }
+]

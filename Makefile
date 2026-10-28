@@ -30,10 +30,18 @@ endif
 
 KUMOD := target/release/kumod$(EXE)
 
+# macOS ties permissions ("Always Allow" on Keychain items, folder access)
+# to the code signature. Ad-hoc signatures change with every build, so each
+# rebuild looks like a new app and asks again. With a stable identity (make
+# signing-cert, once) they're asked for once. Without it: ad-hoc, as before.
+SIGN_NAME := Kumo Development
+SIGN_ID   ?= $(if $(filter macos,$(PLATFORM)),$(shell security find-identity -p codesigning 2>/dev/null | grep -q '"$(SIGN_NAME)"' && echo '$(SIGN_NAME)'))
+SIGN      := $(or $(SIGN_ID),-)
+
 # protoc: the one vendored by Cargo (crates/proto) if present, else the system one.
 PROTOC ?= $(firstword $(wildcard $(HOME)/.cargo/registry/src/*/protoc-bin-vendored-macos-*/bin/protoc) protoc)
 
-.PHONY: help all engine ui app run dev stop status test check bench bench-ui proto clean
+.PHONY: help all engine ui app run dev stop status test check bench bench-ui proto clean signing-cert
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-8s\033[0m %s\n", $$1, $$2}'
@@ -49,9 +57,11 @@ ui: ## Build the Flutter app (release)
 app: engine ui ## Release app with kumod bundled next to the UI executable
 	cp "$(KUMOD)" "$(APP_BIN)/"
 ifeq ($(PLATFORM),macos)
-	@# Adding a binary breaks the bundle seal: sign kumod, then re-seal the app (ad-hoc).
-	codesign --force --sign - "$(APP_BIN)/kumod"
-	codesign --force --sign - --preserve-metadata=entitlements,requirements,flags,runtime "$(APP)"
+	@# Adding a binary breaks the bundle seal: sign kumod (a fixed identifier,
+	@# so macOS knows it's the same program), then re-seal the app.
+	codesign --force --sign "$(SIGN)" --identifier dev.kumo.kumod "$(APP_BIN)/kumod"
+	codesign --force --sign "$(SIGN)" --preserve-metadata=entitlements,requirements,flags,runtime "$(APP)"
+	@$(if $(SIGN_ID),,echo "  (signed ad-hoc: macOS asks for permissions again after every build; run 'make signing-cert' once to stop that)")
 endif
 	@echo "✓ $(APP)"
 
@@ -106,3 +116,17 @@ proto: ## Regenerate the Dart client from proto/ (needs `dart pub global activat
 clean: ## Remove Rust and Flutter build outputs
 	$(CARGO) clean
 	cd $(UI) && $(FLUTTER) clean
+
+signing-cert: ## macOS: create the "Kumo Development" signing identity (once)
+ifeq ($(PLATFORM),macos)
+	@if security find-identity -p codesigning | grep -q '"$(SIGN_NAME)"'; then echo "✓ '$(SIGN_NAME)' already exists"; exit 0; fi; \
+	set -e; dir=$$(mktemp -d); trap 'rm -rf "$$dir"' EXIT; \
+	printf '[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=$(SIGN_NAME)\n[ext]\nbasicConstraints=critical,CA:false\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=critical,codeSigning\n' > "$$dir/cert.cnf"; \
+	/usr/bin/openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -config "$$dir/cert.cnf" -keyout "$$dir/key.pem" -out "$$dir/cert.pem" 2>/dev/null; \
+	/usr/bin/openssl pkcs12 -export -inkey "$$dir/key.pem" -in "$$dir/cert.pem" -name "$(SIGN_NAME)" -out "$$dir/id.p12" -passout pass:kumo; \
+	security import "$$dir/id.p12" -k "$$HOME/Library/Keychains/login.keychain-db" -P kumo -T /usr/bin/codesign; \
+	echo "✓ '$(SIGN_NAME)' created. The next 'make run' signs with it; allow Kumo once more and it sticks."
+else
+	@echo "Only needed on macOS."
+endif
+

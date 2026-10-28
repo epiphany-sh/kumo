@@ -6,17 +6,21 @@ use kumo_application::agents::{AgentPorts, AgentService};
 use kumo_application::changes::{ChangesPorts, ChangesService};
 use kumo_application::daemon::HelloService;
 use kumo_application::pipelines::{PipelinesPorts, PipelinesService, PipelinesTiming};
+use kumo_application::pulls::{PullRequestPorts, PullRequestService};
 use kumo_application::tasks::{TaskPorts, TaskService, TaskTiming};
 use kumo_application::terminal::TerminalService;
 use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
 use kumo_domain::agents::ProgramLocator;
 use kumo_domain::daemon::{ApiVersion, DaemonEndpoint, DiscoveryStore};
-use kumo_domain::pipelines::HostTokens;
+use kumo_domain::pipelines::{HostTokens, TokenFallback};
 use kumo_domain::tasks::{SecretStore, TaskConnector};
 use kumo_domain::workspace::WorktreeLocation;
 use kumo_grpc::server::{GrpcServer, Services};
 use kumo_infrastructure::agents::ShellPathLocator;
-use kumo_infrastructure::ci::{BitbucketPipelines, GhTokenFallback, GitHubActions, GitLabCi};
+use kumo_infrastructure::ci::{
+    BitbucketPipelines, BitbucketPulls, GhTokenFallback, GitHubActions, GitHubPulls, GitLabCi,
+    GitLabPulls,
+};
 use kumo_infrastructure::discovery::FileDiscoveryStore;
 use kumo_infrastructure::fs::LocalFileStore;
 use kumo_infrastructure::git::{FsRepoFinder, GitCli};
@@ -110,6 +114,8 @@ impl Daemon {
         )
         .await?;
 
+        // gh's sign-in, shared: one cached token for pipelines and pull requests.
+        let gh: Arc<dyn TokenFallback> = Arc::new(GhTokenFallback::new(Arc::clone(&locator)));
         let pipelines = Arc::new(PipelinesService::new(
             PipelinesPorts {
                 clients: vec![
@@ -117,13 +123,28 @@ impl Daemon {
                     Arc::new(GitLabCi::default()),
                     Arc::new(BitbucketPipelines::default()),
                 ],
-                tokens: host_tokens,
-                fallback: Arc::new(GhTokenFallback::new(Arc::clone(&locator))),
+                tokens: Arc::clone(&host_tokens),
+                fallback: Arc::clone(&gh),
                 branches: Arc::new(GitCli::default()),
                 terminals: Arc::clone(&terminals) as _,
             },
             PipelinesTiming::default(),
             workspace.watch(),
+        ));
+
+        let pulls = Arc::new(PullRequestService::new(
+            PullRequestPorts {
+                clients: vec![
+                    Arc::new(GitHubPulls::default()),
+                    Arc::new(GitLabPulls::default()),
+                    Arc::new(BitbucketPulls::default()),
+                ],
+                tokens: host_tokens,
+                fallback: gh,
+                branches: Arc::new(GitCli::default()),
+            },
+            workspace.watch(),
+            std::time::Duration::from_secs(60),
         ));
 
         let services = Services {
@@ -148,6 +169,7 @@ impl Daemon {
             )),
             tasks,
             pipelines,
+            pulls,
         };
         let server = GrpcServer::bind(config.listen, token.clone(), services).await?;
 

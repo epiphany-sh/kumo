@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app/app_state.dart';
 import '../data/agents_source.dart';
 import '../data/models.dart' show AgentStatus;
+import '../data/worktree_changes.dart' show CommitInfo;
 import '../editor/file_view.dart';
 import '../overlays/new_agent_dialog.dart';
 import '../engine/engine_scope.dart';
@@ -13,6 +14,7 @@ import '../engine/grpc_terminal_surface.dart';
 import '../engine/kumo_engine.dart';
 import '../shell/screen_chrome.dart';
 import '../shell/side_panel.dart';
+import '../theme/palette.dart';
 import '../terminal/mock_terminal.dart';
 import '../terminal/pane_layout.dart';
 import '../terminal/terminal_surface.dart';
@@ -50,6 +52,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
   bool _adopted = false;
 
   _Space get _space => _spaces.putIfAbsent(_spaceKey, _Space.new);
+
+  /// The space of Home: shells in the home folder, tied to no repository.
+  static const _homeKey = '~';
   List<_TermTab> get _tabs => _space.tabs;
   int get _active => _space.active;
   set _active(int i) => _space.active = i;
@@ -112,10 +117,11 @@ class _TerminalScreenState extends State<TerminalScreen> {
     setState(() {});
   }
 
-  /// Shows space [key] by selecting its worktree.
+  /// Shows space [key] by selecting its worktree (or Home).
   void _showSpace(String key) {
     final s = _app;
     if (s == null || key == _spaceKey) return;
+    if (key == _homeKey) return s.showHome();
     for (final r in s.workspace.repos) {
       for (final w in r.worktrees) {
         if (s.workspace.absolutePathOf(w) == key) return s.selectWorktree(w.branch, path: w.path);
@@ -133,7 +139,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final engine = _engine;
     if (space.visited) return;
     space.visited = true;
-    if (engine == null) return;
+    if (engine == null) {
+      // Design mocks: Home starts with one shell.
+      if (key == _homeKey) {
+        final id = _newShell();
+        space.tabs.add(_TermTab('t-$id', _single(id), id));
+      }
+      return;
+    }
     final hasShell = space.tabs.any((t) => t.layout.panes.any((p) => !_agentPanes.contains(p)));
     if (hasShell) return;
     final id = 'sh-${++_shellSeq}';
@@ -286,8 +299,11 @@ class _TerminalScreenState extends State<TerminalScreen> {
       case TerminalCommand.splitDown:
         _splitDown(_focus);
       case TerminalCommand.closePane:
+        final ctx = _app?.activeContext;
         final file = _app?.activeFile;
-        if (file != null) {
+        if (ctx != null) {
+          _app!.closeContext(ctx);
+        } else if (file != null) {
           _app!.closeFile(file);
         } else {
           _close(_focus);
@@ -301,7 +317,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final n = ++_shellSeq;
     final id = 'sh-$n';
     final engine = _engine;
-    _surfaces[id] = engine == null ? MockSessions.shell(n) : GrpcTerminalSurface.shell(engine, directory: _directoryOf(_spaceKey), onExit: (_) => _closeExited(id));
+    _surfaces[id] = engine == null ? (_spaceKey == _homeKey ? MockSessions.homeShell(n) : MockSessions.shell(n)) : GrpcTerminalSurface.shell(engine, directory: _directoryOf(_spaceKey), onExit: (_) => _closeExited(id));
     return id;
   }
 
@@ -415,30 +431,36 @@ class _TerminalScreenState extends State<TerminalScreen> {
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     // Until the workspace is known, the selected worktree isn't either.
-    if (s.workspace.loaded) {
-      final key = _keyOf(s);
+    if (s.inHome || s.workspace.loaded) {
+      final key = s.inHome ? _homeKey : _keyOf(s);
       if (key != _spaceKey || !_space.visited) _enter(key);
     }
+    // The chrome palette (the terminal area switches to the terminal one).
+    final chrome = context.c;
     return ScreenFrame(
       toolbar: ScreenToolbar(
-        breadcrumb: Breadcrumb(icon: KIcons.branch, parts: [s.activeRepo?.name ?? 'No repository', if (s.changes.branch.isNotEmpty) s.changes.branch]),
+        breadcrumb: const _ContextBar(),
         primary: KButton.primary(label: 'New agent', icon: KIcons.agent, height: 36, onTap: () => showNewAgentDialog(context)),
       ),
       body: LayoutBuilder(builder: (context, box) {
-        final showPanel = s.sidePanelOpen && box.maxWidth >= 640;
+        // Widgets are about the worktree: none in Home.
+        final showPanel = s.sidePanelOpen && !s.inHome && box.maxWidth >= 640;
         // Settings › General › Side panel position.
         final right = s.sidePanelRight;
         return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (showPanel && !right) ...[const SizedBox(width: 300, child: SidePanel()), const SizedBox(width: 10)],
           Expanded(
             // Hybrid mode: this subtree uses the dark "smoked glass" palette.
-            child: KumoTheme.scope(context: context, palette: context.tc, child: Builder(builder: _terminalArea)),
+            child: KumoTheme.scope(context: context, palette: context.tc, child: Builder(builder: (context) => _terminalArea(context, chrome))),
           ),
           if (showPanel && right) ...[const SizedBox(width: 10), const SizedBox(width: 300, child: SidePanel())],
         ]);
       }),
       status: [
-        Flexible(child: StatusText('${s.changes.branch} ↑${s.commitsAhead} ↓${s.changes.behind}', icon: KIcons.branch, monospace: true, flexible: true)),
+        if (s.inHome)
+          const StatusText('~ · Home', icon: KIcons.home, monospace: true)
+        else
+          Flexible(child: StatusText('${s.changes.branch} ↑${s.commitsAhead} ↓${s.changes.behind}', icon: KIcons.branch, monospace: true, flexible: true)),
         ..._agentStatus(context, s),
         const Spacer(),
         StatusText('${_tabs.length} ${_tabs.length == 1 ? 'tab' : 'tabs'} · ${_layout.panes.length} ${_layout.panes.length == 1 ? 'pane' : 'panes'}'),
@@ -479,9 +501,11 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
   String _tabLabel(String id) => id == 'agent' ? 'claude · PRC-412' : (_surfaces[id]?.title ?? id);
 
-  Widget _terminalArea(BuildContext context) {
+  Widget _terminalArea(BuildContext context, KumoPalette chrome) {
     final c = context.c;
     final s = AppScope.of(context);
+    final ctx = s.activeContext;
+    final panelToggle = !s.sidePanelOpen && !s.inHome;
     return GlassPanel(
       fill: c.term,
       clip: true,
@@ -493,11 +517,12 @@ class _TerminalScreenState extends State<TerminalScreen> {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(children: [
-                  if (!s.sidePanelOpen && !s.sidePanelRight) ...[
+                  if (panelToggle && !s.sidePanelRight) ...[
                     KIconButton(icon: KIcons.sidePanel, label: 'Show side panel (⌥⌘B)', size: 30, iconSize: 16, onTap: s.toggleSidePanel),
                     const SizedBox(width: 4),
                   ],
                   for (final t in _tabs) ...[_tabChip(context, t), const SizedBox(width: 4)],
+                  for (final t in s.contextTabs) ...[_contextTab(context, t), const SizedBox(width: 4)],
                   for (final p in s.openFiles) ...[_fileTab(context, p), const SizedBox(width: 4)],
                   KIconButton(icon: KIcons.add, label: 'New tab (⌘T)', size: 30, iconSize: 15, onTap: _newTab),
                 ]),
@@ -512,7 +537,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                 KIconButton(icon: KIcons.splitDown, label: 'Split down (⇧⌘D)', size: 28, iconSize: 15, onTap: () => _splitDown(_focus)),
               ]),
             ),
-            if (!s.sidePanelOpen && s.sidePanelRight) ...[
+            if (panelToggle && s.sidePanelRight) ...[
               const SizedBox(width: 4),
               KIconButton(icon: KIcons.sidePanel, label: 'Show side panel (⌥⌘B)', size: 30, iconSize: 16, onTap: s.toggleSidePanel),
             ],
@@ -521,10 +546,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(8),
-            child: s.activeFile != null
+            child: ctx == ContextTab.files
+                ? const _ContextFiles()
+                : ctx == ContextTab.git
+                ? _ContextGit(chrome: chrome)
+                : s.activeFile != null
                 ? FileView(key: ValueKey(s.activeFile), path: s.activeFile!)
                 : _layout.isEmpty
-                ? (s.workspace.loaded ? _empty(context) : const SizedBox.shrink())
+                ? (s.workspace.loaded || s.inHome ? _empty(context) : const SizedBox.shrink())
                 : _splitPanes(context),
           ),
         ),
@@ -537,7 +566,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final c = context.c;
     final id = t.focus != null && t.layout.contains(t.focus!) ? t.focus! : t.layout.panes.first;
     final (_, dot) = _look(context, id);
-    final on = identical(t, _tab) && AppScope.of(context).activeFile == null;
+    final app = AppScope.of(context);
+    final on = identical(t, _tab) && app.activeFile == null && app.activeContext == null;
     final label = _tabLabel(id);
     final n = t.layout.panes.length;
     return AnimatedContainer(
@@ -564,6 +594,34 @@ class _TerminalScreenState extends State<TerminalScreen> {
         ),
         const SizedBox(width: 6),
         KIconButton(icon: KIcons.close, label: 'Close tab $label', size: 18, iconSize: 11, color: c.text3, onTap: () => _closeTab(t)),
+      ]),
+    );
+  }
+
+  /// A context tab (Files / Git of the worktree) in the tab strip.
+  Widget _contextTab(BuildContext context, ContextTab t) {
+    final c = context.c;
+    final s = AppScope.of(context);
+    final on = s.activeContext == t;
+    final label = '${t.label} · ${_shortBranch(s.changes.branch)}';
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 100),
+      height: 30,
+      padding: const EdgeInsets.only(left: 10, right: 4),
+      decoration: on ? chipDecoration(c, radius: 10, fill: c.tabActive) : BoxDecoration(borderRadius: BorderRadius.circular(10)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        KPressable(
+          onTap: () => s.openContext(t),
+          semanticLabel: '${t.tooltip} tab',
+          selected: on,
+          builder: (context, hover, focus) => Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(t == ContextTab.files ? KIcons.files : KIcons.git, size: 13, color: on ? c.acc : c.text3),
+            const SizedBox(width: 7),
+            Text(label, style: sans(12, weight: FontWeight.w500, color: on || hover ? c.text : c.text2)),
+          ]),
+        ),
+        const SizedBox(width: 6),
+        KIconButton(icon: KIcons.close, label: 'Close tab $label (⌘W)', size: 18, iconSize: 11, color: c.text3, onTap: () => s.closeContext(t)),
       ]),
     );
   }
@@ -607,7 +665,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Icon(KIcons.terminal, size: 26, color: c.text3),
         const SizedBox(height: 12),
-        Text('No terminals open in this worktree', style: sans(12.5, color: c.text3)),
+        Text(AppScope.of(context).inHome ? 'No terminals open in Home' : 'No terminals open in this worktree', style: sans(12.5, color: c.text3)),
         const SizedBox(height: 12),
         KButton(label: 'New tab', height: 30, onTap: _newTab),
       ]),
@@ -702,7 +760,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
           icon: icon,
           iconColor: color,
           focused: focused,
-          active: id == _focus && AppScope.of(context).activeFile == null,
+          active: id == _focus && AppScope.of(context).activeFile == null && AppScope.of(context).activeContext == null,
           onFocus: () => _setFocus(id),
           trailing: trailing,
           footer: isAgent
@@ -717,6 +775,236 @@ class _TerminalScreenState extends State<TerminalScreen> {
         );
       },
     );
+  }
+}
+
+/// Short name of a branch for tab titles: the ticket key when it has one
+/// (`feat/PRC-412-bulk-discounts` → `PRC-412`), else its last segment.
+String _shortBranch(String branch) {
+  final key = RegExp(r'[A-Z][A-Z0-9]+-\d+').firstMatch(branch)?.group(0);
+  if (key != null) return key;
+  return branch.isEmpty ? 'worktree' : branch.split('/').last;
+}
+
+/// Header of the Terminal view: where you are (repo / branch, or Home) and
+/// the worktree's tabs — Terminal, Files, Git.
+class _ContextBar extends StatelessWidget {
+  const _ContextBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    if (s.inHome) {
+      return Tooltip(
+        message: 'A shell in your home folder, not tied to any repository',
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(KIcons.home, size: 15, color: c.acc),
+          const SizedBox(width: 8),
+          Text('~', style: mono(13, weight: FontWeight.w600, color: c.text)),
+          const SizedBox(width: 8),
+          Text('Home', style: sans(13, color: c.text3)),
+        ]),
+      );
+    }
+    final ctx = s.activeContext;
+    final items = [
+      (null, KIcons.terminal, 'Terminal of this worktree'),
+      (ContextTab.files, KIcons.files, ContextTab.files.tooltip),
+      (ContextTab.git, KIcons.git, ContextTab.git.tooltip),
+    ];
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Flexible(
+        child: Tooltip(
+          message: 'Current context: ${s.activeWorktreeEntry?.path ?? s.changes.branch}',
+          child: Breadcrumb(icon: KIcons.branch, parts: [s.activeRepo?.name ?? 'No repository', if (s.changes.branch.isNotEmpty) s.changes.branch]),
+        ),
+      ),
+      const SizedBox(width: 10),
+      Container(
+        height: 28,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(14)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          for (final (tab, icon, label) in items)
+            Builder(builder: (context) {
+              final on = tab == null ? ctx == null && s.activeFile == null : ctx == tab;
+              return KPressable(
+                onTap: tab == null ? s.showTerminals : () => s.openContext(tab),
+                semanticLabel: label,
+                tooltip: label,
+                selected: on,
+                builder: (context, hover, focus) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 100),
+                  width: 30,
+                  height: 24,
+                  decoration: on ? chipDecoration(c, radius: 12, fill: c.tabActive) : BoxDecoration(color: hover ? c.tile : null, borderRadius: BorderRadius.circular(12)),
+                  child: Icon(icon, size: 15, color: on || hover ? c.text : c.text2),
+                ),
+              );
+            }),
+        ]),
+      ),
+    ]);
+  }
+}
+
+/// The worktree's Files tab: its tree on the left, the picked file with its
+/// changes on the right.
+class _ContextFiles extends StatelessWidget {
+  const _ContextFiles();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    final file = s.contextFile;
+    return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      SizedBox(width: 280, child: WorktreeFilesTree(selected: file, onOpen: s.showContextFile)),
+      Container(width: 1, color: c.divider),
+      const SizedBox(width: 8),
+      Expanded(
+        child: file == null
+            ? Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(KIcons.file, size: 26, color: c.text3),
+                  const SizedBox(height: 10),
+                  Text('No file open', style: sans(13.5, weight: FontWeight.w600, color: c.text2)),
+                  const SizedBox(height: 4),
+                  Text('Pick a file on the left. Changed files are marked M / A.', style: sans(12.5, color: c.text3)),
+                ]),
+              )
+            : FileView(key: ValueKey('ctx:$file'), path: file),
+      ),
+    ]);
+  }
+}
+
+/// The worktree's Git tab: source control on the left; on the right the
+/// branch's commits, its pull request and its pipelines. In hybrid mode it
+/// keeps the chrome palette (it isn't a terminal).
+class _ContextGit extends StatelessWidget {
+  const _ContextGit({required this.chrome});
+  final KumoPalette chrome;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final hybrid = s.mode == KumoThemeMode.hybrid;
+    Widget body(BuildContext context) {
+      final c = context.c;
+      return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const SizedBox(width: 340, child: SourceControlPanel()),
+        Container(width: 1, color: c.divider),
+        Expanded(
+          child: ListView(padding: const EdgeInsets.fromLTRB(10, 4, 4, 10), children: [
+            const _BranchCommits(),
+            const SizedBox(height: 10),
+            const PullRequestCard(),
+            const SizedBox(height: 10),
+            const PipelinesCard(),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: KButton(
+                label: 'Whole repository: everyone’s commits, PRs and pipelines in Git',
+                icon: KIcons.arrowRight,
+                kind: KButtonKind.ghost,
+                height: 30,
+                fontSize: 12,
+                onTap: () => s.view = KumoView.git,
+              ),
+            ),
+          ]),
+        ),
+      ]);
+    }
+
+    if (!hybrid) return Builder(builder: body);
+    return KumoTheme.scope(
+      context: context,
+      palette: chrome,
+      child: Container(
+        decoration: BoxDecoration(color: chrome.paper, borderRadius: BorderRadius.circular(14)),
+        clipBehavior: Clip.antiAlias,
+        child: Builder(builder: body),
+      ),
+    );
+  }
+}
+
+/// Latest commits of the branch; the ones not pushed yet are marked.
+class _BranchCommits extends StatefulWidget {
+  const _BranchCommits();
+
+  @override
+  State<_BranchCommits> createState() => _BranchCommitsState();
+}
+
+class _BranchCommitsState extends State<_BranchCommits> {
+  Object? _source;
+  int _version = -1;
+  List<CommitInfo>? _commits;
+
+  /// Design mocks (no history): the branch's two commits.
+  static final _mock = [
+    CommitInfo(sha: '9e41b07', shortSha: '9e41b07', subject: 'feat: BulkDiscount aggregate', author: 'Claude', time: DateTime.now().subtract(const Duration(minutes: 42))),
+    CommitInfo(sha: 'a1c22d4', shortSha: 'a1c22d4', subject: 'feat: repository batch upsert with CopyFrom', author: 'Claude', time: DateTime.now().subtract(const Duration(hours: 1))),
+  ];
+
+  void _load() {
+    final changes = AppScope.read(context).changes;
+    if (identical(changes, _source) && changes.version == _version) return;
+    _source = changes;
+    _version = changes.version;
+    changes.log(limit: 8).then((list) {
+      if (!mounted || !identical(changes, AppScope.read(context).changes)) return;
+      setState(() => _commits = list ?? _mock);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    _load();
+    final commits = _commits ?? const <CommitInfo>[];
+    final ahead = s.changes.pushed ? s.commitsAhead : commits.length;
+    final note = !s.changes.pushed ? 'not published yet' : (ahead == 0 ? 'all pushed' : '$ahead not pushed');
+    return Section(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Icon(KIcons.branch, size: 15, color: c.acc),
+          const SizedBox(width: 8),
+          Expanded(child: Text('Commits on this branch', style: sans(12.5, weight: FontWeight.w600, color: c.text))),
+          Text(note, style: sans(11.5, color: c.text3)),
+        ]),
+        const SizedBox(height: 8),
+        if (_commits == null) Text('Reading history…', style: sans(12, color: c.text3)),
+        if (_commits != null && commits.isEmpty) Text('No commits yet.', style: sans(12, color: c.text3)),
+        for (var i = 0; i < commits.length; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(children: [
+              Text(commits[i].shortSha, style: mono(11.5, color: c.text3)),
+              const SizedBox(width: 9),
+              Expanded(child: Text(commits[i].subject, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: c.text))),
+              if (i < ahead) ...[const SizedBox(width: 8), TagChip('not pushed', color: c.warn, background: c.warnSoft)],
+              const SizedBox(width: 8),
+              Text('${commits[i].author} · ${_ago(commits[i].time)}', style: sans(11.5, color: c.text3)),
+            ]),
+          ),
+      ]),
+    );
+  }
+
+  static String _ago(DateTime t) {
+    final d = DateTime.now().difference(t);
+    if (d.inMinutes < 1) return 'just now';
+    if (d.inMinutes < 60) return '${d.inMinutes} min ago';
+    if (d.inHours < 24) return '${d.inHours} h ago';
+    return '${d.inDays} d ago';
   }
 }
 

@@ -4,18 +4,26 @@
 //! - [`GitHubActions`]: GitHub.com and GitHub Enterprise Server.
 //! - [`GitLabCi`]: GitLab.com and self-managed GitLab.
 //! - [`BitbucketPipelines`]: Bitbucket Cloud.
+//! - [`GitHubPulls`], [`GitLabPulls`], [`BitbucketPulls`]: pull (merge)
+//!   requests, with the same tokens.
 //! - [`GhTokenFallback`]: the token of the user's `gh` sign-in.
 
 mod bitbucket;
+mod bitbucket_pulls;
 mod gh;
 mod github;
+mod github_pulls;
 mod gitlab;
+mod gitlab_pulls;
 mod http;
 
 pub use bitbucket::BitbucketPipelines;
+pub use bitbucket_pulls::BitbucketPulls;
 pub use gh::GhTokenFallback;
 pub use github::GitHubActions;
+pub use github_pulls::GitHubPulls;
 pub use gitlab::GitLabCi;
+pub use gitlab_pulls::GitLabPulls;
 
 use kumo_domain::time::Timestamp;
 use serde_json::Value;

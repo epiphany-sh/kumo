@@ -9580,6 +9580,702 @@ class TestHostResponse extends $pb.GeneratedMessage {
   CiProblem ensureProblem() => $_ensure(1);
 }
 
+class PullRequest extends $pb.GeneratedMessage {
+  factory PullRequest({
+    $fixnum.Int64? number,
+    $core.String? label,
+    $core.String? title,
+    Person? author,
+    $core.String? branch,
+    $core.String? base,
+    $core.bool? draft,
+    PrState? state,
+    ReviewState? review,
+    $core.bool? reviewRequestedFromYou,
+    $core.Iterable<Person>? reviewers,
+    $core.int? checksPassed,
+    $core.int? checksTotal,
+    CiState? checksState,
+    $core.String? url,
+    $fixnum.Int64? createdAt,
+    $fixnum.Int64? updatedAt,
+    $core.int? commentCount,
+  }) {
+    final result = PullRequest._();
+    if (number != null) result.number = number;
+    if (label != null) result.label = label;
+    if (title != null) result.title = title;
+    if (author != null) result.author = author;
+    if (branch != null) result.branch = branch;
+    if (base != null) result.base = base;
+    if (draft != null) result.draft = draft;
+    if (state != null) result.state = state;
+    if (review != null) result.review = review;
+    if (reviewRequestedFromYou != null)
+      result.reviewRequestedFromYou = reviewRequestedFromYou;
+    if (reviewers != null) result.reviewers.addAll(reviewers);
+    if (checksPassed != null) result.checksPassed = checksPassed;
+    if (checksTotal != null) result.checksTotal = checksTotal;
+    if (checksState != null) result.checksState = checksState;
+    if (url != null) result.url = url;
+    if (createdAt != null) result.createdAt = createdAt;
+    if (updatedAt != null) result.updatedAt = updatedAt;
+    if (commentCount != null) result.commentCount = commentCount;
+    return result;
+  }
+
+  PullRequest._();
+
+  factory PullRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PullRequest()..mergeFromBuffer(data, registry);
+  factory PullRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PullRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PullRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: PullRequest.$_createMessage)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'number', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(2, _omitFieldNames ? '' : 'label')
+    ..aOS(3, _omitFieldNames ? '' : 'title')
+    ..aOM<Person>(4, _omitFieldNames ? '' : 'author',
+        subBuilder: Person.$_createMessage)
+    ..aOS(5, _omitFieldNames ? '' : 'branch')
+    ..aOS(6, _omitFieldNames ? '' : 'base')
+    ..aOB(7, _omitFieldNames ? '' : 'draft')
+    ..aE<PrState>(8, _omitFieldNames ? '' : 'state', enumValues: PrState.values)
+    ..aE<ReviewState>(9, _omitFieldNames ? '' : 'review',
+        enumValues: ReviewState.values)
+    ..aOB(10, _omitFieldNames ? '' : 'reviewRequestedFromYou')
+    ..pPM<Person>(11, _omitFieldNames ? '' : 'reviewers',
+        subBuilder: Person.$_createMessage)
+    ..aI(12, _omitFieldNames ? '' : 'checksPassed',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(13, _omitFieldNames ? '' : 'checksTotal',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aE<CiState>(14, _omitFieldNames ? '' : 'checksState',
+        enumValues: CiState.values)
+    ..aOS(15, _omitFieldNames ? '' : 'url')
+    ..aInt64(16, _omitFieldNames ? '' : 'createdAt')
+    ..aInt64(17, _omitFieldNames ? '' : 'updatedAt')
+    ..aI(18, _omitFieldNames ? '' : 'commentCount',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullRequest copyWith(void Function(PullRequest) updates) =>
+      super.copyWith((message) => updates(message as PullRequest))
+          as PullRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PullRequest() / PullRequest.new instead')
+  static PullRequest create() => PullRequest._();
+  static $pb.GeneratedMessage $_createMessage() => PullRequest._();
+  @$core.override
+  PullRequest createEmptyInstance() => PullRequest._();
+  @$core.pragma('dart2js:noInline')
+  static PullRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PullRequest>(
+          PullRequest.$_createMessage);
+  static PullRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get number => $_getI64(0);
+  @$pb.TagNumber(1)
+  set number($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasNumber() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearNumber() => $_clearField(1);
+
+  /// As the host shows it: "#521", "!231".
+  @$pb.TagNumber(2)
+  $core.String get label => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set label($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLabel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLabel() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get title => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set title($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTitle() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTitle() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  Person get author => $_getN(3);
+  @$pb.TagNumber(4)
+  set author(Person value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasAuthor() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAuthor() => $_clearField(4);
+  @$pb.TagNumber(4)
+  Person ensureAuthor() => $_ensure(3);
+
+  /// Source and target branches.
+  @$pb.TagNumber(5)
+  $core.String get branch => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set branch($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasBranch() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearBranch() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get base => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set base($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasBase() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearBase() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get draft => $_getBF(6);
+  @$pb.TagNumber(7)
+  set draft($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasDraft() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearDraft() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  PrState get state => $_getN(7);
+  @$pb.TagNumber(8)
+  set state(PrState value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasState() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearState() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  ReviewState get review => $_getN(8);
+  @$pb.TagNumber(9)
+  set review(ReviewState value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasReview() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearReview() => $_clearField(9);
+
+  /// Someone asked the user to review it.
+  @$pb.TagNumber(10)
+  $core.bool get reviewRequestedFromYou => $_getBF(9);
+  @$pb.TagNumber(10)
+  set reviewRequestedFromYou($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasReviewRequestedFromYou() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearReviewRequestedFromYou() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $pb.PbList<Person> get reviewers => $_getList(10);
+
+  /// Checks on its latest commit: passed of total (0 of 0 = none ran).
+  @$pb.TagNumber(12)
+  $core.int get checksPassed => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set checksPassed($core.int value) => $_setUnsignedInt32(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasChecksPassed() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearChecksPassed() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.int get checksTotal => $_getIZ(12);
+  @$pb.TagNumber(13)
+  set checksTotal($core.int value) => $_setUnsignedInt32(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasChecksTotal() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearChecksTotal() => $_clearField(13);
+
+  /// Overall state of those checks; unset when none ran.
+  @$pb.TagNumber(14)
+  CiState get checksState => $_getN(13);
+  @$pb.TagNumber(14)
+  set checksState(CiState value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasChecksState() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearChecksState() => $_clearField(14);
+
+  @$pb.TagNumber(15)
+  $core.String get url => $_getSZ(14);
+  @$pb.TagNumber(15)
+  set url($core.String value) => $_setString(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasUrl() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearUrl() => $_clearField(15);
+
+  /// Unix ms.
+  @$pb.TagNumber(16)
+  $fixnum.Int64 get createdAt => $_getI64(15);
+  @$pb.TagNumber(16)
+  set createdAt($fixnum.Int64 value) => $_setInt64(15, value);
+  @$pb.TagNumber(16)
+  $core.bool hasCreatedAt() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearCreatedAt() => $_clearField(16);
+
+  @$pb.TagNumber(17)
+  $fixnum.Int64 get updatedAt => $_getI64(16);
+  @$pb.TagNumber(17)
+  set updatedAt($fixnum.Int64 value) => $_setInt64(16, value);
+  @$pb.TagNumber(17)
+  $core.bool hasUpdatedAt() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearUpdatedAt() => $_clearField(17);
+
+  @$pb.TagNumber(18)
+  $core.int get commentCount => $_getIZ(17);
+  @$pb.TagNumber(18)
+  set commentCount($core.int value) => $_setUnsignedInt32(17, value);
+  @$pb.TagNumber(18)
+  $core.bool hasCommentCount() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearCommentCount() => $_clearField(18);
+}
+
+class ListPullRequestsRequest extends $pb.GeneratedMessage {
+  factory ListPullRequestsRequest({
+    $core.String? repoPath,
+    $core.bool? refresh,
+  }) {
+    final result = ListPullRequestsRequest._();
+    if (repoPath != null) result.repoPath = repoPath;
+    if (refresh != null) result.refresh = refresh;
+    return result;
+  }
+
+  ListPullRequestsRequest._();
+
+  factory ListPullRequestsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListPullRequestsRequest()..mergeFromBuffer(data, registry);
+  factory ListPullRequestsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListPullRequestsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListPullRequestsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ListPullRequestsRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'repoPath')
+    ..aOB(2, _omitFieldNames ? '' : 'refresh')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListPullRequestsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListPullRequestsRequest copyWith(
+          void Function(ListPullRequestsRequest) updates) =>
+      super.copyWith((message) => updates(message as ListPullRequestsRequest))
+          as ListPullRequestsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListPullRequestsRequest() / ListPullRequestsRequest.new instead')
+  static ListPullRequestsRequest create() => ListPullRequestsRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListPullRequestsRequest._();
+  @$core.override
+  ListPullRequestsRequest createEmptyInstance() => ListPullRequestsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListPullRequestsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListPullRequestsRequest>(
+          ListPullRequestsRequest.$_createMessage);
+  static ListPullRequestsRequest? _defaultInstance;
+
+  /// The repository's main checkout.
+  @$pb.TagNumber(1)
+  $core.String get repoPath => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set repoPath($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRepoPath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRepoPath() => $_clearField(1);
+
+  /// Ask the host even if the last answer is recent.
+  @$pb.TagNumber(2)
+  $core.bool get refresh => $_getBF(1);
+  @$pb.TagNumber(2)
+  set refresh($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRefresh() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRefresh() => $_clearField(2);
+}
+
+class PullRequestList extends $pb.GeneratedMessage {
+  factory PullRequestList({
+    CiProvider? provider,
+    $core.Iterable<PullRequest>? pullRequests,
+    CiProblem? problem,
+  }) {
+    final result = PullRequestList._();
+    if (provider != null) result.provider = provider;
+    if (pullRequests != null) result.pullRequests.addAll(pullRequests);
+    if (problem != null) result.problem = problem;
+    return result;
+  }
+
+  PullRequestList._();
+
+  factory PullRequestList.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PullRequestList()..mergeFromBuffer(data, registry);
+  factory PullRequestList.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PullRequestList()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PullRequestList',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: PullRequestList.$_createMessage)
+    ..aE<CiProvider>(1, _omitFieldNames ? '' : 'provider',
+        enumValues: CiProvider.values)
+    ..pPM<PullRequest>(2, _omitFieldNames ? '' : 'pullRequests',
+        subBuilder: PullRequest.$_createMessage)
+    ..aOM<CiProblem>(3, _omitFieldNames ? '' : 'problem',
+        subBuilder: CiProblem.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullRequestList clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullRequestList copyWith(void Function(PullRequestList) updates) =>
+      super.copyWith((message) => updates(message as PullRequestList))
+          as PullRequestList;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PullRequestList() / PullRequestList.new instead')
+  static PullRequestList create() => PullRequestList._();
+  static $pb.GeneratedMessage $_createMessage() => PullRequestList._();
+  @$core.override
+  PullRequestList createEmptyInstance() => PullRequestList._();
+  @$core.pragma('dart2js:noInline')
+  static PullRequestList getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PullRequestList>(
+          PullRequestList.$_createMessage);
+  static PullRequestList? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  CiProvider get provider => $_getN(0);
+  @$pb.TagNumber(1)
+  set provider(CiProvider value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProvider() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProvider() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<PullRequest> get pullRequests => $_getList(1);
+
+  /// Why they couldn't be read (the list is then empty).
+  @$pb.TagNumber(3)
+  CiProblem get problem => $_getN(2);
+  @$pb.TagNumber(3)
+  set problem(CiProblem value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasProblem() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearProblem() => $_clearField(3);
+  @$pb.TagNumber(3)
+  CiProblem ensureProblem() => $_ensure(2);
+}
+
+class BranchPullRequestRequest extends $pb.GeneratedMessage {
+  factory BranchPullRequestRequest({
+    $core.String? worktreePath,
+    $core.bool? refresh,
+  }) {
+    final result = BranchPullRequestRequest._();
+    if (worktreePath != null) result.worktreePath = worktreePath;
+    if (refresh != null) result.refresh = refresh;
+    return result;
+  }
+
+  BranchPullRequestRequest._();
+
+  factory BranchPullRequestRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BranchPullRequestRequest()..mergeFromBuffer(data, registry);
+  factory BranchPullRequestRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BranchPullRequestRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BranchPullRequestRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: BranchPullRequestRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'worktreePath')
+    ..aOB(2, _omitFieldNames ? '' : 'refresh')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BranchPullRequestRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BranchPullRequestRequest copyWith(
+          void Function(BranchPullRequestRequest) updates) =>
+      super.copyWith((message) => updates(message as BranchPullRequestRequest))
+          as BranchPullRequestRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use BranchPullRequestRequest() / BranchPullRequestRequest.new instead')
+  static BranchPullRequestRequest create() => BranchPullRequestRequest._();
+  static $pb.GeneratedMessage $_createMessage() => BranchPullRequestRequest._();
+  @$core.override
+  BranchPullRequestRequest createEmptyInstance() =>
+      BranchPullRequestRequest._();
+  @$core.pragma('dart2js:noInline')
+  static BranchPullRequestRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BranchPullRequestRequest>(
+          BranchPullRequestRequest.$_createMessage);
+  static BranchPullRequestRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get worktreePath => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set worktreePath($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasWorktreePath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearWorktreePath() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get refresh => $_getBF(1);
+  @$pb.TagNumber(2)
+  set refresh($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRefresh() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRefresh() => $_clearField(2);
+}
+
+class BranchPullRequest extends $pb.GeneratedMessage {
+  factory BranchPullRequest({
+    CiProvider? provider,
+    PullRequest? pullRequest,
+    CiProblem? problem,
+  }) {
+    final result = BranchPullRequest._();
+    if (provider != null) result.provider = provider;
+    if (pullRequest != null) result.pullRequest = pullRequest;
+    if (problem != null) result.problem = problem;
+    return result;
+  }
+
+  BranchPullRequest._();
+
+  factory BranchPullRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BranchPullRequest()..mergeFromBuffer(data, registry);
+  factory BranchPullRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BranchPullRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BranchPullRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: BranchPullRequest.$_createMessage)
+    ..aE<CiProvider>(1, _omitFieldNames ? '' : 'provider',
+        enumValues: CiProvider.values)
+    ..aOM<PullRequest>(2, _omitFieldNames ? '' : 'pullRequest',
+        subBuilder: PullRequest.$_createMessage)
+    ..aOM<CiProblem>(3, _omitFieldNames ? '' : 'problem',
+        subBuilder: CiProblem.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BranchPullRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BranchPullRequest copyWith(void Function(BranchPullRequest) updates) =>
+      super.copyWith((message) => updates(message as BranchPullRequest))
+          as BranchPullRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use BranchPullRequest() / BranchPullRequest.new instead')
+  static BranchPullRequest create() => BranchPullRequest._();
+  static $pb.GeneratedMessage $_createMessage() => BranchPullRequest._();
+  @$core.override
+  BranchPullRequest createEmptyInstance() => BranchPullRequest._();
+  @$core.pragma('dart2js:noInline')
+  static BranchPullRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<BranchPullRequest>(
+          BranchPullRequest.$_createMessage);
+  static BranchPullRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  CiProvider get provider => $_getN(0);
+  @$pb.TagNumber(1)
+  set provider(CiProvider value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProvider() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProvider() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  PullRequest get pullRequest => $_getN(1);
+  @$pb.TagNumber(2)
+  set pullRequest(PullRequest value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPullRequest() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPullRequest() => $_clearField(2);
+  @$pb.TagNumber(2)
+  PullRequest ensurePullRequest() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  CiProblem get problem => $_getN(2);
+  @$pb.TagNumber(3)
+  set problem(CiProblem value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasProblem() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearProblem() => $_clearField(3);
+  @$pb.TagNumber(3)
+  CiProblem ensureProblem() => $_ensure(2);
+}
+
+class CreatePullRequestRequest extends $pb.GeneratedMessage {
+  factory CreatePullRequestRequest({
+    $core.String? worktreePath,
+    $core.String? title,
+    $core.String? body,
+    $core.String? base,
+    $core.bool? draft,
+  }) {
+    final result = CreatePullRequestRequest._();
+    if (worktreePath != null) result.worktreePath = worktreePath;
+    if (title != null) result.title = title;
+    if (body != null) result.body = body;
+    if (base != null) result.base = base;
+    if (draft != null) result.draft = draft;
+    return result;
+  }
+
+  CreatePullRequestRequest._();
+
+  factory CreatePullRequestRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreatePullRequestRequest()..mergeFromBuffer(data, registry);
+  factory CreatePullRequestRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreatePullRequestRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreatePullRequestRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: CreatePullRequestRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'worktreePath')
+    ..aOS(2, _omitFieldNames ? '' : 'title')
+    ..aOS(3, _omitFieldNames ? '' : 'body')
+    ..aOS(4, _omitFieldNames ? '' : 'base')
+    ..aOB(5, _omitFieldNames ? '' : 'draft')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreatePullRequestRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreatePullRequestRequest copyWith(
+          void Function(CreatePullRequestRequest) updates) =>
+      super.copyWith((message) => updates(message as CreatePullRequestRequest))
+          as CreatePullRequestRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreatePullRequestRequest() / CreatePullRequestRequest.new instead')
+  static CreatePullRequestRequest create() => CreatePullRequestRequest._();
+  static $pb.GeneratedMessage $_createMessage() => CreatePullRequestRequest._();
+  @$core.override
+  CreatePullRequestRequest createEmptyInstance() =>
+      CreatePullRequestRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CreatePullRequestRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreatePullRequestRequest>(
+          CreatePullRequestRequest.$_createMessage);
+  static CreatePullRequestRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get worktreePath => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set worktreePath($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasWorktreePath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearWorktreePath() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get title => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set title($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTitle() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTitle() => $_clearField(2);
+
+  /// Markdown.
+  @$pb.TagNumber(3)
+  $core.String get body => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set body($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBody() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBody() => $_clearField(3);
+
+  /// Target branch; empty = the repository's default branch.
+  @$pb.TagNumber(4)
+  $core.String get base => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set base($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasBase() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearBase() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get draft => $_getBF(4);
+  @$pb.TagNumber(5)
+  set draft($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDraft() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDraft() => $_clearField(5);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

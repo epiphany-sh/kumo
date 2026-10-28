@@ -120,7 +120,7 @@ fn relation_to(relation: TaskRelation) -> pb::TaskRelation {
     }
 }
 
-fn person_to(person: &Person) -> pb::Person {
+pub(crate) fn person_to(person: &Person) -> pb::Person {
     pb::Person {
         id: person.id.clone(),
         name: person.name.clone(),

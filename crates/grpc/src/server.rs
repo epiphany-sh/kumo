@@ -9,6 +9,7 @@ use kumo_application::agents::AgentService;
 use kumo_application::changes::ChangesService;
 use kumo_application::daemon::HelloService;
 use kumo_application::pipelines::PipelinesService;
+use kumo_application::pulls::PullRequestService;
 use kumo_application::tasks::TaskService;
 use kumo_application::terminal::TerminalService;
 use kumo_application::workspace::WorkspaceService;
@@ -17,6 +18,7 @@ use kumo_proto::v1::agents_server::AgentsServer;
 use kumo_proto::v1::core_server::CoreServer;
 use kumo_proto::v1::git_server::GitServer;
 use kumo_proto::v1::pipelines_server::PipelinesServer;
+use kumo_proto::v1::pull_requests_server::PullRequestsServer;
 use kumo_proto::v1::tasks_server::TasksServer;
 use kumo_proto::v1::terminals_server::TerminalsServer;
 use kumo_proto::v1::workspace_server::WorkspaceServer;
@@ -26,7 +28,8 @@ use tonic::transport::server::TcpIncoming;
 
 use crate::auth::RequireBearer;
 use crate::services::{
-    AgentsGrpc, CoreGrpc, GitGrpc, PipelinesGrpc, TasksGrpc, TerminalsGrpc, WorkspaceGrpc,
+    AgentsGrpc, CoreGrpc, GitGrpc, PipelinesGrpc, PullRequestsGrpc, TasksGrpc, TerminalsGrpc,
+    WorkspaceGrpc,
 };
 
 /// Use cases the server exposes.
@@ -39,6 +42,7 @@ pub struct Services {
     pub agents: Arc<AgentService>,
     pub tasks: Arc<TaskService>,
     pub pipelines: Arc<PipelinesService>,
+    pub pulls: Arc<PullRequestService>,
 }
 
 /// A bound, not yet serving, gRPC server.
@@ -111,6 +115,10 @@ impl GrpcServer {
             ))
             .add_service(PipelinesServer::with_interceptor(
                 PipelinesGrpc::new(self.services.pipelines),
+                auth.clone(),
+            ))
+            .add_service(PullRequestsServer::with_interceptor(
+                PullRequestsGrpc::new(self.services.pulls),
                 auth,
             ))
             .serve_with_incoming_shutdown(incoming, shutdown)

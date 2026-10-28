@@ -21,7 +21,8 @@ class EngineConnection {
         git = GitClient(channel, options: auth),
         agents = AgentsClient(channel, options: auth),
         tasks = TasksClient(channel, options: auth),
-        pipelines = PipelinesClient(channel, options: auth);
+        pipelines = PipelinesClient(channel, options: auth),
+        pulls = PullRequestsClient(channel, options: auth);
 
   final ClientChannel channel;
   final DaemonEndpoint endpoint;
@@ -33,6 +34,7 @@ class EngineConnection {
   final AgentsClient agents;
   final TasksClient tasks;
   final PipelinesClient pipelines;
+  final PullRequestsClient pulls;
 }
 
 /// Discovers or launches the daemon, handshakes and hands out the

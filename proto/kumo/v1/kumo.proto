@@ -1132,3 +1132,97 @@ message TestHostResponse {
   // Set when the token doesn't work.
   optional CiProblem problem = 2;
 }
+
+// ---------------------------------------------------------------------------
+// Pull requests (GitLab: merge requests)
+// ---------------------------------------------------------------------------
+//
+// Read from the repository's host with the same token (or gh sign-in) as
+// pipelines; problems come as a CiProblem, worded by the UI.
+
+service PullRequests {
+  // Open pull requests of a repository, most recently updated first.
+  rpc List(ListPullRequestsRequest) returns (PullRequestList);
+  // The pull request of a worktree's branch: the open one, else the last
+  // merged or closed one.
+  rpc ForBranch(BranchPullRequestRequest) returns (BranchPullRequest);
+  // Opens a pull request from a worktree's (pushed) branch.
+  rpc Create(CreatePullRequestRequest) returns (PullRequest);
+}
+
+enum PrState {
+  PR_STATE_OPEN = 0;
+  PR_STATE_MERGED = 1;
+  PR_STATE_CLOSED = 2;
+}
+
+enum ReviewState {
+  // No review asked for or given.
+  REVIEW_STATE_NONE = 0;
+  // Reviewers were asked; nobody approved yet.
+  REVIEW_STATE_REQUIRED = 1;
+  REVIEW_STATE_CHANGES_REQUESTED = 2;
+  REVIEW_STATE_APPROVED = 3;
+}
+
+message PullRequest {
+  uint64 number = 1;
+  // As the host shows it: "#521", "!231".
+  string label = 2;
+  string title = 3;
+  Person author = 4;
+  // Source and target branches.
+  string branch = 5;
+  string base = 6;
+  bool draft = 7;
+  PrState state = 8;
+  ReviewState review = 9;
+  // Someone asked the user to review it.
+  bool review_requested_from_you = 10;
+  repeated Person reviewers = 11;
+  // Checks on its latest commit: passed of total (0 of 0 = none ran).
+  uint32 checks_passed = 12;
+  uint32 checks_total = 13;
+  // Overall state of those checks; unset when none ran.
+  optional CiState checks_state = 14;
+  string url = 15;
+  // Unix ms.
+  int64 created_at = 16;
+  int64 updated_at = 17;
+  uint32 comment_count = 18;
+}
+
+message ListPullRequestsRequest {
+  // The repository's main checkout.
+  string repo_path = 1;
+  // Ask the host even if the last answer is recent.
+  bool refresh = 2;
+}
+
+message PullRequestList {
+  CiProvider provider = 1;
+  repeated PullRequest pull_requests = 2;
+  // Why they couldn't be read (the list is then empty).
+  optional CiProblem problem = 3;
+}
+
+message BranchPullRequestRequest {
+  string worktree_path = 1;
+  bool refresh = 2;
+}
+
+message BranchPullRequest {
+  CiProvider provider = 1;
+  optional PullRequest pull_request = 2;
+  optional CiProblem problem = 3;
+}
+
+message CreatePullRequestRequest {
+  string worktree_path = 1;
+  string title = 2;
+  // Markdown.
+  string body = 3;
+  // Target branch; empty = the repository's default branch.
+  string base = 4;
+  bool draft = 5;
+}

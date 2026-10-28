@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../data/agents_source.dart';
 import '../data/ci_hosts_source.dart';
 import '../data/pipelines_source.dart';
+import '../data/pull_requests_source.dart';
 import '../data/tasks_source.dart';
 import '../data/changes.dart';
 import '../data/workspace_source.dart';
@@ -15,15 +16,33 @@ import 'preferences.dart';
 
 enum KumoView {
   terminal('Terminal', '⌘1'),
-  files('Files', '⌘2'),
-  agents('Agents', '⌘3'),
-  tasks('Tasks', '⌘4'),
-  git('Git', '⌘5'),
-  docs('Docs', '⌘6');
+  // The full editor: opened from a file (no side-nav entry; files of the
+  // current worktree live in its Files tab).
+  files('Files', '', inNav: false),
+  agents('Agents', '⌘2'),
+  tasks('Tasks', '⌘3'),
+  git('Git', '⌘4'),
+  docs('Docs', '⌘5');
 
-  const KumoView(this.label, this.shortcut);
+  const KumoView(this.label, this.shortcut, {this.inNav = true});
   final String label;
   final String shortcut;
+
+  /// Listed in the side-nav (and reachable with ⌘1…⌘5).
+  final bool inNav;
+
+  static List<KumoView> get nav => [for (final v in values) if (v.inNav) v];
+}
+
+/// Tabs of the current worktree's context, next to its terminal tabs
+/// (opened from the icons in the Terminal header).
+enum ContextTab {
+  files('Files', 'Files of this worktree'),
+  git('Git', 'Git of this branch: changes, commits, PR and pipelines');
+
+  const ContextTab(this.label, this.tooltip);
+  final String label;
+  final String tooltip;
 }
 
 /// App-wide UI state. Everything here changes optimistically in the same
@@ -48,6 +67,7 @@ class AppState extends ChangeNotifier {
     TasksSource? tasks,
     PipelinesFactory? pipelinesFor,
     CiHostsSource? ciHosts,
+    PullRequestsSource? pullRequests,
   })  : prefs = prefs ?? Preferences.memory(),
         workspace = workspace ?? MockWorkspaceSource(),
         agents = agents ?? MockAgentsSource(),
@@ -55,6 +75,7 @@ class AppState extends ChangeNotifier {
         _changesFor = changesFor,
         _pipelinesFor = pipelinesFor ?? mockPipelinesFor,
         ciHosts = ciHosts ?? MockCiHostsSource(),
+        pullRequests = pullRequests ?? MockPullRequests(),
         _mode = mode {
     _changes = changesFor == null ? MockWorktreeChanges() : NoWorktreeChanges();
     _changes.addListener(notifyListeners);
@@ -131,6 +152,7 @@ class AppState extends ChangeNotifier {
   void selectWorktree(String branch, {String? path}) {
     activeWorktree = branch;
     activeWorktreePath = path;
+    _home = false;
     _bindChanges();
     _bindPipelines();
     notifyListeners();
@@ -166,6 +188,21 @@ class AppState extends ChangeNotifier {
     _bindChanges();
     _bindPipelines();
     notifyListeners();
+  }
+
+  /// Opens [path] in the full editor (the Files view, not in the side-nav).
+  String? _editRequest;
+  void editFile(String path) {
+    _editRequest = path;
+    _view = KumoView.files;
+    notifyListeners();
+  }
+
+  /// The file the editor was asked to show, once.
+  String? takeEditRequest() {
+    final p = _editRequest;
+    _editRequest = null;
+    return p;
   }
 
   /// Request to open the "New worktree" popover (from ⌘⇧N or the sidebar +).
@@ -348,17 +385,53 @@ class AppState extends ChangeNotifier {
   /// Whether the side panel starts open (it can always be toggled, ⌥⌘B).
   bool get sidePanelOnLaunch => prefs.get<bool>('sidePanel.onLaunch', true);
   set sidePanelOnLaunch(bool v) => setSetting('sidePanel.onLaunch', v);
-  SidePanelTab _sidePanelTab = SidePanelTab.git;
-  SidePanelTab get sidePanelTab => _sidePanelTab;
-
   void toggleSidePanel() {
     _sidePanelOpen = !_sidePanelOpen;
     notifyListeners();
   }
 
-  void showSidePanelTab(SidePanelTab t) {
-    _sidePanelTab = t;
-    _sidePanelOpen = true;
+  // ---- Context: the selected worktree, or Home ----
+
+  /// Home: plain shells in the home folder that belong to no repository
+  /// (Terminal in the side-nav). Selecting a worktree leaves it.
+  bool _home = false;
+  bool get inHome => _home;
+
+  void showHome() {
+    _home = true;
+    _view = KumoView.terminal;
+    notifyListeners();
+  }
+
+  final List<ContextTab> _contextTabs = [];
+  ContextTab? _activeContext;
+
+  /// The worktree's Files / Git tabs that are open (none in Home).
+  List<ContextTab> get contextTabs => _home ? const [] : List.unmodifiable(_contextTabs);
+
+  /// The context tab showing, or null when terminals or a file tab are.
+  ContextTab? get activeContext => _home ? null : _activeContext;
+
+  /// Opens (or goes to) the worktree's [t] tab in the Terminal view.
+  void openContext(ContextTab t) {
+    _home = false;
+    if (!_contextTabs.contains(t)) _contextTabs.add(t);
+    _activeContext = t;
+    _view = KumoView.terminal;
+    notifyListeners();
+  }
+
+  void closeContext(ContextTab t) {
+    if (!_contextTabs.remove(t)) return;
+    if (_activeContext == t) _activeContext = null;
+    notifyListeners();
+  }
+
+  /// The file shown in the Files tab (its tree picks it).
+  String? _contextFile;
+  String? get contextFile => _contextFile;
+  void showContextFile(String path) {
+    _contextFile = path;
     notifyListeners();
   }
 
@@ -413,15 +486,19 @@ class AppState extends ChangeNotifier {
   // ---- File tabs in the Terminal view ----
 
   final List<String> _openFiles = [];
-  List<String> get openFiles => List.unmodifiable(_openFiles);
+  /// File tabs belong to the worktree's context: none in Home.
+  List<String> get openFiles => _home ? const [] : List.unmodifiable(_openFiles);
   String? _activeFile;
 
-  /// The file tab showing, or null when the terminal panes are showing.
-  String? get activeFile => _activeFile;
+  /// The file tab showing, or null when the terminal panes (or a context
+  /// tab) are showing.
+  String? get activeFile => _home || activeContext != null ? null : _activeFile;
 
   void openFile(String path) {
     if (!_openFiles.contains(path)) _openFiles.add(path);
     _activeFile = path;
+    _activeContext = null;
+    _home = false;
     _view = KumoView.terminal;
     notifyListeners();
   }
@@ -434,6 +511,8 @@ class AppState extends ChangeNotifier {
     }
     if (first == null) return;
     _activeFile = first;
+    _activeContext = null;
+    _home = false;
     _view = KumoView.terminal;
     notifyListeners();
   }
@@ -448,8 +527,9 @@ class AppState extends ChangeNotifier {
 
   /// Back to the terminal panes (a terminal tab was clicked).
   void showTerminals() {
-    if (_activeFile == null) return;
+    if (_activeFile == null && _activeContext == null) return;
     _activeFile = null;
+    _activeContext = null;
     notifyListeners();
   }
 
@@ -478,6 +558,7 @@ class AppState extends ChangeNotifier {
     _changesPath = path;
     _changes = path == null ? NoWorktreeChanges() : factory(path);
     _changes.addListener(notifyListeners);
+    _contextFile = null;
     _commitNotice = null;
     _canUndoCommit = false;
   }
@@ -619,6 +700,9 @@ class AppState extends ChangeNotifier {
 
   /// The repository hosts' tokens, for pipelines.
   final CiHostsSource ciHosts;
+
+  /// Pull requests of the repositories' hosts (same tokens as pipelines).
+  final PullRequestsSource pullRequests;
 
   /// Follows the selection: one [PipelinesSource] per worktree.
   void _bindPipelines() {
@@ -777,15 +861,6 @@ class AppState extends ChangeNotifier {
 }
 
 enum TerminalCommand { splitRight, splitDown, closePane, newTerminal }
-
-enum SidePanelTab {
-  files('Files'),
-  widgets('Widgets'),
-  git('Source control');
-
-  const SidePanelTab(this.label);
-  final String label;
-}
 
 enum InspectorWidget {
   agent('Agent', 'Ticket, plan steps, review and pause'),

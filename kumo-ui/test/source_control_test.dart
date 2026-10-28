@@ -37,6 +37,9 @@ void main() {
     final state = AppState(demoWallpaper: true);
     await tester.pumpWidget(KumoApp(state: state));
     await tester.pump();
+    // Source control lives in the worktree's Git tab.
+    state.openContext(ContextTab.git);
+    await tester.pump();
     expect(find.text('PR #521'), findsNothing);
     expect(find.text(state.changes.branch), findsWidgets);
 
@@ -72,6 +75,9 @@ void main() {
     final state = AppState(demoWallpaper: true);
     await tester.pumpWidget(KumoApp(state: state));
     await tester.pump();
+    // Source control lives in the worktree's Git tab.
+    state.openContext(ContextTab.git);
+    await tester.pump();
     const path = 'internal/kafka/bulk_consumer.go';
     // Hover highlights only show in mouse mode, which a test doesn't start in.
     FocusManager.instance.highlightStrategy = FocusHighlightStrategy.alwaysTraditional;
@@ -80,7 +86,7 @@ void main() {
     await mouse.addPointer(location: Offset.zero);
     addTearDown(mouse.removePointer);
     Future<void> hover() async {
-      await mouse.moveTo(tester.getCenter(find.byTooltip(path)));
+      await mouse.moveTo(tester.getCenter(find.byTooltip(path).last));
       await tester.pump();
     }
 
@@ -95,7 +101,7 @@ void main() {
     await tester.tap(find.byTooltip('Discard changes to bulk_consumer.go'));
     await tester.pump();
     expect(state.pendingChanges.map((f) => f.path), isNot(contains(path)), reason: 'hidden during the undo window');
-    expect(find.byTooltip(path), findsNothing);
+    expect(find.byTooltip(path), findsNothing, reason: 'gone from the Git tab and from the Changes widget');
     expect(state.undo?.message, 'Discarded changes to bulk_consumer.go');
 
     state.undoLast();

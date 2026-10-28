@@ -4,6 +4,7 @@ mod agents;
 mod changes;
 mod error;
 mod pipelines;
+mod pulls;
 mod tasks;
 mod terminal;
 mod workspace;
@@ -15,6 +16,7 @@ pub use error::{
     workspace_status_from,
 };
 pub use pipelines::{ci_problem_to, host_info_to, pipelines_snapshot_to};
+pub use pulls::{branch_pull_request_to, pull_request_list_to, pull_request_to};
 pub use tasks::{
     detected_to, source_options_from, source_to, task_detail_to, task_link_to, task_status_from,
     task_to, tasks_update_to,

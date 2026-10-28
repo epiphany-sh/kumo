@@ -1726,3 +1726,117 @@ abstract class PipelinesServiceBase extends $grpc.Service {
   $async.Future<$0.SignInWithGhResponse> signInWithGh(
       $grpc.ServiceCall call, $0.SignInWithGhRequest request);
 }
+
+@$pb.GrpcServiceName('kumo.v1.PullRequests')
+class PullRequestsClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  PullRequestsClient(super.channel, {super.options, super.interceptors});
+
+  /// Open pull requests of a repository, most recently updated first.
+  $grpc.ResponseFuture<$0.PullRequestList> list(
+    $0.ListPullRequestsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$list, request, options: options);
+  }
+
+  /// The pull request of a worktree's branch: the open one, else the last
+  /// merged or closed one.
+  $grpc.ResponseFuture<$0.BranchPullRequest> forBranch(
+    $0.BranchPullRequestRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$forBranch, request, options: options);
+  }
+
+  /// Opens a pull request from a worktree's (pushed) branch.
+  $grpc.ResponseFuture<$0.PullRequest> create(
+    $0.CreatePullRequestRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$create, request, options: options);
+  }
+
+  // method descriptors
+
+  static final _$list =
+      $grpc.ClientMethod<$0.ListPullRequestsRequest, $0.PullRequestList>(
+          '/kumo.v1.PullRequests/List',
+          ($0.ListPullRequestsRequest value) => value.writeToBuffer(),
+          $0.PullRequestList.fromBuffer);
+  static final _$forBranch =
+      $grpc.ClientMethod<$0.BranchPullRequestRequest, $0.BranchPullRequest>(
+          '/kumo.v1.PullRequests/ForBranch',
+          ($0.BranchPullRequestRequest value) => value.writeToBuffer(),
+          $0.BranchPullRequest.fromBuffer);
+  static final _$create =
+      $grpc.ClientMethod<$0.CreatePullRequestRequest, $0.PullRequest>(
+          '/kumo.v1.PullRequests/Create',
+          ($0.CreatePullRequestRequest value) => value.writeToBuffer(),
+          $0.PullRequest.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.PullRequests')
+abstract class PullRequestsServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.PullRequests';
+
+  PullRequestsServiceBase() {
+    $addMethod(
+        $grpc.ServiceMethod<$0.ListPullRequestsRequest, $0.PullRequestList>(
+            'List',
+            list_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.ListPullRequestsRequest.fromBuffer(value),
+            ($0.PullRequestList value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.BranchPullRequestRequest, $0.BranchPullRequest>(
+            'ForBranch',
+            forBranch_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.BranchPullRequestRequest.fromBuffer(value),
+            ($0.BranchPullRequest value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.CreatePullRequestRequest, $0.PullRequest>(
+        'Create',
+        create_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.CreatePullRequestRequest.fromBuffer(value),
+        ($0.PullRequest value) => value.writeToBuffer()));
+  }
+
+  $async.Future<$0.PullRequestList> list_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ListPullRequestsRequest> $request) async {
+    return list($call, await $request);
+  }
+
+  $async.Future<$0.PullRequestList> list(
+      $grpc.ServiceCall call, $0.ListPullRequestsRequest request);
+
+  $async.Future<$0.BranchPullRequest> forBranch_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.BranchPullRequestRequest> $request) async {
+    return forBranch($call, await $request);
+  }
+
+  $async.Future<$0.BranchPullRequest> forBranch(
+      $grpc.ServiceCall call, $0.BranchPullRequestRequest request);
+
+  $async.Future<$0.PullRequest> create_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.CreatePullRequestRequest> $request) async {
+    return create($call, await $request);
+  }
+
+  $async.Future<$0.PullRequest> create(
+      $grpc.ServiceCall call, $0.CreatePullRequestRequest request);
+}

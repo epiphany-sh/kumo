@@ -4,7 +4,7 @@ use kumo_domain::pipelines::{
 use kumo_domain::time::Timestamp;
 use kumo_proto::v1 as pb;
 
-fn ms(at: Option<Timestamp>) -> i64 {
+pub(crate) fn ms(at: Option<Timestamp>) -> i64 {
     at.map_or(0, |t| {
         i64::try_from(t.as_unix_nanos() / 1_000_000).unwrap_or(i64::MAX)
     })
@@ -19,7 +19,7 @@ pub fn ci_provider_to(provider: Option<CiProvider>) -> pb::CiProvider {
     }
 }
 
-fn state_to(state: CiState) -> pb::CiState {
+pub(crate) fn state_to(state: CiState) -> pb::CiState {
     match state {
         CiState::Queued => pb::CiState::Queued,
         CiState::Running => pb::CiState::Running,

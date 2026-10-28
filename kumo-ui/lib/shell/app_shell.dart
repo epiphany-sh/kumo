@@ -33,12 +33,14 @@ class AppShell extends StatelessWidget {
         LogicalKeyboardKey.digit3,
         LogicalKeyboardKey.digit4,
         LogicalKeyboardKey.digit5,
-        LogicalKeyboardKey.digit6,
       ];
-      for (var i = 0; i < keys.length; i++) {
-        final v = KumoView.values[i];
-        map[SingleActivator(keys[i], meta: true)] = () => s.view = v;
-        map[SingleActivator(keys[i], control: true)] = () => s.view = v;
+      final nav = KumoView.nav;
+      for (var i = 0; i < keys.length && i < nav.length; i++) {
+        final v = nav[i];
+        // ⌘1 is Terminal in the side-nav: Home.
+        final VoidCallback go = v == KumoView.terminal ? s.showHome : () => s.view = v;
+        map[SingleActivator(keys[i], meta: true)] = go;
+        map[SingleActivator(keys[i], control: true)] = go;
       }
       for (final mod in [true, false]) {
         map[SingleActivator(LogicalKeyboardKey.keyL, meta: mod, control: !mod, shift: true)] = s.cycleTheme;

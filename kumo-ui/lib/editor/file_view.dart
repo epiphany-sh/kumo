@@ -141,10 +141,10 @@ class _FileViewState extends State<FileView> {
               ],
               KIconButton(
                 icon: KIcons.external,
-                label: 'Open in Files to edit',
+                label: 'Edit in the editor',
                 size: 24,
                 iconSize: 14,
-                onTap: () => AppScope.read(context).view = KumoView.files,
+                onTap: () => AppScope.read(context).editFile(widget.path),
               ),
             ]),
           );
@@ -165,7 +165,7 @@ class _FileViewState extends State<FileView> {
           TextSpan(text: '.', style: sans(12.5, color: c.text2)),
         ])),
         const SizedBox(height: 12),
-        KButton(label: 'Open in Files to view and edit', height: 30, onTap: () => AppScope.read(context).view = KumoView.files),
+        KButton(label: 'Open in the editor', height: 30, onTap: () => AppScope.read(context).editFile(widget.path)),
       ]),
     );
   }

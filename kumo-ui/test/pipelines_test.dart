@@ -16,7 +16,6 @@ Future<void> _pumpWidgets(WidgetTester tester, MockPipelinesScenario scenario) a
     pipelinesFor: ({required Repo repo, required Worktree worktree, required String worktreePath}) => _mock(scenario),
   );
   await tester.pumpWidget(KumoApp(state: state));
-  state.showSidePanelTab(SidePanelTab.widgets);
   await tester.pump();
 }
 

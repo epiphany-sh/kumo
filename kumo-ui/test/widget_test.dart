@@ -85,12 +85,20 @@ void main() {
   testWidgets('source control: open a changed file, commit, close the tab', (tester) async {
     final state = await pumpApp(tester);
     expect(find.byType(SidePanel), findsOneWidget);
-    await tester.tap(find.byTooltip('internal/discount/repository.go').first);
+    // Source control lives in the worktree's Git tab (header icons).
+    await tester.tap(find.byTooltip(ContextTab.git.tooltip));
+    await tester.pump();
+    expect(find.byType(SourceControlPanel), findsOneWidget);
+    await tester.tap(find.byTooltip('internal/discount/repository.go').last);
     await tester.pump();
     expect(find.byType(FileView), findsOneWidget);
     expect(state.activeFile, 'internal/discount/repository.go');
+    expect(state.activeContext, isNull, reason: 'a file tab shows instead');
+    await tester.tap(find.byTooltip(ContextTab.git.tooltip));
+    await tester.pump();
     // Nothing staged: Commit takes every change.
     state.changes.unstage(List.of(state.changes.stagedList));
+    await tester.pump();
     await tester.tap(find.byTooltip('Generate message from the changes'));
     await tester.pump();
     await tester.tap(find.text('Commit').first);
@@ -103,14 +111,17 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('side panel tabs and hide / show', (tester) async {
+  testWidgets('side panel shows the widgets; the Files tab shows the tree', (tester) async {
     final state = await pumpApp(tester);
-    await tester.tap(find.byTooltip('Widgets'));
-    await tester.pump();
     expect(find.text('Bulk discounts by category'), findsWidgets);
-    await tester.tap(find.byTooltip('Files'));
+    await tester.tap(find.byTooltip(ContextTab.files.tooltip));
     await tester.pump();
-    expect(find.text('price-admin'), findsWidgets);
+    expect(find.byType(WorktreeFilesTree), findsOneWidget);
+    expect(find.text('No file open'), findsOneWidget);
+    await tester.tap(find.text('bulk.go').first);
+    await tester.pump();
+    expect(state.contextFile, 'internal/discount/bulk.go');
+    expect(find.byType(FileView), findsOneWidget);
     state.toggleSidePanel();
     await tester.pump();
     expect(find.byType(SidePanel), findsNothing);

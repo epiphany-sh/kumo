@@ -4,25 +4,24 @@ import 'package:flutter/services.dart';
 import '../app/app_state.dart';
 import '../data/changes.dart';
 import '../data/pipelines_source.dart';
+import '../data/pull_requests_source.dart';
+import '../data/repo_activity.dart';
 import '../overlays/settings_dialog.dart';
 import '../platform/open_url.dart';
 import '../theme/kumo_theme.dart';
+import '../theme/palette.dart';
 import '../widgets/context_menu.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
 import 'screen_chrome.dart';
 
-/// Left panel of the Terminal view with three tabs: the worktree's files,
-/// the inspector widgets, and source control. ⌥⌘B hides / shows it.
+/// Panel beside the Terminal view's tabs: the inspector widgets of the
+/// current worktree (agent, pipelines, changes…). ⌥⌘B hides / shows it.
+/// The worktree's files and source control live in its context tabs
+/// ([WorktreeFilesTree], [SourceControlPanel]).
 class SidePanel extends StatelessWidget {
   const SidePanel({super.key});
-
-  static const _icons = {
-    SidePanelTab.files: KIcons.folder,
-    SidePanelTab.widgets: KIcons.widgets,
-    SidePanelTab.git: KIcons.git,
-  };
 
   @override
   Widget build(BuildContext context) {
@@ -33,43 +32,16 @@ class SidePanel extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Container(
           height: 46,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.only(left: 16, right: 8),
           decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.divider))),
           child: Row(children: [
-            for (final t in SidePanelTab.values)
-              KPressable(
-                onTap: () => s.showSidePanelTab(t),
-                semanticLabel: t.label,
-                tooltip: t.label,
-                selected: s.sidePanelTab == t,
-                builder: (context, hover, focus) {
-                  final on = s.sidePanelTab == t;
-                  return SizedBox(
-                    width: 40,
-                    height: 46,
-                    child: Stack(alignment: Alignment.center, children: [
-                      Icon(_icons[t], size: 18, color: on || hover ? c.text : c.text3),
-                      Positioned(
-                        left: 10,
-                        right: 10,
-                        bottom: 0,
-                        child: Container(height: 2, decoration: BoxDecoration(color: on ? c.text : Colors.transparent, borderRadius: BorderRadius.circular(1))),
-                      ),
-                    ]),
-                  );
-                },
-              ),
-            const Spacer(),
+            Icon(KIcons.widgets, size: 16, color: c.text3),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Widgets', style: sans(12.5, weight: FontWeight.w600, color: c.text))),
             KIconButton(icon: KIcons.sidePanel, label: 'Hide side panel (⌥⌘B)', onTap: s.toggleSidePanel),
           ]),
         ),
-        Expanded(
-          child: switch (s.sidePanelTab) {
-            SidePanelTab.files => const _FilesTab(),
-            SidePanelTab.widgets => const _WidgetsTab(),
-            SidePanelTab.git => const _SourceControlTab(),
-          },
-        ),
+        const Expanded(child: _WidgetsTab()),
       ]),
     );
   }
@@ -77,14 +49,16 @@ class SidePanel extends StatelessWidget {
 
 // ---------------------------------------------------------------- Source control
 
-class _SourceControlTab extends StatefulWidget {
-  const _SourceControlTab();
+/// Source control of the current worktree (the Git context tab): branch,
+/// commit box, actions and the changed files.
+class SourceControlPanel extends StatefulWidget {
+  const SourceControlPanel({super.key});
 
   @override
-  State<_SourceControlTab> createState() => _SourceControlTabState();
+  State<SourceControlPanel> createState() => _SourceControlPanelState();
 }
 
-class _SourceControlTabState extends State<_SourceControlTab> {
+class _SourceControlPanelState extends State<SourceControlPanel> {
   final _msg = TextEditingController();
   final _query = TextEditingController();
   bool _needMsg = false;
@@ -568,14 +542,18 @@ class _Field extends StatelessWidget {
 
 // ---------------------------------------------------------------- Files
 
-class _FilesTab extends StatefulWidget {
-  const _FilesTab();
+/// The current worktree's folder tree with each file's change (M / A).
+/// Tapping a file calls [onOpen]; [selected] is highlighted.
+class WorktreeFilesTree extends StatefulWidget {
+  const WorktreeFilesTree({super.key, required this.onOpen, this.selected});
+  final ValueChanged<String> onOpen;
+  final String? selected;
 
   @override
-  State<_FilesTab> createState() => _FilesTabState();
+  State<WorktreeFilesTree> createState() => _WorktreeFilesTreeState();
 }
 
-class _FilesTabState extends State<_FilesTab> {
+class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
   final Set<String> _open = {'internal', 'internal/discount', 'internal/kafka'};
   bool _changedOnly = false;
 
@@ -627,9 +605,9 @@ class _FilesTabState extends State<_FilesTab> {
           name: p.split('/').last,
           color: col ?? c.text,
           kind: k,
-          selected: s.activeFile == p,
+          selected: widget.selected == p,
           semantic: p,
-          onTap: () => s.openFile(p),
+          onTap: () => widget.onOpen(p),
         ));
       }
     }
@@ -641,8 +619,8 @@ class _FilesTabState extends State<_FilesTab> {
       Row(children: [
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('price-admin', style: mono(12.5, weight: FontWeight.w600, color: c.text)),
-            Text('~/wt/price-admin/PRC-412', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11, color: c.text3)),
+            Text(s.activeRepo?.name ?? 'No repository', style: mono(12.5, weight: FontWeight.w600, color: c.text)),
+            Text(s.activeWorktreeEntry?.path ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11, color: c.text3)),
           ]),
         ),
         KPressable(
@@ -879,9 +857,9 @@ Widget _widgetBody(InspectorWidget w) => switch (w) {
       InspectorWidget.agent => const _AgentWidget(),
       InspectorWidget.changes => const _ChangesWidget(),
       InspectorWidget.context => const _ContextWidget(),
-      InspectorWidget.pipelines => const _PipelinesWidget(),
+      InspectorWidget.pipelines => const PipelinesCard(),
       InspectorWidget.tests => const _TestsWidget(),
-      InspectorWidget.pullRequest => const _PrWidget(),
+      InspectorWidget.pullRequest => const PullRequestCard(),
       InspectorWidget.activity => const _ActivityWidget(),
     };
 
@@ -1050,7 +1028,7 @@ class _ChangesWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          KButton(label: 'Commit…', height: 30, fontSize: 12, onTap: () => s.showSidePanelTab(SidePanelTab.git)),
+          KButton(label: 'Commit…', height: 30, fontSize: 12, onTap: () => s.openContext(ContextTab.git)),
         ]),
       ]),
     );
@@ -1092,8 +1070,8 @@ class _ContextWidget extends StatelessWidget {
 /// (GitHub Actions, GitLab CI, Bitbucket Pipelines). Problems — a token
 /// without access, an expired one, an outage — read as plain sentences with
 /// the fix one click away; the provider's own words show small underneath.
-class _PipelinesWidget extends StatelessWidget {
-  const _PipelinesWidget();
+class PipelinesCard extends StatelessWidget {
+  const PipelinesCard({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -1366,44 +1344,247 @@ class _TestsWidget extends StatelessWidget {
   }
 }
 
-class _PrWidget extends StatelessWidget {
-  const _PrWidget();
+/// The pull request of the selected worktree's branch, from its host:
+/// review, reviewers and checks; "Create pull request" when it has none and
+/// "Publish branch" while it isn't pushed.
+class PullRequestCard extends StatefulWidget {
+  const PullRequestCard({super.key});
+
+  @override
+  State<PullRequestCard> createState() => _PullRequestCardState();
+}
+
+class _PullRequestCardState extends State<PullRequestCard> {
+  /// The worktree whose pull request is shown.
+  String? _path;
+  BranchPullRequest? _answer;
+  String? _error;
+  bool _loading = false;
+  bool _creating = false;
+  bool _busy = false;
+  bool _draft = true;
+  final _title = TextEditingController();
+
+  @override
+  void dispose() {
+    _title.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load({bool refresh = false}) async {
+    final path = _path;
+    if (path == null) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final answer = await AppScope.read(context).pullRequests.forBranch(path, refresh: refresh);
+      if (!mounted || path != _path) return;
+      setState(() => _answer = answer);
+    } on Object catch (e) {
+      if (mounted && path == _path) setState(() => _error = '$e');
+    }
+    if (mounted && path == _path) setState(() => _loading = false);
+  }
+
+  Future<void> _create() async {
+    final path = _path;
+    if (path == null) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final pr = await AppScope.read(context).pullRequests.create(worktreePath: path, title: _title.text, draft: _draft);
+      if (!mounted || path != _path) return;
+      setState(() {
+        _answer = BranchPullRequest(provider: _answer?.provider, pullRequest: pr);
+        _creating = false;
+      });
+    } on Object catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  /// `feat/PRC-412-bulk-discounts` → `feat: PRC-412 bulk discounts`.
+  static String _titleFor(String branch) {
+    final slash = branch.indexOf('/');
+    final rest = (slash < 0 ? branch : branch.substring(slash + 1)).replaceAll('-', ' ').replaceAll('_', ' ');
+    final key = RegExp(r'^([A-Za-z]+) (\d+)').firstMatch(rest);
+    final body = key == null ? rest : '${key[1]!.toUpperCase()}-${key[2]}${rest.substring(key.end)}';
+    return slash < 0 ? body : '${branch.substring(0, slash)}: $body';
+  }
 
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final c = context.c;
-    final checks = [('build', 'passed', c.ok), ('golangci-lint', 'passed', c.ok), ('test · integration', 'running', c.acc)];
+    final entry = s.activeWorktreeEntry;
+    final path = entry == null ? null : s.workspace.absolutePathOf(entry);
+    if (path != _path) {
+      _path = path;
+      _answer = null;
+      _error = null;
+      _creating = false;
+      if (path != null) WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    }
+    final repo = s.activeRepo;
+    final terms = RepoTerms.of(repo?.host ?? 'GH');
+    final title = terms.prOne == 'MR' ? 'Merge request' : 'Pull request';
+    final answer = _answer;
+    final pr = answer?.pullRequest;
+    final provider = answer?.provider ?? (repo == null ? null : CiProvider.ofHost(repo.host));
+    final host = provider?.hostName ?? 'its host';
+    final branch = entry?.branch ?? '';
+
+    Widget body;
+    if (entry == null) {
+      body = Text('Select a worktree to see its ${terms.prOne}.', style: sans(12, color: c.text3));
+    } else if (provider == null) {
+      body = Text('Kumo reads ${terms.prs} from GitHub, GitLab and Bitbucket.', style: sans(12, color: c.text3));
+    } else if (answer == null && _error == null) {
+      body = Text('Looking for the ${terms.prOne} of $branch…', style: sans(12, color: c.text3));
+    } else if (pr != null) {
+      body = _pullRequest(context, pr, host);
+    } else if (_creating) {
+      body = _form(context, branch, terms);
+    } else {
+      body = _missing(context, s, answer?.problem, host, branch, terms);
+    }
+
     return Section(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
           Icon(KIcons.pullRequest, size: 15, color: c.acc),
           const SizedBox(width: 8),
-          Expanded(child: Text('Pull request', style: sans(12.5, weight: FontWeight.w600, color: c.text))),
-          TagChip('Draft', color: c.text2),
+          Expanded(child: Text(title, style: sans(12.5, weight: FontWeight.w600, color: c.text))),
+          if (pr != null) _stateChip(c, pr),
+          KIconButton(icon: KIcons.refresh, label: 'Check again', size: 24, iconSize: 14, onTap: _loading || _path == null ? null : () => _load(refresh: true)),
         ]),
         const SizedBox(height: 8),
-        Text.rich(TextSpan(children: [
-          TextSpan(text: '#521 ', style: mono(12, color: c.text3)),
-          TextSpan(text: 'feat: bulk discounts by category', style: sans(12.5, weight: FontWeight.w500, color: c.text)),
-        ])),
-        Text('GitHub · into main · Lucía requested as reviewer', style: sans(11.5, color: c.text3)),
-        const SizedBox(height: 8),
-        for (final (name, state, col) in checks)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Row(children: [
-              Dot(col),
-              const SizedBox(width: 8),
-              Expanded(child: Text(name, style: mono(11.5, color: c.text2))),
-              Text(state, style: sans(11.5, color: col)),
-            ]),
-          ),
-        const SizedBox(height: 8),
-        KButton(label: 'Open in Git', height: 30, fontSize: 12, expand: true, onTap: () => s.view = KumoView.git),
+        body,
+        if (_error != null) ...[
+          const SizedBox(height: 6),
+          Text(_error!, style: sans(11.5, color: c.err)),
+        ],
       ]),
     );
+  }
+
+  Widget _stateChip(KumoPalette c, PullRequestInfo pr) {
+    final (label, color) = switch (pr) {
+      PullRequestInfo(state: PrOpenState.merged) => ('Merged', c.acc),
+      PullRequestInfo(state: PrOpenState.closed) => ('Closed', c.text3),
+      PullRequestInfo(draft: true) => ('Draft', c.text2),
+      PullRequestInfo(review: PrReview.approved) => ('Approved', c.ok),
+      PullRequestInfo(review: PrReview.changesRequested) => ('Changes requested', c.err),
+      PullRequestInfo(review: PrReview.required) => ('Review requested', c.warn),
+      _ => ('Open', c.acc),
+    };
+    return TagChip(label, color: color);
+  }
+
+  Widget _pullRequest(BuildContext context, PullRequestInfo pr, String host) {
+    final s = AppScope.read(context);
+    final c = context.c;
+    final who = pr.reviewers.isEmpty
+        ? ''
+        : ' · ${pr.reviewers.join(', ')} ${pr.review == PrReview.required ? (pr.reviewers.length == 1 ? 'requested as reviewer' : 'requested as reviewers') : 'reviewing'}';
+    final (checks, color) = switch (pr.checksState) {
+      null => ('No checks ran', c.text3),
+      CiState.failed => ('${pr.checksPassed} of ${pr.checksTotal} checks passed · failing', c.err),
+      CiState.running || CiState.queued => ('${pr.checksPassed} of ${pr.checksTotal} checks passed · running', c.acc),
+      CiState.passed => ('${pr.checksTotal == 1 ? 'Checks' : 'All ${pr.checksTotal} checks'} passed', c.ok),
+      _ => ('Checks ${pr.checksState!.name}', c.text3),
+    };
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text.rich(
+        TextSpan(children: [
+          TextSpan(text: '${pr.label} ', style: mono(12, color: c.text3)),
+          TextSpan(text: pr.title, style: sans(12.5, weight: FontWeight.w500, color: c.text)),
+        ]),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      Text(
+        '$host · into ${pr.base.isEmpty ? 'the default branch' : pr.base}$who${pr.reviewRequestedFromYou ? ' · your review' : ''}',
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: sans(11.5, color: c.text3),
+      ),
+      const SizedBox(height: 8),
+      Row(children: [
+        Dot(color),
+        const SizedBox(width: 8),
+        Expanded(child: Text(checks, style: sans(11.5, color: color))),
+        if (pr.commentCount > 0) ...[
+          Icon(Icons.chat_bubble_outline_rounded, size: 12, color: c.text3),
+          const SizedBox(width: 4),
+          Text('${pr.commentCount}', style: sans(11.5, color: c.text3)),
+        ],
+      ]),
+      const SizedBox(height: 10),
+      Row(children: [
+        Expanded(child: KButton(label: 'Open in $host', height: 30, fontSize: 12, expand: true, onTap: pr.url.isEmpty ? null : () => openUrl(pr.url))),
+        const SizedBox(width: 8),
+        Expanded(child: KButton(label: 'Open in Git', height: 30, fontSize: 12, expand: true, onTap: () => s.view = KumoView.git)),
+      ]),
+    ]);
+  }
+
+  Widget _missing(BuildContext context, AppState s, CiProblem? problem, String host, String branch, RepoTerms terms) {
+    final c = context.c;
+    final (String text, Widget? action) = switch (problem?.kind) {
+      null => (
+          'No ${terms.prOne} for $branch yet.',
+          KButton.primary(
+            label: 'Create ${terms.prOne == 'MR' ? 'merge request' : 'pull request'}',
+            height: 30,
+            fontSize: 12,
+            expand: true,
+            onTap: () => setState(() {
+              _creating = true;
+              _title.text = _titleFor(branch);
+            }),
+          ),
+        ),
+      CiProblemKind.notPushed => (
+          '$branch isn’t on $host yet: publish it to open a ${terms.prOne}.',
+          KButton.primary(label: 'Publish branch', height: 30, fontSize: 12, expand: true, onTap: s.canPush ? s.push : null),
+        ),
+      CiProblemKind.notConnected || CiProblemKind.unauthorized || CiProblemKind.forbidden => (
+          problem!.kind == CiProblemKind.notConnected ? '$host isn’t connected.' : 'Your $host token can’t read ${terms.prs}${problem.detail.isEmpty ? '' : ' (${problem.detail})'}.',
+          KButton(label: 'Open Settings', height: 30, fontSize: 12, expand: true, onTap: () => showSettingsDialog(context, initial: SettingsTab.repos)),
+        ),
+      _ => ('Couldn’t ask $host${problem!.detail.isEmpty ? '' : ': ${problem.detail}'}.', null),
+    };
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text(text, style: sans(12, color: c.text2)),
+      if (action != null) ...[const SizedBox(height: 10), action],
+    ]);
+  }
+
+  Widget _form(BuildContext context, String branch, RepoTerms terms) {
+    final c = context.c;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      KField(label: 'Title', controller: _title),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(child: Text('Open as draft', style: sans(12, color: c.text2))),
+        KSwitch(value: _draft, onChanged: (v) => setState(() => _draft = v), label: 'Open as draft'),
+      ]),
+      const SizedBox(height: 4),
+      Text('From $branch into the default branch.', style: sans(11, color: c.text3)),
+      const SizedBox(height: 10),
+      Row(children: [
+        KButton(label: 'Cancel', height: 30, fontSize: 12, onTap: _busy ? null : () => setState(() => _creating = false)),
+        const SizedBox(width: 8),
+        Expanded(child: KButton.primary(label: _busy ? 'Creating…' : 'Create ${terms.prOne}', height: 30, fontSize: 12, expand: true, onTap: _busy ? null : _create)),
+      ]),
+    ]);
   }
 }
 

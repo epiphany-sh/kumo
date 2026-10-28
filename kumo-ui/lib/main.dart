@@ -6,6 +6,7 @@ import 'app/preferences.dart';
 import 'data/pipelines_source.dart';
 import 'engine/engine_agents_source.dart';
 import 'engine/engine_pipelines_source.dart';
+import 'engine/engine_pull_requests.dart';
 import 'engine/engine_tasks_source.dart';
 import 'engine/engine_workspace_source.dart';
 import 'engine/engine_worktree_changes.dart';
@@ -27,6 +28,7 @@ Future<void> main() async {
     pipelinesFor: ({required repo, required worktree, required worktreePath}) =>
         EnginePipelinesSource(engine, worktreePath, provider: CiProvider.ofHost(repo.host), branch: worktree.branch),
     ciHosts: EngineCiHostsSource(engine),
+    pullRequests: EnginePullRequests(engine),
   );
   runApp(KumoApp(state: state, engine: engine));
 }

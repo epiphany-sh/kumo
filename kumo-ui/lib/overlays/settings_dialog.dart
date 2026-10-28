@@ -358,7 +358,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             _KbdRow('Show / hide side panel', ['⌥', '⌘', 'B']),
           ]),
           ('Workspace', const [
-            _KbdRow('Terminal · Files · Agents · Tasks · Git · Docs', ['⌘', '1…6']),
+            _KbdRow('Terminal (Home) · Agents · Tasks · Git · Docs', ['⌘', '1…5']),
             _KbdRow('Settings', ['⌘', ',']),
             _KbdRow('New worktree', ['⇧', '⌘', 'N']),
             _KbdRow('Show / hide sidebar', ['⌥', '⌘', 'S']),

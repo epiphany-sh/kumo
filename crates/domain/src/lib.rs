@@ -8,6 +8,7 @@
 //! - [`terminal`]: PTY-backed terminal sessions, their output and lifecycle.
 //! - [`daemon`]: daemon identity, security and discovery rules.
 //! - [`pipelines`]: CI runs of a worktree's branch on its repository's host.
+//! - [`pulls`]: pull requests of the workspace's repositories.
 //! - [`tasks`]: tasks from the user's tools, cached locally.
 //! - [`workspace`]: namespaces, git repositories and their worktrees.
 
@@ -15,6 +16,7 @@ pub mod agents;
 pub mod changes;
 pub mod daemon;
 pub mod pipelines;
+pub mod pulls;
 pub mod tasks;
 pub mod terminal;
 pub mod time;

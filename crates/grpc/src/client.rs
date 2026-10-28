@@ -8,6 +8,7 @@ use kumo_proto::v1::agents_client::AgentsClient;
 use kumo_proto::v1::core_client::CoreClient;
 use kumo_proto::v1::git_client::GitClient;
 use kumo_proto::v1::pipelines_client::PipelinesClient;
+use kumo_proto::v1::pull_requests_client::PullRequestsClient;
 use kumo_proto::v1::tasks_client::TasksClient;
 use kumo_proto::v1::terminals_client::TerminalsClient;
 use kumo_proto::v1::workspace_client::WorkspaceClient;
@@ -29,6 +30,7 @@ pub struct KumoClient {
     pub agents: AgentsClient<AuthChannel>,
     pub tasks: TasksClient<AuthChannel>,
     pub pipelines: PipelinesClient<AuthChannel>,
+    pub pulls: PullRequestsClient<AuthChannel>,
 }
 
 impl KumoClient {
@@ -48,7 +50,8 @@ impl KumoClient {
             git: GitClient::with_interceptor(channel.clone(), auth.clone()),
             agents: AgentsClient::with_interceptor(channel.clone(), auth.clone()),
             tasks: TasksClient::with_interceptor(channel.clone(), auth.clone()),
-            pipelines: PipelinesClient::with_interceptor(channel, auth),
+            pipelines: PipelinesClient::with_interceptor(channel.clone(), auth.clone()),
+            pulls: PullRequestsClient::with_interceptor(channel, auth),
         })
     }
 

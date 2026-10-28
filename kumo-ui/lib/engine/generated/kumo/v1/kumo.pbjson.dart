@@ -289,6 +289,38 @@ final $typed_data.Uint8List ciProblemKindDescriptor = $convert.base64Decode(
     'T0JMRU1fS0lORF9VTlJFQUNIQUJMRRAGEh4KGkNJX1BST0JMRU1fS0lORF9OT1RfUFVTSEVEEA'
     'cSHwobQ0lfUFJPQkxFTV9LSU5EX1VOU1VQUE9SVEVEEAg=');
 
+@$core.Deprecated('Use prStateDescriptor instead')
+const PrState$json = {
+  '1': 'PrState',
+  '2': [
+    {'1': 'PR_STATE_OPEN', '2': 0},
+    {'1': 'PR_STATE_MERGED', '2': 1},
+    {'1': 'PR_STATE_CLOSED', '2': 2},
+  ],
+};
+
+/// Descriptor for `PrState`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List prStateDescriptor = $convert.base64Decode(
+    'CgdQclN0YXRlEhEKDVBSX1NUQVRFX09QRU4QABITCg9QUl9TVEFURV9NRVJHRUQQARITCg9QUl'
+    '9TVEFURV9DTE9TRUQQAg==');
+
+@$core.Deprecated('Use reviewStateDescriptor instead')
+const ReviewState$json = {
+  '1': 'ReviewState',
+  '2': [
+    {'1': 'REVIEW_STATE_NONE', '2': 0},
+    {'1': 'REVIEW_STATE_REQUIRED', '2': 1},
+    {'1': 'REVIEW_STATE_CHANGES_REQUESTED', '2': 2},
+    {'1': 'REVIEW_STATE_APPROVED', '2': 3},
+  ],
+};
+
+/// Descriptor for `ReviewState`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List reviewStateDescriptor = $convert.base64Decode(
+    'CgtSZXZpZXdTdGF0ZRIVChFSRVZJRVdfU1RBVEVfTk9ORRAAEhkKFVJFVklFV19TVEFURV9SRV'
+    'FVSVJFRBABEiIKHlJFVklFV19TVEFURV9DSEFOR0VTX1JFUVVFU1RFRBACEhkKFVJFVklFV19T'
+    'VEFURV9BUFBST1ZFRBAD');
+
 @$core.Deprecated('Use helloRequestDescriptor instead')
 const HelloRequest$json = {
   '1': 'HelloRequest',
@@ -2744,3 +2776,226 @@ const TestHostResponse$json = {
 final $typed_data.Uint8List testHostResponseDescriptor = $convert.base64Decode(
     'ChBUZXN0SG9zdFJlc3BvbnNlEhgKB21lc3NhZ2UYASABKAlSB21lc3NhZ2USMQoHcHJvYmxlbR'
     'gCIAEoCzISLmt1bW8udjEuQ2lQcm9ibGVtSABSB3Byb2JsZW2IAQFCCgoIX3Byb2JsZW0=');
+
+@$core.Deprecated('Use pullRequestDescriptor instead')
+const PullRequest$json = {
+  '1': 'PullRequest',
+  '2': [
+    {'1': 'number', '3': 1, '4': 1, '5': 4, '10': 'number'},
+    {'1': 'label', '3': 2, '4': 1, '5': 9, '10': 'label'},
+    {'1': 'title', '3': 3, '4': 1, '5': 9, '10': 'title'},
+    {
+      '1': 'author',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.Person',
+      '10': 'author'
+    },
+    {'1': 'branch', '3': 5, '4': 1, '5': 9, '10': 'branch'},
+    {'1': 'base', '3': 6, '4': 1, '5': 9, '10': 'base'},
+    {'1': 'draft', '3': 7, '4': 1, '5': 8, '10': 'draft'},
+    {
+      '1': 'state',
+      '3': 8,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.PrState',
+      '10': 'state'
+    },
+    {
+      '1': 'review',
+      '3': 9,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.ReviewState',
+      '10': 'review'
+    },
+    {
+      '1': 'review_requested_from_you',
+      '3': 10,
+      '4': 1,
+      '5': 8,
+      '10': 'reviewRequestedFromYou'
+    },
+    {
+      '1': 'reviewers',
+      '3': 11,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.Person',
+      '10': 'reviewers'
+    },
+    {'1': 'checks_passed', '3': 12, '4': 1, '5': 13, '10': 'checksPassed'},
+    {'1': 'checks_total', '3': 13, '4': 1, '5': 13, '10': 'checksTotal'},
+    {
+      '1': 'checks_state',
+      '3': 14,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.CiState',
+      '9': 0,
+      '10': 'checksState',
+      '17': true
+    },
+    {'1': 'url', '3': 15, '4': 1, '5': 9, '10': 'url'},
+    {'1': 'created_at', '3': 16, '4': 1, '5': 3, '10': 'createdAt'},
+    {'1': 'updated_at', '3': 17, '4': 1, '5': 3, '10': 'updatedAt'},
+    {'1': 'comment_count', '3': 18, '4': 1, '5': 13, '10': 'commentCount'},
+  ],
+  '8': [
+    {'1': '_checks_state'},
+  ],
+};
+
+/// Descriptor for `PullRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pullRequestDescriptor = $convert.base64Decode(
+    'CgtQdWxsUmVxdWVzdBIWCgZudW1iZXIYASABKARSBm51bWJlchIUCgVsYWJlbBgCIAEoCVIFbG'
+    'FiZWwSFAoFdGl0bGUYAyABKAlSBXRpdGxlEicKBmF1dGhvchgEIAEoCzIPLmt1bW8udjEuUGVy'
+    'c29uUgZhdXRob3ISFgoGYnJhbmNoGAUgASgJUgZicmFuY2gSEgoEYmFzZRgGIAEoCVIEYmFzZR'
+    'IUCgVkcmFmdBgHIAEoCFIFZHJhZnQSJgoFc3RhdGUYCCABKA4yEC5rdW1vLnYxLlByU3RhdGVS'
+    'BXN0YXRlEiwKBnJldmlldxgJIAEoDjIULmt1bW8udjEuUmV2aWV3U3RhdGVSBnJldmlldxI5Ch'
+    'lyZXZpZXdfcmVxdWVzdGVkX2Zyb21feW91GAogASgIUhZyZXZpZXdSZXF1ZXN0ZWRGcm9tWW91'
+    'Ei0KCXJldmlld2VycxgLIAMoCzIPLmt1bW8udjEuUGVyc29uUglyZXZpZXdlcnMSIwoNY2hlY2'
+    'tzX3Bhc3NlZBgMIAEoDVIMY2hlY2tzUGFzc2VkEiEKDGNoZWNrc190b3RhbBgNIAEoDVILY2hl'
+    'Y2tzVG90YWwSOAoMY2hlY2tzX3N0YXRlGA4gASgOMhAua3Vtby52MS5DaVN0YXRlSABSC2NoZW'
+    'Nrc1N0YXRliAEBEhAKA3VybBgPIAEoCVIDdXJsEh0KCmNyZWF0ZWRfYXQYECABKANSCWNyZWF0'
+    'ZWRBdBIdCgp1cGRhdGVkX2F0GBEgASgDUgl1cGRhdGVkQXQSIwoNY29tbWVudF9jb3VudBgSIA'
+    'EoDVIMY29tbWVudENvdW50Qg8KDV9jaGVja3Nfc3RhdGU=');
+
+@$core.Deprecated('Use listPullRequestsRequestDescriptor instead')
+const ListPullRequestsRequest$json = {
+  '1': 'ListPullRequestsRequest',
+  '2': [
+    {'1': 'repo_path', '3': 1, '4': 1, '5': 9, '10': 'repoPath'},
+    {'1': 'refresh', '3': 2, '4': 1, '5': 8, '10': 'refresh'},
+  ],
+};
+
+/// Descriptor for `ListPullRequestsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listPullRequestsRequestDescriptor =
+    $convert.base64Decode(
+        'ChdMaXN0UHVsbFJlcXVlc3RzUmVxdWVzdBIbCglyZXBvX3BhdGgYASABKAlSCHJlcG9QYXRoEh'
+        'gKB3JlZnJlc2gYAiABKAhSB3JlZnJlc2g=');
+
+@$core.Deprecated('Use pullRequestListDescriptor instead')
+const PullRequestList$json = {
+  '1': 'PullRequestList',
+  '2': [
+    {
+      '1': 'provider',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.CiProvider',
+      '10': 'provider'
+    },
+    {
+      '1': 'pull_requests',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.PullRequest',
+      '10': 'pullRequests'
+    },
+    {
+      '1': 'problem',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.CiProblem',
+      '9': 0,
+      '10': 'problem',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_problem'},
+  ],
+};
+
+/// Descriptor for `PullRequestList`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pullRequestListDescriptor = $convert.base64Decode(
+    'Cg9QdWxsUmVxdWVzdExpc3QSLwoIcHJvdmlkZXIYASABKA4yEy5rdW1vLnYxLkNpUHJvdmlkZX'
+    'JSCHByb3ZpZGVyEjkKDXB1bGxfcmVxdWVzdHMYAiADKAsyFC5rdW1vLnYxLlB1bGxSZXF1ZXN0'
+    'UgxwdWxsUmVxdWVzdHMSMQoHcHJvYmxlbRgDIAEoCzISLmt1bW8udjEuQ2lQcm9ibGVtSABSB3'
+    'Byb2JsZW2IAQFCCgoIX3Byb2JsZW0=');
+
+@$core.Deprecated('Use branchPullRequestRequestDescriptor instead')
+const BranchPullRequestRequest$json = {
+  '1': 'BranchPullRequestRequest',
+  '2': [
+    {'1': 'worktree_path', '3': 1, '4': 1, '5': 9, '10': 'worktreePath'},
+    {'1': 'refresh', '3': 2, '4': 1, '5': 8, '10': 'refresh'},
+  ],
+};
+
+/// Descriptor for `BranchPullRequestRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List branchPullRequestRequestDescriptor =
+    $convert.base64Decode(
+        'ChhCcmFuY2hQdWxsUmVxdWVzdFJlcXVlc3QSIwoNd29ya3RyZWVfcGF0aBgBIAEoCVIMd29ya3'
+        'RyZWVQYXRoEhgKB3JlZnJlc2gYAiABKAhSB3JlZnJlc2g=');
+
+@$core.Deprecated('Use branchPullRequestDescriptor instead')
+const BranchPullRequest$json = {
+  '1': 'BranchPullRequest',
+  '2': [
+    {
+      '1': 'provider',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.CiProvider',
+      '10': 'provider'
+    },
+    {
+      '1': 'pull_request',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.PullRequest',
+      '9': 0,
+      '10': 'pullRequest',
+      '17': true
+    },
+    {
+      '1': 'problem',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.CiProblem',
+      '9': 1,
+      '10': 'problem',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_pull_request'},
+    {'1': '_problem'},
+  ],
+};
+
+/// Descriptor for `BranchPullRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List branchPullRequestDescriptor = $convert.base64Decode(
+    'ChFCcmFuY2hQdWxsUmVxdWVzdBIvCghwcm92aWRlchgBIAEoDjITLmt1bW8udjEuQ2lQcm92aW'
+    'RlclIIcHJvdmlkZXISPAoMcHVsbF9yZXF1ZXN0GAIgASgLMhQua3Vtby52MS5QdWxsUmVxdWVz'
+    'dEgAUgtwdWxsUmVxdWVzdIgBARIxCgdwcm9ibGVtGAMgASgLMhIua3Vtby52MS5DaVByb2JsZW'
+    '1IAVIHcHJvYmxlbYgBAUIPCg1fcHVsbF9yZXF1ZXN0QgoKCF9wcm9ibGVt');
+
+@$core.Deprecated('Use createPullRequestRequestDescriptor instead')
+const CreatePullRequestRequest$json = {
+  '1': 'CreatePullRequestRequest',
+  '2': [
+    {'1': 'worktree_path', '3': 1, '4': 1, '5': 9, '10': 'worktreePath'},
+    {'1': 'title', '3': 2, '4': 1, '5': 9, '10': 'title'},
+    {'1': 'body', '3': 3, '4': 1, '5': 9, '10': 'body'},
+    {'1': 'base', '3': 4, '4': 1, '5': 9, '10': 'base'},
+    {'1': 'draft', '3': 5, '4': 1, '5': 8, '10': 'draft'},
+  ],
+};
+
+/// Descriptor for `CreatePullRequestRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createPullRequestRequestDescriptor = $convert.base64Decode(
+    'ChhDcmVhdGVQdWxsUmVxdWVzdFJlcXVlc3QSIwoNd29ya3RyZWVfcGF0aBgBIAEoCVIMd29ya3'
+    'RyZWVQYXRoEhQKBXRpdGxlGAIgASgJUgV0aXRsZRISCgRib2R5GAMgASgJUgRib2R5EhIKBGJh'
+    'c2UYBCABKAlSBGJhc2USFAoFZHJhZnQYBSABKAhSBWRyYWZ0');

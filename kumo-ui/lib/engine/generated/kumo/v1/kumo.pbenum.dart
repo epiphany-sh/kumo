@@ -474,5 +474,55 @@ class CiProblemKind extends $pb.ProtobufEnum {
   const CiProblemKind._(super.value, super.name);
 }
 
+class PrState extends $pb.ProtobufEnum {
+  static const PrState PR_STATE_OPEN =
+      PrState._(0, _omitEnumNames ? '' : 'PR_STATE_OPEN');
+  static const PrState PR_STATE_MERGED =
+      PrState._(1, _omitEnumNames ? '' : 'PR_STATE_MERGED');
+  static const PrState PR_STATE_CLOSED =
+      PrState._(2, _omitEnumNames ? '' : 'PR_STATE_CLOSED');
+
+  static const $core.List<PrState> values = <PrState>[
+    PR_STATE_OPEN,
+    PR_STATE_MERGED,
+    PR_STATE_CLOSED,
+  ];
+
+  static final $core.List<PrState?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static PrState? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const PrState._(super.value, super.name);
+}
+
+class ReviewState extends $pb.ProtobufEnum {
+  /// No review asked for or given.
+  static const ReviewState REVIEW_STATE_NONE =
+      ReviewState._(0, _omitEnumNames ? '' : 'REVIEW_STATE_NONE');
+
+  /// Reviewers were asked; nobody approved yet.
+  static const ReviewState REVIEW_STATE_REQUIRED =
+      ReviewState._(1, _omitEnumNames ? '' : 'REVIEW_STATE_REQUIRED');
+  static const ReviewState REVIEW_STATE_CHANGES_REQUESTED =
+      ReviewState._(2, _omitEnumNames ? '' : 'REVIEW_STATE_CHANGES_REQUESTED');
+  static const ReviewState REVIEW_STATE_APPROVED =
+      ReviewState._(3, _omitEnumNames ? '' : 'REVIEW_STATE_APPROVED');
+
+  static const $core.List<ReviewState> values = <ReviewState>[
+    REVIEW_STATE_NONE,
+    REVIEW_STATE_REQUIRED,
+    REVIEW_STATE_CHANGES_REQUESTED,
+    REVIEW_STATE_APPROVED,
+  ];
+
+  static final $core.List<ReviewState?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ReviewState? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ReviewState._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

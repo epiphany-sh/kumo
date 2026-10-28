@@ -1,4 +1,4 @@
-import 'dart:io' show Platform, Process;
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -10,6 +10,7 @@ import '../data/models.dart';
 import '../overlays/namespace_dialog.dart';
 import '../overlays/new_worktree_popover.dart';
 import '../overlays/settings_dialog.dart';
+import '../platform/git_user.dart';
 import '../platform/window_effects.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/anchored_popover.dart';
@@ -86,7 +87,7 @@ class Sidebar extends StatelessWidget {
             const SizedBox(height: 12),
             const _WorkspaceSwitcher(),
             const SizedBox(height: 14),
-            for (final v in KumoView.values) _NavItem(view: v, icon: _navIcons[v]!),
+            for (final v in KumoView.nav) _NavItem(view: v, icon: _navIcons[v]!),
             const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.only(left: 10, right: 2, bottom: 6),
@@ -117,10 +118,10 @@ class Sidebar extends StatelessWidget {
                 height: 26,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(color: c.accSoft, shape: BoxShape.circle),
-                child: Text(_initial(_UserName.name), style: sans(12, weight: FontWeight.w600, color: c.acc)),
+                child: Text(_initial(gitUserName), style: sans(12, weight: FontWeight.w600, color: c.acc)),
               ),
               const SizedBox(width: 9),
-              Expanded(child: Text(_UserName.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, weight: FontWeight.w500, color: c.text))),
+              Expanded(child: Text(gitUserName, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, weight: FontWeight.w500, color: c.text))),
               KIconButton(icon: KIcons.settings, label: 'Settings (⌘,)', onTap: () => showSettingsDialog(context)),
             ]),
           ],
@@ -208,24 +209,6 @@ class _WorkspaceSwitcher extends StatelessWidget {
 }
 
 String _initial(String name) => name.trim().isEmpty ? '?' : name.trim().characters.first.toUpperCase();
-
-/// The user's name for the sidebar: git's `user.name`, else the login.
-abstract final class _UserName {
-  static final String name = _read();
-
-  static String _read() {
-    final login = Platform.environment['USER'] ?? Platform.environment['USERNAME'] ?? '';
-    if (kIsWeb) return login;
-    try {
-      final r = Process.runSync('git', ['config', '--global', 'user.name']);
-      final name = '${r.stdout}'.trim();
-      if (r.exitCode == 0 && name.isNotEmpty) return name;
-    } on Object {
-      // No git: the login will do.
-    }
-    return login.isEmpty ? 'You' : login;
-  }
-}
 
 /// What's connected: task sources and repository hosts (a token or gh).
 /// A tile opens its Settings page; failing ones show in warning colors.
@@ -334,11 +317,14 @@ class _NavItem extends StatelessWidget {
       KumoView.tasks when open > 0 => '$open',
       _ => null,
     };
+    // Terminal opens Home: shells in ~ that belong to no repository; a
+    // worktree's terminals are one click away on the worktree itself.
+    final home = view == KumoView.terminal;
     return KPressable(
-      onTap: () => s.view = view,
-      semanticLabel: view.label,
+      onTap: home ? s.showHome : () => s.view = view,
+      semanticLabel: home ? 'Terminal in your home folder' : view.label,
       selected: on,
-      tooltip: '${view.label}  ${view.shortcut}',
+      tooltip: home ? 'Terminal in ~, not tied to a repository  ${view.shortcut}' : '${view.label}  ${view.shortcut}',
       builder: (context, hover, focus) => AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         height: 34,
@@ -442,8 +428,17 @@ class _NamespaceGroupState extends State<_NamespaceGroup> {
     final c = context.c;
     final ns = widget.ns;
     final repos = [for (final id in ns.repos) s.workspace.repo(id)].whereType<Repo>().toList();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+    // The namespace you're standing in (its worktree is the context) gets
+    // a soft outline; the border is always there so nothing shifts.
+    final here = !s.inHome && repos.any((r) => s.worktreesOf(r).any(s.isActiveWorktree));
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: here ? c.acc.withValues(alpha: 0.04) : null,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: here ? c.acc.withValues(alpha: 0.32) : Colors.transparent),
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         GestureDetector(
           onSecondaryTapDown: (d) => _openMenu(d.globalPosition),
@@ -718,16 +713,15 @@ class _RepoGroupState extends State<_RepoGroup> {
                 onTap: () => s.selectWorktree(w.branch, path: w.path),
                 semanticLabel: '${w.branch}, ${w.note}${w.isMain ? ', principal checkout' : ''}',
                 tooltip: w.isMain ? 'Principal checkout · right-click for actions' : null,
-                selected: s.isActiveWorktree(w),
+                selected: s.isActiveWorktree(w) && !s.inHome,
                 builder: (context, hover, focus) {
-                  final sel = s.isActiveWorktree(w);
+                  // The worktree you're standing on: a soft accent background.
+                  final sel = s.isActiveWorktree(w) && !s.inHome;
                   final menu = _menuFor == w.branch;
                   return Container(
                     margin: const EdgeInsets.only(top: 1),
                     padding: const EdgeInsets.fromLTRB(28, 5, 8, 5),
-                    decoration: sel && !menu
-                        ? chipDecoration(c, radius: 9, fill: c.navActive)
-                        : BoxDecoration(color: hover || menu ? c.tile : null, borderRadius: BorderRadius.circular(9)),
+                    decoration: BoxDecoration(color: menu ? c.tile : (sel ? c.accSoft : (hover ? c.tile : null)), borderRadius: BorderRadius.circular(9)),
                     child: Row(children: [
                       Dot(toneColor(context, w.tone)),
                       const SizedBox(width: 9),

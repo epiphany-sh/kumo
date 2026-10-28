@@ -87,6 +87,16 @@ abstract final class MockSessions {
         ],
       );
 
+  /// A shell in Home: the home folder, no repository.
+  static MockTerminalSurface homeShell(int n) => MockTerminalSurface(
+        title: n == 1 ? 'zsh' : 'zsh $n',
+        cwd: '~',
+        initial: [
+          TermLine.of([('Last login: Wed Oct 28 14:58 on ttys004', TermRole.text3)]),
+          TermLine.of([('~ ', TermRole.cyan), ('❯', TermRole.text3)]),
+        ],
+      );
+
   static MockTerminalSurface agent() => MockTerminalSurface(
         title: 'Claude Code',
         cwd: '~/wt/price-admin/PRC-412',
