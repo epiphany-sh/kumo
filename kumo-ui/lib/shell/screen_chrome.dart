@@ -111,7 +111,8 @@ class Breadcrumb extends StatelessWidget {
       final last = i == parts.length - 1;
       if (i > 0) children.add(Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Text('/', style: sans(13, color: c.text3))));
       final text = Text(parts[i], maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, weight: last ? FontWeight.w600 : FontWeight.w400, color: last ? c.text : c.text2));
-      children.add(last ? Flexible(child: text) : text);
+      // Every part ellipsizes when the toolbar is narrow.
+      children.add(Flexible(child: text));
     }
     return Row(mainAxisSize: MainAxisSize.min, children: children);
   }
@@ -189,7 +190,8 @@ class PanelHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(children: [
         Expanded(child: Text(text, style: sans(size, weight: FontWeight.w600, color: context.c.text))),
-        if (trailing != null) trailing!,
+        // Shrinks (its texts ellipsize) rather than overflow a narrow panel.
+        if (trailing != null) Flexible(child: trailing!),
       ]);
 }
 

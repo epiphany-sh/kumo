@@ -45,9 +45,9 @@ class _DocsScreenState extends State<DocsScreen> {
         ]);
       }),
       status: const [
-        StatusText('Confluence · 214 pages indexed'),
-        StatusText('Notion · 96 pages'),
-        StatusText('Obsidian vault · 41 notes, local'),
+        Flexible(child: StatusText('Confluence · 214 pages indexed', flexible: true)),
+        Flexible(child: StatusText('Notion · 96 pages', flexible: true)),
+        Flexible(child: StatusText('Obsidian vault · 41 notes, local', flexible: true)),
         Spacer(),
         StatusText('Read-only unless an agent has write access'),
       ],

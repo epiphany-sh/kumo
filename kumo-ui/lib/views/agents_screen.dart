@@ -271,7 +271,7 @@ class _AgentCard extends StatelessWidget {
               Row(children: [
                 Icon(KIcons.shield, size: 14, color: c.warn),
                 const SizedBox(width: 8),
-                Text('Approval needed · shell command', style: sans(12, weight: FontWeight.w600, color: c.warn)),
+                Flexible(child: Text('Approval needed · shell command', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, weight: FontWeight.w600, color: c.warn))),
               ]),
               const SizedBox(height: 10),
               Container(
@@ -290,8 +290,7 @@ class _AgentCard extends StatelessWidget {
         ],
         const SizedBox(height: 12),
         Row(children: [
-          Text(a.meta, style: mono(11.5, color: c.text3)),
-          const Spacer(),
+          Expanded(child: Text(a.meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11.5, color: c.text3))),
           Icon(KIcons.clock, size: 12, color: c.text3),
           const SizedBox(width: 4),
           Text(a.time, style: sans(11.5, color: c.text3)),

@@ -276,14 +276,19 @@ class _HistoryState extends State<_History> {
         Row(children: [
           Text('History', style: sans(13, weight: FontWeight.w600, color: c.text)),
           const SizedBox(width: 8),
-          Text('price-admin', style: sans(12, color: c.text3)),
-          const Spacer(),
-          for (final (i, name) in const [(0, 'main'), (1, 'PRC-412'), (2, 'PRC-398')]) ...[
-            Dot(lanes[i], size: 8),
-            const SizedBox(width: 5),
-            Text(name, style: sans(11, color: c.text3)),
-            const SizedBox(width: 10),
-          ],
+          Expanded(child: Text('price-admin', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: c.text3))),
+          // The lanes' legend wraps when the panel is narrow.
+          Flexible(
+            child: Wrap(alignment: WrapAlignment.end, spacing: 10, runSpacing: 4, children: [
+              for (final (i, name) in const [(0, 'main'), (1, 'PRC-412'), (2, 'PRC-398')])
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Dot(lanes[i], size: 8),
+                  const SizedBox(width: 5),
+                  Text(name, style: sans(11, color: c.text3)),
+                ]),
+            ]),
+          ),
+          const SizedBox(width: 10),
         ]),
         const SizedBox(height: 12),
         Expanded(
@@ -479,7 +484,7 @@ class _PullRequests extends StatelessWidget {
             trailing: Row(mainAxisSize: MainAxisSize.min, children: [
               TagChip(repo.host),
               const SizedBox(width: 5),
-              Text('${repo.name} · current worktree', style: sans(11, color: c.text3)),
+              Flexible(child: Text('${repo.name} · current worktree', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11, color: c.text3))),
             ]),
           ),
         ),

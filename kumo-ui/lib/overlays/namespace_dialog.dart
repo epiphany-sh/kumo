@@ -114,6 +114,7 @@ class _NamespaceDialogState extends State<NamespaceDialog> {
         autofocus: true,
         child: Semantics(
           scopesRoute: true,
+          explicitChildNodes: true,
           namesRoute: true,
           label: title,
           child: ConstrainedBox(
