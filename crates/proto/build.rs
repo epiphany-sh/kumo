@@ -6,6 +6,8 @@ use std::path::PathBuf;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let proto_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../proto");
     let proto_file = proto_root.join("kumo/v1/kumo.proto");
+    // The .proto lives outside this crate: tell Cargo to watch it.
+    println!("cargo:rerun-if-changed={}", proto_root.display());
 
     let mut config = tonic_prost_build::Config::new();
     config.protoc_executable(protoc_bin_vendored::protoc_bin_path()?);

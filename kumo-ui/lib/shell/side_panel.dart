@@ -511,7 +511,7 @@ class _FilesTabState extends State<_FilesTab> {
     final s = AppScope.of(context);
     final c = context.c;
     final status = {for (final f in s.pendingChanges) f.path: f.kind};
-    final paths = [for (final p in MockChanges.tree) if (!_changedOnly || status.containsKey(p)) p];
+    final paths = [for (final p in s.changes.files) if (!_changedOnly || status.containsKey(p)) p];
     final root = _Dir('');
     for (final p in paths) {
       final parts = p.split('/');

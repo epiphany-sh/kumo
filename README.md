@@ -29,6 +29,16 @@ descubre el daemon por `daemon.json` o lo lanza desacoplado si no está corriend
 | `make bench` | Benchmarks del daemon |
 | `make proto` | Regenera el cliente Dart desde `proto/` |
 
+Qué es real hoy y qué sigue siendo mock:
+
+| Área | Estado |
+|---|---|
+| Terminales (shells) | Real: PTYs en `kumod`, render en grilla de celdas |
+| Namespaces, repos y worktrees | Real: `Workspace` en `kumod`, persistido en `kumo.db` (SQLite) |
+| Files, cambios de git, diffs, commit, push, historial | Real: `Git` en `kumod`; el estado se actualiza solo (file watcher) |
+| Gráfico de ramas del historial, panel Diff de la vista Git | Mock |
+| Agentes, tareas, PRs, pipelines, docs, integraciones | Mock (M3 / M4) |
+
 El daemon vive más que la UI: si cerrás la app, las terminales siguen corriendo
 y al reabrirla la UI se vuelve a enganchar a ellas con replay.
 
@@ -38,7 +48,9 @@ y al reabrirla la UI se vuelve a enganchar a ellas con replay.
 cargo run --release -p kumod
 ```
 
-Escucha en `127.0.0.1` (puerto efímero) y escribe el archivo de descubrimiento:
+Escucha en `127.0.0.1` (puerto efímero). En el directorio de datos guarda el archivo de
+descubrimiento y `kumo.db` (namespaces y repos). Los worktrees nuevos van por defecto a
+`~/wt/<repo>/<branch>`. El archivo de descubrimiento está en:
 
 | SO      | Ruta                                              |
 |---------|---------------------------------------------------|

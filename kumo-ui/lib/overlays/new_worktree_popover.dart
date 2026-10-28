@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
 import '../data/mock_data.dart';
+import '../data/models.dart';
+import '../data/workspace_source.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
@@ -17,7 +19,7 @@ class NewWorktreePopover extends StatefulWidget {
 
   final VoidCallback onClose;
 
-  /// Repo the popover opens on (the sidebar row whose + was pressed).
+  /// Id of the repo the popover opens on (the sidebar row whose + was pressed).
   final String repo;
 
   @override
@@ -33,6 +35,11 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
   String _agent = 'claude';
   bool _agentOn = true;
   bool _created = false;
+  bool _busy = false;
+  String? _error;
+
+  /// Real branches of [_repo]; null for mocks (the canvas values are shown).
+  RepoBranches? _branches;
   final _branch = TextEditingController();
   final _path = TextEditingController();
 
@@ -41,6 +48,26 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
     ('CU-2302', 'CU-2302 · Role templates for store managers'),
     ('TD-ROT', 'Todoist · Rotate staging Kafka credentials'),
   ];
+
+  WorkspaceSource get _workspace => AppScope.read(context).workspace;
+  Repo? get _repoEntry => _workspace.repo(_repo);
+  String get _repoName => _repoEntry?.name ?? _repo;
+
+  /// Branches a new one can start from: the checked-out one first.
+  List<String> get _baseOptions {
+    final b = _branches;
+    if (b == null) return const ['main', 'release/2026.11'];
+    return [if (b.current.isNotEmpty) b.current, for (final l in b.local) if (l != b.current) l];
+  }
+
+  /// Branches that can be checked out: local ones not in a worktree yet,
+  /// then remote ones.
+  List<String> get _existingOptions {
+    final b = _branches;
+    if (b == null) return const ['origin/fix/PRC-377-export-rounding', 'origin/chore/pgx-v5.7', 'origin/spike/price-cache'];
+    final checkedOut = {for (final w in _repoEntry?.worktrees ?? const <Worktree>[]) w.branch};
+    return [for (final l in b.local) if (!checkedOut.contains(l)) l, ...b.remote];
+  }
 
   /// Repos the user has put in a namespace, plus the one we opened on.
   List<String> get _repoOptions {
@@ -55,6 +82,20 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
   void initState() {
     super.initState();
     _fillNames();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBranches());
+  }
+
+  Future<void> _loadBranches() async {
+    if (!mounted) return;
+    final repo = _repoEntry;
+    final branches = repo == null ? null : await _workspace.branches(repo);
+    if (!mounted || branches == null) return;
+    setState(() {
+      _branches = branches;
+      if (!_baseOptions.contains(_base) && _baseOptions.isNotEmpty) _base = _baseOptions.first;
+      if (!_existingOptions.contains(_existing) && _existingOptions.isNotEmpty) _existing = _existingOptions.first;
+      _fillNames();
+    });
   }
 
   @override
@@ -67,21 +108,57 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
   void _fillNames() {
     final (b, p) = switch (_src) {
       _Source.ticket => switch (_ticket) {
-          'PRC-421' => ('feat/PRC-421-price-history', '~/wt/$_repo/PRC-421'),
-          'CU-2302' => ('feat/CU-2302-role-templates', '~/wt/$_repo/CU-2302'),
-          _ => ('chore/rotate-kafka-creds', '~/wt/$_repo/kafka-creds'),
+          'PRC-421' => ('feat/PRC-421-price-history', '~/wt/$_repoName/PRC-421'),
+          'CU-2302' => ('feat/CU-2302-role-templates', '~/wt/$_repoName/CU-2302'),
+          _ => ('chore/rotate-kafka-creds', '~/wt/$_repoName/kafka-creds'),
         },
-      _Source.fresh => ('feat/', '~/wt/$_repo/'),
-      _Source.existing => ('fix/PRC-377-export-rounding', '~/wt/$_repo/PRC-377'),
+      _Source.fresh => ('feat/', '~/wt/$_repoName/'),
+      _Source.existing => (_localName(_existing), '~/wt/$_repoName/${_localName(_existing).replaceAll('/', '-')}'),
     };
     _branch.text = b;
     _path.text = p;
   }
 
-  void _create() {
-    // Optimistic: flip the UI now; the daemon (M3) will confirm or revert.
-    setState(() => _created = true);
-    AppScope.read(context).selectWorktree(_branch.text);
+  /// `origin/fix/x` → `fix/x`: git checks out a remote branch by its short
+  /// name (creating the local tracking branch).
+  String _localName(String branch) {
+    final remote = _branches?.remote.contains(branch) ?? branch.startsWith('origin/');
+    return remote ? branch.substring(branch.indexOf('/') + 1) : branch;
+  }
+
+  Future<void> _create() async {
+    if (_busy) return;
+    final s = AppScope.read(context);
+    final repo = _repoEntry;
+    final branch = _branch.text.trim();
+    // Optimistic: flip the UI now; the daemon confirms or we go back.
+    setState(() {
+      _created = true;
+      _busy = true;
+      _error = null;
+    });
+    s.selectWorktree(branch);
+    if (repo == null) return;
+    try {
+      await s.workspace.createWorktree(
+        repo,
+        branch: branch,
+        createBranch: _src != _Source.existing,
+        base: _src == _Source.existing ? '' : _base,
+        path: _path.text,
+      );
+      final created = s.workspace.repo(repo.id)?.worktrees.where((w) => w.branch == branch).firstOrNull;
+      if (created != null) s.selectWorktree(created.branch, path: created.path);
+    } on Object catch (e) {
+      if (mounted) {
+        setState(() {
+          _created = false;
+          _error = s.workspace.error ?? '$e';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -107,7 +184,7 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('New worktree', style: sans(14, weight: FontWeight.w600, color: c.text)),
-                Text('$_repo · ${Mock.hostNames[Mock.repoNamed(_repo)?.host] ?? 'Local'}', style: sans(11.5, color: c.text3)),
+                Text('$_repoName · ${Mock.hostNames[_repoEntry?.host] ?? 'Local'}', style: sans(11.5, color: c.text3)),
               ]),
             ),
             KIconButton(icon: KIcons.close, label: 'Close', onTap: widget.onClose),
@@ -139,11 +216,13 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
         label: 'Repository',
         value: _repo,
         items: [
-          for (final r in _repoOptions) (r, r),
+          for (final r in _repoOptions) (r, _workspace.repo(r)?.name ?? r),
         ],
         onChanged: (v) => setState(() {
           _repo = v;
+          _branches = null;
           _fillNames();
+          _loadBranches();
         }),
       ),
       const SizedBox(height: 10),
@@ -159,17 +238,19 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
         ),
         const SizedBox(height: 10),
       ],
-      if (_src == _Source.existing) ...[
+      if (_src == _Source.existing && _existingOptions.isEmpty) ...[
+        Text('Every branch is already checked out somewhere.', style: sans(11.5, color: p.text3)),
+        const SizedBox(height: 10),
+      ] else if (_src == _Source.existing) ...[
         KSelect<String>(
           label: 'Existing branch',
           monospace: true,
           value: _existing,
-          items: const [
-            ('origin/fix/PRC-377-export-rounding', 'origin/fix/PRC-377-export-rounding'),
-            ('origin/chore/pgx-v5.7', 'origin/chore/pgx-v5.7'),
-            ('origin/spike/price-cache', 'origin/spike/price-cache'),
-          ],
-          onChanged: (v) => setState(() => _existing = v),
+          items: [for (final b in _existingOptions) (b, b)],
+          onChanged: (v) => setState(() {
+            _existing = v;
+            _fillNames();
+          }),
         ),
         const SizedBox(height: 10),
       ],
@@ -179,7 +260,7 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
             label: 'Base branch',
             monospace: true,
             value: _base,
-            items: const [('main', 'main'), ('release/2026.11', 'release/2026.11')],
+            items: [for (final b in _baseOptions) (b, b)],
             onChanged: (v) => setState(() => _base = v),
           ),
         ),
@@ -216,6 +297,10 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
           ],
         ]),
       ),
+      if (_error != null) ...[
+        const SizedBox(height: 12),
+        Text(_error!, maxLines: 4, overflow: TextOverflow.ellipsis, style: sans(11.5, color: p.err)),
+      ],
       const SizedBox(height: 14),
       Row(children: [
         Expanded(child: Text('Opens a terminal tab in the new path', style: sans(11, color: p.text3))),

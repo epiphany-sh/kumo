@@ -117,3 +117,334 @@ message TerminalInfo {
   bool exited = 3;
   int32 exit_code = 4;
 }
+
+// ---------------------------------------------------------------------------
+// Workspace: namespaces, repositories and worktrees
+// ---------------------------------------------------------------------------
+//
+// Repos are identified by the absolute path of their main checkout and
+// worktrees by their path. The daemon pushes the whole workspace on every
+// change (last wins): small, and the UI never has to merge events.
+
+service Workspace {
+  // Current snapshot first, then a new one after every change.
+  rpc Watch(WatchWorkspaceRequest) returns (stream WorkspaceSnapshot);
+  // Re-reads git state (e.g. when the window gets focus).
+  rpc Refresh(RefreshWorkspaceRequest) returns (RefreshWorkspaceResponse);
+  // Git repositories found on disk, to pick from when editing a namespace.
+  rpc DiscoverRepos(DiscoverReposRequest) returns (DiscoverReposResponse);
+  // Creates (empty id) or replaces a namespace. Unknown repo paths are
+  // registered; they must be git repositories.
+  rpc SaveNamespace(SaveNamespaceRequest) returns (SaveNamespaceResponse);
+  // Only the group: repositories and worktrees stay on disk.
+  rpc DeleteNamespace(DeleteNamespaceRequest) returns (DeleteNamespaceResponse);
+  rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse);
+  // `git worktree remove`; the branch stays. The main checkout can't be removed.
+  rpc RemoveWorktree(RemoveWorktreeRequest) returns (RemoveWorktreeResponse);
+  // Branches to start a worktree from or check out.
+  rpc ListBranches(ListBranchesRequest) returns (ListBranchesResponse);
+}
+
+message WatchWorkspaceRequest {}
+
+message WorkspaceSnapshot {
+  // Increases with every change.
+  uint64 version = 1;
+  repeated Namespace namespaces = 2;
+  // Every repository referenced by a namespace.
+  repeated Repository repositories = 3;
+}
+
+message Namespace {
+  string id = 1;
+  string name = 2;
+  // Repository paths, in sidebar order.
+  repeated string repo_paths = 3;
+  bool collapsed = 4;
+}
+
+enum GitHost {
+  GIT_HOST_UNSPECIFIED = 0;
+  GIT_HOST_LOCAL = 1; // no remote
+  GIT_HOST_GITHUB = 2;
+  GIT_HOST_GITLAB = 3;
+  GIT_HOST_BITBUCKET = 4;
+  GIT_HOST_OTHER = 5;
+}
+
+message Repository {
+  // Absolute path of the main checkout: the repository's identity.
+  string path = 1;
+  string name = 2;
+  GitHost host = 3;
+  // "owner/name" on the host, empty without a remote.
+  string full_name = 4;
+  string remote_url = 5;
+  repeated Worktree worktrees = 6;
+  // Set when git could not be read (moved or deleted folder…).
+  string error = 7;
+}
+
+message Worktree {
+  string path = 1;
+  // Empty when HEAD is detached.
+  string branch = 2;
+  string head = 3;
+  bool is_main = 4;
+  bool locked = 5;
+  WorktreeStatus status = 6;
+}
+
+message WorktreeStatus {
+  // Files with staged, unstaged or untracked changes.
+  uint32 changed_files = 1;
+  uint32 ahead = 2;
+  uint32 behind = 3;
+  // e.g. "origin/main"; empty if the branch was never pushed.
+  string upstream = 4;
+}
+
+message RefreshWorkspaceRequest {}
+message RefreshWorkspaceResponse {}
+
+message DiscoverReposRequest {
+  // Folders to scan; empty means the usual ones (~/workspace, ~/dev, ~/code…).
+  repeated string roots = 1;
+}
+
+message DiscoverReposResponse {
+  repeated RepoCandidate candidates = 1;
+}
+
+message RepoCandidate {
+  string path = 1;
+  string name = 2;
+  GitHost host = 3;
+  string full_name = 4;
+  uint32 worktree_count = 5;
+}
+
+message SaveNamespaceRequest {
+  // Empty to create one.
+  string id = 1;
+  string name = 2;
+  repeated string repo_paths = 3;
+  bool collapsed = 4;
+  // Position among namespaces (past the end appends). Unset: new ones are
+  // appended, existing ones keep their place.
+  optional uint32 position = 5;
+}
+
+message SaveNamespaceResponse {
+  string id = 1;
+}
+
+message DeleteNamespaceRequest {
+  string id = 1;
+}
+
+message DeleteNamespaceResponse {}
+
+message CreateWorktreeRequest {
+  string repo_path = 1;
+  string branch = 2;
+  // Create `branch` from `base` (default: the repo's current HEAD); false
+  // checks out an existing branch.
+  bool create_branch = 3;
+  string base = 4;
+  // Where to put it; "~" is expanded. Empty: ~/wt/<repo>/<branch>.
+  string path = 5;
+}
+
+message CreateWorktreeResponse {
+  Worktree worktree = 1;
+}
+
+message RemoveWorktreeRequest {
+  string repo_path = 1;
+  string worktree_path = 2;
+  // Also remove it with uncommitted changes.
+  bool force = 3;
+}
+
+message RemoveWorktreeResponse {}
+
+message ListBranchesRequest {
+  string repo_path = 1;
+}
+
+message ListBranchesResponse {
+  // Branch checked out in the main checkout; empty if detached.
+  string current = 1;
+  repeated string local = 2;
+  // e.g. "origin/feat/x", without the remotes' HEAD aliases.
+  repeated string remote = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Git: changes, files and history of one worktree
+// ---------------------------------------------------------------------------
+//
+// Every call names a worktree of a repository in the workspace; file paths
+// are relative to it and can't leave it.
+
+service Git {
+  // Status now, then again whenever files or the index change.
+  rpc WatchStatus(WatchStatusRequest) returns (stream WorktreeChanges);
+  // Tracked and untracked (not ignored) files.
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+  rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+  rpc WriteFile(WriteFileRequest) returns (WriteFileResponse);
+  // The whole file with its changes (unchanged lines as context).
+  rpc Diff(DiffRequest) returns (DiffResponse);
+  rpc Stage(PathsRequest) returns (GitActionResponse);
+  rpc Unstage(PathsRequest) returns (GitActionResponse);
+  // Back to HEAD (staged and working tree). Untracked files are left alone.
+  rpc Restore(PathsRequest) returns (GitActionResponse);
+  rpc Commit(CommitRequest) returns (CommitResponse);
+  rpc Push(WorktreeRequest) returns (GitActionResponse);
+  // `git reset --soft HEAD~1`: the changes stay, staged.
+  rpc UndoLastCommit(WorktreeRequest) returns (GitActionResponse);
+  rpc Log(LogRequest) returns (LogResponse);
+}
+
+message WorktreeRequest {
+  string worktree_path = 1;
+}
+
+message WatchStatusRequest {
+  string worktree_path = 1;
+}
+
+enum ChangeKind {
+  CHANGE_KIND_NONE = 0;
+  CHANGE_KIND_MODIFIED = 1;
+  CHANGE_KIND_ADDED = 2;
+  CHANGE_KIND_DELETED = 3;
+  CHANGE_KIND_RENAMED = 4;
+  CHANGE_KIND_UNTRACKED = 5;
+  CHANGE_KIND_TYPE_CHANGED = 6;
+}
+
+message FileChange {
+  string path = 1;
+  // Renames: where it came from.
+  string old_path = 2;
+  // Staged (index vs HEAD) and unstaged (working tree vs index) changes.
+  ChangeKind staged = 3;
+  ChangeKind unstaged = 4;
+  bool conflict = 5;
+  uint32 additions = 6;
+  uint32 deletions = 7;
+  bool binary = 8;
+}
+
+message WorktreeChanges {
+  // Empty when HEAD is detached.
+  string branch = 1;
+  string upstream = 2;
+  uint32 ahead = 3;
+  uint32 behind = 4;
+  // Uncommitted changes, staged or not.
+  repeated FileChange working = 5;
+  // Committed on this branch since it left `base` (e.g. "origin/main").
+  string base = 6;
+  repeated FileChange committed = 7;
+}
+
+message ListFilesRequest {
+  string worktree_path = 1;
+}
+
+message ListFilesResponse {
+  repeated string paths = 1;
+  // More files than the daemon lists at once.
+  bool truncated = 2;
+}
+
+message ReadFileRequest {
+  string worktree_path = 1;
+  string path = 2;
+}
+
+message ReadFileResponse {
+  bytes content = 1;
+  bool binary = 2;
+  // Only the first bytes were sent (big file).
+  bool truncated = 3;
+  uint64 size = 4;
+}
+
+message WriteFileRequest {
+  string worktree_path = 1;
+  string path = 2;
+  bytes content = 3;
+}
+
+message WriteFileResponse {}
+
+enum DiffScope {
+  // Working tree (staged and not) vs HEAD.
+  DIFF_SCOPE_WORKING = 0;
+  // HEAD vs the branch base.
+  DIFF_SCOPE_COMMITTED = 1;
+}
+
+message DiffRequest {
+  string worktree_path = 1;
+  string path = 2;
+  DiffScope scope = 3;
+}
+
+enum DiffLineKind {
+  DIFF_LINE_KIND_CONTEXT = 0;
+  DIFF_LINE_KIND_ADDED = 1;
+  DIFF_LINE_KIND_DELETED = 2;
+}
+
+message DiffLine {
+  DiffLineKind kind = 1;
+  string text = 2;
+}
+
+message DiffResponse {
+  repeated DiffLine lines = 1;
+  bool binary = 2;
+}
+
+message PathsRequest {
+  string worktree_path = 1;
+  repeated string paths = 2;
+}
+
+message GitActionResponse {}
+
+message CommitRequest {
+  string worktree_path = 1;
+  string message = 2;
+  // Stage every change first (`git add -A`).
+  bool all = 3;
+  bool amend = 4;
+}
+
+message CommitResponse {
+  string sha = 1;
+  string short_sha = 2;
+}
+
+message LogRequest {
+  string worktree_path = 1;
+  uint32 limit = 2;
+}
+
+message Commit {
+  string sha = 1;
+  string short_sha = 2;
+  string subject = 3;
+  string author = 4;
+  uint64 time_unix = 5;
+}
+
+message LogResponse {
+  repeated Commit commits = 1;
+}

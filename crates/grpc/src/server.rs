@@ -5,23 +5,29 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use kumo_application::changes::ChangesService;
 use kumo_application::daemon::HelloService;
 use kumo_application::terminal::TerminalService;
+use kumo_application::workspace::WorkspaceService;
 use kumo_domain::daemon::{AuthToken, DaemonError, ListenAddress};
 use kumo_proto::v1::core_server::CoreServer;
+use kumo_proto::v1::git_server::GitServer;
 use kumo_proto::v1::terminals_server::TerminalsServer;
+use kumo_proto::v1::workspace_server::WorkspaceServer;
 use tokio::net::TcpListener;
 use tonic::transport::Server;
 use tonic::transport::server::TcpIncoming;
 
 use crate::auth::RequireBearer;
-use crate::services::{CoreGrpc, TerminalsGrpc};
+use crate::services::{CoreGrpc, GitGrpc, TerminalsGrpc, WorkspaceGrpc};
 
 /// Use cases the server exposes.
 #[derive(Debug, Clone)]
 pub struct Services {
     pub hello: HelloService,
     pub terminals: Arc<TerminalService>,
+    pub workspace: Arc<WorkspaceService>,
+    pub changes: Arc<ChangesService>,
 }
 
 /// A bound, not yet serving, gRPC server.
@@ -74,6 +80,14 @@ impl GrpcServer {
             ))
             .add_service(TerminalsServer::with_interceptor(
                 TerminalsGrpc::new(self.services.terminals),
+                auth.clone(),
+            ))
+            .add_service(WorkspaceServer::with_interceptor(
+                WorkspaceGrpc::new(self.services.workspace),
+                auth.clone(),
+            ))
+            .add_service(GitServer::with_interceptor(
+                GitGrpc::new(self.services.changes),
                 auth,
             ))
             .serve_with_incoming_shutdown(incoming, shutdown)

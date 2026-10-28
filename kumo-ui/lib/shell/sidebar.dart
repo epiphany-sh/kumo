@@ -48,7 +48,7 @@ class Sidebar extends StatelessWidget {
         if (!n.collapsed)
           for (final r in n.repos) (n.id, r),
     ];
-    final active = Mock.repoOf(s.activeWorktree).name;
+    final active = s.activeRepo?.id;
     for (final v in visible) {
       if (v.$2 == active) return v;
     }
@@ -102,6 +102,7 @@ class Sidebar extends StatelessWidget {
                   for (final ns in s.namespaces)
                     _NamespaceGroup(key: ValueKey(ns.id), ns: ns, signalRepo: signal != null && signal.$1 == ns.id ? signal.$2 : null),
                   if (s.undo != null) _UndoToast(notice: s.undo!),
+                  if (s.workspaceError != null) _ErrorToast(message: s.workspaceError!),
                   const _NewNamespaceRow(),
                 ],
               ),
@@ -294,7 +295,7 @@ class _NamespaceGroupState extends State<_NamespaceGroup> {
     final s = AppScope.of(context);
     final c = context.c;
     final ns = widget.ns;
-    final repos = [for (final name in ns.repos) Mock.repoNamed(name)].whereType<Repo>().toList();
+    final repos = [for (final id in ns.repos) s.workspace.repo(id)].whereType<Repo>().toList();
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -417,6 +418,31 @@ class _NamespaceMenuState extends State<_NamespaceMenu> {
   }
 }
 
+/// A daemon error about the workspace (e.g. git refused to remove a worktree
+/// with uncommitted changes).
+class _ErrorToast extends StatelessWidget {
+  const _ErrorToast({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+        padding: const EdgeInsets.fromLTRB(10, 6, 3, 6),
+        decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(10)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: Text(message, maxLines: 4, overflow: TextOverflow.ellipsis, style: sans(12, color: c.err))),
+          KIconButton(icon: KIcons.close, label: 'Dismiss', size: 22, iconSize: 12, color: c.text3, onTap: s.dismissWorkspaceError),
+        ]),
+      ),
+    );
+  }
+}
+
 class _UndoToast extends StatelessWidget {
   const _UndoToast({required this.notice});
   final UndoNotice notice;
@@ -532,7 +558,7 @@ class _RepoGroupState extends State<_RepoGroup> {
                   iconSize: 14,
                   color: open ? c.acc : c.text3,
                 ),
-                popoverBuilder: (context, close) => NewWorktreePopover(onClose: close, repo: r.name),
+                popoverBuilder: (context, close) => NewWorktreePopover(onClose: close, repo: r.id),
               ),
             ]),
           ),
@@ -542,12 +568,12 @@ class _RepoGroupState extends State<_RepoGroup> {
             GestureDetector(
               onSecondaryTapDown: (d) => _openMenu(w, d.globalPosition),
               child: KPressable(
-                onTap: () => s.selectWorktree(w.branch),
-                semanticLabel: '${w.branch}, ${w.note}${w.branch == 'main' ? ', principal checkout' : ''}',
-                tooltip: w.branch == 'main' ? 'Principal checkout · right-click for actions' : null,
-                selected: s.activeWorktree == w.branch,
+                onTap: () => s.selectWorktree(w.branch, path: w.path),
+                semanticLabel: '${w.branch}, ${w.note}${w.isMain ? ', principal checkout' : ''}',
+                tooltip: w.isMain ? 'Principal checkout · right-click for actions' : null,
+                selected: s.isActiveWorktree(w),
                 builder: (context, hover, focus) {
-                  final sel = s.activeWorktree == w.branch;
+                  final sel = s.isActiveWorktree(w);
                   final menu = _menuFor == w.branch;
                   return Container(
                     margin: const EdgeInsets.only(top: 1),
@@ -562,7 +588,7 @@ class _RepoGroupState extends State<_RepoGroup> {
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Row(children: [
                             Flexible(child: Text(w.branch, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11.5, color: c.text, height: 1.35))),
-                            if (w.branch == 'main') ...[
+                            if (w.isMain) ...[
                               const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 5),
@@ -606,7 +632,7 @@ class _WorktreeMenuState extends State<_WorktreeMenu> {
   Widget build(BuildContext context) {
     final s = AppScope.read(context);
     final w = widget.wt;
-    final isMain = w.branch == 'main';
+    final isMain = w.isMain;
     final running = w.tone == WorktreeTone.running && w.note.contains('running');
     final agent = w.note.split(' · ').first;
     return KMenuPanel(children: _confirm
@@ -617,7 +643,7 @@ class _WorktreeMenuState extends State<_WorktreeMenu> {
               body: '${running ? '$agent is running here and will be stopped. ' : ''}Runs git worktree remove. The branch stays in the repo.',
               confirmLabel: 'Delete',
               onCancel: () => setState(() => _confirm = false),
-              onConfirm: () => _do(() => s.deleteWorktree(widget.repo.name, w.branch)),
+              onConfirm: () => _do(() => s.deleteWorktree(widget.repo.id, w.branch)),
             ),
           ]
         : [
@@ -625,7 +651,7 @@ class _WorktreeMenuState extends State<_WorktreeMenu> {
               icon: KIcons.terminal,
               label: 'Open in terminal',
               onTap: () => _do(() {
-                s.selectWorktree(w.branch);
+                s.selectWorktree(w.branch, path: w.path);
                 s.view = KumoView.terminal;
               }),
             ),
