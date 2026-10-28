@@ -168,6 +168,9 @@ class EngineWorkspaceSource extends WorkspaceSource {
   }
 
   @override
+  String absolutePathOf(ui.Worktree worktree) => _absolute[worktree.path] ?? worktree.path;
+
+  @override
   Future<RepoBranches?> branches(ui.Repo repo) async {
     try {
       final conn = await _engine.connection();

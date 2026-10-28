@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../data/changes.dart';
 import '../data/workspace_source.dart';
+import '../data/worktree_changes.dart';
 import '../data/models.dart';
 import '../theme/palette.dart';
 import 'preferences.dart';
@@ -27,12 +28,21 @@ class AppState extends ChangeNotifier {
   /// [prefs] restores the user's settings (theme, translucency, side panel)
   /// and keeps them; without it everything is in memory (tests).
   ///
-  /// [workspace] provides namespaces, repos and worktrees: the daemon in the
-  /// app, the design mocks when omitted (tests).
-  AppState({KumoThemeMode mode = KumoThemeMode.dark, this.demoWallpaper = false, Preferences? prefs, WorkspaceSource? workspace})
-      : prefs = prefs ?? Preferences.memory(),
+  /// [workspace] provides namespaces, repos and worktrees, and [changesFor]
+  /// the git state of the selected worktree (by absolute path): the daemon
+  /// in the app, the design mocks when omitted (tests).
+  AppState({
+    KumoThemeMode mode = KumoThemeMode.dark,
+    this.demoWallpaper = false,
+    Preferences? prefs,
+    WorkspaceSource? workspace,
+    WorktreeChanges Function(String worktreePath)? changesFor,
+  })  : prefs = prefs ?? Preferences.memory(),
         workspace = workspace ?? MockWorkspaceSource(),
+        _changesFor = changesFor,
         _mode = mode {
+    _changes = changesFor == null ? MockWorktreeChanges() : NoWorktreeChanges();
+    _changes.addListener(notifyListeners);
     this.workspace.addListener(_onWorkspaceChanged);
     final p = this.prefs;
     final saved = p.get<String>('theme', '');
@@ -104,6 +114,7 @@ class AppState extends ChangeNotifier {
   void selectWorktree(String branch, {String? path}) {
     activeWorktree = branch;
     activeWorktreePath = path;
+    _bindChanges();
     notifyListeners();
   }
 
@@ -134,6 +145,7 @@ class AppState extends ChangeNotifier {
         activeWorktreePath = main.path;
       }
     }
+    _bindChanges();
     notifyListeners();
   }
 
@@ -407,50 +419,87 @@ class AppState extends ChangeNotifier {
 
   // ---- Source control of the current worktree ----
 
-  bool _committed = false;
-  bool _pushed = false;
+  final WorktreeChanges Function(String worktreePath)? _changesFor;
+  late WorktreeChanges _changes;
+  String? _changesPath;
+
+  /// Git and files of the selected worktree.
+  WorktreeChanges get changes => _changes;
+
+  /// Follows the selection: a new [WorktreeChanges] per worktree.
+  void _bindChanges() {
+    final factory = _changesFor;
+    if (factory == null) return;
+    final entry = activeWorktreeEntry;
+    final path = entry == null ? null : workspace.absolutePathOf(entry);
+    if (path == _changesPath) return;
+    _changes
+      ..removeListener(notifyListeners)
+      ..dispose();
+    _changesPath = path;
+    _changes = path == null ? NoWorktreeChanges() : factory(path);
+    _changes.addListener(notifyListeners);
+    _commitNotice = null;
+  }
+
   String? _commitNotice;
   String? get commitNotice => _commitNotice;
 
+  /// Git answers asynchronously; ignore answers that arrive after disposal.
+  bool _disposed = false;
+
   /// Working-tree changes not committed yet.
-  List<ChangedFile> get pendingChanges => _committed ? const [] : [for (final f in MockChanges.files) if (!f.committed) f];
+  List<ChangedFile> get pendingChanges => _changes.pending;
 
-  /// Changes already in commits on the branch (vs. origin/main).
-  List<ChangedFile> get branchChanges => [
-        for (final f in MockChanges.files) if (f.committed) f,
-        if (_committed) ...[for (final f in MockChanges.files) if (!f.committed) f],
-      ];
+  /// Changes already in commits on the branch (vs. its base).
+  List<ChangedFile> get branchChanges => _changes.onBranch;
 
-  int get commitsAhead => _pushed ? 0 : 2 + (_committed ? 1 : 0);
+  int get commitsAhead => _changes.ahead;
 
-  /// Optimistic commit; [how] is commit / push / pr / amend.
+  /// A changed file of this worktree, uncommitted or on the branch.
+  ChangedFile? changedFile(String path) => [...pendingChanges, ...branchChanges].where((f) => f.path == path).firstOrNull;
+
+  /// Commits every change; [how] is commit / push / pr / amend. Returns false
+  /// when there is nothing to commit or no message. Optimistic: the notice
+  /// shows at once and gets the sha (or the error) when git answers.
   bool commit(String message, {String how = 'commit'}) {
     final pending = pendingChanges;
     if (pending.isEmpty || message.trim().isEmpty) return false;
     final n = '${pending.length} ${pending.length == 1 ? 'file' : 'files'}';
-    _committed = true;
-    _pushed = how == 'push' || how == 'pr';
-    _commitNotice = switch (how) {
-      'push' => 'Committed $n as 3f9c2ab and pushed',
-      'pr' => 'Committed $n, pushed, PR #521 ready for review',
-      'amend' => 'Amended 9e41b07 with $n',
-      _ => 'Committed $n as 3f9c2ab',
-    };
+    final push = how == 'push' || how == 'pr';
+    _commitNotice = how == 'amend' ? 'Amending with $n…' : 'Committed $n${push ? ', pushing…' : ''}';
+    final committing = _changes.commit(message, all: true, amend: how == 'amend', push: push);
     notifyListeners();
+    committing.then((sha) {
+      if (_disposed) return;
+      _commitNotice = sha == null
+          ? 'Commit failed: ${_changes.error ?? 'unknown error'}'
+          : switch (how) {
+              'push' => 'Committed $n as $sha and pushed',
+              'pr' => 'Committed $n as $sha and pushed. Opening the PR comes with the GitHub integration.',
+              'amend' => 'Amended $sha with $n',
+              _ => 'Committed $n as $sha',
+            };
+      notifyListeners();
+    });
     return true;
   }
 
   void push() {
-    if (!_committed || _pushed) return;
-    _pushed = true;
-    _commitNotice = 'Pushed to origin/feat/PRC-412-bulk-discounts';
+    if (_changes.ahead == 0 && _changes.pushed) return;
+    _commitNotice = 'Pushing…';
     notifyListeners();
+    _changes.push().then((_) {
+      if (_disposed) return;
+      final error = _changes.error;
+      _commitNotice = error == null ? 'Pushed ${_changes.branch}' : 'Push failed: $error';
+      notifyListeners();
+    });
   }
 
   void undoCommit() {
-    _committed = false;
-    _pushed = false;
     _commitNotice = null;
+    _changes.undoLastCommit();
     notifyListeners();
   }
 
@@ -470,6 +519,10 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _changes
+      ..removeListener(notifyListeners)
+      ..dispose();
     workspace
       ..removeListener(_onWorkspaceChanged)
       ..dispose();

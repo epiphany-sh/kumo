@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../app/app_state.dart';
 import '../data/mock_project.dart';
+import '../data/worktree_changes.dart';
 import '../editor/code_editor.dart';
 import '../editor/syntax.dart';
-import '../editor/working_copy.dart';
 import '../shell/screen_chrome.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
@@ -36,47 +37,116 @@ class FilesScreen extends StatefulWidget {
 }
 
 class _FilesScreenState extends State<FilesScreen> {
-  final _wc = WorkingCopy();
+  /// Files open when the screen first shows (those that exist).
+  static const _initialTabs = ['internal/discount/repository.go', MockProject.conflictPath, 'testdata/bulk_discount.json'];
+
+  /// Git and files of the selected worktree.
+  WorktreeChanges get _git => AppScope.read(context).changes;
+  WorktreeChanges? _bound;
+
   final _controllers = <String, CodeController>{};
   final _saved = <String, String>{};
   final _dirty = <String>{};
-  final _collapsed = <String>{'cmd'};
+  final _expanded = <String>{};
+  final _resolved = <String>{};
+  final _marks = <String, Map<int, bool>>{};
+  Object? _marksKey;
+  List<TreeNode> _tree = const [];
+  List<String>? _treeOf;
+  String? _lastCommit;
   final _caret = ValueNotifier<(int, int)>((1, 1));
   final _commitMsg = TextEditingController(text: 'feat(discount): bulk discounts by category (PRC-412)');
-  List<String> _tabs = ['internal/discount/repository.go', MockProject.conflictPath, 'testdata/bulk_discount.json'];
-  String? _active = 'internal/discount/repository.go';
+  List<String> _tabs = const [];
+  String? _active;
   bool _changedOnly = false;
   bool _asked = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _wc.addListener(() => setState(() {}));
-  }
 
   @override
   void dispose() {
     for (final c in _controllers.values) {
       c.dispose();
     }
-    _wc.dispose();
     _caret.dispose();
     _commitMsg.dispose();
     super.dispose();
   }
 
+  /// A new worktree was selected: start over with its files.
+  void _bind(WorktreeChanges git) {
+    _bound = git;
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    _controllers.clear();
+    _saved.clear();
+    _dirty.clear();
+    _resolved.clear();
+    _marks.clear();
+    _treeOf = null;
+    _lastCommit = null;
+    _tabs = [for (final p in _initialTabs) if (git.files.contains(p)) p];
+    _active = _tabs.firstOrNull;
+  }
+
+  /// Folder tree, rebuilt only when the file list changes. Small trees
+  /// start expanded, big ones collapsed.
+  List<TreeNode> _treeFor(WorktreeChanges git) {
+    final files = git.files;
+    if (identical(files, _treeOf)) return _tree;
+    final first = _treeOf == null;
+    _treeOf = files;
+    _tree = buildTree(files);
+    if (first && files.length <= 300) {
+      void expand(List<TreeNode> nodes, String prefix) {
+        for (final n in nodes.where((n) => n.isDir)) {
+          final path = prefix.isEmpty ? n.name : '$prefix/${n.name}';
+          _expanded.add(path);
+          expand(n.children!, path);
+        }
+      }
+
+      expand(_tree, '');
+    }
+    return _tree;
+  }
+
   CodeController _ctrl(String path) {
     return _controllers.putIfAbsent(path, () {
-      final text = MockProject.files[path] ?? '';
-      _saved[path] = text;
-      final c = CodeController(text: text, lang: langOf(path).lang, deleted: _wc.statusOf(path) == GitStatus.deleted);
+      _saved[path] = '';
+      final c = CodeController(text: '', lang: langOf(path).lang, deleted: _git.statusOf(path) == GitStatus.deleted);
       c.addListener(() {
         final isDirty = c.text != _saved[path];
         if (isDirty != _dirty.contains(path)) setState(() => isDirty ? _dirty.add(path) : _dirty.remove(path));
         if (path == _active) _caret.value = c.caret;
       });
+      _load(path, c);
       return c;
     });
+  }
+
+  /// Fills [c] with the file's text (the last committed one if deleted).
+  void _load(String path, CodeController c) {
+    _git.read(path).then((text) {
+      if (!mounted || _controllers[path] != c) return;
+      _saved[path] = text ?? '';
+      c.text = text ?? '';
+    });
+  }
+
+  /// Changed lines for the gutter, refetched when the status changes.
+  Map<int, bool> _marksFor(String path) {
+    final key = (_git, _git.version);
+    if (key != _marksKey) {
+      _marks.clear();
+      _marksKey = key;
+    }
+    final cached = _marks[path];
+    if (cached != null) return cached;
+    _marks[path] = const {};
+    _git.marks(path).then((marks) {
+      if (mounted && _marksKey == key) setState(() => _marks[path] = marks);
+    });
+    return const {};
   }
 
   void _open(String path) => setState(() {
@@ -90,37 +160,56 @@ class _FilesScreenState extends State<FilesScreen> {
         if (_active == path) _active = _tabs.isEmpty ? null : _tabs[idx < _tabs.length ? idx : _tabs.length - 1];
       });
 
+  /// ⌘S: writes the file in the worktree.
   void _save() {
     final p = _active;
     if (p == null) return;
+    final text = _ctrl(p).text;
     setState(() {
-      _saved[p] = _ctrl(p).text;
+      _saved[p] = text;
       _dirty.remove(p);
+    });
+    _git.write(p, text);
+  }
+
+  /// Keeps one side of a merge conflict, saves and stages the file.
+  void _resolve(String path, String keep) {
+    final c = _ctrl(path);
+    c.text = MockProject.resolveConflict(c.text, keep);
+    _saved[path] = c.text;
+    _dirty.remove(path);
+    setState(() => _resolved.add(path));
+    _git.resolveConflict(path, keep, c.text);
+  }
+
+  /// Brings a deleted file back from HEAD.
+  void _restore(String path) {
+    final c = _ctrl(path)..deleted = false;
+    _git.restore(path).then((_) {
+      if (mounted) _load(path, c);
     });
   }
 
-  void _resolve(String keep) {
-    final c = _ctrl(MockProject.conflictPath);
-    c.text = MockProject.resolveConflict(c.text, keep);
-    _saved[MockProject.conflictPath] = c.text;
-    _dirty.remove(MockProject.conflictPath);
-    _wc.resolve(keep);
-  }
-
-  void _restore() {
-    _ctrl(MockProject.deletedPath).deleted = false;
-    _wc.restore();
+  Future<void> _commit() async {
+    final n = _git.stagedList.length;
+    final sha = await _git.commit(_commitMsg.text);
+    if (!mounted) return;
+    setState(() => _lastCommit = sha == null
+        ? 'Commit failed: ${_git.error ?? 'nothing to commit'}'
+        : 'Committed $n ${n == 1 ? 'file' : 'files'} as $sha · not pushed yet');
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final s = AppScope.of(context);
+    if (!identical(s.changes, _bound)) _bind(s.changes);
     final active = _active;
     final info = active == null ? null : langOf(active);
-    final conflicts = _wc.conflicts.length;
+    final conflicts = _git.conflicts.length;
     return ScreenFrame(
       toolbar: ScreenToolbar(
-        breadcrumb: const Breadcrumb(icon: KIcons.branch, parts: ['price-admin', 'feat/PRC-412-bulk-discounts']),
+        breadcrumb: Breadcrumb(icon: KIcons.branch, parts: [s.activeRepo?.name ?? 'No repository', if (_git.branch.isNotEmpty) _git.branch]),
         searchHint: 'Go to file or symbol…',
         searchKey: '⌘P',
         primary: KButton.primary(label: 'Ask agent about file', icon: KIcons.agent, height: 36, onTap: () {}),
@@ -135,8 +224,8 @@ class _FilesScreenState extends State<FilesScreen> {
         ]);
       }),
       status: [
-        StatusText('feat/PRC-412-bulk-discounts ↑${_wc.ahead} ↓0', icon: KIcons.branch, monospace: true),
-        StatusText(conflicts > 0 ? '1 merge conflict' : 'No conflicts', color: conflicts > 0 ? c.err : null),
+        StatusText('${_git.branch} ↑${_git.ahead} ↓${_git.behind}', icon: KIcons.branch, monospace: true),
+        StatusText(conflicts > 0 ? '$conflicts merge ${conflicts == 1 ? 'conflict' : 'conflicts'}' : 'No conflicts', color: conflicts > 0 ? c.err : null),
         const Spacer(),
         if (info != null) ...[
           ValueListenableBuilder<(int, int)>(valueListenable: _caret, builder: (context, v, _) => StatusText('Ln ${v.$1}, Col ${v.$2}')),
@@ -156,9 +245,9 @@ class _FilesScreenState extends State<FilesScreen> {
       for (final n in nodes) {
         final path = prefix.isEmpty ? n.name : '$prefix/${n.name}';
         if (n.isDir) {
-          final agg = _wc.dirStatus(path);
+          final agg = _git.dirStatus(path);
           if (_changedOnly && agg == null) continue;
-          final open = _changedOnly || !_collapsed.contains(path);
+          final open = _changedOnly || _expanded.contains(path);
           rows.add(_TreeRow(
             depth: depth,
             name: n.name,
@@ -166,11 +255,11 @@ class _FilesScreenState extends State<FilesScreen> {
             open: open,
             nameColor: agg == null ? c.text : (agg == GitStatus.conflict ? c.err : c.warn),
             dot: agg == null ? null : (agg == GitStatus.conflict ? c.err : c.warn),
-            onTap: () => setState(() => open ? _collapsed.add(path) : _collapsed.remove(path)),
+            onTap: () => setState(() => open ? _expanded.remove(path) : _expanded.add(path)),
           ));
           if (open) walk(n.children!, path, depth + 1);
         } else {
-          final s = _wc.statusOf(path);
+          final s = _git.statusOf(path);
           if (_changedOnly && s == null) continue;
           final li = langOf(path);
           rows.add(_TreeRow(
@@ -188,8 +277,8 @@ class _FilesScreenState extends State<FilesScreen> {
       }
     }
 
-    walk(MockProject.tree, '', 0);
-    final changedCount = _wc.changed.length;
+    walk(_treeFor(_git), '', 0);
+    final changedCount = _git.changed.length;
     return GlassPanel(
       padding: const EdgeInsets.fromLTRB(8, 12, 8, 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -199,7 +288,7 @@ class _FilesScreenState extends State<FilesScreen> {
             Expanded(child: Text('EXPLORER', style: microLabel(c))),
             KIconButton(icon: KIcons.fileAdd, label: 'New file', size: 26, iconSize: 15, onTap: () {}),
             KIconButton(icon: KIcons.folderAdd, label: 'New folder', size: 26, iconSize: 15, onTap: () {}),
-            KIconButton(icon: KIcons.collapseAll, label: 'Collapse all folders', size: 26, iconSize: 15, onTap: () => setState(() => _collapsed.addAll(['cmd', 'config', 'deploy', 'internal', 'testdata']))),
+            KIconButton(icon: KIcons.collapseAll, label: 'Collapse all folders', size: 26, iconSize: 15, onTap: () => setState(_expanded.clear)),
           ]),
         ),
         const SizedBox(height: 10),
@@ -266,7 +355,7 @@ class _FilesScreenState extends State<FilesScreen> {
             child: CodeEditor(
               key: ValueKey(active),
               controller: _ctrl(active),
-              readOnly: _wc.statusOf(active) == GitStatus.deleted,
+              readOnly: _git.statusOf(active) == GitStatus.deleted,
               decorate: (lines) => _decorate(c, active, lines),
             ),
           ),
@@ -278,7 +367,7 @@ class _FilesScreenState extends State<FilesScreen> {
   Widget _tab(BuildContext context, String path) {
     final c = context.c;
     final sel = path == _active;
-    final s = _wc.statusOf(path);
+    final s = _git.statusOf(path);
     final li = langOf(path);
     final name = path.split('/').last;
     return Padding(
@@ -334,7 +423,7 @@ class _FilesScreenState extends State<FilesScreen> {
 
   List<Widget> _banners(BuildContext context, String path) {
     final c = context.c;
-    final s = _wc.statusOf(path);
+    final s = _git.statusOf(path);
     Widget banner(Color bg, IconData icon, Color fg, String title, String body, List<Widget> actions) => Container(
           color: bg,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
@@ -348,23 +437,23 @@ class _FilesScreenState extends State<FilesScreen> {
             ...actions,
           ]),
         );
-    if (path == MockProject.conflictPath && s == GitStatus.conflict) {
+    if (s == GitStatus.conflict) {
       return [
-        banner(c.errSoft, KIcons.warning, c.err, 'Merge conflict with main', 'Both branches changed the image tag.', [
-          KButton(label: 'Accept current', kind: KButtonKind.ghost, height: 26, fontSize: 11.5, onTap: () => _resolve('current')),
-          KButton(label: 'Accept incoming', kind: KButtonKind.ghost, height: 26, fontSize: 11.5, onTap: () => _resolve('incoming')),
-          KButton(label: 'Accept both', kind: KButtonKind.ghost, height: 26, fontSize: 11.5, onTap: () => _resolve('both')),
+        banner(c.errSoft, KIcons.warning, c.err, 'Merge conflict', 'Both sides changed this file.', [
+          KButton(label: 'Accept current', kind: KButtonKind.ghost, height: 26, fontSize: 11.5, onTap: () => _resolve(path, 'current')),
+          KButton(label: 'Accept incoming', kind: KButtonKind.ghost, height: 26, fontSize: 11.5, onTap: () => _resolve(path, 'incoming')),
+          KButton(label: 'Accept both', kind: KButtonKind.ghost, height: 26, fontSize: 11.5, onTap: () => _resolve(path, 'both')),
           KButton(label: _asked ? 'Sent to Claude' : 'Ask Claude to resolve', icon: KIcons.agent, kind: KButtonKind.ghost, height: 26, fontSize: 11.5, onTap: () => setState(() => _asked = true)),
         ]),
       ];
     }
-    if (path == MockProject.conflictPath && _wc.resolution != null && s == GitStatus.modified) {
+    if (_resolved.contains(path) && s != null && s != GitStatus.conflict) {
       return [banner(c.okSoft, KIcons.check, c.ok, 'Conflict resolved', 'Stage the file to finish the merge.', const [])];
     }
     if (s == GitStatus.deleted) {
       return [
         banner(c.errSoft, KIcons.warning, c.err, 'Deleted in this worktree', 'Showing the last committed version.', [
-          KButton(label: 'Restore file', height: 26, fontSize: 11.5, onTap: _restore),
+          KButton(label: 'Restore file', height: 26, fontSize: 11.5, onTap: () => _restore(path)),
         ]),
       ];
     }
@@ -372,16 +461,9 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   List<LineDeco> _decorate(KumoPalette c, String path, List<String> lines) {
-    final s = _wc.statusOf(path);
+    final s = _git.statusOf(path);
     final conflictActive = MockProject.hasConflictMarkers(lines.join('\n'));
-    final marks = <int, bool>{};
-    if (s != null && !conflictActive) {
-      for (final (from, to, add) in MockProject.marks[path] ?? const <(int, int, bool)>[]) {
-        for (var n = from; n <= to; n++) {
-          marks[n] = add;
-        }
-      }
-    }
+    final marks = s != null && !conflictActive ? _marksFor(path) : const <int, bool>{};
     final whole = s == GitStatus.added || s == GitStatus.untracked;
     String? zone;
     final out = <LineDeco>[];
@@ -417,17 +499,15 @@ class _FilesScreenState extends State<FilesScreen> {
   Widget _sourceControl(BuildContext context) {
     final c = context.c;
     final sections = [
-      ('Merge conflicts', _wc.conflicts, 'conflict', c.err),
-      ('Staged', _wc.stagedList, 'staged', c.text),
-      ('Changes', _wc.unstagedChanges, 'changes', c.text),
-      ('Untracked', _wc.untracked, 'untracked', c.text),
+      ('Merge conflicts', _git.conflicts, 'conflict', c.err),
+      ('Staged', _git.stagedList, 'staged', c.text),
+      ('Changes', _git.unstagedChanges, 'changes', c.text),
+      ('Untracked', _git.untracked, 'untracked', c.text),
     ].where((s) => s.$2.isNotEmpty).toList();
-    final canCommit = _wc.canCommit;
-    final hint = _wc.conflicts.isNotEmpty
+    final canCommit = _git.canCommit;
+    final hint = _git.conflicts.isNotEmpty
         ? 'Resolve the merge conflict before committing'
-        : (_wc.stagedList.isNotEmpty
-            ? 'Commits to feat/PRC-412-bulk-discounts'
-            : (_wc.lastCommitSize != null ? 'Committed ${_wc.lastCommitSize} files · not pushed yet' : 'Stage files to commit'));
+        : (_git.stagedList.isNotEmpty ? 'Commits to ${_git.branch}' : (_lastCommit ?? 'Stage files to commit'));
     return GlassPanel(
       padding: const EdgeInsets.fromLTRB(10, 14, 10, 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -435,7 +515,7 @@ class _FilesScreenState extends State<FilesScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Row(children: [
             Expanded(child: Text('SOURCE CONTROL', style: microLabel(c))),
-            Text('↑${_wc.ahead} ↓0', style: mono(11, color: c.text2)),
+            Text('↑${_git.ahead} ↓${_git.behind}', style: mono(11, color: c.text2)),
           ]),
         ),
         const SizedBox(height: 10),
@@ -458,13 +538,13 @@ class _FilesScreenState extends State<FilesScreen> {
             ),
             const SizedBox(height: 8),
             KButton.primary(
-              label: canCommit ? 'Commit ${_wc.stagedList.length} ${_wc.stagedList.length == 1 ? 'file' : 'files'}' : 'Commit',
+              label: canCommit ? 'Commit ${_git.stagedList.length} ${_git.stagedList.length == 1 ? 'file' : 'files'}' : 'Commit',
               expand: true,
               height: 32,
-              onTap: canCommit ? () => _wc.commit() : null,
+              onTap: canCommit ? _commit : null,
             ),
             const SizedBox(height: 6),
-            Text(hint, style: sans(11.5, color: _wc.conflicts.isNotEmpty ? c.err : c.text3)),
+            Text(hint, style: sans(11.5, color: _git.conflicts.isNotEmpty ? c.err : c.text3)),
           ]),
         ),
         const SizedBox(height: 12),
@@ -489,7 +569,7 @@ class _FilesScreenState extends State<FilesScreen> {
 
   Widget _scmRow(BuildContext context, String path, String mode) {
     final c = context.c;
-    final s = _wc.statusOf(path);
+    final s = _git.statusOf(path);
     final parts = path.split('/');
     final name = parts.removeLast();
     final li = langOf(path);
@@ -522,7 +602,7 @@ class _FilesScreenState extends State<FilesScreen> {
             label: '${mode == 'staged' ? 'Unstage' : 'Stage'} $name',
             size: 24,
             iconSize: 14,
-            onTap: () => mode == 'staged' ? _wc.unstage(path) : _wc.stage(path),
+            onTap: () => mode == 'staged' ? _git.unstage(path) : _git.stage(path),
           ),
       ]),
     );

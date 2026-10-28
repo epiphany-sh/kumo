@@ -470,3 +470,358 @@ abstract class WorkspaceServiceBase extends $grpc.Service {
   $async.Future<$0.ListBranchesResponse> listBranches(
       $grpc.ServiceCall call, $0.ListBranchesRequest request);
 }
+
+@$pb.GrpcServiceName('kumo.v1.Git')
+class GitClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  GitClient(super.channel, {super.options, super.interceptors});
+
+  /// Status now, then again whenever files or the index change.
+  $grpc.ResponseStream<$0.WorktreeChanges> watchStatus(
+    $0.WatchStatusRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createStreamingCall(
+        _$watchStatus, $async.Stream.fromIterable([request]),
+        options: options);
+  }
+
+  /// Tracked and untracked (not ignored) files.
+  $grpc.ResponseFuture<$0.ListFilesResponse> listFiles(
+    $0.ListFilesRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$listFiles, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.ReadFileResponse> readFile(
+    $0.ReadFileRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$readFile, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.WriteFileResponse> writeFile(
+    $0.WriteFileRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$writeFile, request, options: options);
+  }
+
+  /// The whole file with its changes (unchanged lines as context).
+  $grpc.ResponseFuture<$0.DiffResponse> diff(
+    $0.DiffRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$diff, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.GitActionResponse> stage(
+    $0.PathsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$stage, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.GitActionResponse> unstage(
+    $0.PathsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$unstage, request, options: options);
+  }
+
+  /// Back to HEAD (staged and working tree). Untracked files are left alone.
+  $grpc.ResponseFuture<$0.GitActionResponse> restore(
+    $0.PathsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$restore, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.CommitResponse> commit(
+    $0.CommitRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$commit, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.GitActionResponse> push(
+    $0.WorktreeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$push, request, options: options);
+  }
+
+  /// `git reset --soft HEAD~1`: the changes stay, staged.
+  $grpc.ResponseFuture<$0.GitActionResponse> undoLastCommit(
+    $0.WorktreeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$undoLastCommit, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.LogResponse> log(
+    $0.LogRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$log, request, options: options);
+  }
+
+  // method descriptors
+
+  static final _$watchStatus =
+      $grpc.ClientMethod<$0.WatchStatusRequest, $0.WorktreeChanges>(
+          '/kumo.v1.Git/WatchStatus',
+          ($0.WatchStatusRequest value) => value.writeToBuffer(),
+          $0.WorktreeChanges.fromBuffer);
+  static final _$listFiles =
+      $grpc.ClientMethod<$0.ListFilesRequest, $0.ListFilesResponse>(
+          '/kumo.v1.Git/ListFiles',
+          ($0.ListFilesRequest value) => value.writeToBuffer(),
+          $0.ListFilesResponse.fromBuffer);
+  static final _$readFile =
+      $grpc.ClientMethod<$0.ReadFileRequest, $0.ReadFileResponse>(
+          '/kumo.v1.Git/ReadFile',
+          ($0.ReadFileRequest value) => value.writeToBuffer(),
+          $0.ReadFileResponse.fromBuffer);
+  static final _$writeFile =
+      $grpc.ClientMethod<$0.WriteFileRequest, $0.WriteFileResponse>(
+          '/kumo.v1.Git/WriteFile',
+          ($0.WriteFileRequest value) => value.writeToBuffer(),
+          $0.WriteFileResponse.fromBuffer);
+  static final _$diff = $grpc.ClientMethod<$0.DiffRequest, $0.DiffResponse>(
+      '/kumo.v1.Git/Diff',
+      ($0.DiffRequest value) => value.writeToBuffer(),
+      $0.DiffResponse.fromBuffer);
+  static final _$stage =
+      $grpc.ClientMethod<$0.PathsRequest, $0.GitActionResponse>(
+          '/kumo.v1.Git/Stage',
+          ($0.PathsRequest value) => value.writeToBuffer(),
+          $0.GitActionResponse.fromBuffer);
+  static final _$unstage =
+      $grpc.ClientMethod<$0.PathsRequest, $0.GitActionResponse>(
+          '/kumo.v1.Git/Unstage',
+          ($0.PathsRequest value) => value.writeToBuffer(),
+          $0.GitActionResponse.fromBuffer);
+  static final _$restore =
+      $grpc.ClientMethod<$0.PathsRequest, $0.GitActionResponse>(
+          '/kumo.v1.Git/Restore',
+          ($0.PathsRequest value) => value.writeToBuffer(),
+          $0.GitActionResponse.fromBuffer);
+  static final _$commit =
+      $grpc.ClientMethod<$0.CommitRequest, $0.CommitResponse>(
+          '/kumo.v1.Git/Commit',
+          ($0.CommitRequest value) => value.writeToBuffer(),
+          $0.CommitResponse.fromBuffer);
+  static final _$push =
+      $grpc.ClientMethod<$0.WorktreeRequest, $0.GitActionResponse>(
+          '/kumo.v1.Git/Push',
+          ($0.WorktreeRequest value) => value.writeToBuffer(),
+          $0.GitActionResponse.fromBuffer);
+  static final _$undoLastCommit =
+      $grpc.ClientMethod<$0.WorktreeRequest, $0.GitActionResponse>(
+          '/kumo.v1.Git/UndoLastCommit',
+          ($0.WorktreeRequest value) => value.writeToBuffer(),
+          $0.GitActionResponse.fromBuffer);
+  static final _$log = $grpc.ClientMethod<$0.LogRequest, $0.LogResponse>(
+      '/kumo.v1.Git/Log',
+      ($0.LogRequest value) => value.writeToBuffer(),
+      $0.LogResponse.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Git')
+abstract class GitServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.Git';
+
+  GitServiceBase() {
+    $addMethod($grpc.ServiceMethod<$0.WatchStatusRequest, $0.WorktreeChanges>(
+        'WatchStatus',
+        watchStatus_Pre,
+        false,
+        true,
+        ($core.List<$core.int> value) =>
+            $0.WatchStatusRequest.fromBuffer(value),
+        ($0.WorktreeChanges value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ListFilesRequest, $0.ListFilesResponse>(
+        'ListFiles',
+        listFiles_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.ListFilesRequest.fromBuffer(value),
+        ($0.ListFilesResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ReadFileRequest, $0.ReadFileResponse>(
+        'ReadFile',
+        readFile_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.ReadFileRequest.fromBuffer(value),
+        ($0.ReadFileResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.WriteFileRequest, $0.WriteFileResponse>(
+        'WriteFile',
+        writeFile_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.WriteFileRequest.fromBuffer(value),
+        ($0.WriteFileResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.DiffRequest, $0.DiffResponse>(
+        'Diff',
+        diff_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.DiffRequest.fromBuffer(value),
+        ($0.DiffResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.PathsRequest, $0.GitActionResponse>(
+        'Stage',
+        stage_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.PathsRequest.fromBuffer(value),
+        ($0.GitActionResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.PathsRequest, $0.GitActionResponse>(
+        'Unstage',
+        unstage_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.PathsRequest.fromBuffer(value),
+        ($0.GitActionResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.PathsRequest, $0.GitActionResponse>(
+        'Restore',
+        restore_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.PathsRequest.fromBuffer(value),
+        ($0.GitActionResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.CommitRequest, $0.CommitResponse>(
+        'Commit',
+        commit_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.CommitRequest.fromBuffer(value),
+        ($0.CommitResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.WorktreeRequest, $0.GitActionResponse>(
+        'Push',
+        push_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.WorktreeRequest.fromBuffer(value),
+        ($0.GitActionResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.WorktreeRequest, $0.GitActionResponse>(
+        'UndoLastCommit',
+        undoLastCommit_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.WorktreeRequest.fromBuffer(value),
+        ($0.GitActionResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.LogRequest, $0.LogResponse>(
+        'Log',
+        log_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.LogRequest.fromBuffer(value),
+        ($0.LogResponse value) => value.writeToBuffer()));
+  }
+
+  $async.Stream<$0.WorktreeChanges> watchStatus_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WatchStatusRequest> $request) async* {
+    yield* watchStatus($call, await $request);
+  }
+
+  $async.Stream<$0.WorktreeChanges> watchStatus(
+      $grpc.ServiceCall call, $0.WatchStatusRequest request);
+
+  $async.Future<$0.ListFilesResponse> listFiles_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ListFilesRequest> $request) async {
+    return listFiles($call, await $request);
+  }
+
+  $async.Future<$0.ListFilesResponse> listFiles(
+      $grpc.ServiceCall call, $0.ListFilesRequest request);
+
+  $async.Future<$0.ReadFileResponse> readFile_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ReadFileRequest> $request) async {
+    return readFile($call, await $request);
+  }
+
+  $async.Future<$0.ReadFileResponse> readFile(
+      $grpc.ServiceCall call, $0.ReadFileRequest request);
+
+  $async.Future<$0.WriteFileResponse> writeFile_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WriteFileRequest> $request) async {
+    return writeFile($call, await $request);
+  }
+
+  $async.Future<$0.WriteFileResponse> writeFile(
+      $grpc.ServiceCall call, $0.WriteFileRequest request);
+
+  $async.Future<$0.DiffResponse> diff_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.DiffRequest> $request) async {
+    return diff($call, await $request);
+  }
+
+  $async.Future<$0.DiffResponse> diff(
+      $grpc.ServiceCall call, $0.DiffRequest request);
+
+  $async.Future<$0.GitActionResponse> stage_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.PathsRequest> $request) async {
+    return stage($call, await $request);
+  }
+
+  $async.Future<$0.GitActionResponse> stage(
+      $grpc.ServiceCall call, $0.PathsRequest request);
+
+  $async.Future<$0.GitActionResponse> unstage_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.PathsRequest> $request) async {
+    return unstage($call, await $request);
+  }
+
+  $async.Future<$0.GitActionResponse> unstage(
+      $grpc.ServiceCall call, $0.PathsRequest request);
+
+  $async.Future<$0.GitActionResponse> restore_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.PathsRequest> $request) async {
+    return restore($call, await $request);
+  }
+
+  $async.Future<$0.GitActionResponse> restore(
+      $grpc.ServiceCall call, $0.PathsRequest request);
+
+  $async.Future<$0.CommitResponse> commit_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.CommitRequest> $request) async {
+    return commit($call, await $request);
+  }
+
+  $async.Future<$0.CommitResponse> commit(
+      $grpc.ServiceCall call, $0.CommitRequest request);
+
+  $async.Future<$0.GitActionResponse> push_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WorktreeRequest> $request) async {
+    return push($call, await $request);
+  }
+
+  $async.Future<$0.GitActionResponse> push(
+      $grpc.ServiceCall call, $0.WorktreeRequest request);
+
+  $async.Future<$0.GitActionResponse> undoLastCommit_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.WorktreeRequest> $request) async {
+    return undoLastCommit($call, await $request);
+  }
+
+  $async.Future<$0.GitActionResponse> undoLastCommit(
+      $grpc.ServiceCall call, $0.WorktreeRequest request);
+
+  $async.Future<$0.LogResponse> log_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.LogRequest> $request) async {
+    return log($call, await $request);
+  }
+
+  $async.Future<$0.LogResponse> log(
+      $grpc.ServiceCall call, $0.LogRequest request);
+}

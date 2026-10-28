@@ -17,7 +17,8 @@ class EngineConnection {
   EngineConnection._(this.channel, this.endpoint, this.serverVersion, CallOptions auth)
       : core = CoreClient(channel, options: auth),
         terminals = TerminalsClient(channel, options: auth),
-        workspace = WorkspaceClient(channel, options: auth);
+        workspace = WorkspaceClient(channel, options: auth),
+        git = GitClient(channel, options: auth);
 
   final ClientChannel channel;
   final DaemonEndpoint endpoint;
@@ -25,6 +26,7 @@ class EngineConnection {
   final CoreClient core;
   final TerminalsClient terminals;
   final WorkspaceClient workspace;
+  final GitClient git;
 }
 
 /// Discovers or launches the daemon, handshakes and hands out the

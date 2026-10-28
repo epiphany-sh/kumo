@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
-import '../data/changes.dart';
 import '../editor/file_view.dart';
 import '../engine/engine_scope.dart';
 import '../engine/generated/kumo/v1/kumo.pb.dart' show TerminalInfo;
@@ -248,7 +247,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final s = AppScope.of(context);
     return ScreenFrame(
       toolbar: ScreenToolbar(
-        breadcrumb: const Breadcrumb(icon: KIcons.branch, parts: ['price-admin', 'feat/PRC-412-bulk-discounts']),
+        breadcrumb: Breadcrumb(icon: KIcons.branch, parts: [s.activeRepo?.name ?? 'No repository', if (s.changes.branch.isNotEmpty) s.changes.branch]),
         primary: KButton.primary(label: 'New agent', icon: KIcons.agent, height: 36, onTap: () {}),
       ),
       body: LayoutBuilder(builder: (context, box) {
@@ -265,7 +264,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
         ]);
       }),
       status: [
-        Flexible(child: StatusText('feat/PRC-412-bulk-discounts ↑${s.commitsAhead} ↓0', icon: KIcons.branch, monospace: true, flexible: true)),
+        Flexible(child: StatusText('${s.changes.branch} ↑${s.commitsAhead} ↓${s.changes.behind}', icon: KIcons.branch, monospace: true, flexible: true)),
         StatusText('1 agent needs you', color: c.warn, dot: true),
         const StatusText('2 agents running'),
         const StatusText('gke-staging · pricing', icon: KIcons.cluster),
@@ -381,7 +380,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
   Widget _fileTab(BuildContext context, String path) {
     final c = context.c;
     final s = AppScope.of(context);
-    final f = MockChanges.byPath(path);
+    final f = s.changedFile(path);
     final name = path.substring(path.lastIndexOf('/') + 1);
     final col = f == null ? c.text3 : (f.kind == 'A' ? c.ok : c.warn);
     final on = s.activeFile == path;

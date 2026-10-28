@@ -12,12 +12,23 @@ class DiffLine {
 }
 
 class ChangedFile {
-  const ChangedFile({required this.path, required this.kind, required this.lines, this.committed = false, this.writing = false});
+  const ChangedFile({
+    required this.path,
+    required this.kind,
+    required this.lines,
+    this.committed = false,
+    this.writing = false,
+    this.addedCount,
+    this.deletedCount,
+  });
 
   final String path;
 
-  /// 'A' added, 'M' modified.
+  /// 'A' added, 'M' modified, 'D' deleted, 'R' renamed, 'U' untracked.
   final String kind;
+
+  /// The whole file with its changes. Empty until loaded for daemon data
+  /// (the list only carries line counts).
   final List<DiffLine> lines;
 
   /// Already in a commit on the branch (not in the working tree).
@@ -26,8 +37,12 @@ class ChangedFile {
   /// The agent is still writing it.
   final bool writing;
 
-  int get added => lines.where((l) => l.kind == DiffKind.added).length;
-  int get deleted => lines.where((l) => l.kind == DiffKind.deleted).length;
+  /// Line counts when [lines] is not loaded.
+  final int? addedCount;
+  final int? deletedCount;
+
+  int get added => addedCount ?? lines.where((l) => l.kind == DiffKind.added).length;
+  int get deleted => deletedCount ?? lines.where((l) => l.kind == DiffKind.deleted).length;
   String get name => path.substring(path.lastIndexOf('/') + 1);
   String get dir => path.substring(0, path.lastIndexOf('/') + 1);
 }

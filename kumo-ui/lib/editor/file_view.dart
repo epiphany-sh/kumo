@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
 import '../data/changes.dart';
+import '../data/worktree_changes.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/kicons.dart';
@@ -28,6 +29,20 @@ class _FileViewState extends State<FileView> {
 
   bool _changesOnly = false;
   int _hunk = 0;
+
+  /// The file with its changed lines, loaded from the worktree's changes.
+  ChangedFile? _file;
+  Object? _loadedFor;
+
+  /// (Re)loads when the worktree, its status or the path changes.
+  void _load(WorktreeChanges changes) {
+    final key = (changes, changes.version, widget.path);
+    if (key == _loadedFor) return;
+    _loadedFor = key;
+    changes.diff(widget.path).then((file) {
+      if (mounted && _loadedFor == key) setState(() => _file = file);
+    });
+  }
   final _scroll = ScrollController();
   final _hScroll = ScrollController();
 
@@ -56,14 +71,15 @@ class _FileViewState extends State<FileView> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final file = MockChanges.byPath(widget.path);
+    _load(AppScope.of(context).changes);
+    final file = _file;
     final name = widget.path.substring(widget.path.lastIndexOf('/') + 1);
     final dir = widget.path.substring(0, widget.path.lastIndexOf('/') + 1);
     final count = file == null ? 0 : hunkCount(file);
     final rows = file == null ? const <DiffRow>[] : diffRows(file, changesOnly: _changesOnly);
     final kindColor = file == null ? c.text3 : (file.kind == 'A' ? c.ok : c.warn);
     final kindSoft = file == null ? c.tile : (file.kind == 'A' ? c.okSoft : c.warnSoft);
-    final label = file == null ? 'No changes' : (file.kind == 'A' ? 'Added' : 'Modified');
+    final label = file == null ? 'No changes' : switch (file.kind) { 'A' => 'Added', 'D' => 'Deleted', _ => 'Modified' };
     final hunkLabel = file == null ? '—' : (file.kind == 'A' ? 'New file' : 'Change ${count == 0 ? 0 : _hunk + 1} of $count');
 
     return Container(

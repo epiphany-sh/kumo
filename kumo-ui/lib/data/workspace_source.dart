@@ -42,6 +42,9 @@ abstract class WorkspaceSource extends ChangeNotifier {
 
   /// Branches of [repo]; null when this source has none (mocks).
   Future<RepoBranches?> branches(Repo repo);
+
+  /// Where [worktree] is on disk ([Worktree.path] may be shortened to `~/…`).
+  String absolutePathOf(Worktree worktree) => worktree.path;
 }
 
 /// Branches to start a worktree from or check out.

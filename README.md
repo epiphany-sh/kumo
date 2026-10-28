@@ -35,7 +35,8 @@ Qué es real hoy y qué sigue siendo mock:
 |---|---|
 | Terminales (shells) | Real: PTYs en `kumod`, render en grilla de celdas |
 | Namespaces, repos y worktrees | Real: `Workspace` en `kumod`, persistido en `kumo.db` (SQLite) |
-| Files, cambios de git, diffs, commit | Mock (siguiente bloque) |
+| Files, cambios de git, diffs, commit, push, historial | Real: `Git` en `kumod`; el estado se actualiza solo (file watcher) |
+| Gráfico de ramas del historial, panel Diff de la vista Git | Mock |
 | Agentes, tareas, PRs, pipelines, docs, integraciones | Mock (M3 / M4) |
 
 El daemon vive más que la UI: si cerrás la app, las terminales siguen corriendo

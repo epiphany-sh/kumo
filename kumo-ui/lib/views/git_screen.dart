@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app/app_state.dart';
 import '../data/mock_data.dart';
 import '../data/models.dart';
+import '../data/worktree_changes.dart';
 import '../editor/diff_colors.dart';
 import '../editor/syntax.dart';
 import '../shell/screen_chrome.dart';
@@ -190,8 +191,69 @@ class _WorktreeTable extends StatelessWidget {
 }
 
 /// Commit graph for price-admin: main + two feature lanes.
-class _History extends StatelessWidget {
+/// The worktree's history. Daemon data is a plain list of its commits;
+/// the mock keeps the designed multi-branch graph.
+class _History extends StatefulWidget {
   const _History();
+
+  @override
+  State<_History> createState() => _HistoryState();
+}
+
+class _HistoryState extends State<_History> {
+  List<CommitInfo>? _log;
+  Object? _loadedFor;
+
+  void _load(WorktreeChanges changes) {
+    final key = (changes, changes.version);
+    if (key == _loadedFor) return;
+    _loadedFor = key;
+    changes.log().then((log) {
+      if (mounted && _loadedFor == key) setState(() => _log = log);
+    });
+  }
+
+  static String _ago(DateTime time) {
+    final d = DateTime.now().difference(time);
+    if (d.inMinutes < 1) return 'now';
+    if (d.inHours < 1) return '${d.inMinutes}m';
+    if (d.inDays < 1) return '${d.inHours}h';
+    if (d.inDays < 30) return '${d.inDays}d';
+    return '${(d.inDays / 30).floor()}mo';
+  }
+
+  Widget _real(BuildContext context, List<CommitInfo> log) {
+    final c = context.c;
+    final s = AppScope.of(context);
+    return Section(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Text('History', style: sans(13, weight: FontWeight.w600, color: c.text)),
+          const SizedBox(width: 8),
+          Expanded(child: Text('${s.activeRepo?.name ?? ''} · ${s.changes.branch}', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: c.text3))),
+        ]),
+        const SizedBox(height: 12),
+        Expanded(
+          child: log.isEmpty
+              ? Center(child: Text('No commits yet', style: sans(12.5, color: c.text3)))
+              : ListView(padding: EdgeInsets.zero, children: [
+                  for (final commit in log)
+                    SizedBox(
+                      height: 32,
+                      child: Row(children: [
+                        Dot(c.acc, size: 8),
+                        const SizedBox(width: 10),
+                        Text(commit.shortSha, style: mono(11, color: c.text3)),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(commit.subject, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: c.text))),
+                        Text('${commit.author} · ${_ago(commit.time)}', style: sans(11, color: c.text3)),
+                      ]),
+                    ),
+                ]),
+        ),
+      ]),
+    );
+  }
 
   static const commits = [
     (1, 'feat: batch upsert with CopyFrom', 'Claude · 2m'),
@@ -204,6 +266,9 @@ class _History extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    _load(AppScope.of(context).changes);
+    final log = _log;
+    if (log != null) return _real(context, log);
     final c = context.c;
     final lanes = [c.text3, c.acc, c.warn];
     return Section(
@@ -280,8 +345,8 @@ class _GraphPainter extends CustomPainter {
         ..lineTo(x[2], y(2)),
       stroke..color = lanes[2],
     );
-    for (var i = 0; i < _History.commits.length; i++) {
-      final lane = _History.commits[i].$1;
+    for (var i = 0; i < _HistoryState.commits.length; i++) {
+      final lane = _HistoryState.commits[i].$1;
       final p = Offset(x[lane], y(i));
       canvas.drawCircle(p, 5, Paint()..color = dotFill);
       canvas.drawCircle(p, 5, stroke..color = lanes[lane]);
