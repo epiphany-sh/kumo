@@ -179,8 +179,10 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     struct FakeGh(PathBuf);
 
+    #[cfg(unix)]
     impl ProgramLocator for FakeGh {
         fn locate(&self, program: &str) -> Option<PathBuf> {
             (program == "gh").then(|| self.0.clone())
@@ -212,6 +214,7 @@ mod tests {
         assert!(gh.sign_in(&github()).is_none());
     }
 
+    #[cfg(unix)]
     /// A stand-in `gh` that prints a token and an account.
     fn fake_gh(dir: &Path) -> PathBuf {
         use std::os::unix::fs::PermissionsExt;
