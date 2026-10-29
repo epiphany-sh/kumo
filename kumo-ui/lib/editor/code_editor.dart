@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
+import '../widgets/change_scrollbar.dart';
 import 'syntax.dart';
 
 /// Editable controller that highlights as you type. The span text always
@@ -61,7 +62,11 @@ class LineDeco {
 
 /// Gutter + highlighted, editable code with vertical and horizontal scroll.
 class CodeEditor extends StatefulWidget {
-  const CodeEditor({super.key, required this.controller, required this.decorate, this.readOnly = false, this.fontSize = 12.5});
+  const CodeEditor({super.key, required this.controller, required this.decorate, this.readOnly = false, this.fontSize = 12.5, this.scrollController});
+
+  /// Height of a line, and the space above the first one.
+  static double lineExtentFor(double fontSize) => fontSize * _CodeEditorState._lh;
+  static const topPadding = 10.0;
 
   final CodeController controller;
 
@@ -71,18 +76,23 @@ class CodeEditor extends StatefulWidget {
   final bool readOnly;
   final double fontSize;
 
+  /// Vertical scrolling, to jump to a line from outside (optional).
+  final ScrollController? scrollController;
+
   @override
   State<CodeEditor> createState() => _CodeEditorState();
 }
 
 class _CodeEditorState extends State<CodeEditor> {
-  final _v = ScrollController();
+  final _ownV = ScrollController();
   final _h = ScrollController();
   static const _lh = 1.7;
 
+  ScrollController get _v => widget.scrollController ?? _ownV;
+
   @override
   void dispose() {
-    _v.dispose();
+    _ownV.dispose();
     _h.dispose();
     super.dispose();
   }
@@ -110,11 +120,13 @@ class _CodeEditorState extends State<CodeEditor> {
         final longest = lines.fold<int>(0, (m, l) => math.max(m, l.length));
         final raw = widget.decorate(lines);
         final decos = [for (var i = 0; i < lines.length; i++) i < raw.length ? raw[i] : const LineDeco()];
-        return Scrollbar(
+        // The scrollbar maps the change bars of the gutter.
+        return ChangeScrollbar(
           controller: _v,
+          ticks: changeTicks(List.filled(lines.length, lineExtent), [for (final d in decos) d.bar], top: CodeEditor.topPadding, bottom: 24),
           child: SingleChildScrollView(
             controller: _v,
-            padding: const EdgeInsets.only(top: 10, bottom: 24),
+            padding: const EdgeInsets.only(top: CodeEditor.topPadding, bottom: 24),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               // Gutter: change bar + line number.
               ExcludeSemantics(

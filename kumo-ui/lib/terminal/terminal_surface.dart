@@ -81,7 +81,7 @@ class TermLine {
 /// screen state (dirty-line diffs from the daemon); in M0/M1 raw bytes.
 @immutable
 class TermBuffer {
-  const TermBuffer(this.lines, {this.cursorVisible = true, this.cursor, this.seq = 0});
+  const TermBuffer(this.lines, {this.cursorVisible = true, this.cursor, this.seq = 0, this.dropped = 0, this.reflows = 0, this.altScreen = false});
   final List<TermLine> lines;
   final bool cursorVisible;
 
@@ -92,10 +92,22 @@ class TermBuffer {
   /// Monotonic per session (OutputBatch.seq in the proto).
   final int seq;
 
+  /// Lines dropped from the top since the session started: line `i` here
+  /// is line `dropped + i` of the whole session, which keeps a scrolled
+  /// view still while old lines go.
+  final int dropped;
+
+  /// Width changes that re-wrapped the lines (line numbers changed).
+  final int reflows;
+
+  /// A full-screen program (vim, less, htop) owns the screen: no
+  /// scrollback to show.
+  final bool altScreen;
+
   TermBuffer append(List<TermLine> more, {int maxLines = 5000}) {
     final all = [...lines, ...more];
     final trimmed = all.length > maxLines ? all.sublist(all.length - maxLines) : all;
-    return TermBuffer(trimmed, cursorVisible: cursorVisible, cursor: cursor, seq: seq + 1);
+    return TermBuffer(trimmed, cursorVisible: cursorVisible, cursor: cursor, seq: seq + 1, dropped: dropped + all.length - trimmed.length);
   }
 }
 

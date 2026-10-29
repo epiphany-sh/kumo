@@ -10,7 +10,8 @@ use tokio_stream::wrappers::WatchStream;
 use tonic::{Request, Response, Status};
 
 use crate::mapping::{
-    agent_session_to, agents_snapshot_to, agents_status_from, provider_to, size_from, status_from,
+    agent_context_from, agent_session_to, agents_snapshot_to, agents_status_from, provider_to,
+    size_from, status_from,
 };
 
 type SnapshotStream = Pin<Box<dyn Stream<Item = Result<pb::AgentsSnapshot, Status>> + Send>>;
@@ -118,6 +119,7 @@ impl pb::agents_server::Agents for AgentsGrpc {
                 &PathBuf::from(r.worktree_path),
                 &r.prompt,
                 &r.title,
+                r.context.into_iter().map(agent_context_from).collect(),
                 size,
             )
             .await
@@ -133,6 +135,22 @@ impl pb::agents_server::Agents for AgentsGrpc {
             .stop(&session_id(&request.into_inner().id)?)
             .map_err(agents_status_from)?;
         Ok(Response::new(pb::StopAgentResponse {}))
+    }
+
+    async fn add_context(
+        &self,
+        request: Request<pb::AddAgentContextRequest>,
+    ) -> Result<Response<pb::AgentSession>, Status> {
+        let r = request.into_inner();
+        let context = r
+            .context
+            .ok_or_else(|| Status::invalid_argument("context is missing"))?;
+        let session = self
+            .service
+            .add_context(&session_id(&r.id)?, agent_context_from(context), &r.text)
+            .await
+            .map_err(agents_status_from)?;
+        Ok(Response::new(agent_session_to(session)))
     }
 
     async fn dismiss(

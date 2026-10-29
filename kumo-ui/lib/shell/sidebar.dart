@@ -448,12 +448,13 @@ class _NamespaceGroupState extends State<_NamespaceGroup> {
               duration: const Duration(milliseconds: 90),
               height: 30,
               margin: const EdgeInsets.only(bottom: 2),
-              padding: const EdgeInsets.only(left: 8, right: 2),
+              padding: const EdgeInsets.only(left: 4, right: 2),
               decoration: BoxDecoration(color: _menuOpen || _renaming ? c.tile : null, borderRadius: BorderRadius.circular(8)),
               child: Row(children: [
-                Icon(KIcons.namespace, size: 14, color: c.text3),
-                const SizedBox(width: 7),
-                if (_renaming)
+                if (_renaming) ...[
+                  const SizedBox(width: 18),
+                  Icon(KIcons.namespace, size: 14, color: c.text3),
+                  const SizedBox(width: 7),
                   Expanded(
                     child: CallbackShortcuts(
                       bindings: {const SingleActivator(LogicalKeyboardKey.escape): _cancelRename},
@@ -472,17 +473,33 @@ class _NamespaceGroupState extends State<_NamespaceGroup> {
                         ),
                       ),
                     ),
-                  )
-                else ...[
-                  Flexible(child: Text(ns.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, weight: FontWeight.w600, color: c.text2))),
-                  const SizedBox(width: 7),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(8)),
-                    child: Text('${repos.length}', style: sans(10.5, color: c.text3)),
                   ),
-                  const Spacer(),
-                ],
+                ] else
+                  // The chevron, icon and name fold or unfold the namespace.
+                  Expanded(
+                    child: KPressable(
+                      onTap: () => s.toggleNamespaceCollapsed(ns.id),
+                      semanticLabel: '${ns.collapsed ? 'Expand' : 'Collapse'} ${ns.name}',
+                      tooltip: ns.collapsed ? 'Expand' : 'Collapse',
+                      builder: (context, hover, focus) => SizedBox(
+                        height: 30,
+                        child: Row(children: [
+                          Icon(ns.collapsed ? KIcons.chevronRight : KIcons.chevronDown, size: 14, color: hover || focus ? c.text2 : c.text3),
+                          const SizedBox(width: 4),
+                          Icon(KIcons.namespace, size: 14, color: c.text3),
+                          const SizedBox(width: 7),
+                          Flexible(child: Text(ns.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, weight: FontWeight.w600, color: hover || focus ? c.text : c.text2))),
+                          const SizedBox(width: 7),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(8)),
+                            child: Text('${repos.length}', style: sans(10.5, color: c.text3)),
+                          ),
+                          const Spacer(),
+                        ]),
+                      ),
+                    ),
+                  ),
                 const SizedBox(width: 4),
                 Builder(
                   builder: (btn) => KIconButton(
@@ -710,7 +727,9 @@ class _RepoGroupState extends State<_RepoGroup> {
             GestureDetector(
               onSecondaryTapDown: (d) => _openMenu(w, d.globalPosition),
               child: KPressable(
-                onTap: () => s.selectWorktree(w.branch, path: w.path),
+                // From Docs, Tasks, Git or Agents a worktree takes you to its
+                // terminals; in the Terminal view it switches the context.
+                onTap: () => s.view == KumoView.terminal ? s.selectWorktree(w.branch, path: w.path) : s.openWorktree(w),
                 semanticLabel: '${w.branch}, ${w.note}${w.isMain ? ', principal checkout' : ''}',
                 tooltip: w.isMain ? 'Principal checkout · right-click for actions' : null,
                 selected: s.isActiveWorktree(w) && !s.inHome,

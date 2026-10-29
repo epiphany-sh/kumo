@@ -1,0 +1,2963 @@
+diff --git a/crates/application/src/changes/service.rs b/crates/application/src/changes/service.rs
+index a0de821..5a9d294 100644
+--- a/crates/application/src/changes/service.rs
++++ b/crates/application/src/changes/service.rs
+@@ -124,6 +124,43 @@ impl ChangesService {
+         blocking(move || files.write(&worktree, &path, &bytes)).await
+     }
+ 
++    /// Renames or moves a file or folder inside the worktree.
++    pub async fn move_path(
++        &self,
++        worktree: &Path,
++        from: &str,
++        to: &str,
++    ) -> Result<(), ChangesError> {
++        let worktree = self.worktree(worktree).await?;
++        let (from, to) = (RelativePath::parse(from)?, RelativePath::parse(to)?);
++        let files = Arc::clone(&self.ports.files);
++        let target = worktree.clone();
++        blocking(move || files.rename(&target, &from, &to)).await?;
++        self.workspace.refresh_worktree(&worktree).await;
++        Ok(())
++    }
++
++    /// Deletes files, or folders with everything in them.
++    pub async fn remove_paths(
++        &self,
++        worktree: &Path,
++        paths: &[String],
++    ) -> Result<(), ChangesError> {
++        let worktree = self.worktree(worktree).await?;
++        let paths = paths
++            .iter()
++            .map(|p| RelativePath::parse(p))
++            .collect::<Result<Vec<_>, _>>()?;
++        if paths.is_empty() {
++            return Ok(());
++        }
++        let files = Arc::clone(&self.ports.files);
++        let target = worktree.clone();
++        blocking(move || paths.iter().try_for_each(|p| files.remove(&target, p))).await?;
++        self.workspace.refresh_worktree(&worktree).await;
++        Ok(())
++    }
++
+     pub async fn diff(
+         &self,
+         worktree: &Path,
+diff --git a/crates/daemon/tests/git.rs b/crates/daemon/tests/git.rs
+index 99c9cd2..30bd77d 100644
+--- a/crates/daemon/tests/git.rs
++++ b/crates/daemon/tests/git.rs
+@@ -267,6 +267,63 @@ async fn files_are_listed_read_and_written_inside_the_worktree_only() {
+     );
+ }
+ 
++#[tokio::test(flavor = "multi_thread")]
++async fn files_and_folders_are_renamed_and_deleted() {
++    let daemon = TestDaemon::start().await;
++    let mut client = daemon.client().await;
++    let wt = feature_worktree(&daemon, &mut client).await;
++    std::fs::write(wt.join("src/util.rs"), "pub fn u() {}\n").unwrap();
++
++    client
++        .git
++        .move_path(pb::MovePathRequest {
++            worktree_path: request(&wt),
++            from: "src/lib.rs".into(),
++            to: "src/core/lib.rs".into(),
++        })
++        .await
++        .unwrap();
++    assert!(wt.join("src/core/lib.rs").exists() && !wt.join("src/lib.rs").exists());
++    let taken = client
++        .git
++        .move_path(pb::MovePathRequest {
++            worktree_path: request(&wt),
++            from: "src/util.rs".into(),
++            to: "README.md".into(),
++        })
++        .await
++        .unwrap_err();
++    assert_eq!(taken.code(), tonic::Code::Internal, "never overwrites");
++
++    client
++        .git
++        .remove_paths(pb::PathsRequest {
++            worktree_path: request(&wt),
++            paths: vec!["src".into(), "README.md".into()],
++        })
++        .await
++        .unwrap();
++    assert!(!wt.join("src").exists() && !wt.join("README.md").exists());
++    let changes = status(&mut client, &wt).await;
++    assert!(
++        changes.working.iter().any(|c| c.path == "README.md"),
++        "the deletion shows as a change: {changes:?}"
++    );
++
++    for path in [".git", "../outside"] {
++        let error = client
++            .git
++            .remove_paths(pb::PathsRequest {
++                worktree_path: request(&wt),
++                paths: vec![path.into()],
++            })
++            .await
++            .unwrap_err();
++        assert_eq!(error.code(), tonic::Code::InvalidArgument, "{path}");
++    }
++    assert!(wt.join(".git").exists());
++}
++
+ #[tokio::test(flavor = "multi_thread")]
+ async fn stage_commit_undo_and_log() {
+     let daemon = TestDaemon::start().await;
+diff --git a/crates/domain/src/changes/ports.rs b/crates/domain/src/changes/ports.rs
+index b7afe95..7661a01 100644
+--- a/crates/domain/src/changes/ports.rs
++++ b/crates/domain/src/changes/ports.rs
+@@ -46,6 +46,16 @@ pub trait FileStore: Send + Sync + 'static {
+     ) -> Result<FileContent, ChangesError>;
+     fn write(&self, worktree: &Path, path: &RelativePath, bytes: &[u8])
+     -> Result<(), ChangesError>;
++    /// Renames or moves a file or folder, creating `to`'s folders. Fails
++    /// when `to` already exists.
++    fn rename(
++        &self,
++        worktree: &Path,
++        from: &RelativePath,
++        to: &RelativePath,
++    ) -> Result<(), ChangesError>;
++    /// Deletes a file, or a folder with everything in it.
++    fn remove(&self, worktree: &Path, path: &RelativePath) -> Result<(), ChangesError>;
+ }
+ 
+ /// Keeps a watch alive; dropping it stops watching.
+diff --git a/crates/grpc/src/services/git.rs b/crates/grpc/src/services/git.rs
+index 86d815b..3c067ba 100644
+--- a/crates/grpc/src/services/git.rs
++++ b/crates/grpc/src/services/git.rs
+@@ -106,6 +106,30 @@ impl pb::git_server::Git for GitGrpc {
+         Ok(Response::new(pb::WriteFileResponse {}))
+     }
+ 
++    async fn move_path(
++        &self,
++        request: Request<pb::MovePathRequest>,
++    ) -> Result<Response<pb::GitActionResponse>, Status> {
++        let request = request.into_inner();
++        done(
++            self.service
++                .move_path(&path(request.worktree_path), &request.from, &request.to)
++                .await,
++        )
++    }
++
++    async fn remove_paths(
++        &self,
++        request: Request<pb::PathsRequest>,
++    ) -> Result<Response<pb::GitActionResponse>, Status> {
++        let request = request.into_inner();
++        done(
++            self.service
++                .remove_paths(&path(request.worktree_path), &request.paths)
++                .await,
++        )
++    }
++
+     async fn diff(
+         &self,
+         request: Request<pb::DiffRequest>,
+diff --git a/crates/infrastructure/src/fs/local.rs b/crates/infrastructure/src/fs/local.rs
+index 75e3362..33591f4 100644
+--- a/crates/infrastructure/src/fs/local.rs
++++ b/crates/infrastructure/src/fs/local.rs
+@@ -24,6 +24,15 @@ impl LocalFileStore {
+         }
+         Ok(target)
+     }
++
++    /// The worktree's git folder isn't a file to move or delete.
++    fn not_git_dir(path: &RelativePath) -> Result<(), ChangesError> {
++        let first = path.as_path().components().next();
++        if first.is_some_and(|c| c.as_os_str() == ".git") {
++            return Err(ChangesError::InvalidPath(path.to_string()));
++        }
++        Ok(())
++    }
+ }
+ 
+ impl FileStore for LocalFileStore {
+@@ -62,6 +71,45 @@ impl FileStore for LocalFileStore {
+         }
+         std::fs::write(&target, bytes).map_err(|e| io_error(&target, e))
+     }
++
++    fn rename(
++        &self,
++        worktree: &Path,
++        from: &RelativePath,
++        to: &RelativePath,
++    ) -> Result<(), ChangesError> {
++        Self::not_git_dir(from)?;
++        Self::not_git_dir(to)?;
++        let source = Self::inside(worktree, from)?;
++        let target = Self::inside(worktree, to)?;
++        std::fs::symlink_metadata(&source).map_err(|e| io_error(&source, e))?;
++        if target != source && target.starts_with(&source) {
++            // A folder can't go inside itself.
++            return Err(ChangesError::InvalidPath(to.to_string()));
++        }
++        // On case-insensitive disks `Foo.rs` → `foo.rs` finds the file itself.
++        let only_case = from.to_string().to_lowercase() == to.to_string().to_lowercase();
++        if std::fs::symlink_metadata(&target).is_ok() && !only_case {
++            return Err(ChangesError::Io(format!("{to} already exists")));
++        }
++        if let Some(parent) = target.parent() {
++            std::fs::create_dir_all(parent).map_err(|e| io_error(parent, e))?;
++        }
++        std::fs::rename(&source, &target).map_err(|e| io_error(&source, e))
++    }
++
++    fn remove(&self, worktree: &Path, path: &RelativePath) -> Result<(), ChangesError> {
++        Self::not_git_dir(path)?;
++        let target = Self::inside(worktree, path)?;
++        // A symlink goes away itself; what it points to stays.
++        let meta = std::fs::symlink_metadata(&target).map_err(|e| io_error(&target, e))?;
++        if meta.is_dir() {
++            std::fs::remove_dir_all(&target)
++        } else {
++            std::fs::remove_file(&target)
++        }
++        .map_err(|e| io_error(&target, e))
++    }
+ }
+ 
+ fn io_error(path: &Path, error: std::io::Error) -> ChangesError {
+@@ -96,6 +144,58 @@ mod tests {
+         );
+     }
+ 
++    #[test]
++    fn renames_moves_and_removes_files_and_folders() {
++        let dir = tempfile::tempdir().unwrap();
++        let store = LocalFileStore;
++        store.write(dir.path(), &rel("src/a.rs"), b"a").unwrap();
++        store.write(dir.path(), &rel("src/b.rs"), b"b").unwrap();
++
++        store
++            .rename(dir.path(), &rel("src/a.rs"), &rel("src/core/a2.rs"))
++            .unwrap();
++        assert!(!dir.path().join("src/a.rs").exists());
++        assert_eq!(
++            std::fs::read(dir.path().join("src/core/a2.rs")).unwrap(),
++            b"a"
++        );
++        assert!(
++            matches!(
++                store.rename(dir.path(), &rel("src/b.rs"), &rel("src/core/a2.rs")),
++                Err(ChangesError::Io(_))
++            ),
++            "never overwrites"
++        );
++        assert!(matches!(
++            store.rename(dir.path(), &rel("src"), &rel("src/inner")),
++            Err(ChangesError::InvalidPath(_))
++        ));
++        store.rename(dir.path(), &rel("src"), &rel("lib")).unwrap();
++        assert!(dir.path().join("lib/core/a2.rs").exists());
++
++        store.remove(dir.path(), &rel("lib/b.rs")).unwrap();
++        assert!(!dir.path().join("lib/b.rs").exists());
++        store.remove(dir.path(), &rel("lib")).unwrap();
++        assert!(!dir.path().join("lib").exists());
++        assert!(store.remove(dir.path(), &rel("lib")).is_err());
++    }
++
++    #[test]
++    fn leaves_the_git_folder_alone() {
++        let dir = tempfile::tempdir().unwrap();
++        std::fs::create_dir_all(dir.path().join(".git")).unwrap();
++        let store = LocalFileStore;
++        assert!(matches!(
++            store.remove(dir.path(), &rel(".git")),
++            Err(ChangesError::InvalidPath(_))
++        ));
++        assert!(matches!(
++            store.rename(dir.path(), &rel(".git"), &rel("git")),
++            Err(ChangesError::InvalidPath(_))
++        ));
++        assert!(dir.path().join(".git").exists());
++    }
++
+     #[cfg(unix)]
+     #[test]
+     fn refuses_symlinks_that_escape() {
+diff --git a/kumo-ui/lib/app/app_state.dart b/kumo-ui/lib/app/app_state.dart
+index f096de2..2ce3d40 100644
+--- a/kumo-ui/lib/app/app_state.dart
++++ b/kumo-ui/lib/app/app_state.dart
+@@ -11,6 +11,7 @@ import '../data/changes.dart';
+ import '../data/workspace_source.dart';
+ import '../data/worktree_changes.dart';
+ import '../data/models.dart';
++import '../editor/file_buffers.dart';
+ import '../theme/palette.dart';
+ import 'preferences.dart';
+ 
+@@ -427,14 +428,230 @@ class AppState extends ChangeNotifier {
+     notifyListeners();
+   }
+ 
+-  /// The file shown in the Files tab (its tree picks it).
++  /// Files open in the Files tab (its tree opens them), in tab order, and
++  /// the one showing.
++  final List<String> _contextFiles = [];
+   String? _contextFile;
++  List<String> get contextFiles => List.unmodifiable(_contextFiles);
+   String? get contextFile => _contextFile;
++
++  /// Opens [path] in the Files tab (a tab of its own, or the one it has).
+   void showContextFile(String path) {
++    if (!_contextFiles.contains(path)) _contextFiles.add(path);
+     _contextFile = path;
+     notifyListeners();
+   }
+ 
++  /// Closes [path]'s tab in the Files tab; its neighbour shows next.
++  void closeContextFile(String path) {
++    final i = _contextFiles.indexOf(path);
++    if (i < 0) return;
++    _contextFiles.removeAt(i);
++    if (_contextFile == path) _contextFile = _contextFiles.isEmpty ? null : _contextFiles[i > 0 ? i - 1 : 0];
++    _forgetBuffer(path);
++    notifyListeners();
++  }
++
++  /// Keeps only the file showing in the Files tab (and files with unsaved
++  /// edits: they never close without asking).
++  void closeOtherContextFiles() {
++    final keep = [for (final p in _contextFiles) if (p == _contextFile || buffers.isDirty(p)) p];
++    final gone = [for (final p in _contextFiles) if (!keep.contains(p)) p];
++    _contextFiles
++      ..clear()
++      ..addAll(keep);
++    gone.forEach(_forgetBuffer);
++    notifyListeners();
++  }
++
++  /// Closes every file in the Files tab but those with unsaved edits.
++  void closeAllContextFiles() {
++    final keep = [for (final p in _contextFiles) if (buffers.isDirty(p)) p];
++    final gone = [for (final p in _contextFiles) if (!keep.contains(p)) p];
++    _contextFiles
++      ..clear()
++      ..addAll(keep);
++    gone.forEach(_forgetBuffer);
++    if (!keep.contains(_contextFile)) _contextFile = keep.firstOrNull;
++    notifyListeners();
++  }
++
++  // ---- Editing (the file views) ----
++
++  FileBuffers? _buffers;
++
++  /// Unsaved edits of the current worktree's files.
++  FileBuffers get buffers {
++    final b = _buffers;
++    if (b != null && identical(b.changes, _changes)) return b;
++    b
++      ?..removeListener(notifyListeners)
++      ..dispose();
++    return _buffers = FileBuffers(_changes)..addListener(notifyListeners);
++  }
++
++  /// A buffer goes once no tab shows its file.
++  void _forgetBuffer(String path) {
++    if (_contextFiles.contains(path) || _openFiles.contains(path)) return;
++    buffers.forget(path);
++  }
++
++  /// A tab with unsaved edits that asked to close: its file view asks
++  /// whether to save them. `$2` is true for the Files tab's tabs.
++  (String, bool)? _closeAsk;
++  (String, bool)? get closeAsk => _closeAsk;
++
++  /// Closes [path]'s tab ([files]: in the Files tab, else a file tab of the
++  /// Terminal view); with unsaved edits, shows the file and asks first.
++  void askClose(String path, {bool files = false}) {
++    if (!buffers.isDirty(path)) {
++      files ? closeContextFile(path) : closeFile(path);
++      return;
++    }
++    files ? showContextFile(path) : openFile(path);
++    _closeAsk = (path, files);
++    notifyListeners();
++  }
++
++  /// The answer to [closeAsk]: save (or drop) the edits, then close. Returns
++  /// why saving failed (the tab stays), or null.
++  Future<String?> answerClose({required bool save}) async {
++    final ask = _closeAsk;
++    if (ask == null) return null;
++    _closeAsk = null;
++    final (path, files) = ask;
++    if (save) {
++      final error = await buffers.save(path);
++      if (error != null) {
++        notifyListeners();
++        return error;
++      }
++    } else {
++      buffers.revert(path);
++    }
++    files ? closeContextFile(path) : closeFile(path);
++    return null;
++  }
++
++  void cancelClose() {
++    if (_closeAsk == null) return;
++    _closeAsk = null;
++    notifyListeners();
++  }
++
++  // ---- Files and folders (the Files tree's menus) ----
++
++  /// Deleted files and folders still within the undo window: hidden until
++  /// the window closes, then deleted.
++  final Set<String> _deleting = {};
++
++  /// [path] is, or is inside, something being deleted.
++  bool isDeleting(String path) => _deleting.any((d) => path == d || path.startsWith('$d/'));
++
++  /// The worktree's files, minus those being deleted.
++  List<String> get visibleFiles => _deleting.isEmpty ? _changes.files : [for (final f in _changes.files) if (!isDeleting(f)) f];
++
++  static String cleanPath(String raw) => raw.trim().replaceAll(RegExp(r'^/+|/+$'), '').replaceAll(RegExp(r'/+'), '/');
++
++  /// Something is at [path]: a file, or a folder with files in it.
++  bool pathExists(String path) => _changes.files.any((f) => f == path || f.startsWith('$path/'));
++
++  /// A new empty file (its folders are created). Returns why not, or null.
++  Future<String?> createFile(String raw) async {
++    final path = cleanPath(raw);
++    if (path.isEmpty || path.endsWith('.')) return 'Give the file a name';
++    if (pathExists(path)) return '$path already exists';
++    final changes = _changes;
++    await changes.write(path, '');
++    if (!identical(changes, _changes)) return null;
++    return changes.error;
++  }
++
++  /// Renames or moves a file or folder; its tabs and unsaved edits follow.
++  /// Returns why not, or null.
++  Future<String?> movePath(String from, String raw) async {
++    final to = cleanPath(raw);
++    if (to.isEmpty) return 'Give it a name';
++    if (to == from) return null;
++    if (to.startsWith('$from/')) return 'A folder can’t go inside itself';
++    if (pathExists(to) && to.toLowerCase() != from.toLowerCase()) return '$to already exists';
++    final changes = _changes;
++    final ok = await changes.move(from, to);
++    if (_disposed || !identical(changes, _changes)) return null;
++    if (!ok) return changes.error ?? 'Couldn’t rename ${from.split('/').last}';
++    String follow(String p) => p == from ? to : (p.startsWith('$from/') ? to + p.substring(from.length) : p);
++    for (final list in [_contextFiles, _openFiles]) {
++      for (var i = 0; i < list.length; i++) {
++        list[i] = follow(list[i]);
++      }
++    }
++    if (_contextFile != null) _contextFile = follow(_contextFile!);
++    if (_activeFile != null) _activeFile = follow(_activeFile!);
++    buffers.moved(from, to);
++    notifyListeners();
++    return null;
++  }
++
++  /// Deletes a file, or a folder with everything in it. It leaves the tree
++  /// and its tabs close at once; the disk changes when the undo window
++  /// closes (Undo brings it all back).
++  void deletePath(String path) {
++    if (isDeleting(path)) return;
++    bool inside(String p) => p == path || p.startsWith('$path/');
++    final ctxBefore = List.of(_contextFiles);
++    final ctxFileBefore = _contextFile;
++    final openBefore = List.of(_openFiles);
++    final activeBefore = _activeFile;
++    for (final p in {..._contextFiles.where(inside), ..._openFiles.where(inside)}) {
++      buffers.forget(p);
++    }
++    _contextFiles.removeWhere(inside);
++    _openFiles.removeWhere(inside);
++    if (_contextFile != null && inside(_contextFile!)) _contextFile = _contextFiles.lastOrNull;
++    if (_activeFile != null && inside(_activeFile!)) _activeFile = _openFiles.lastOrNull;
++    _deleting.add(path);
++    final changes = _changes;
++    _offerUndo(
++      'Deleted ${path.split('/').last}',
++      () {
++        _deleting.remove(path);
++        if (!identical(changes, _changes)) return;
++        _contextFiles
++          ..clear()
++          ..addAll(ctxBefore);
++        _contextFile = ctxFileBefore;
++        _openFiles
++          ..clear()
++          ..addAll(openBefore);
++        _activeFile = activeBefore;
++      },
++      commit: () => changes.remove([path]).whenComplete(() {
++        if (_disposed || !identical(changes, _changes)) return;
++        _deleting.remove(path);
++        notifyListeners();
++      }),
++    );
++  }
++
++  /// Takes every changed file inside [dir] back to the last commit (files
++  /// git doesn't track yet are deleted), with an undo window like
++  /// [discardChanges].
++  void discardChangesIn(String dir) {
++    final paths = [for (final f in pendingChanges) if (f.path.startsWith('$dir/')) f.path];
++    if (paths.isEmpty) return;
++    _discarding.addAll(paths);
++    final changes = _changes;
++    _offerUndo(
++      'Discarded ${paths.length} ${paths.length == 1 ? 'change' : 'changes'} in ${dir.split('/').last}',
++      () => _discarding.removeAll(paths),
++      commit: () => _discarded = changes.restoreAll(paths).whenComplete(() {
++        if (_disposed || !identical(changes, _changes)) return;
++        _discarding.removeAll(paths);
++        notifyListeners();
++      }),
++    );
++  }
++
+   // ---- Inspector widgets (the Widgets tab) ----
+ 
+   List<InspectorWidget> _widgets = const [InspectorWidget.agent, InspectorWidget.pipelines, InspectorWidget.changes, InspectorWidget.context];
+@@ -522,6 +739,7 @@ class AppState extends ChangeNotifier {
+     if (i < 0) return;
+     _openFiles.removeAt(i);
+     if (_activeFile == path) _activeFile = _openFiles.isEmpty ? null : _openFiles[i > 0 ? i - 1 : 0];
++    _forgetBuffer(path);
+     notifyListeners();
+   }
+ 
+@@ -550,14 +768,22 @@ class AppState extends ChangeNotifier {
+     final path = entry == null ? null : workspace.absolutePathOf(entry);
+     if (path == _changesPath) return;
+     // A discard still in its undo window happens now, on its own worktree.
+-    if (_discarding.isNotEmpty) dismissUndo();
++    if (_discarding.isNotEmpty || _deleting.isNotEmpty) dismissUndo();
+     _discarding.clear();
++    _deleting.clear();
++    _closeAsk = null;
++    _buffers
++      ?..removeListener(notifyListeners)
++      ..dispose();
++    _buffers = null;
+     _changes
+       ..removeListener(notifyListeners)
+       ..dispose();
+     _changesPath = path;
+     _changes = path == null ? NoWorktreeChanges() : factory(path);
+     _changes.addListener(notifyListeners);
++    // Another worktree: its own files.
++    _contextFiles.clear();
+     _contextFile = null;
+     _commitNotice = null;
+     _canUndoCommit = false;
+@@ -844,6 +1070,9 @@ class AppState extends ChangeNotifier {
+       ..removeListener(notifyListeners)
+       ..dispose();
+     tasks.dispose();
++    _buffers
++      ?..removeListener(notifyListeners)
++      ..dispose();
+     _changes
+       ..removeListener(notifyListeners)
+       ..dispose();
+diff --git a/kumo-ui/lib/data/worktree_changes.dart b/kumo-ui/lib/data/worktree_changes.dart
+index 8cbd0aa..96e2c68 100644
+--- a/kumo-ui/lib/data/worktree_changes.dart
++++ b/kumo-ui/lib/data/worktree_changes.dart
+@@ -89,6 +89,20 @@ abstract class WorktreeChanges extends ChangeNotifier {
+   /// Back to HEAD (restores a deleted file).
+   Future<void> restore(String path);
+ 
++  /// [restore] for several files at once (a folder's changes).
++  Future<void> restoreAll(List<String> paths) async {
++    for (final p in paths) {
++      await restore(p);
++    }
++  }
++
++  /// Renames or moves a file or folder ([to] must be free; its folders are
++  /// created). False when it failed ([error] says why).
++  Future<bool> move(String from, String to);
++
++  /// Deletes files, or folders with everything in them.
++  Future<bool> remove(List<String> paths);
++
+   /// Writes the resolved text ([keep]: current / incoming / both) and stages.
+   Future<void> resolveConflict(String path, String keep, String text);
+ 
+@@ -119,6 +133,11 @@ class MockWorktreeChanges extends WorktreeChanges {
+ 
+   final _wc = WorkingCopy();
+   final _texts = <String, String>{};
++
++  /// Files deleted or moved away, and files created or moved here.
++  final _gone = <String>{};
++  final _made = <String>{};
++  List<String>? _files;
+   bool _committed = false;
+   bool _pushed = false;
+ 
+@@ -138,13 +157,59 @@ class MockWorktreeChanges extends WorktreeChanges {
+   String? get error => null;
+ 
+   @override
+-  List<String> get files => {...MockProject.files.keys, ...MockChanges.tree}.toList();
++  List<String> get files => _files ??= [
++        for (final p in {...MockProject.files.keys, ...MockChanges.tree, ..._made}) if (!_gone.contains(p)) p,
++      ];
++
++  @override
++  Future<String?> read(String path) async => _gone.contains(path) ? null : (_texts[path] ?? MockProject.files[path]);
+ 
+   @override
+-  Future<String?> read(String path) async => _texts[path] ?? MockProject.files[path];
++  Future<void> write(String path, String text) async {
++    _texts[path] = text;
++    if (!files.contains(path)) {
++      _gone.remove(path);
++      _made.add(path);
++      _files = null;
++      notifyListeners();
++    }
++  }
++
++  /// [path] itself, or the files under it when it is a folder.
++  List<String> _under(String path) => [for (final f in files) if (f == path || f.startsWith('$path/')) f];
++
++  @override
++  Future<bool> move(String from, String to) async {
++    final moving = _under(from);
++    if (moving.isEmpty || _under(to).isNotEmpty || to.startsWith('$from/')) return false;
++    for (final f in moving) {
++      final dest = to + f.substring(from.length);
++      final text = await read(f);
++      _texts[dest] = text ?? '';
++      _gone
++        ..add(f)
++        ..remove(dest);
++      _made
++        ..remove(f)
++        ..add(dest);
++    }
++    _files = null;
++    notifyListeners();
++    return true;
++  }
+ 
+   @override
+-  Future<void> write(String path, String text) async => _texts[path] = text;
++  Future<bool> remove(List<String> paths) async {
++    for (final p in paths) {
++      for (final f in _under(p)) {
++        _gone.add(f);
++        _made.remove(f);
++      }
++      _files = null;
++    }
++    notifyListeners();
++    return true;
++  }
+ 
+   @override
+   GitStatus? statusOf(String path) => _wc.statusOf(path);
+@@ -312,6 +377,10 @@ class NoWorktreeChanges extends WorktreeChanges {
+   @override
+   Future<void> restore(String path) async {}
+   @override
++  Future<bool> move(String from, String to) async => false;
++  @override
++  Future<bool> remove(List<String> paths) async => false;
++  @override
+   Future<void> resolveConflict(String path, String keep, String text) async {}
+   @override
+   Future<String?> commit(String message, {bool all = false, bool amend = false, bool push = false}) async => null;
+diff --git a/kumo-ui/lib/editor/code_editor.dart b/kumo-ui/lib/editor/code_editor.dart
+index bbfd887..d620388 100644
+--- a/kumo-ui/lib/editor/code_editor.dart
++++ b/kumo-ui/lib/editor/code_editor.dart
+@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
+ 
+ import '../theme/kumo_theme.dart';
+ import '../theme/palette.dart';
++import '../widgets/change_scrollbar.dart';
+ import 'syntax.dart';
+ 
+ /// Editable controller that highlights as you type. The span text always
+@@ -61,7 +62,11 @@ class LineDeco {
+ 
+ /// Gutter + highlighted, editable code with vertical and horizontal scroll.
+ class CodeEditor extends StatefulWidget {
+-  const CodeEditor({super.key, required this.controller, required this.decorate, this.readOnly = false, this.fontSize = 12.5});
++  const CodeEditor({super.key, required this.controller, required this.decorate, this.readOnly = false, this.fontSize = 12.5, this.scrollController});
++
++  /// Height of a line, and the space above the first one.
++  static double lineExtentFor(double fontSize) => fontSize * _CodeEditorState._lh;
++  static const topPadding = 10.0;
+ 
+   final CodeController controller;
+ 
+@@ -71,18 +76,23 @@ class CodeEditor extends StatefulWidget {
+   final bool readOnly;
+   final double fontSize;
+ 
++  /// Vertical scrolling, to jump to a line from outside (optional).
++  final ScrollController? scrollController;
++
+   @override
+   State<CodeEditor> createState() => _CodeEditorState();
+ }
+ 
+ class _CodeEditorState extends State<CodeEditor> {
+-  final _v = ScrollController();
++  final _ownV = ScrollController();
+   final _h = ScrollController();
+   static const _lh = 1.7;
+ 
++  ScrollController get _v => widget.scrollController ?? _ownV;
++
+   @override
+   void dispose() {
+-    _v.dispose();
++    _ownV.dispose();
+     _h.dispose();
+     super.dispose();
+   }
+@@ -110,11 +120,13 @@ class _CodeEditorState extends State<CodeEditor> {
+         final longest = lines.fold<int>(0, (m, l) => math.max(m, l.length));
+         final raw = widget.decorate(lines);
+         final decos = [for (var i = 0; i < lines.length; i++) i < raw.length ? raw[i] : const LineDeco()];
+-        return Scrollbar(
++        // The scrollbar maps the change bars of the gutter.
++        return ChangeScrollbar(
+           controller: _v,
++          ticks: changeTicks(List.filled(lines.length, lineExtent), [for (final d in decos) d.bar], top: CodeEditor.topPadding, bottom: 24),
+           child: SingleChildScrollView(
+             controller: _v,
+-            padding: const EdgeInsets.only(top: 10, bottom: 24),
++            padding: const EdgeInsets.only(top: CodeEditor.topPadding, bottom: 24),
+             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+               // Gutter: change bar + line number.
+               ExcludeSemantics(
+diff --git a/kumo-ui/lib/editor/file_view.dart b/kumo-ui/lib/editor/file_view.dart
+index 5f77786..429a185 100644
+--- a/kumo-ui/lib/editor/file_view.dart
++++ b/kumo-ui/lib/editor/file_view.dart
+@@ -1,23 +1,34 @@
+ import 'dart:math' as math;
+ 
+ import 'package:flutter/material.dart';
++import 'package:flutter/services.dart';
+ 
+ import '../app/app_state.dart';
+ import '../data/changes.dart';
++import '../data/mock_project.dart' show GitStatus;
+ import '../data/worktree_changes.dart';
+ import '../theme/kumo_theme.dart';
++import '../widgets/change_scrollbar.dart';
+ import '../widgets/controls.dart';
+ import '../widgets/kicons.dart';
++import 'code_editor.dart';
+ import 'diff_colors.dart';
+ import 'syntax.dart';
+ 
+-/// A file tab of the Terminal view: the whole file with its changes inline
+-/// (or only the changed hunks), numbered old/new like `git diff`, with
+-/// previous / next change navigation.
++/// How a [FileView] shows its file.
++enum FileViewMode { edit, diff, changesOnly }
++
++/// A file of the worktree: editable (Edit), or the whole file with its
++/// changes inline (Diff) or only the changed hunks, numbered old/new like
++/// `git diff`, with previous / next change navigation. Its scrollbar maps
++/// where the file changed.
+ class FileView extends StatefulWidget {
+-  const FileView({super.key, required this.path});
++  const FileView({super.key, required this.path, this.startEditing = false});
+   final String path;
+ 
++  /// Opens in Edit (the Files tab) instead of the diff (a review's tabs).
++  final bool startEditing;
++
+   @override
+   State<FileView> createState() => _FileViewState();
+ }
+@@ -26,13 +37,21 @@ class _FileViewState extends State<FileView> {
+   static const _lineH = 20.0;
+   static const _foldH = 30.0;
+   static const _gutter = 3.0 + 34 + 42 + 16;
++  static const _editFont = 12.5;
+ 
+-  bool _changesOnly = false;
++  late FileViewMode _mode = widget.startEditing ? FileViewMode.edit : FileViewMode.diff;
++  bool get _changesOnly => _mode == FileViewMode.changesOnly;
+   int _hunk = 0;
++  String? _saveError;
+ 
+   /// The file with its changed lines, loaded from the worktree's changes.
+   ChangedFile? _file;
+   Object? _loadedFor;
++  bool _diffLoaded = false;
++
++  /// Changed lines for the editor's gutter (line → added?).
++  Map<int, bool> _marks = const {};
++  Object? _marksFor;
+ 
+   /// (Re)loads when the worktree, its status or the path changes.
+   void _load(WorktreeChanges changes) {
+@@ -40,136 +59,253 @@ class _FileViewState extends State<FileView> {
+     if (key == _loadedFor) return;
+     _loadedFor = key;
+     changes.diff(widget.path).then((file) {
+-      if (mounted && _loadedFor == key) setState(() => _file = file);
++      if (mounted && _loadedFor == key) {
++        setState(() {
++          _file = file;
++          _diffLoaded = true;
++        });
++      }
++    });
++  }
++
++  void _loadMarks(WorktreeChanges changes) {
++    final key = (changes, changes.version, widget.path);
++    if (key == _marksFor) return;
++    _marksFor = key;
++    changes.marks(widget.path).then((marks) {
++      if (mounted && _marksFor == key) setState(() => _marks = marks);
+     });
+   }
++
+   final _scroll = ScrollController();
+   final _hScroll = ScrollController();
++  final _editScroll = ScrollController();
+ 
+   @override
+   void dispose() {
+     _scroll.dispose();
+     _hScroll.dispose();
++    _editScroll.dispose();
+     super.dispose();
+   }
+ 
+-  void _jump(int delta, List<DiffRow> rows, int count) {
++  /// First line of each run of changed lines, for previous / next in Edit.
++  List<int> get _runs {
++    final lines = _marks.keys.toList()..sort();
++    return [for (var i = 0; i < lines.length; i++) if (i == 0 || lines[i] != lines[i - 1] + 1) lines[i]];
++  }
++
++  void _scrollTo(ScrollController sc, double y) {
++    if (!sc.hasClients) return;
++    final pos = sc.position;
++    final target = math.max(0.0, math.min(pos.maxScrollExtent, y - pos.viewportDimension / 3));
++    sc.animateTo(target, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
++  }
++
++  void _jump(int delta, List<DiffRow> rows, int count, FileViewMode mode) {
+     if (count == 0) return;
+     final next = (_hunk + delta + count) % count;
+     setState(() => _hunk = next);
++    if (mode == FileViewMode.edit) {
++      final line = _runs[next];
++      _scrollTo(_editScroll, CodeEditor.topPadding + (line - 1) * CodeEditor.lineExtentFor(_editFont));
++      return;
++    }
+     var y = 6.0;
+     for (final r in rows) {
+       if (r.hunk == next) break;
+       y += r.isFold ? _foldH : _lineH;
+     }
+-    if (!_scroll.hasClients) return;
+-    final pos = _scroll.position;
+-    final target = math.max(0.0, math.min(pos.maxScrollExtent, y - pos.viewportDimension / 3));
+-    _scroll.animateTo(target, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
++    _scrollTo(_scroll, y);
++  }
++
++  Future<void> _save() async {
++    final error = await AppScope.read(context).buffers.save(widget.path);
++    if (mounted) setState(() => _saveError = error);
+   }
+ 
+   @override
+   Widget build(BuildContext context) {
+     final c = context.c;
+-    _load(AppScope.of(context).changes);
++    final s = AppScope.of(context);
++    _load(s.changes);
+     final file = _file;
++    final deleted = s.changes.statusOf(widget.path) == GitStatus.deleted || file?.kind == 'D';
++    // Unchanged files only have the editor; deleted ones only the diff.
++    final mode = file == null ? FileViewMode.edit : (deleted && _mode == FileViewMode.edit ? FileViewMode.diff : _mode);
++    if (mode == FileViewMode.edit) _loadMarks(s.changes);
++    final dirty = s.buffers.isDirty(widget.path);
++    final asking = s.closeAsk?.$1 == widget.path;
+     final name = widget.path.substring(widget.path.lastIndexOf('/') + 1);
+     final dir = widget.path.substring(0, widget.path.lastIndexOf('/') + 1);
+-    final count = file == null ? 0 : hunkCount(file);
+-    final rows = file == null ? const <DiffRow>[] : diffRows(file, changesOnly: _changesOnly);
++    final count = mode == FileViewMode.edit ? _runs.length : (file == null ? 0 : hunkCount(file));
++    final rows = file == null || mode == FileViewMode.edit ? const <DiffRow>[] : diffRows(file, changesOnly: _changesOnly);
+     final kindColor = file == null ? c.text3 : (file.kind == 'A' ? c.ok : c.warn);
+     final kindSoft = file == null ? c.tile : (file.kind == 'A' ? c.okSoft : c.warnSoft);
+     final label = file == null ? 'No changes' : switch (file.kind) { 'A' => 'Added', 'D' => 'Deleted', _ => 'Modified' };
+-    final hunkLabel = file == null ? '—' : (file.kind == 'A' ? 'New file' : 'Change ${count == 0 ? 0 : _hunk + 1} of $count');
++    final hunkLabel = file?.kind == 'A' ? 'New file' : (count == 0 ? 'No changes' : 'Change ${_hunk.clamp(0, count - 1) + 1} of $count');
+ 
+-    return Container(
+-      decoration: BoxDecoration(color: c.pane, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.paneBorder)),
+-      clipBehavior: Clip.antiAlias,
+-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+-        LayoutBuilder(builder: (context, box) {
+-          final compact = box.maxWidth < 640;
+-          return Container(
+-            height: 42,
+-            padding: const EdgeInsets.only(left: 12, right: 8),
+-            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.divider))),
+-            child: Row(children: [
+-              Icon(KIcons.file, size: 15, color: kindColor),
+-              const SizedBox(width: 8),
+-              Flexible(
+-                child: Text.rich(
+-                  TextSpan(children: [
+-                    TextSpan(text: dir, style: mono(12, color: c.text3)),
+-                    TextSpan(text: name, style: mono(12, weight: FontWeight.w600, color: c.text)),
+-                  ]),
+-                  maxLines: 1,
+-                  overflow: TextOverflow.ellipsis,
+-                ),
+-              ),
+-              const SizedBox(width: 10),
+-              if (!compact) ...[
+-                Container(
+-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+-                  decoration: BoxDecoration(color: kindSoft, borderRadius: BorderRadius.circular(9)),
+-                  child: Text(label, style: sans(11, weight: FontWeight.w600, color: kindColor)),
+-                ),
++    return CallbackShortcuts(
++      bindings: {
++        const SingleActivator(LogicalKeyboardKey.keyS, meta: true): _save,
++        const SingleActivator(LogicalKeyboardKey.keyS, control: true): _save,
++      },
++      child: Container(
++        decoration: BoxDecoration(color: c.pane, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.paneBorder)),
++        clipBehavior: Clip.antiAlias,
++        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
++          LayoutBuilder(builder: (context, box) {
++            final compact = box.maxWidth < 700;
++            return Container(
++              height: 42,
++              padding: const EdgeInsets.only(left: 12, right: 8),
++              decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.divider))),
++              child: Row(children: [
++                Icon(KIcons.file, size: 15, color: kindColor),
+                 const SizedBox(width: 8),
+-              ],
+-              if (file != null) ...[
+-                Text.rich(TextSpan(children: [
+-                  TextSpan(text: '+${file.added} ', style: mono(11.5, color: c.ok)),
+-                  TextSpan(text: '−${file.deleted}', style: mono(11.5, color: c.err)),
+-                ])),
+-                if (file.writing && !compact) ...[
++                Flexible(
++                  child: Text.rich(
++                    TextSpan(children: [
++                      TextSpan(text: dir, style: mono(12, color: c.text3)),
++                      TextSpan(text: name, style: mono(12, weight: FontWeight.w600, color: c.text)),
++                    ]),
++                    maxLines: 1,
++                    overflow: TextOverflow.ellipsis,
++                  ),
++                ),
++                const SizedBox(width: 10),
++                if (!compact && file != null) ...[
++                  Container(
++                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
++                    decoration: BoxDecoration(color: kindSoft, borderRadius: BorderRadius.circular(9)),
++                    child: Text(label, style: sans(11, weight: FontWeight.w600, color: kindColor)),
++                  ),
+                   const SizedBox(width: 8),
+-                  Pill(label: 'Claude is still writing', color: c.acc, background: c.accSoft),
+                 ],
+-              ],
+-              const Spacer(),
+-              if (file != null) ...[
+-                KSegmented<bool>(
+-                  label: 'Show',
+-                  height: 24,
+-                  value: _changesOnly,
+-                  onChanged: (v) => setState(() => _changesOnly = v),
+-                  items: const [(false, 'Full file', null), (true, 'Changes only', null)],
++                if (file != null) ...[
++                  Text.rich(TextSpan(children: [
++                    TextSpan(text: '+${file.added} ', style: mono(11.5, color: c.ok)),
++                    TextSpan(text: '−${file.deleted}', style: mono(11.5, color: c.err)),
++                  ])),
++                  if (file.writing && !compact) ...[
++                    const SizedBox(width: 8),
++                    Pill(label: 'Claude is still writing', color: c.acc, background: c.accSoft),
++                  ],
++                ],
++                const Spacer(),
++                if (_saveError != null && !compact) ...[
++                  Flexible(child: Text(_saveError!, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, color: c.err))),
++                  const SizedBox(width: 8),
++                ],
++                if (dirty) ...[
++                  Tooltip(message: 'Save (⌘S)', child: KButton(label: 'Save', height: 24, fontSize: 11.5, onTap: _save)),
++                  const SizedBox(width: 8),
++                ],
++                if (file != null) ...[
++                  KSegmented<FileViewMode>(
++                    label: 'Show',
++                    height: 24,
++                    value: mode,
++                    onChanged: (v) => setState(() {
++                      _mode = v;
++                      _hunk = 0;
++                    }),
++                    items: [
++                      if (!deleted) (FileViewMode.edit, 'Edit', null),
++                      (FileViewMode.diff, 'Diff', null),
++                      (FileViewMode.changesOnly, 'Changes only', null),
++                    ],
++                  ),
++                  const SizedBox(width: 8),
++                ],
++                if (count > 0 || file != null) ...[
++                  KIconButton(icon: KIcons.chevronUp, label: 'Previous change', size: 24, iconSize: 16, onTap: () => _jump(-1, rows, count, mode)),
++                  if (!compact) SizedBox(width: 82, child: Text(hunkLabel, textAlign: TextAlign.center, style: sans(11.5, color: c.text2))),
++                  KIconButton(icon: KIcons.chevronDown, label: 'Next change', size: 24, iconSize: 16, onTap: () => _jump(1, rows, count, mode)),
++                ],
++                KIconButton(
++                  icon: KIcons.external,
++                  label: 'Open in the full editor',
++                  size: 24,
++                  iconSize: 14,
++                  onTap: () => AppScope.read(context).editFile(widget.path),
+                 ),
+-                const SizedBox(width: 8),
+-                KIconButton(icon: KIcons.chevronUp, label: 'Previous change', size: 24, iconSize: 16, onTap: () => _jump(-1, rows, count)),
+-                if (!compact)
+-                  SizedBox(width: 82, child: Text(hunkLabel, textAlign: TextAlign.center, style: sans(11.5, color: c.text2))),
+-                KIconButton(icon: KIcons.chevronDown, label: 'Next change', size: 24, iconSize: 16, onTap: () => _jump(1, rows, count)),
+-              ],
+-              KIconButton(
+-                icon: KIcons.external,
+-                label: 'Edit in the editor',
+-                size: 24,
+-                iconSize: 14,
+-                onTap: () => AppScope.read(context).editFile(widget.path),
+-              ),
+-            ]),
+-          );
+-        }),
+-        Expanded(child: file == null ? _unchanged(context) : _body(context, file, rows)),
+-      ]),
++              ]),
++            );
++          }),
++          if (asking) _closeBar(context, name),
++          Expanded(
++            child: !_diffLoaded
++                ? const SizedBox.shrink()
++                : (mode == FileViewMode.edit || file == null ? _editor(context) : _body(context, file, rows)),
++          ),
++        ]),
++      ),
+     );
+   }
+ 
+-  Widget _unchanged(BuildContext context) {
++  /// The tab asked to close with unsaved edits.
++  Widget _closeBar(BuildContext context, String name) {
+     final c = context.c;
+-    return Padding(
+-      padding: const EdgeInsets.all(24),
+-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+-        Text.rich(TextSpan(children: [
+-          TextSpan(text: 'No changes in this file on ', style: sans(12.5, color: c.text2)),
+-          TextSpan(text: AppScope.of(context).changes.branch, style: mono(12, color: c.text2)),
+-          TextSpan(text: '.', style: sans(12.5, color: c.text2)),
+-        ])),
+-        const SizedBox(height: 12),
+-        KButton(label: 'Open in the editor', height: 30, onTap: () => AppScope.read(context).editFile(widget.path)),
++    final s = AppScope.read(context);
++    return Container(
++      padding: const EdgeInsets.fromLTRB(12, 7, 8, 7),
++      decoration: BoxDecoration(color: c.warnSoft, border: Border(bottom: BorderSide(color: c.divider))),
++      child: Row(children: [
++        Icon(KIcons.warning, size: 15, color: c.warn),
++        const SizedBox(width: 8),
++        Expanded(child: Text('$name has unsaved changes. Save them before closing?', maxLines: 2, style: sans(12, color: c.text))),
++        const SizedBox(width: 8),
++        KButton.primary(
++          label: 'Save and close',
++          height: 26,
++          fontSize: 11.5,
++          onTap: () async {
++            final error = await s.answerClose(save: true);
++            if (mounted && error != null) setState(() => _saveError = error);
++          },
++        ),
++        const SizedBox(width: 6),
++        KButton(label: 'Don’t save', kind: KButtonKind.ghost, height: 26, fontSize: 11.5, onTap: () => s.answerClose(save: false)),
++        KButton(label: 'Cancel', kind: KButtonKind.ghost, height: 26, fontSize: 11.5, onTap: s.cancelClose),
+       ]),
+     );
+   }
+ 
++  /// Edit: the file's buffer in the code editor, with its changed lines in
++  /// the gutter and on the scrollbar.
++  Widget _editor(BuildContext context) {
++    final c = context.c;
++    final s = AppScope.of(context);
++    final buffers = s.buffers;
++    final ctrl = buffers.of(widget.path);
++    if (!buffers.isLoaded(widget.path)) return const SizedBox.shrink();
++    final why = buffers.readOnlyReason(widget.path);
++    final status = s.changes.statusOf(widget.path);
++    final whole = status == GitStatus.added || status == GitStatus.untracked || _file?.kind == 'A';
++    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
++      if (why != null)
++        Container(
++          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
++          color: c.tile,
++          child: Text(why, style: sans(12, color: c.text2)),
++        ),
++      Expanded(
++        child: CodeEditor(
++          key: ValueKey('edit:${widget.path}'),
++          controller: ctrl,
++          readOnly: why != null,
++          fontSize: _editFont,
++          scrollController: _editScroll,
++          decorate: (lines) => [
++            for (var i = 0; i < lines.length; i++)
++              LineDeco(bar: whole ? c.ok : switch (_marks[i + 1]) { true => c.ok, false => c.warn, null => null }),
++          ],
++        ),
++      ),
++    ]);
++  }
++
+   Widget _body(BuildContext context, ChangedFile file, List<DiffRow> rows) {
+     final c = context.c;
+     final d = DiffColors.of(c);
+@@ -217,7 +353,7 @@ class _FileViewState extends State<FileView> {
+     Widget fold(DiffRow r) => SizedBox(
+           height: _foldH,
+           child: KPressable(
+-            onTap: () => setState(() => _changesOnly = false),
++            onTap: () => setState(() => _mode = FileViewMode.diff),
+             semanticLabel: 'Show ${r.fold} unchanged lines',
+             builder: (context, hover, focus) => Container(
+               margin: const EdgeInsets.symmetric(vertical: 2),
+@@ -229,34 +365,47 @@ class _FileViewState extends State<FileView> {
+           ),
+         );
+ 
++    final extra = file.writing ? 1 : 0;
++    final ticks = changeTicks(
++      [for (final r in rows) r.isFold ? _foldH : _lineH],
++      [
++        for (final r in rows)
++          if (r.isFold) null else switch (r.line!.kind) { DiffKind.added => c.ok, DiffKind.deleted => c.err, DiffKind.context => null },
++      ],
++      top: 6,
++      bottom: 6 + extra * _lineH,
++    );
+     return LayoutBuilder(builder: (context, box) {
+       final width = math.max(box.maxWidth, _gutter + longest * charW + 24);
+-      final extra = file.writing ? 1 : 0;
+-      return Scrollbar(
+-        controller: _hScroll,
+-        child: SingleChildScrollView(
++      return ChangeScrollbar(
++        controller: _scroll,
++        ticks: ticks,
++        child: Scrollbar(
+           controller: _hScroll,
+-          scrollDirection: Axis.horizontal,
+-          child: SizedBox(
+-            width: width,
+-            height: box.maxHeight,
+-            child: ListView.builder(
+-              controller: _scroll,
+-              padding: const EdgeInsets.symmetric(vertical: 6),
+-              itemCount: rows.length + extra,
+-              itemBuilder: (context, i) {
+-                if (i == rows.length) {
+-                  return SizedBox(
+-                    height: _lineH,
+-                    child: Padding(
+-                      padding: const EdgeInsets.only(left: _gutter),
+-                      child: Align(alignment: Alignment.centerLeft, child: Container(width: 7, height: 15, color: c.acc)),
+-                    ),
+-                  );
+-                }
+-                final r = rows[i];
+-                return r.isFold ? fold(r) : line(r);
+-              },
++          child: SingleChildScrollView(
++            controller: _hScroll,
++            scrollDirection: Axis.horizontal,
++            child: SizedBox(
++              width: width,
++              height: box.maxHeight,
++              child: ListView.builder(
++                controller: _scroll,
++                padding: const EdgeInsets.symmetric(vertical: 6),
++                itemCount: rows.length + extra,
++                itemBuilder: (context, i) {
++                  if (i == rows.length) {
++                    return SizedBox(
++                      height: _lineH,
++                      child: Padding(
++                        padding: const EdgeInsets.only(left: _gutter),
++                        child: Align(alignment: Alignment.centerLeft, child: Container(width: 7, height: 15, color: c.acc)),
++                      ),
++                    );
++                  }
++                  final r = rows[i];
++                  return r.isFold ? fold(r) : line(r);
++                },
++              ),
+             ),
+           ),
+         ),
+diff --git a/kumo-ui/lib/engine/engine_worktree_changes.dart b/kumo-ui/lib/engine/engine_worktree_changes.dart
+index 6c793fb..9d05ceb 100644
+--- a/kumo-ui/lib/engine/engine_worktree_changes.dart
++++ b/kumo-ui/lib/engine/engine_worktree_changes.dart
+@@ -242,6 +242,23 @@ class EngineWorktreeChanges extends ui.WorktreeChanges {
+   @override
+   Future<void> restore(String path) => _act((git) => git.restore(_paths([path])));
+ 
++  @override
++  Future<void> restoreAll(List<String> paths) => _act((git) => git.restore(_paths(paths)));
++
++  @override
++  Future<bool> move(String from, String to) async {
++    final ok = await _act((git) => git.movePath(MovePathRequest(worktreePath: worktree, from: from, to: to)));
++    if (ok) unawaited(_listFiles());
++    return ok;
++  }
++
++  @override
++  Future<bool> remove(List<String> paths) async {
++    final ok = await _act((git) => git.removePaths(_paths(paths)));
++    if (ok) unawaited(_listFiles());
++    return ok;
++  }
++
+   @override
+   Future<void> resolveConflict(String path, String keep, String text) async {
+     await write(path, text);
+diff --git a/kumo-ui/lib/engine/generated/kumo/v1/kumo.pb.dart b/kumo-ui/lib/engine/generated/kumo/v1/kumo.pb.dart
+index de635aa..128d88d 100644
+--- a/kumo-ui/lib/engine/generated/kumo/v1/kumo.pb.dart
++++ b/kumo-ui/lib/engine/generated/kumo/v1/kumo.pb.dart
+@@ -3456,6 +3456,87 @@ class WriteFileResponse extends $pb.GeneratedMessage {
+   static WriteFileResponse? _defaultInstance;
+ }
+ 
++class MovePathRequest extends $pb.GeneratedMessage {
++  factory MovePathRequest({
++    $core.String? worktreePath,
++    $core.String? from,
++    $core.String? to,
++  }) {
++    final result = MovePathRequest._();
++    if (worktreePath != null) result.worktreePath = worktreePath;
++    if (from != null) result.from = from;
++    if (to != null) result.to = to;
++    return result;
++  }
++
++  MovePathRequest._();
++
++  factory MovePathRequest.fromBuffer($core.List<$core.int> data,
++          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
++      MovePathRequest()..mergeFromBuffer(data, registry);
++  factory MovePathRequest.fromJson($core.String json,
++          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
++      MovePathRequest()..mergeFromJson(json, registry);
++
++  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
++      _omitMessageNames ? '' : 'MovePathRequest',
++      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
++      createEmptyInstance: MovePathRequest.$_createMessage)
++    ..aOS(1, _omitFieldNames ? '' : 'worktreePath')
++    ..aOS(2, _omitFieldNames ? '' : 'from')
++    ..aOS(3, _omitFieldNames ? '' : 'to')
++    ..hasRequiredFields = false;
++
++  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
++  MovePathRequest clone() => deepCopy();
++  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
++  MovePathRequest copyWith(void Function(MovePathRequest) updates) =>
++      super.copyWith((message) => updates(message as MovePathRequest))
++          as MovePathRequest;
++
++  @$core.override
++  $pb.BuilderInfo get info_ => _i;
++
++  @$core.pragma('dart2js:noInline')
++  @$core.Deprecated('Use MovePathRequest() / MovePathRequest.new instead')
++  static MovePathRequest create() => MovePathRequest._();
++  static $pb.GeneratedMessage $_createMessage() => MovePathRequest._();
++  @$core.override
++  MovePathRequest createEmptyInstance() => MovePathRequest._();
++  @$core.pragma('dart2js:noInline')
++  static MovePathRequest getDefault() =>
++      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<MovePathRequest>(
++          MovePathRequest.$_createMessage);
++  static MovePathRequest? _defaultInstance;
++
++  @$pb.TagNumber(1)
++  $core.String get worktreePath => $_getSZ(0);
++  @$pb.TagNumber(1)
++  set worktreePath($core.String value) => $_setString(0, value);
++  @$pb.TagNumber(1)
++  $core.bool hasWorktreePath() => $_has(0);
++  @$pb.TagNumber(1)
++  void clearWorktreePath() => $_clearField(1);
++
++  @$pb.TagNumber(2)
++  $core.String get from => $_getSZ(1);
++  @$pb.TagNumber(2)
++  set from($core.String value) => $_setString(1, value);
++  @$pb.TagNumber(2)
++  $core.bool hasFrom() => $_has(1);
++  @$pb.TagNumber(2)
++  void clearFrom() => $_clearField(2);
++
++  @$pb.TagNumber(3)
++  $core.String get to => $_getSZ(2);
++  @$pb.TagNumber(3)
++  set to($core.String value) => $_setString(2, value);
++  @$pb.TagNumber(3)
++  $core.bool hasTo() => $_has(2);
++  @$pb.TagNumber(3)
++  void clearTo() => $_clearField(3);
++}
++
+ class DiffRequest extends $pb.GeneratedMessage {
+   factory DiffRequest({
+     $core.String? worktreePath,
+diff --git a/kumo-ui/lib/engine/generated/kumo/v1/kumo.pbgrpc.dart b/kumo-ui/lib/engine/generated/kumo/v1/kumo.pbgrpc.dart
+index 3a36fd1..15c8647 100644
+--- a/kumo-ui/lib/engine/generated/kumo/v1/kumo.pbgrpc.dart
++++ b/kumo-ui/lib/engine/generated/kumo/v1/kumo.pbgrpc.dart
+@@ -515,6 +515,23 @@ class GitClient extends $grpc.Client {
+     return $createUnaryCall(_$writeFile, request, options: options);
+   }
+ 
++  /// Renames or moves a file or folder; its new folders are created. Fails
++  /// when something is already there.
++  $grpc.ResponseFuture<$0.GitActionResponse> movePath(
++    $0.MovePathRequest request, {
++    $grpc.CallOptions? options,
++  }) {
++    return $createUnaryCall(_$movePath, request, options: options);
++  }
++
++  /// Deletes files, or folders with everything in them.
++  $grpc.ResponseFuture<$0.GitActionResponse> removePaths(
++    $0.PathsRequest request, {
++    $grpc.CallOptions? options,
++  }) {
++    return $createUnaryCall(_$removePaths, request, options: options);
++  }
++
+   /// The whole file with its changes (unchanged lines as context).
+   $grpc.ResponseFuture<$0.DiffResponse> diff(
+     $0.DiffRequest request, {
+@@ -611,6 +628,16 @@ class GitClient extends $grpc.Client {
+           '/kumo.v1.Git/WriteFile',
+           ($0.WriteFileRequest value) => value.writeToBuffer(),
+           $0.WriteFileResponse.fromBuffer);
++  static final _$movePath =
++      $grpc.ClientMethod<$0.MovePathRequest, $0.GitActionResponse>(
++          '/kumo.v1.Git/MovePath',
++          ($0.MovePathRequest value) => value.writeToBuffer(),
++          $0.GitActionResponse.fromBuffer);
++  static final _$removePaths =
++      $grpc.ClientMethod<$0.PathsRequest, $0.GitActionResponse>(
++          '/kumo.v1.Git/RemovePaths',
++          ($0.PathsRequest value) => value.writeToBuffer(),
++          $0.GitActionResponse.fromBuffer);
+   static final _$diff = $grpc.ClientMethod<$0.DiffRequest, $0.DiffResponse>(
+       '/kumo.v1.Git/Diff',
+       ($0.DiffRequest value) => value.writeToBuffer(),
+@@ -695,6 +722,20 @@ abstract class GitServiceBase extends $grpc.Service {
+         false,
+         ($core.List<$core.int> value) => $0.WriteFileRequest.fromBuffer(value),
+         ($0.WriteFileResponse value) => value.writeToBuffer()));
++    $addMethod($grpc.ServiceMethod<$0.MovePathRequest, $0.GitActionResponse>(
++        'MovePath',
++        movePath_Pre,
++        false,
++        false,
++        ($core.List<$core.int> value) => $0.MovePathRequest.fromBuffer(value),
++        ($0.GitActionResponse value) => value.writeToBuffer()));
++    $addMethod($grpc.ServiceMethod<$0.PathsRequest, $0.GitActionResponse>(
++        'RemovePaths',
++        removePaths_Pre,
++        false,
++        false,
++        ($core.List<$core.int> value) => $0.PathsRequest.fromBuffer(value),
++        ($0.GitActionResponse value) => value.writeToBuffer()));
+     $addMethod($grpc.ServiceMethod<$0.DiffRequest, $0.DiffResponse>(
+         'Diff',
+         diff_Pre,
+@@ -799,6 +840,22 @@ abstract class GitServiceBase extends $grpc.Service {
+   $async.Future<$0.WriteFileResponse> writeFile(
+       $grpc.ServiceCall call, $0.WriteFileRequest request);
+ 
++  $async.Future<$0.GitActionResponse> movePath_Pre($grpc.ServiceCall $call,
++      $async.Future<$0.MovePathRequest> $request) async {
++    return movePath($call, await $request);
++  }
++
++  $async.Future<$0.GitActionResponse> movePath(
++      $grpc.ServiceCall call, $0.MovePathRequest request);
++
++  $async.Future<$0.GitActionResponse> removePaths_Pre(
++      $grpc.ServiceCall $call, $async.Future<$0.PathsRequest> $request) async {
++    return removePaths($call, await $request);
++  }
++
++  $async.Future<$0.GitActionResponse> removePaths(
++      $grpc.ServiceCall call, $0.PathsRequest request);
++
+   $async.Future<$0.DiffResponse> diff_Pre(
+       $grpc.ServiceCall $call, $async.Future<$0.DiffRequest> $request) async {
+     return diff($call, await $request);
+diff --git a/kumo-ui/lib/shell/side_panel.dart b/kumo-ui/lib/shell/side_panel.dart
+index 821231e..a1605b2 100644
+--- a/kumo-ui/lib/shell/side_panel.dart
++++ b/kumo-ui/lib/shell/side_panel.dart
+@@ -557,12 +557,159 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
+   final Set<String> _open = {'internal', 'internal/discount', 'internal/kafka'};
+   bool _changedOnly = false;
+ 
++  /// The row whose menu is open, the one being renamed, and the folder a
++  /// new file is being named in ('' is the worktree's root).
++  String? _menuFor;
++  String? _renaming;
++  String? _creatingIn;
++  final _name = TextEditingController();
++  final _nameFocus = FocusNode();
++  String? _nameError;
++  bool _busy = false;
++
++  @override
++  void initState() {
++    super.initState();
++    // Clicking elsewhere gives up, like Esc.
++    _nameFocus.addListener(() {
++      if (!_nameFocus.hasFocus && !_busy) _stopNaming();
++    });
++  }
++
++  @override
++  void dispose() {
++    _name.dispose();
++    _nameFocus.dispose();
++    super.dispose();
++  }
++
++  static String _dirOf(String? path) => path == null || !path.contains('/') ? '' : path.substring(0, path.lastIndexOf('/'));
++
++  void _focusName() => WidgetsBinding.instance.addPostFrameCallback((_) {
++        if (mounted) _nameFocus.requestFocus();
++      });
++
++  void _stopNaming() {
++    if (_renaming == null && _creatingIn == null) return;
++    setState(() {
++      _renaming = null;
++      _creatingIn = null;
++      _nameError = null;
++    });
++  }
++
++  /// The name is selected without its extension, ready to type over.
++  void _startRename(String path) {
++    final name = path.split('/').last;
++    final dot = name.lastIndexOf('.');
++    _name.value = TextEditingValue(text: name, selection: TextSelection(baseOffset: 0, extentOffset: dot > 0 ? dot : name.length));
++    setState(() {
++      _renaming = path;
++      _creatingIn = null;
++      _nameError = null;
++    });
++    _focusName();
++  }
++
++  void _startCreate(String dir) {
++    _name.clear();
++    setState(() {
++      _creatingIn = dir;
++      _renaming = null;
++      _nameError = null;
++      if (dir.isNotEmpty) _openUpTo(dir);
++    });
++    _focusName();
++  }
++
++  void _openUpTo(String dir) {
++    final parts = dir.split('/');
++    for (var i = 1; i <= parts.length; i++) {
++      _open.add(parts.sublist(0, i).join('/'));
++    }
++  }
++
++  /// ↩ in the name field: renames, or creates the file and opens it.
++  Future<void> _submitName() async {
++    final s = AppScope.read(context);
++    final raw = _name.text.trim();
++    if (raw.isEmpty) {
++      _stopNaming();
++      return;
++    }
++    _busy = true;
++    String? error;
++    final renaming = _renaming;
++    if (renaming != null) {
++      final parent = _dirOf(renaming);
++      final to = AppState.cleanPath(parent.isEmpty ? raw : '$parent/$raw');
++      error = await s.movePath(renaming, to);
++      if (error == null) {
++        // Open folders keep showing under their new name.
++        final moved = [for (final k in _open) if (k == renaming || k.startsWith('$renaming/')) k];
++        _open
++          ..removeAll(moved)
++          ..addAll([for (final k in moved) to + k.substring(renaming.length)]);
++      }
++    } else {
++      final dir = _creatingIn ?? '';
++      final path = AppState.cleanPath(dir.isEmpty ? raw : '$dir/$raw');
++      error = await s.createFile(path);
++      if (error == null) {
++        _openUpTo(_dirOf(path));
++        widget.onOpen(path);
++      }
++    }
++    _busy = false;
++    if (!mounted) return;
++    if (error != null) {
++      setState(() => _nameError = error);
++      _nameFocus.requestFocus();
++      return;
++    }
++    setState(() {
++      _renaming = null;
++      _creatingIn = null;
++      _nameError = null;
++    });
++  }
++
++  void _menu(Offset at, String path, {required bool dir}) {
++    setState(() => _menuFor = path);
++    showKMenu(
++      context,
++      position: at,
++      onClosed: () {
++        if (mounted) setState(() => _menuFor = null);
++      },
++      builder: (context, close) => _FileTreeMenu(
++        path: path,
++        dir: dir,
++        close: close,
++        onOpen: dir ? null : () => widget.onOpen(path),
++        onNewFile: () => _startCreate(path),
++        onRename: () => _startRename(path),
++      ),
++    );
++  }
++
++  Widget _field(int depth, IconData icon, {required String hint}) => _NameField(
++        depth: depth,
++        icon: icon,
++        controller: _name,
++        focus: _nameFocus,
++        hint: hint,
++        error: _nameError,
++        onSubmit: _submitName,
++        onCancel: _stopNaming,
++      );
++
+   @override
+   Widget build(BuildContext context) {
+     final s = AppScope.of(context);
+     final c = context.c;
+     final status = {for (final f in s.pendingChanges) f.path: f.kind};
+-    final paths = [for (final p in s.changes.files) if (!_changedOnly || status.containsKey(p)) p];
++    final paths = [for (final p in s.visibleFiles) if (!_changedOnly || status.containsKey(p)) p];
+     final root = _Dir('');
+     for (final p in paths) {
+       final parts = p.split('/');
+@@ -573,6 +720,7 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
+       }
+       node.files.add(p);
+     }
++    const newHint = 'name.ext — a/b.ext makes folders';
+     final rows = <Widget>[];
+     void walk(_Dir node, int depth) {
+       for (final name in node.dirs.keys.toList()..sort()) {
+@@ -581,21 +729,32 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
+         final inside = status.keys.where((p) => p.startsWith('${d.key}/')).toList();
+         final allAdded = inside.isNotEmpty && inside.every((p) => status[p] == 'A');
+         final tone = inside.isEmpty ? null : (allAdded ? c.ok : c.warn);
+-        rows.add(_TreeRow(
+-          depth: depth,
+-          icon: KIcons.folder,
+-          iconColor: c.text3,
+-          name: name,
+-          color: tone ?? c.text,
+-          chevron: open ? KIcons.chevronDown : KIcons.chevronRight,
+-          dot: !open ? tone : null,
+-          semantic: '${d.key}/, ${open ? 'collapse' : 'expand'}${inside.isEmpty ? '' : ', ${inside.length} changed'}',
+-          onTap: () => setState(() => _open.contains(d.key) ? _open.remove(d.key) : _open.add(d.key)),
+-        ));
++        if (_renaming == d.key) {
++          rows.add(_field(depth, KIcons.folder, hint: 'Folder name'));
++        } else {
++          rows.add(_TreeRow(
++            depth: depth,
++            icon: KIcons.folder,
++            iconColor: c.text3,
++            name: name,
++            color: tone ?? c.text,
++            chevron: open ? KIcons.chevronDown : KIcons.chevronRight,
++            dot: !open ? tone : null,
++            highlight: _menuFor == d.key,
++            semantic: '${d.key}/, ${open ? 'collapse' : 'expand'}${inside.isEmpty ? '' : ', ${inside.length} changed'}',
++            onTap: () => setState(() => _open.contains(d.key) ? _open.remove(d.key) : _open.add(d.key)),
++            onMenu: (at) => _menu(at, d.key, dir: true),
++          ));
++        }
++        if (open && _creatingIn == d.key) rows.add(_field(depth + 1, KIcons.file, hint: newHint));
+         if (open) walk(d, depth + 1);
+       }
+       final files = [...node.files]..sort((a, b) => a.split('/').last.compareTo(b.split('/').last));
+       for (final p in files) {
++        if (_renaming == p) {
++          rows.add(_field(depth, KIcons.file, hint: 'File name'));
++          continue;
++        }
+         final k = status[p];
+         final col = k == 'A' ? c.ok : (k == 'M' ? c.warn : null);
+         rows.add(_TreeRow(
+@@ -606,12 +765,15 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
+           color: col ?? c.text,
+           kind: k,
+           selected: widget.selected == p,
++          highlight: _menuFor == p,
+           semantic: p,
+           onTap: () => widget.onOpen(p),
++          onMenu: (at) => _menu(at, p, dir: false),
+         ));
+       }
+     }
+ 
++    if (_creatingIn == '') rows.add(_field(0, KIcons.file, hint: newHint));
+     walk(root, 0);
+     final pending = s.pendingChanges;
+     final added = pending.where((f) => f.kind == 'A').length;
+@@ -639,6 +801,11 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
+             child: Text('Changed only', style: sans(11.5, weight: FontWeight.w500, color: _changedOnly ? c.acc : c.text2)),
+           ),
+         ),
++        KIconButton(
++          icon: KIcons.fileAdd,
++          label: 'New file (or right-click a folder)',
++          onTap: () => _startCreate(_dirOf(widget.selected)),
++        ),
+         KIconButton(
+           icon: KIcons.collapseAll,
+           label: 'Collapse all',
+@@ -660,6 +827,105 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
+   }
+ }
+ 
++/// Right-click on a file or folder of the Files tree.
++class _FileTreeMenu extends StatelessWidget {
++  const _FileTreeMenu({required this.path, required this.dir, required this.close, required this.onNewFile, required this.onRename, this.onOpen});
++  final String path;
++  final bool dir;
++  final VoidCallback close;
++  final VoidCallback? onOpen;
++  final VoidCallback onNewFile;
++  final VoidCallback onRename;
++
++  @override
++  Widget build(BuildContext context) {
++    final s = AppScope.read(context);
++    void then(VoidCallback f) {
++      close();
++      f();
++    }
++
++    final changed = [for (final f in s.pendingChanges) if (dir ? f.path.startsWith('$path/') : f.path == path) f.path];
++    final n = changed.length;
++    final discardLabel = dir && n > 0 ? 'Discard $n ${n == 1 ? 'change' : 'changes'}' : 'Discard changes';
++    return KMenuPanel(width: 248, children: [
++      if (dir) KMenuItem(icon: KIcons.fileAdd, label: 'New file…', onTap: () => then(onNewFile)),
++      if (onOpen != null) KMenuItem(icon: KIcons.file, label: 'Open', onTap: () => then(onOpen!)),
++      KMenuItem(icon: KIcons.rename, label: 'Rename…', onTap: () => then(onRename)),
++      KMenuItem(
++        icon: KIcons.discard,
++        label: discardLabel,
++        note: n == 0 ? (dir ? 'Nothing changed in this folder' : 'This file has no changes') : null,
++        onTap: n == 0 ? null : () => then(() => dir ? s.discardChangesIn(path) : s.discardChanges(path)),
++      ),
++      KMenuItem(icon: KIcons.copy, label: 'Copy path', onTap: () => then(() => Clipboard.setData(ClipboardData(text: path)))),
++      const KMenuDivider(),
++      KMenuItem(icon: KIcons.trash, label: dir ? 'Delete folder' : 'Delete', danger: true, onTap: () => then(() => s.deletePath(path))),
++    ]);
++  }
++}
++
++/// Inline name field of the Files tree: ↩ confirms, Esc or a click
++/// elsewhere gives up.
++class _NameField extends StatelessWidget {
++  const _NameField({
++    required this.depth,
++    required this.icon,
++    required this.controller,
++    required this.focus,
++    required this.hint,
++    required this.onSubmit,
++    required this.onCancel,
++    this.error,
++  });
++
++  final int depth;
++  final IconData icon;
++  final TextEditingController controller;
++  final FocusNode focus;
++  final String hint;
++  final String? error;
++  final VoidCallback onSubmit;
++  final VoidCallback onCancel;
++
++  @override
++  Widget build(BuildContext context) {
++    final c = context.c;
++    return Padding(
++      padding: EdgeInsets.only(left: 6.0 + depth * 14 + 18, right: 2, top: 1, bottom: 2),
++      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
++        Container(
++          height: 26,
++          padding: const EdgeInsets.symmetric(horizontal: 6),
++          decoration: BoxDecoration(color: c.chip, borderRadius: BorderRadius.circular(7), border: Border.all(color: error == null ? c.acc : c.err)),
++          child: Row(children: [
++            Icon(icon, size: 14, color: c.text3),
++            const SizedBox(width: 6),
++            Expanded(
++              child: CallbackShortcuts(
++                bindings: {const SingleActivator(LogicalKeyboardKey.escape): onCancel},
++                child: TextField(
++                  key: const ValueKey('tree-name'),
++                  controller: controller,
++                  focusNode: focus,
++                  onSubmitted: (_) => onSubmit(),
++                  style: sans(12.5, color: c.text),
++                  cursorColor: c.acc,
++                  decoration: InputDecoration.collapsed(hintText: hint, hintStyle: sans(12.5, color: c.text3)),
++                ),
++              ),
++            ),
++          ]),
++        ),
++        Padding(
++          padding: const EdgeInsets.only(top: 3, left: 2),
++          child: Text(error ?? '↩ to confirm · Esc cancels', style: sans(11, color: error == null ? c.text3 : c.err)),
++        ),
++      ]),
++    );
++  }
++}
++
+ class _Dir {
+   _Dir(this.key);
+   final String key;
+@@ -676,10 +942,12 @@ class _TreeRow extends StatelessWidget {
+     required this.color,
+     required this.semantic,
+     required this.onTap,
++    this.onMenu,
+     this.chevron,
+     this.dot,
+     this.kind,
+     this.selected = false,
++    this.highlight = false,
+   });
+ 
+   final int depth;
+@@ -689,33 +957,42 @@ class _TreeRow extends StatelessWidget {
+   final Color color;
+   final String semantic;
+   final VoidCallback onTap;
++
++  /// Right-click, at the click's global position.
++  final ValueChanged<Offset>? onMenu;
+   final IconData? chevron;
+   final Color? dot;
+   final String? kind;
+   final bool selected;
+ 
++  /// Its menu is open.
++  final bool highlight;
++
+   @override
+   Widget build(BuildContext context) {
+     final c = context.c;
+-    return KPressable(
+-      onTap: onTap,
+-      semanticLabel: semantic,
+-      selected: selected,
+-      builder: (context, hover, focus) => Container(
+-        height: 26,
+-        padding: EdgeInsets.only(left: 6.0 + depth * 14, right: 6),
+-        decoration: selected
+-            ? chipDecoration(c, radius: 7, fill: c.navActive)
+-            : BoxDecoration(color: hover || focus ? c.tile : null, borderRadius: BorderRadius.circular(7)),
+-        child: Row(children: [
+-          SizedBox(width: 14, child: chevron == null ? null : Icon(chevron, size: 14, color: c.text3)),
+-          const SizedBox(width: 4),
+-          Icon(icon, size: 14, color: iconColor),
+-          const SizedBox(width: 6),
+-          Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: color))),
+-          if (dot != null) Dot(dot!, size: 6),
+-          if (kind != null) SizedBox(width: 12, child: Text(kind!, textAlign: TextAlign.center, style: mono(11, weight: FontWeight.w700, color: color))),
+-        ]),
++    return GestureDetector(
++      onSecondaryTapDown: onMenu == null ? null : (d) => onMenu!(d.globalPosition),
++      child: KPressable(
++        onTap: onTap,
++        semanticLabel: semantic,
++        selected: selected,
++        builder: (context, hover, focus) => Container(
++          height: 26,
++          padding: EdgeInsets.only(left: 6.0 + depth * 14, right: 6),
++          decoration: selected
++              ? chipDecoration(c, radius: 7, fill: c.navActive)
++              : BoxDecoration(color: hover || focus || highlight ? c.tile : null, borderRadius: BorderRadius.circular(7)),
++          child: Row(children: [
++            SizedBox(width: 14, child: chevron == null ? null : Icon(chevron, size: 14, color: c.text3)),
++            const SizedBox(width: 4),
++            Icon(icon, size: 14, color: iconColor),
++            const SizedBox(width: 6),
++            Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: color))),
++            if (dot != null) Dot(dot!, size: 6),
++            if (kind != null) SizedBox(width: 12, child: Text(kind!, textAlign: TextAlign.center, style: mono(11, weight: FontWeight.w700, color: color))),
++          ]),
++        ),
+       ),
+     );
+   }
+diff --git a/kumo-ui/lib/shell/sidebar.dart b/kumo-ui/lib/shell/sidebar.dart
+index c871bbd..4c514db 100644
+--- a/kumo-ui/lib/shell/sidebar.dart
++++ b/kumo-ui/lib/shell/sidebar.dart
+@@ -448,12 +448,13 @@ class _NamespaceGroupState extends State<_NamespaceGroup> {
+               duration: const Duration(milliseconds: 90),
+               height: 30,
+               margin: const EdgeInsets.only(bottom: 2),
+-              padding: const EdgeInsets.only(left: 8, right: 2),
++              padding: const EdgeInsets.only(left: 4, right: 2),
+               decoration: BoxDecoration(color: _menuOpen || _renaming ? c.tile : null, borderRadius: BorderRadius.circular(8)),
+               child: Row(children: [
+-                Icon(KIcons.namespace, size: 14, color: c.text3),
+-                const SizedBox(width: 7),
+-                if (_renaming)
++                if (_renaming) ...[
++                  const SizedBox(width: 18),
++                  Icon(KIcons.namespace, size: 14, color: c.text3),
++                  const SizedBox(width: 7),
+                   Expanded(
+                     child: CallbackShortcuts(
+                       bindings: {const SingleActivator(LogicalKeyboardKey.escape): _cancelRename},
+@@ -472,17 +473,33 @@ class _NamespaceGroupState extends State<_NamespaceGroup> {
+                         ),
+                       ),
+                     ),
+-                  )
+-                else ...[
+-                  Flexible(child: Text(ns.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, weight: FontWeight.w600, color: c.text2))),
+-                  const SizedBox(width: 7),
+-                  Container(
+-                    padding: const EdgeInsets.symmetric(horizontal: 6),
+-                    decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(8)),
+-                    child: Text('${repos.length}', style: sans(10.5, color: c.text3)),
+                   ),
+-                  const Spacer(),
+-                ],
++                ] else
++                  // The chevron, icon and name fold or unfold the namespace.
++                  Expanded(
++                    child: KPressable(
++                      onTap: () => s.toggleNamespaceCollapsed(ns.id),
++                      semanticLabel: '${ns.collapsed ? 'Expand' : 'Collapse'} ${ns.name}',
++                      tooltip: ns.collapsed ? 'Expand' : 'Collapse',
++                      builder: (context, hover, focus) => SizedBox(
++                        height: 30,
++                        child: Row(children: [
++                          Icon(ns.collapsed ? KIcons.chevronRight : KIcons.chevronDown, size: 14, color: hover || focus ? c.text2 : c.text3),
++                          const SizedBox(width: 4),
++                          Icon(KIcons.namespace, size: 14, color: c.text3),
++                          const SizedBox(width: 7),
++                          Flexible(child: Text(ns.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, weight: FontWeight.w600, color: hover || focus ? c.text : c.text2))),
++                          const SizedBox(width: 7),
++                          Container(
++                            padding: const EdgeInsets.symmetric(horizontal: 6),
++                            decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(8)),
++                            child: Text('${repos.length}', style: sans(10.5, color: c.text3)),
++                          ),
++                          const Spacer(),
++                        ]),
++                      ),
++                    ),
++                  ),
+                 const SizedBox(width: 4),
+                 Builder(
+                   builder: (btn) => KIconButton(
+diff --git a/kumo-ui/lib/views/terminal_screen.dart b/kumo-ui/lib/views/terminal_screen.dart
+index 6dd5644..e431378 100644
+--- a/kumo-ui/lib/views/terminal_screen.dart
++++ b/kumo-ui/lib/views/terminal_screen.dart
+@@ -1,5 +1,6 @@
+ import 'dart:io';
+ 
++import 'package:flutter/gestures.dart' show PointerScrollEvent, PointerSignalEvent;
+ import 'package:flutter/material.dart';
+ 
+ import '../app/app_state.dart';
+@@ -301,10 +302,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
+       case TerminalCommand.closePane:
+         final ctx = _app?.activeContext;
+         final file = _app?.activeFile;
+-        if (ctx != null) {
++        final ctxFile = _app?.contextFile;
++        if (ctx == ContextTab.files && ctxFile != null) {
++          // In the Files tab ⌘W closes the file showing, then the tab.
++          _app!.askClose(ctxFile, files: true);
++        } else if (ctx != null) {
+           _app!.closeContext(ctx);
+         } else if (file != null) {
+-          _app!.closeFile(file);
++          _app!.askClose(file);
+         } else {
+           _close(_focus);
+         }
+@@ -650,10 +655,18 @@ class _TerminalScreenState extends State<TerminalScreen> {
+               const SizedBox(width: 7),
+               Text(name, style: mono(11.5, color: on || hover ? c.text : c.text2)),
+               if (f != null) ...[const SizedBox(width: 6), Text(f.kind, style: mono(10, weight: FontWeight.w700, color: col))],
++              if (s.buffers.isDirty(path)) ...[const SizedBox(width: 6), Dot(c.text2, size: 7)],
+             ]),
+           ),
+           const SizedBox(width: 6),
+-          KIconButton(icon: KIcons.close, label: 'Close $name (⌘W)', size: 18, iconSize: 11, color: c.text3, onTap: () => s.closeFile(path)),
++          KIconButton(
++            icon: KIcons.close,
++            label: s.buffers.isDirty(path) ? 'Close $name, unsaved changes (⌘W)' : 'Close $name (⌘W)',
++            size: 18,
++            iconSize: 11,
++            color: c.text3,
++            onTap: () => s.askClose(path),
++          ),
+         ]),
+       ),
+     );
+@@ -864,7 +877,20 @@ class _ContextFiles extends StatelessWidget {
+       Container(width: 1, color: c.divider),
+       const SizedBox(width: 8),
+       Expanded(
+-        child: file == null
++        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
++          if (s.contextFiles.isNotEmpty) ...[
++            const _ContextFileStrip(),
++            const SizedBox(height: 8),
++          ],
++          Expanded(child: _contextFileBody(context, file)),
++        ]),
++      ),
++    ]);
++  }
++
++  Widget _contextFileBody(BuildContext context, String? file) {
++    final c = context.c;
++    return file == null
+             ? Center(
+                 child: Column(mainAxisSize: MainAxisSize.min, children: [
+                   Icon(KIcons.file, size: 26, color: c.text3),
+@@ -874,10 +900,283 @@ class _ContextFiles extends StatelessWidget {
+                   Text('Pick a file on the left. Changed files are marked M / A.', style: sans(12.5, color: c.text3)),
+                 ]),
+               )
+-            : FileView(key: ValueKey('ctx:$file'), path: file),
++            : FileView(key: ValueKey('ctx:$file'), path: file, startEditing: true);
++  }
++}
++
++/// The Files tab's open files. The strip scrolls sideways (a mouse wheel
++/// too), fades where tabs are cut off, keeps the file showing in view and
++/// ends in “N open”: every open file, Close others and Close all.
++class _ContextFileStrip extends StatefulWidget {
++  const _ContextFileStrip();
++
++  @override
++  State<_ContextFileStrip> createState() => _ContextFileStripState();
++}
++
++class _ContextFileStripState extends State<_ContextFileStrip> {
++  final _scroll = ScrollController();
++  final _keys = <String, GlobalKey>{};
++  String? _shown;
++  int _shownAt = -1;
++  bool _fadeStart = false;
++  bool _fadeEnd = false;
++  bool _menuOpen = false;
++
++  @override
++  void initState() {
++    super.initState();
++    _scroll.addListener(_updateFades);
++  }
++
++  @override
++  void dispose() {
++    _scroll.dispose();
++    super.dispose();
++  }
++
++  void _updateFades() {
++    if (!mounted || !_scroll.hasClients) return;
++    final p = _scroll.position;
++    final start = p.extentBefore > 0.5;
++    final end = p.extentAfter > 0.5;
++    if (start != _fadeStart || end != _fadeEnd) {
++      setState(() {
++        _fadeStart = start;
++        _fadeEnd = end;
++      });
++    }
++  }
++
++  /// After layout: refresh the fades and bring a newly shown file's tab
++  /// into view, from whichever side it is cut off.
++  void _afterLayout(String? file, int index) {
++    WidgetsBinding.instance.addPostFrameCallback((_) {
++      if (!mounted) return;
++      _updateFades();
++      if (file == null || file == _shown) return;
++      final forward = index >= _shownAt;
++      _shown = file;
++      _shownAt = index;
++      final ctx = _keys[file]?.currentContext;
++      if (ctx == null) return;
++      Scrollable.ensureVisible(
++        ctx,
++        duration: const Duration(milliseconds: 160),
++        curve: Curves.easeOut,
++        alignmentPolicy: forward ? ScrollPositionAlignmentPolicy.keepVisibleAtEnd : ScrollPositionAlignmentPolicy.keepVisibleAtStart,
++      );
++    });
++  }
++
++  void _wheel(PointerSignalEvent e) {
++    if (e is! PointerScrollEvent || !_scroll.hasClients) return;
++    final d = e.scrollDelta;
++    if (d.dx.abs() >= d.dy.abs()) return; // a trackpad already scrolls sideways
++    final p = _scroll.position;
++    _scroll.jumpTo((p.pixels + d.dy).clamp(p.minScrollExtent, p.maxScrollExtent).toDouble());
++  }
++
++  void _openMenu(BuildContext anchor) {
++    setState(() => _menuOpen = true);
++    showKMenu(
++      context,
++      position: belowOf(anchor),
++      alignRight: true,
++      onClosed: () {
++        if (mounted) setState(() => _menuOpen = false);
++      },
++      builder: (context, close) => _OpenFilesMenu(close: close),
++    );
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final s = AppScope.of(context);
++    final c = context.c;
++    final files = s.contextFiles;
++    _keys.removeWhere((p, _) => !files.contains(p));
++    _afterLayout(s.contextFile, s.contextFile == null ? -1 : files.indexOf(s.contextFile!));
++    const fade = Color(0x00000000);
++    const solid = Color(0xFF000000);
++    return SizedBox(
++      height: 30,
++      child: Row(children: [
++        Expanded(
++          child: Listener(
++            onPointerSignal: _wheel,
++            child: ShaderMask(
++              blendMode: BlendMode.dstIn,
++              shaderCallback: (rect) => LinearGradient(
++                colors: [_fadeStart ? fade : solid, solid, solid, _fadeEnd ? fade : solid],
++                stops: [0.0, rect.width <= 0 ? 0.0 : (28 / rect.width).clamp(0.0, 0.5), rect.width <= 0 ? 1.0 : (1 - 36 / rect.width).clamp(0.5, 1.0), 1.0],
++              ).createShader(rect),
++              child: NotificationListener<ScrollMetricsNotification>(
++                onNotification: (_) {
++                  _updateFades();
++                  return false;
++                },
++                child: SingleChildScrollView(
++                  controller: _scroll,
++                  scrollDirection: Axis.horizontal,
++                  child: Row(children: [
++                    for (final p in files)
++                      Padding(
++                        key: _keys.putIfAbsent(p, () => GlobalKey()),
++                        padding: const EdgeInsets.only(right: 4),
++                        child: _ContextFileTab(path: p),
++                      ),
++                  ]),
++                ),
++              ),
++            ),
++          ),
++        ),
++        const SizedBox(width: 4),
++        Builder(
++          builder: (anchor) => KPressable(
++            onTap: () => _openMenu(anchor),
++            semanticLabel: 'All open files, ${files.length} open',
++            tooltip: 'All open files',
++            builder: (context, hover, focus) => Container(
++              height: 28,
++              padding: const EdgeInsets.only(left: 10, right: 7),
++              decoration: BoxDecoration(color: hover || focus || _menuOpen ? c.tabActive : c.tile, borderRadius: BorderRadius.circular(9)),
++              child: Row(mainAxisSize: MainAxisSize.min, children: [
++                Text('${files.length} open', style: sans(11.5, weight: FontWeight.w500, color: c.text2)),
++                const SizedBox(width: 3),
++                Icon(KIcons.chevronDown, size: 14, color: c.text2),
++              ]),
++            ),
++          ),
++        ),
++      ]),
++    );
++  }
++}
++
++/// “N open”: every open file (the one showing checked) with its folder and
++/// change letter, each closable, then Close others and Close all.
++class _OpenFilesMenu extends StatelessWidget {
++  const _OpenFilesMenu({required this.close});
++  final VoidCallback close;
++
++  @override
++  Widget build(BuildContext context) {
++    final s = AppScope.of(context);
++    final files = s.contextFiles;
++    return KMenuPanel(width: 340, children: [
++      ConstrainedBox(
++        constraints: const BoxConstraints(maxHeight: 420),
++        child: SingleChildScrollView(
++          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
++            for (final p in files) _OpenFileRow(path: p, close: close),
++          ]),
++        ),
+       ),
++      const KMenuDivider(),
++      KMenuItem(icon: KIcons.close, label: 'Close others', onTap: files.length > 1 && s.contextFile != null ? () => _then(s.closeOtherContextFiles) : null),
++      KMenuItem(icon: KIcons.close, label: 'Close all', onTap: () => _then(s.closeAllContextFiles)),
+     ]);
+   }
++
++  void _then(VoidCallback f) {
++    close();
++    f();
++  }
++}
++
++class _OpenFileRow extends StatelessWidget {
++  const _OpenFileRow({required this.path, required this.close});
++  final String path;
++  final VoidCallback close;
++
++  @override
++  Widget build(BuildContext context) {
++    final s = AppScope.of(context);
++    final c = context.c;
++    final f = s.changedFile(path);
++    final cut = path.lastIndexOf('/');
++    final name = path.substring(cut + 1);
++    final dir = cut < 0 ? '' : path.substring(0, cut);
++    final on = s.contextFile == path;
++    final col = f == null ? c.text3 : (f.kind == 'A' ? c.ok : c.warn);
++    return Row(children: [
++      Expanded(
++        child: KPressable(
++          onTap: () {
++            close();
++            s.showContextFile(path);
++          },
++          semanticLabel: 'Show $path',
++          selected: on,
++          builder: (context, hover, focus) => Container(
++            height: 28,
++            padding: const EdgeInsets.symmetric(horizontal: 8),
++            decoration: BoxDecoration(color: hover || focus ? c.tile : null, borderRadius: BorderRadius.circular(7)),
++            child: Row(children: [
++              SizedBox(width: 15, child: on ? Icon(KIcons.check, size: 14, color: c.acc) : null),
++              const SizedBox(width: 6),
++              Text(name, style: mono(11.5, weight: on ? FontWeight.w600 : FontWeight.w400, color: c.text)),
++              const SizedBox(width: 8),
++              Expanded(child: Text(dir, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(10.5, color: c.text3))),
++              if (f != null) ...[const SizedBox(width: 6), Text(f.kind, style: mono(10, weight: FontWeight.w700, color: col))],
++            ]),
++          ),
++        ),
++      ),
++      const SizedBox(width: 2),
++      KIconButton(icon: KIcons.close, label: 'Close $name', size: 22, iconSize: 11, color: c.text3, onTap: () => s.askClose(path, files: true)),
++    ]);
++  }
++}
++
++/// A file tab inside the Files tab: name, change letter, close.
++class _ContextFileTab extends StatelessWidget {
++  const _ContextFileTab({required this.path});
++  final String path;
++
++  @override
++  Widget build(BuildContext context) {
++    final c = context.c;
++    final s = AppScope.of(context);
++    final f = s.changedFile(path);
++    final name = path.substring(path.lastIndexOf('/') + 1);
++    final col = f == null ? c.text3 : (f.kind == 'A' ? c.ok : c.warn);
++    final on = s.contextFile == path;
++    return Tooltip(
++      message: path,
++      child: AnimatedContainer(
++        duration: const Duration(milliseconds: 100),
++        height: 30,
++        padding: const EdgeInsets.only(left: 10, right: 4),
++        decoration: on ? chipDecoration(c, radius: 10, fill: c.tabActive) : BoxDecoration(borderRadius: BorderRadius.circular(10)),
++        child: Row(mainAxisSize: MainAxisSize.min, children: [
++          KPressable(
++            onTap: () => s.showContextFile(path),
++            semanticLabel: 'Open file $path',
++            selected: on,
++            builder: (context, hover, focus) => Row(mainAxisSize: MainAxisSize.min, children: [
++              Icon(KIcons.file, size: 13, color: col),
++              const SizedBox(width: 7),
++              Text(name, style: mono(11.5, color: on || hover ? c.text : c.text2)),
++              if (f != null) ...[const SizedBox(width: 6), Text(f.kind, style: mono(10, weight: FontWeight.w700, color: col))],
++              if (s.buffers.isDirty(path)) ...[const SizedBox(width: 6), Dot(c.text2, size: 7)],
++            ]),
++          ),
++          const SizedBox(width: 6),
++          KIconButton(
++            icon: KIcons.close,
++            label: s.buffers.isDirty(path) ? 'Close $name, unsaved changes (⌘W)' : 'Close $name (⌘W)',
++            size: 18,
++            iconSize: 11,
++            color: c.text3,
++            onTap: () => s.askClose(path, files: true),
++          ),
++        ]),
++      ),
++    );
++  }
+ }
+ 
+ /// The worktree's Git tab: source control on the left; on the right the
+diff --git a/kumo-ui/test/context_tabs_test.dart b/kumo-ui/test/context_tabs_test.dart
+index a94fe80..20aff62 100644
+--- a/kumo-ui/test/context_tabs_test.dart
++++ b/kumo-ui/test/context_tabs_test.dart
+@@ -74,6 +74,31 @@ void main() {
+     expect(tester.takeException(), isNull);
+   });
+ 
++  testWidgets('Files tab: each file opened from the tree gets a tab; ⌘W closes it', (tester) async {
++    final state = await _pump(tester);
++    await tester.tap(find.byTooltip(ContextTab.files.tooltip));
++    await tester.pump();
++    await tester.tap(find.text('bulk.go').first);
++    await tester.pump();
++    await tester.tap(find.text('repository.go').first);
++    await tester.pump();
++    expect(state.contextFiles, ['internal/discount/bulk.go', 'internal/discount/repository.go']);
++    expect(state.contextFile, 'internal/discount/repository.go');
++    expect(find.byTooltip('Close bulk.go (⌘W)'), findsOneWidget);
++    // Back to the first file through its tab.
++    await tester.tap(find.byTooltip('internal/discount/bulk.go').last);
++    await tester.pump();
++    expect(state.contextFile, 'internal/discount/bulk.go');
++    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
++    await tester.sendKeyEvent(LogicalKeyboardKey.keyW);
++    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
++    await tester.pump();
++    expect(state.contextFiles, ['internal/discount/repository.go']);
++    expect(state.contextFile, 'internal/discount/repository.go');
++    expect(state.activeContext, ContextTab.files, reason: 'the Files tab stays while it has files');
++    expect(tester.takeException(), isNull);
++  });
++
+   testWidgets('Terminal in the side-nav opens Home: a shell in ~, no widgets', (tester) async {
+     final state = await _pump(tester);
+     await tester.tap(find.byTooltip('Terminal in ~, not tied to a repository  ⌘1'));
+@@ -93,4 +118,55 @@ void main() {
+     expect(find.text('Claude Code'), findsWidgets);
+     expect(tester.takeException(), isNull);
+   });
++
++  test('Files tab: close others keeps the file showing; close all empties it', () {
++    final s = AppState();
++    for (final p in ['go.mod', 'internal/discount/bulk.go', 'internal/http/routes.go']) {
++      s.showContextFile(p);
++    }
++    s.showContextFile('internal/discount/bulk.go');
++    s.closeOtherContextFiles();
++    expect(s.contextFiles, ['internal/discount/bulk.go']);
++    expect(s.contextFile, 'internal/discount/bulk.go');
++    s.closeAllContextFiles();
++    expect(s.contextFiles, isEmpty);
++    expect(s.contextFile, isNull);
++    s.dispose();
++  });
++
++  testWidgets('Files tab with many files: the strip scrolls, “N open” lists them all and closes others', (tester) async {
++    final state = await _pump(tester);
++    await tester.tap(find.byTooltip(ContextTab.files.tooltip));
++    await tester.pump();
++    const many = [
++      'cmd/price-admin/main.go', 'config/app.yaml', 'deploy/k8s/values.yaml', 'go.mod',
++      'internal/discount/bulk.go', 'internal/discount/bulk_test.go', 'internal/discount/discount.go',
++      'internal/discount/legacy_v1.go', 'internal/discount/repository.go', 'internal/discount/service.go',
++      'internal/http/handler.go', 'internal/http/routes.go', 'internal/kafka/bulk_consumer.go',
++      'migrations/0042_discount_category.sql',
++    ];
++    for (final p in many) {
++      state.showContextFile(p);
++    }
++    await tester.pump();
++    await tester.pump(const Duration(milliseconds: 300));
++    expect(find.text('14 open'), findsOneWidget);
++    // The last file opened is the one showing, and its tab was scrolled into view.
++    final strip = tester.widget<SingleChildScrollView>(
++      find.ancestor(of: find.byTooltip('Close 0042_discount_category.sql (⌘W)'), matching: find.byType(SingleChildScrollView)).first,
++    );
++    expect(strip.controller!.offset, greaterThan(0));
++
++    await tester.tap(find.text('14 open'));
++    await tester.pump();
++    expect(find.text('Close others'), findsOneWidget);
++    expect(find.text('Close all'), findsOneWidget);
++    await tester.tap(find.text('Close others'));
++    await tester.pump();
++    await tester.pump(const Duration(milliseconds: 300));
++    expect(state.contextFiles, ['migrations/0042_discount_category.sql']);
++    expect(find.text('1 open'), findsOneWidget);
++    expect(find.text('Close others'), findsNothing, reason: 'the menu closed');
++    expect(tester.takeException(), isNull);
++  });
+ }
+diff --git a/proto/kumo/v1/kumo.proto b/proto/kumo/v1/kumo.proto
+index fd64eae..79b6556 100644
+--- a/proto/kumo/v1/kumo.proto
++++ b/proto/kumo/v1/kumo.proto
+@@ -298,6 +298,11 @@ service Git {
+   rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+   rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+   rpc WriteFile(WriteFileRequest) returns (WriteFileResponse);
++  // Renames or moves a file or folder; its new folders are created. Fails
++  // when something is already there.
++  rpc MovePath(MovePathRequest) returns (GitActionResponse);
++  // Deletes files, or folders with everything in them.
++  rpc RemovePaths(PathsRequest) returns (GitActionResponse);
+   // The whole file with its changes (unchanged lines as context).
+   rpc Diff(DiffRequest) returns (DiffResponse);
+   rpc Stage(PathsRequest) returns (GitActionResponse);
+@@ -389,6 +394,12 @@ message WriteFileRequest {
+ 
+ message WriteFileResponse {}
+ 
++message MovePathRequest {
++  string worktree_path = 1;
++  string from = 2;
++  string to = 3;
++}
++
+ enum DiffScope {
+   // Working tree (staged and not) vs HEAD.
+   DIFF_SCOPE_WORKING = 0;
+=== NEW FILE kumo-ui/lib/editor/file_buffers.dart
+import 'dart:convert';
+
+import 'package:flutter/widgets.dart';
+
+import '../data/worktree_changes.dart';
+import 'code_editor.dart';
+import 'syntax.dart';
+
+/// What you're editing in the worktree's file views: one buffer per file,
+/// kept while you switch tabs, saved with ⌘S. Buffers without edits follow
+/// the disk (an agent writing the file, a discard).
+class FileBuffers extends ChangeNotifier {
+  FileBuffers(this.changes) {
+    changes.addListener(_onChanges);
+  }
+
+  /// The worktree the buffers belong to.
+  final WorktreeChanges changes;
+
+  final _ctrls = <String, CodeController>{};
+  final _saved = <String, String>{};
+  final _loaded = <String>{};
+  final _dirty = <String>{};
+  final _readOnly = <String, String>{};
+  int _version = -1;
+  bool _disposed = false;
+
+  bool isDirty(String path) => _dirty.contains(path);
+  bool get anyDirty => _dirty.isNotEmpty;
+
+  /// The file's text has arrived (an empty editor before means "loading").
+  bool isLoaded(String path) => _loaded.contains(path);
+
+  /// Why [path] can't be edited here (binary, too big), or null.
+  String? readOnlyReason(String path) => _readOnly[path];
+
+  /// The daemon sends at most this much of a file: saving a cut-off file
+  /// would lose the rest.
+  static const maxEditableBytes = 2 * 1024 * 1024 - 1;
+
+  /// The editor buffer of [path], loading it the first time.
+  CodeController of(String path) => _ctrls.putIfAbsent(path, () {
+        final c = CodeController(text: '', lang: langOf(path).lang);
+        c.addListener(() => _edited(c));
+        _load(path, c);
+        return c;
+      });
+
+  void _edited(CodeController c) {
+    // Looked up each time: a rename moves the buffer to another path.
+    final path = _ctrls.entries.where((e) => identical(e.value, c)).firstOrNull?.key;
+    if (path == null || !_loaded.contains(path)) return;
+    final dirty = c.text != _saved[path];
+    if (dirty == _dirty.contains(path)) return;
+    dirty ? _dirty.add(path) : _dirty.remove(path);
+    notifyListeners();
+  }
+
+  void _load(String path, CodeController c) {
+    changes.read(path).then((text) {
+      if (_disposed || _ctrls[path] != c || _dirty.contains(path)) return;
+      final t = text ?? '';
+      if (text == null) {
+        _readOnly[path] = 'This file can’t be shown as text';
+      } else if (utf8.encode(t).length >= maxEditableBytes) {
+        _readOnly[path] = 'Too big to edit here: open it in your editor';
+      } else {
+        _readOnly.remove(path);
+      }
+      _saved[path] = t;
+      final first = _loaded.add(path);
+      if (c.text != t) {
+        final at = c.selection.baseOffset.clamp(0, t.length);
+        c.value = TextEditingValue(text: t, selection: TextSelection.collapsed(offset: first ? 0 : at));
+      }
+      notifyListeners();
+    });
+  }
+
+  /// The status changed: files may have changed on disk.
+  void _onChanges() {
+    if (changes.version == _version) return;
+    _version = changes.version;
+    for (final e in _ctrls.entries) {
+      if (!_dirty.contains(e.key)) _load(e.key, e.value);
+    }
+  }
+
+  /// Writes [path]'s buffer to the worktree. Returns why not, or null.
+  Future<String?> save(String path) async {
+    final c = _ctrls[path];
+    if (c == null || !_dirty.contains(path)) return null;
+    final why = _readOnly[path];
+    if (why != null) return why;
+    final text = c.text;
+    await changes.write(path, text);
+    if (_disposed) return null;
+    final error = changes.error;
+    if (error != null) return error;
+    _saved[path] = text;
+    if (c.text == text) _dirty.remove(path);
+    notifyListeners();
+    return null;
+  }
+
+  /// Drops [path]'s edits: back to what's on disk.
+  void revert(String path) {
+    final c = _ctrls[path];
+    if (c == null) return;
+    _dirty.remove(path);
+    c.text = _saved[path] ?? '';
+    notifyListeners();
+  }
+
+  /// [path]'s tab closed: its buffer goes (edits included).
+  void forget(String path) {
+    _ctrls.remove(path)?.dispose();
+    _saved.remove(path);
+    _loaded.remove(path);
+    _readOnly.remove(path);
+    if (_dirty.remove(path)) notifyListeners();
+  }
+
+  /// A file or folder moved: its buffers move with it.
+  void moved(String from, String to) {
+    String follow(String p) => p == from ? to : (p.startsWith('$from/') ? to + p.substring(from.length) : p);
+    for (final p in [..._ctrls.keys]) {
+      final dest = follow(p);
+      if (dest == p) continue;
+      if (!_dirty.contains(p) && langOf(p).lang != langOf(dest).lang) {
+        forget(p); // reloads with the new language's colors
+        continue;
+      }
+      _ctrls[dest] = _ctrls.remove(p)!;
+      if (_saved.containsKey(p)) _saved[dest] = _saved.remove(p)!;
+      if (_loaded.remove(p)) _loaded.add(dest);
+      final why = _readOnly.remove(p);
+      if (why != null) _readOnly[dest] = why;
+      if (_dirty.remove(p)) _dirty.add(dest);
+    }
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    changes.removeListener(_onChanges);
+    for (final c in _ctrls.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+}
+=== NEW FILE kumo-ui/lib/widgets/change_scrollbar.dart
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import '../theme/kumo_theme.dart';
+
+/// A changed stretch of a file for [ChangeScrollbar], as fractions (0–1) of
+/// the scrolled content's height.
+@immutable
+class ChangeTick {
+  const ChangeTick(this.start, this.end, this.color);
+  final double start;
+  final double end;
+  final Color color;
+
+  @override
+  bool operator ==(Object other) => other is ChangeTick && other.start == start && other.end == end && other.color == color;
+
+  @override
+  int get hashCode => Object.hash(start, end, color);
+}
+
+/// Ticks for rows of [heights] (one per row, in order) whose [colors] aren't
+/// null; consecutive rows of the same color make one tick. [top] and
+/// [bottom] are the content's padding.
+List<ChangeTick> changeTicks(List<double> heights, List<Color?> colors, {double top = 0, double bottom = 0}) {
+  final total = top + heights.fold<double>(0, (a, h) => a + h) + bottom;
+  if (total <= 0) return const [];
+  final ticks = <ChangeTick>[];
+  var y = top;
+  double? start;
+  Color? run;
+  for (var i = 0; i <= heights.length; i++) {
+    final color = i < heights.length ? colors[i] : null;
+    if (color != run) {
+      if (run != null && start != null) ticks.add(ChangeTick(start / total, y / total, run));
+      start = color == null ? null : y;
+      run = color;
+    }
+    if (i < heights.length) y += heights[i];
+  }
+  return ticks;
+}
+
+/// The vertical scrollbar of a file: a slim track along the right edge that
+/// maps where the file changed (ticks in the change colors) and shows the
+/// part on screen (the thumb). Clicking the track goes there; dragging moves
+/// through the file. It replaces the platform scrollbar of [child], which
+/// must scroll with [controller].
+class ChangeScrollbar extends StatefulWidget {
+  const ChangeScrollbar({super.key, required this.controller, required this.ticks, required this.child, this.width = 14});
+
+  final ScrollController controller;
+  final List<ChangeTick> ticks;
+  final Widget child;
+  final double width;
+
+  @override
+  State<ChangeScrollbar> createState() => _ChangeScrollbarState();
+}
+
+class _ChangeScrollbarState extends State<ChangeScrollbar> {
+  bool _hover = false;
+  bool _dragging = false;
+  double _grabY = 0;
+  double _grabPixels = 0;
+
+  ScrollPosition? get _position {
+    final c = widget.controller;
+    if (!c.hasClients || c.positions.length != 1) return null;
+    final p = c.position;
+    return p.hasContentDimensions ? p : null;
+  }
+
+  /// (top, height) of the thumb in a track [h] tall; null when it all fits.
+  (double, double)? _thumb(ScrollPosition p, double h) {
+    if (p.maxScrollExtent <= 0) return null;
+    final total = p.maxScrollExtent + p.viewportDimension;
+    final height = math.max(24.0, h * p.viewportDimension / total);
+    final top = (h - height) * (p.pixels / p.maxScrollExtent).clamp(0.0, 1.0);
+    return (top, height);
+  }
+
+  void _down(PointerDownEvent e, double h) {
+    final p = _position;
+    if (p == null || p.maxScrollExtent <= 0) return;
+    final thumb = _thumb(p, h)!;
+    final y = e.localPosition.dy;
+    if (y < thumb.$1 || y > thumb.$1 + thumb.$2) {
+      // Outside the thumb: center the view on that point first.
+      final total = p.maxScrollExtent + p.viewportDimension;
+      p.jumpTo((y / h * total - p.viewportDimension / 2).clamp(p.minScrollExtent, p.maxScrollExtent).toDouble());
+    }
+    setState(() => _dragging = true);
+    _grabY = y;
+    _grabPixels = p.pixels;
+  }
+
+  void _move(PointerMoveEvent e, double h) {
+    final p = _position;
+    if (!_dragging || p == null) return;
+    final thumb = _thumb(p, h);
+    if (thumb == null) return;
+    final room = h - thumb.$2;
+    if (room <= 0) return;
+    final delta = (e.localPosition.dy - _grabY) / room * p.maxScrollExtent;
+    p.jumpTo((_grabPixels + delta).clamp(p.minScrollExtent, p.maxScrollExtent).toDouble());
+  }
+
+  void _up() {
+    if (_dragging) setState(() => _dragging = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (_) {
+        if (mounted) setState(() {});
+        return false;
+      },
+      child: Stack(children: [
+        Positioned.fill(
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+            child: widget.child,
+          ),
+        ),
+        Positioned(
+          top: 0,
+          bottom: 0,
+          right: 0,
+          width: widget.width,
+          child: LayoutBuilder(builder: (context, box) {
+            final h = box.maxHeight;
+            return MouseRegion(
+              onEnter: (_) => setState(() => _hover = true),
+              onExit: (_) => setState(() => _hover = false),
+              child: Listener(
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: (e) => _down(e, h),
+                onPointerMove: (e) => _move(e, h),
+                onPointerUp: (_) => _up(),
+                onPointerCancel: (_) => _up(),
+                child: AnimatedBuilder(
+                  animation: widget.controller,
+                  builder: (context, _) {
+                    final p = _position;
+                    final thumb = p == null ? null : _thumb(p, h);
+                    return CustomPaint(
+                      size: Size(widget.width, h),
+                      painter: _ChangeMapPainter(
+                        ticks: widget.ticks,
+                        thumb: thumb,
+                        thumbColor: c.text.withValues(alpha: _dragging ? 0.34 : (_hover ? 0.24 : 0.13)),
+                        track: _hover || _dragging ? c.text.withValues(alpha: 0.05) : null,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          }),
+        ),
+      ]),
+    );
+  }
+}
+
+class _ChangeMapPainter extends CustomPainter {
+  _ChangeMapPainter({required this.ticks, required this.thumb, required this.thumbColor, required this.track});
+
+  final List<ChangeTick> ticks;
+  final (double, double)? thumb;
+  final Color thumbColor;
+  final Color? track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    if (size.height < 4) return;
+    if (track != null) {
+      canvas.drawRRect(RRect.fromLTRBR(2, 0, w - 2, size.height, const Radius.circular(5)), Paint()..color = track!);
+    }
+    final t = thumb;
+    if (t != null) {
+      canvas.drawRRect(RRect.fromLTRBR(3, t.$1, w - 3, t.$1 + t.$2, const Radius.circular(4)), Paint()..color = thumbColor);
+    }
+    // Ticks in the right lane, over the thumb, at least 2px tall.
+    final paint = Paint();
+    for (final k in ticks) {
+      final top = (k.start * size.height).clamp(0.0, size.height - 2);
+      final bottom = math.max(top + 2, k.end * size.height).clamp(0.0, size.height);
+      paint.color = k.color;
+      canvas.drawRRect(RRect.fromLTRBR(w - 6, top, w - 2.5, bottom, const Radius.circular(1.5)), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ChangeMapPainter old) =>
+      old.thumb != thumb || old.thumbColor != thumbColor || old.track != track || !_sameTicks(old.ticks, ticks);
+
+  static bool _sameTicks(List<ChangeTick> a, List<ChangeTick> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+}
+=== NEW FILE kumo-ui/test/files_editing_test.dart
+import 'package:flutter/gestures.dart' show kSecondaryButton;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:kumo_ui/app/app_state.dart';
+import 'package:kumo_ui/app/kumo_app.dart';
+import 'package:kumo_ui/editor/code_editor.dart';
+import 'package:kumo_ui/widgets/change_scrollbar.dart';
+
+const _repo = 'internal/discount/repository.go';
+
+/// The app with the worktree's Files tab open.
+Future<AppState> _filesTab(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(1440, 960);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final state = AppState(demoWallpaper: true);
+  await tester.pumpWidget(KumoApp(state: state));
+  await tester.pump();
+  await tester.tap(find.byTooltip(ContextTab.files.tooltip));
+  await tester.pump();
+  return state;
+}
+
+Future<void> _pumpAsync(WidgetTester tester) async {
+  for (var i = 0; i < 4; i++) {
+    await tester.pump();
+  }
+}
+
+Future<void> _rightClick(WidgetTester tester, Finder f) async {
+  await tester.tap(f, buttons: kSecondaryButton);
+  await tester.pump();
+}
+
+void main() {
+  test('rows of the same color make one tick, placed as fractions of the content', () {
+    final ticks = changeTicks([10, 10, 10, 10], [null, Colors.green, Colors.green, Colors.red], top: 10, bottom: 10);
+    expect(ticks, [const ChangeTick(0.2, 0.6, Colors.green), const ChangeTick(0.6, 0.8, Colors.red)]);
+  });
+
+  test('rename moves the tabs; delete hides, Undo brings back, and the window closing deletes', () async {
+    final s = AppState();
+    s.showContextFile(_repo);
+    s.showContextFile('internal/discount/bulk.go');
+    expect(await s.movePath(_repo, 'internal/discount/repo.go'), isNull);
+    expect(s.contextFiles, ['internal/discount/repo.go', 'internal/discount/bulk.go']);
+    expect(s.changes.files, contains('internal/discount/repo.go'));
+    expect(s.changes.files, isNot(contains(_repo)));
+    expect(await s.movePath('internal/discount/repo.go', 'internal/discount/bulk.go'), 'internal/discount/bulk.go already exists');
+    expect(await s.movePath('internal', 'internal/inner'), contains('inside itself'));
+
+    s.deletePath('internal/discount');
+    expect(s.visibleFiles.where((f) => f.startsWith('internal/discount/')), isEmpty);
+    expect(s.contextFiles, isEmpty, reason: 'its tabs close');
+    expect(s.undo?.message, 'Deleted discount');
+    s.undoLast();
+    expect(s.visibleFiles, contains('internal/discount/bulk.go'));
+    expect(s.contextFiles, ['internal/discount/repo.go', 'internal/discount/bulk.go']);
+
+    s.deletePath('internal/discount/bulk.go');
+    s.dismissUndo();
+    await Future<void>.delayed(Duration.zero);
+    expect(s.changes.files, isNot(contains('internal/discount/bulk.go')));
+    expect(s.isDeleting('internal/discount/bulk.go'), isFalse);
+    s.dispose();
+  });
+
+  test('new files are refused where something exists; a folder’s changes discard together', () async {
+    final s = AppState();
+    expect(await s.createFile(_repo), '$_repo already exists');
+    expect(await s.createFile('/internal//cache/lru.go/'), isNull);
+    expect(s.changes.files, contains('internal/cache/lru.go'));
+    final before = s.pendingChanges.where((f) => f.path.startsWith('internal/discount/')).length;
+    expect(before, greaterThan(1));
+    s.discardChangesIn('internal/discount');
+    expect(s.pendingChanges.where((f) => f.path.startsWith('internal/discount/')), isEmpty);
+    expect(s.undo?.message, 'Discarded $before changes in discount');
+    s.dispose();
+  });
+
+  testWidgets('a file in the Files tab is editable; ⌘S saves it', (tester) async {
+    final state = await _filesTab(tester);
+    await tester.tap(find.text('repository.go').first);
+    await _pumpAsync(tester);
+    expect(find.byType(CodeEditor), findsOneWidget, reason: 'the Files tab opens files in Edit');
+    expect(find.byType(ChangeScrollbar), findsOneWidget);
+    final bar = tester.widget<ChangeScrollbar>(find.byType(ChangeScrollbar));
+    expect(bar.ticks, isNotEmpty, reason: 'the scrollbar maps the changed lines');
+
+    final field = find.descendant(of: find.byType(CodeEditor), matching: find.byType(TextField));
+    await tester.enterText(field, 'package discount\n// edited\n');
+    await tester.pump();
+    expect(state.buffers.isDirty(_repo), isTrue);
+    expect(find.text('Save'), findsOneWidget);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await _pumpAsync(tester);
+    expect(state.buffers.isDirty(_repo), isFalse);
+    expect(await state.changes.read(_repo), 'package discount\n// edited\n');
+    expect(find.text('Save'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('closing a tab with unsaved edits asks first', (tester) async {
+    final state = await _filesTab(tester);
+    await tester.tap(find.text('repository.go').first);
+    await _pumpAsync(tester);
+    await tester.enterText(find.descendant(of: find.byType(CodeEditor), matching: find.byType(TextField)), 'draft');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Close repository.go, unsaved changes (⌘W)'));
+    await tester.pump();
+    expect(find.text('repository.go has unsaved changes. Save them before closing?'), findsOneWidget);
+    expect(state.contextFiles, [_repo], reason: 'still open');
+    await tester.tap(find.text('Don’t save'));
+    await _pumpAsync(tester);
+    expect(state.contextFiles, isEmpty);
+    expect(await state.changes.read(_repo), isNot('draft'));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('right-click a file: rename it in place; its tab follows', (tester) async {
+    final state = await _filesTab(tester);
+    await tester.tap(find.text('repository.go').first);
+    await _pumpAsync(tester);
+    await _rightClick(tester, find.text('repository.go').first);
+    for (final item in ['Open', 'Rename…', 'Discard changes', 'Copy path', 'Delete']) {
+      expect(find.text(item), findsOneWidget, reason: item);
+    }
+    await tester.tap(find.text('Rename…'));
+    await tester.pump();
+    await tester.pump();
+    final name = tester.widget<TextField>(find.byKey(const ValueKey('tree-name')));
+    expect(name.controller!.text, 'repository.go');
+    expect(name.controller!.selection.textInside(name.controller!.text), 'repository', reason: 'the extension stays');
+    await tester.enterText(find.byKey(const ValueKey('tree-name')), 'store.go');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await _pumpAsync(tester);
+    expect(state.contextFiles, ['internal/discount/store.go']);
+    expect(find.text('store.go'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('right-click a folder: new file inside it, then delete the folder with undo', (tester) async {
+    final state = await _filesTab(tester);
+    await _rightClick(tester, find.text('discount').first);
+    expect(find.text('New file…'), findsOneWidget);
+    expect(find.textContaining(RegExp(r'^Discard \d+ changes$')), findsOneWidget);
+    expect(find.text('Delete folder'), findsOneWidget);
+    await tester.tap(find.text('New file…'));
+    await tester.pump();
+    await tester.pump();
+    await tester.enterText(find.byKey(const ValueKey('tree-name')), 'cache.go');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await _pumpAsync(tester);
+    expect(state.changes.files, contains('internal/discount/cache.go'));
+    expect(state.contextFile, 'internal/discount/cache.go', reason: 'the new file opens');
+
+    await _rightClick(tester, find.text('discount').first);
+    await tester.tap(find.text('Delete folder'));
+    await tester.pump();
+    expect(find.text('cache.go'), findsNothing);
+    expect(state.undo?.message, 'Deleted discount');
+    state.undoLast();
+    await tester.pump();
+    expect(find.text('repository.go'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+}

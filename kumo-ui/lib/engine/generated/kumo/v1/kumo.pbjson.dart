@@ -84,6 +84,44 @@ final $typed_data.Uint8List diffLineKindDescriptor = $convert.base64Decode(
     'CgxEaWZmTGluZUtpbmQSGgoWRElGRl9MSU5FX0tJTkRfQ09OVEVYVBAAEhgKFERJRkZfTElORV'
     '9LSU5EX0FEREVEEAESGgoWRElGRl9MSU5FX0tJTkRfREVMRVRFRBAC');
 
+@$core.Deprecated('Use agentContextKindDescriptor instead')
+const AgentContextKind$json = {
+  '1': 'AgentContextKind',
+  '2': [
+    {'1': 'AGENT_CONTEXT_KIND_TASK', '2': 0},
+    {'1': 'AGENT_CONTEXT_KIND_DOC', '2': 1},
+  ],
+};
+
+/// Descriptor for `AgentContextKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List agentContextKindDescriptor = $convert.base64Decode(
+    'ChBBZ2VudENvbnRleHRLaW5kEhsKF0FHRU5UX0NPTlRFWFRfS0lORF9UQVNLEAASGgoWQUdFTl'
+    'RfQ09OVEVYVF9LSU5EX0RPQxAB');
+
+@$core.Deprecated('Use agentEventKindDescriptor instead')
+const AgentEventKind$json = {
+  '1': 'AgentEventKind',
+  '2': [
+    {'1': 'AGENT_EVENT_KIND_STARTED', '2': 0},
+    {'1': 'AGENT_EVENT_KIND_EDITED', '2': 1},
+    {'1': 'AGENT_EVENT_KIND_RAN', '2': 2},
+    {'1': 'AGENT_EVENT_KIND_READ', '2': 3},
+    {'1': 'AGENT_EVENT_KIND_SEARCHED', '2': 4},
+    {'1': 'AGENT_EVENT_KIND_TOOL', '2': 5},
+    {'1': 'AGENT_EVENT_KIND_WAITING', '2': 6},
+    {'1': 'AGENT_EVENT_KIND_CONTEXT', '2': 7},
+    {'1': 'AGENT_EVENT_KIND_EXITED', '2': 8},
+  ],
+};
+
+/// Descriptor for `AgentEventKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List agentEventKindDescriptor = $convert.base64Decode(
+    'Cg5BZ2VudEV2ZW50S2luZBIcChhBR0VOVF9FVkVOVF9LSU5EX1NUQVJURUQQABIbChdBR0VOVF'
+    '9FVkVOVF9LSU5EX0VESVRFRBABEhgKFEFHRU5UX0VWRU5UX0tJTkRfUkFOEAISGQoVQUdFTlRf'
+    'RVZFTlRfS0lORF9SRUFEEAMSHQoZQUdFTlRfRVZFTlRfS0lORF9TRUFSQ0hFRBAEEhkKFUFHRU'
+    '5UX0VWRU5UX0tJTkRfVE9PTBAFEhwKGEFHRU5UX0VWRU5UX0tJTkRfV0FJVElORxAGEhwKGEFH'
+    'RU5UX0VWRU5UX0tJTkRfQ09OVEVYVBAHEhsKF0FHRU5UX0VWRU5UX0tJTkRfRVhJVEVEEAg=');
+
 @$core.Deprecated('Use agentStateDescriptor instead')
 const AgentState$json = {
   '1': 'AgentState',
@@ -335,6 +373,23 @@ const DocKind$json = {
 final $typed_data.Uint8List docKindDescriptor = $convert.base64Decode(
     'CgdEb2NLaW5kEhgKFERPQ19LSU5EX1VOU1BFQ0lGSUVEEAASFwoTRE9DX0tJTkRfQ09ORkxVRU'
     '5DRRABEhUKEURPQ19LSU5EX09CU0lESUFOEAI=');
+
+@$core.Deprecated('Use testRunStateDescriptor instead')
+const TestRunState$json = {
+  '1': 'TestRunState',
+  '2': [
+    {'1': 'TEST_RUN_STATE_RUNNING', '2': 0},
+    {'1': 'TEST_RUN_STATE_PASSED', '2': 1},
+    {'1': 'TEST_RUN_STATE_FAILED', '2': 2},
+    {'1': 'TEST_RUN_STATE_STOPPED', '2': 3},
+  ],
+};
+
+/// Descriptor for `TestRunState`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List testRunStateDescriptor = $convert.base64Decode(
+    'CgxUZXN0UnVuU3RhdGUSGgoWVEVTVF9SVU5fU1RBVEVfUlVOTklORxAAEhkKFVRFU1RfUlVOX1'
+    'NUQVRFX1BBU1NFRBABEhkKFVRFU1RfUlVOX1NUQVRFX0ZBSUxFRBACEhoKFlRFU1RfUlVOX1NU'
+    'QVRFX1NUT1BQRUQQAw==');
 
 @$core.Deprecated('Use helloRequestDescriptor instead')
 const HelloRequest$json = {
@@ -1182,6 +1237,21 @@ const WriteFileResponse$json = {
 final $typed_data.Uint8List writeFileResponseDescriptor =
     $convert.base64Decode('ChFXcml0ZUZpbGVSZXNwb25zZQ==');
 
+@$core.Deprecated('Use movePathRequestDescriptor instead')
+const MovePathRequest$json = {
+  '1': 'MovePathRequest',
+  '2': [
+    {'1': 'worktree_path', '3': 1, '4': 1, '5': 9, '10': 'worktreePath'},
+    {'1': 'from', '3': 2, '4': 1, '5': 9, '10': 'from'},
+    {'1': 'to', '3': 3, '4': 1, '5': 9, '10': 'to'},
+  ],
+};
+
+/// Descriptor for `MovePathRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List movePathRequestDescriptor = $convert.base64Decode(
+    'Cg9Nb3ZlUGF0aFJlcXVlc3QSIwoNd29ya3RyZWVfcGF0aBgBIAEoCVIMd29ya3RyZWVQYXRoEh'
+    'IKBGZyb20YAiABKAlSBGZyb20SDgoCdG8YAyABKAlSAnRv');
+
 @$core.Deprecated('Use diffRequestDescriptor instead')
 const DiffRequest$json = {
   '1': 'DiffRequest',
@@ -1518,6 +1588,14 @@ const StartAgentRequest$json = {
     {'1': 'title', '3': 4, '4': 1, '5': 9, '10': 'title'},
     {'1': 'cols', '3': 5, '4': 1, '5': 13, '10': 'cols'},
     {'1': 'rows', '3': 6, '4': 1, '5': 13, '10': 'rows'},
+    {
+      '1': 'context',
+      '3': 7,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.AgentContext',
+      '10': 'context'
+    },
   ],
 };
 
@@ -1526,7 +1604,54 @@ final $typed_data.Uint8List startAgentRequestDescriptor = $convert.base64Decode(
     'ChFTdGFydEFnZW50UmVxdWVzdBIfCgtwcm92aWRlcl9pZBgBIAEoCVIKcHJvdmlkZXJJZBIjCg'
     '13b3JrdHJlZV9wYXRoGAIgASgJUgx3b3JrdHJlZVBhdGgSFgoGcHJvbXB0GAMgASgJUgZwcm9t'
     'cHQSFAoFdGl0bGUYBCABKAlSBXRpdGxlEhIKBGNvbHMYBSABKA1SBGNvbHMSEgoEcm93cxgGIA'
-    'EoDVIEcm93cw==');
+    'EoDVIEcm93cxIvCgdjb250ZXh0GAcgAygLMhUua3Vtby52MS5BZ2VudENvbnRleHRSB2NvbnRl'
+    'eHQ=');
+
+@$core.Deprecated('Use agentContextDescriptor instead')
+const AgentContext$json = {
+  '1': 'AgentContext',
+  '2': [
+    {
+      '1': 'kind',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.AgentContextKind',
+      '10': 'kind'
+    },
+    {'1': 'title', '3': 2, '4': 1, '5': 9, '10': 'title'},
+    {'1': 'detail', '3': 3, '4': 1, '5': 9, '10': 'detail'},
+    {'1': 'url', '3': 4, '4': 1, '5': 9, '10': 'url'},
+  ],
+};
+
+/// Descriptor for `AgentContext`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List agentContextDescriptor = $convert.base64Decode(
+    'CgxBZ2VudENvbnRleHQSLQoEa2luZBgBIAEoDjIZLmt1bW8udjEuQWdlbnRDb250ZXh0S2luZF'
+    'IEa2luZBIUCgV0aXRsZRgCIAEoCVIFdGl0bGUSFgoGZGV0YWlsGAMgASgJUgZkZXRhaWwSEAoD'
+    'dXJsGAQgASgJUgN1cmw=');
+
+@$core.Deprecated('Use agentEventDescriptor instead')
+const AgentEvent$json = {
+  '1': 'AgentEvent',
+  '2': [
+    {'1': 'at_unix_ms', '3': 1, '4': 1, '5': 4, '10': 'atUnixMs'},
+    {
+      '1': 'kind',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.AgentEventKind',
+      '10': 'kind'
+    },
+    {'1': 'text', '3': 3, '4': 1, '5': 9, '10': 'text'},
+  ],
+};
+
+/// Descriptor for `AgentEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List agentEventDescriptor = $convert.base64Decode(
+    'CgpBZ2VudEV2ZW50EhwKCmF0X3VuaXhfbXMYASABKARSCGF0VW5peE1zEisKBGtpbmQYAiABKA'
+    '4yFy5rdW1vLnYxLkFnZW50RXZlbnRLaW5kUgRraW5kEhIKBHRleHQYAyABKAlSBHRleHQ=');
 
 @$core.Deprecated('Use agentSessionDescriptor instead')
 const AgentSession$json = {
@@ -1558,6 +1683,22 @@ const AgentSession$json = {
       '10': 'stateSinceUnixMs'
     },
     {'1': 'last_line', '3': 13, '4': 1, '5': 9, '10': 'lastLine'},
+    {
+      '1': 'context',
+      '3': 14,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.AgentContext',
+      '10': 'context'
+    },
+    {
+      '1': 'events',
+      '3': 15,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.AgentEvent',
+      '10': 'events'
+    },
   ],
 };
 
@@ -1570,7 +1711,9 @@ final $typed_data.Uint8List agentSessionDescriptor = $convert.base64Decode(
     'cHQYCCABKAlSBnByb21wdBIpCgVzdGF0ZRgJIAEoDjITLmt1bW8udjEuQWdlbnRTdGF0ZVIFc3'
     'RhdGUSGwoJZXhpdF9jb2RlGAogASgFUghleGl0Q29kZRImCg9zdGFydGVkX3VuaXhfbXMYCyAB'
     'KARSDXN0YXJ0ZWRVbml4TXMSLQoTc3RhdGVfc2luY2VfdW5peF9tcxgMIAEoBFIQc3RhdGVTaW'
-    '5jZVVuaXhNcxIbCglsYXN0X2xpbmUYDSABKAlSCGxhc3RMaW5l');
+    '5jZVVuaXhNcxIbCglsYXN0X2xpbmUYDSABKAlSCGxhc3RMaW5lEi8KB2NvbnRleHQYDiADKAsy'
+    'FS5rdW1vLnYxLkFnZW50Q29udGV4dFIHY29udGV4dBIrCgZldmVudHMYDyADKAsyEy5rdW1vLn'
+    'YxLkFnZW50RXZlbnRSBmV2ZW50cw==');
 
 @$core.Deprecated('Use stopAgentRequestDescriptor instead')
 const StopAgentRequest$json = {
@@ -1592,6 +1735,28 @@ const StopAgentResponse$json = {
 /// Descriptor for `StopAgentResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List stopAgentResponseDescriptor =
     $convert.base64Decode('ChFTdG9wQWdlbnRSZXNwb25zZQ==');
+
+@$core.Deprecated('Use addAgentContextRequestDescriptor instead')
+const AddAgentContextRequest$json = {
+  '1': 'AddAgentContextRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {
+      '1': 'context',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.AgentContext',
+      '10': 'context'
+    },
+    {'1': 'text', '3': 3, '4': 1, '5': 9, '10': 'text'},
+  ],
+};
+
+/// Descriptor for `AddAgentContextRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List addAgentContextRequestDescriptor = $convert.base64Decode(
+    'ChZBZGRBZ2VudENvbnRleHRSZXF1ZXN0Eg4KAmlkGAEgASgJUgJpZBIvCgdjb250ZXh0GAIgAS'
+    'gLMhUua3Vtby52MS5BZ2VudENvbnRleHRSB2NvbnRleHQSEgoEdGV4dBgDIAEoCVIEdGV4dA==');
 
 @$core.Deprecated('Use dismissAgentRequestDescriptor instead')
 const DismissAgentRequest$json = {
@@ -3168,3 +3333,132 @@ final $typed_data.Uint8List docDescriptor = $convert.base64Decode(
     'CgNEb2MSLQoHc3VtbWFyeRgBIAEoCzITLmt1bW8udjEuRG9jU3VtbWFyeVIHc3VtbWFyeRIqCg'
     'Zzb3VyY2UYAiABKAsyEi5rdW1vLnYxLkRvY1NvdXJjZVIGc291cmNlEhoKCG1hcmtkb3duGAMg'
     'ASgJUghtYXJrZG93bhISCgRwYXRoGAQgAygJUgRwYXRoEhIKBGZpbGUYBSABKAlSBGZpbGU=');
+
+@$core.Deprecated('Use watchTestsRequestDescriptor instead')
+const WatchTestsRequest$json = {
+  '1': 'WatchTestsRequest',
+  '2': [
+    {'1': 'worktree_path', '3': 1, '4': 1, '5': 9, '10': 'worktreePath'},
+  ],
+};
+
+/// Descriptor for `WatchTestsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List watchTestsRequestDescriptor = $convert.base64Decode(
+    'ChFXYXRjaFRlc3RzUmVxdWVzdBIjCg13b3JrdHJlZV9wYXRoGAEgASgJUgx3b3JrdHJlZVBhdG'
+    'g=');
+
+@$core.Deprecated('Use testsSnapshotDescriptor instead')
+const TestsSnapshot$json = {
+  '1': 'TestsSnapshot',
+  '2': [
+    {'1': 'command', '3': 1, '4': 1, '5': 9, '10': 'command'},
+    {'1': 'command_origin', '3': 2, '4': 1, '5': 9, '10': 'commandOrigin'},
+    {'1': 'run', '3': 3, '4': 1, '5': 11, '6': '.kumo.v1.TestRun', '10': 'run'},
+  ],
+};
+
+/// Descriptor for `TestsSnapshot`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List testsSnapshotDescriptor = $convert.base64Decode(
+    'Cg1UZXN0c1NuYXBzaG90EhgKB2NvbW1hbmQYASABKAlSB2NvbW1hbmQSJQoOY29tbWFuZF9vcm'
+    'lnaW4YAiABKAlSDWNvbW1hbmRPcmlnaW4SIgoDcnVuGAMgASgLMhAua3Vtby52MS5UZXN0UnVu'
+    'UgNydW4=');
+
+@$core.Deprecated('Use testSuiteDescriptor instead')
+const TestSuite$json = {
+  '1': 'TestSuite',
+  '2': [
+    {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'passed', '3': 2, '4': 1, '5': 8, '10': 'passed'},
+    {'1': 'duration_ms', '3': 3, '4': 1, '5': 4, '10': 'durationMs'},
+    {'1': 'tests', '3': 4, '4': 1, '5': 13, '10': 'tests'},
+  ],
+};
+
+/// Descriptor for `TestSuite`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List testSuiteDescriptor = $convert.base64Decode(
+    'CglUZXN0U3VpdGUSEgoEbmFtZRgBIAEoCVIEbmFtZRIWCgZwYXNzZWQYAiABKAhSBnBhc3NlZB'
+    'IfCgtkdXJhdGlvbl9tcxgDIAEoBFIKZHVyYXRpb25NcxIUCgV0ZXN0cxgEIAEoDVIFdGVzdHM=');
+
+@$core.Deprecated('Use testRunDescriptor instead')
+const TestRun$json = {
+  '1': 'TestRun',
+  '2': [
+    {'1': 'worktree_path', '3': 1, '4': 1, '5': 9, '10': 'worktreePath'},
+    {'1': 'command', '3': 2, '4': 1, '5': 9, '10': 'command'},
+    {'1': 'terminal_id', '3': 3, '4': 1, '5': 9, '10': 'terminalId'},
+    {
+      '1': 'state',
+      '3': 4,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.TestRunState',
+      '10': 'state'
+    },
+    {'1': 'exit_code', '3': 5, '4': 1, '5': 5, '10': 'exitCode'},
+    {'1': 'started_unix_ms', '3': 6, '4': 1, '5': 4, '10': 'startedUnixMs'},
+    {'1': 'finished_unix_ms', '3': 7, '4': 1, '5': 4, '10': 'finishedUnixMs'},
+    {'1': 'passed', '3': 8, '4': 1, '5': 13, '10': 'passed'},
+    {'1': 'failed', '3': 9, '4': 1, '5': 13, '10': 'failed'},
+    {'1': 'skipped', '3': 10, '4': 1, '5': 13, '10': 'skipped'},
+    {
+      '1': 'suites',
+      '3': 11,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.TestSuite',
+      '10': 'suites'
+    },
+    {'1': 'failures', '3': 12, '4': 3, '5': 9, '10': 'failures'},
+    {'1': 'last_line', '3': 13, '4': 1, '5': 9, '10': 'lastLine'},
+  ],
+};
+
+/// Descriptor for `TestRun`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List testRunDescriptor = $convert.base64Decode(
+    'CgdUZXN0UnVuEiMKDXdvcmt0cmVlX3BhdGgYASABKAlSDHdvcmt0cmVlUGF0aBIYCgdjb21tYW'
+    '5kGAIgASgJUgdjb21tYW5kEh8KC3Rlcm1pbmFsX2lkGAMgASgJUgp0ZXJtaW5hbElkEisKBXN0'
+    'YXRlGAQgASgOMhUua3Vtby52MS5UZXN0UnVuU3RhdGVSBXN0YXRlEhsKCWV4aXRfY29kZRgFIA'
+    'EoBVIIZXhpdENvZGUSJgoPc3RhcnRlZF91bml4X21zGAYgASgEUg1zdGFydGVkVW5peE1zEigK'
+    'EGZpbmlzaGVkX3VuaXhfbXMYByABKARSDmZpbmlzaGVkVW5peE1zEhYKBnBhc3NlZBgIIAEoDV'
+    'IGcGFzc2VkEhYKBmZhaWxlZBgJIAEoDVIGZmFpbGVkEhgKB3NraXBwZWQYCiABKA1SB3NraXBw'
+    'ZWQSKgoGc3VpdGVzGAsgAygLMhIua3Vtby52MS5UZXN0U3VpdGVSBnN1aXRlcxIaCghmYWlsdX'
+    'JlcxgMIAMoCVIIZmFpbHVyZXMSGwoJbGFzdF9saW5lGA0gASgJUghsYXN0TGluZQ==');
+
+@$core.Deprecated('Use runTestsRequestDescriptor instead')
+const RunTestsRequest$json = {
+  '1': 'RunTestsRequest',
+  '2': [
+    {'1': 'worktree_path', '3': 1, '4': 1, '5': 9, '10': 'worktreePath'},
+    {'1': 'command', '3': 2, '4': 1, '5': 9, '10': 'command'},
+    {'1': 'cols', '3': 3, '4': 1, '5': 13, '10': 'cols'},
+    {'1': 'rows', '3': 4, '4': 1, '5': 13, '10': 'rows'},
+  ],
+};
+
+/// Descriptor for `RunTestsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List runTestsRequestDescriptor = $convert.base64Decode(
+    'Cg9SdW5UZXN0c1JlcXVlc3QSIwoNd29ya3RyZWVfcGF0aBgBIAEoCVIMd29ya3RyZWVQYXRoEh'
+    'gKB2NvbW1hbmQYAiABKAlSB2NvbW1hbmQSEgoEY29scxgDIAEoDVIEY29scxISCgRyb3dzGAQg'
+    'ASgNUgRyb3dz');
+
+@$core.Deprecated('Use stopTestsRequestDescriptor instead')
+const StopTestsRequest$json = {
+  '1': 'StopTestsRequest',
+  '2': [
+    {'1': 'worktree_path', '3': 1, '4': 1, '5': 9, '10': 'worktreePath'},
+  ],
+};
+
+/// Descriptor for `StopTestsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List stopTestsRequestDescriptor = $convert.base64Decode(
+    'ChBTdG9wVGVzdHNSZXF1ZXN0EiMKDXdvcmt0cmVlX3BhdGgYASABKAlSDHdvcmt0cmVlUGF0aA'
+    '==');
+
+@$core.Deprecated('Use stopTestsResponseDescriptor instead')
+const StopTestsResponse$json = {
+  '1': 'StopTestsResponse',
+};
+
+/// Descriptor for `StopTestsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List stopTestsResponseDescriptor =
+    $convert.base64Decode('ChFTdG9wVGVzdHNSZXNwb25zZQ==');

@@ -113,7 +113,7 @@ void main() {
 
   testWidgets('side panel shows the widgets; the Files tab shows the tree', (tester) async {
     final state = await pumpApp(tester);
-    expect(find.text('Bulk discounts by category'), findsWidgets);
+    expect(find.textContaining('No agent in this worktree yet'), findsOneWidget);
     await tester.tap(find.byTooltip(ContextTab.files.tooltip));
     await tester.pump();
     expect(find.byType(WorktreeFilesTree), findsOneWidget);

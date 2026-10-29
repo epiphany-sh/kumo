@@ -515,6 +515,23 @@ class GitClient extends $grpc.Client {
     return $createUnaryCall(_$writeFile, request, options: options);
   }
 
+  /// Renames or moves a file or folder; its new folders are created. Fails
+  /// when something is already there.
+  $grpc.ResponseFuture<$0.GitActionResponse> movePath(
+    $0.MovePathRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$movePath, request, options: options);
+  }
+
+  /// Deletes files, or folders with everything in them.
+  $grpc.ResponseFuture<$0.GitActionResponse> removePaths(
+    $0.PathsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$removePaths, request, options: options);
+  }
+
   /// The whole file with its changes (unchanged lines as context).
   $grpc.ResponseFuture<$0.DiffResponse> diff(
     $0.DiffRequest request, {
@@ -611,6 +628,16 @@ class GitClient extends $grpc.Client {
           '/kumo.v1.Git/WriteFile',
           ($0.WriteFileRequest value) => value.writeToBuffer(),
           $0.WriteFileResponse.fromBuffer);
+  static final _$movePath =
+      $grpc.ClientMethod<$0.MovePathRequest, $0.GitActionResponse>(
+          '/kumo.v1.Git/MovePath',
+          ($0.MovePathRequest value) => value.writeToBuffer(),
+          $0.GitActionResponse.fromBuffer);
+  static final _$removePaths =
+      $grpc.ClientMethod<$0.PathsRequest, $0.GitActionResponse>(
+          '/kumo.v1.Git/RemovePaths',
+          ($0.PathsRequest value) => value.writeToBuffer(),
+          $0.GitActionResponse.fromBuffer);
   static final _$diff = $grpc.ClientMethod<$0.DiffRequest, $0.DiffResponse>(
       '/kumo.v1.Git/Diff',
       ($0.DiffRequest value) => value.writeToBuffer(),
@@ -695,6 +722,20 @@ abstract class GitServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.WriteFileRequest.fromBuffer(value),
         ($0.WriteFileResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.MovePathRequest, $0.GitActionResponse>(
+        'MovePath',
+        movePath_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.MovePathRequest.fromBuffer(value),
+        ($0.GitActionResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.PathsRequest, $0.GitActionResponse>(
+        'RemovePaths',
+        removePaths_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.PathsRequest.fromBuffer(value),
+        ($0.GitActionResponse value) => value.writeToBuffer()));
     $addMethod($grpc.ServiceMethod<$0.DiffRequest, $0.DiffResponse>(
         'Diff',
         diff_Pre,
@@ -798,6 +839,22 @@ abstract class GitServiceBase extends $grpc.Service {
 
   $async.Future<$0.WriteFileResponse> writeFile(
       $grpc.ServiceCall call, $0.WriteFileRequest request);
+
+  $async.Future<$0.GitActionResponse> movePath_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.MovePathRequest> $request) async {
+    return movePath($call, await $request);
+  }
+
+  $async.Future<$0.GitActionResponse> movePath(
+      $grpc.ServiceCall call, $0.MovePathRequest request);
+
+  $async.Future<$0.GitActionResponse> removePaths_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.PathsRequest> $request) async {
+    return removePaths($call, await $request);
+  }
+
+  $async.Future<$0.GitActionResponse> removePaths(
+      $grpc.ServiceCall call, $0.PathsRequest request);
 
   $async.Future<$0.DiffResponse> diff_Pre(
       $grpc.ServiceCall $call, $async.Future<$0.DiffRequest> $request) async {
@@ -949,6 +1006,15 @@ class AgentsClient extends $grpc.Client {
     return $createUnaryCall(_$stop, request, options: options);
   }
 
+  /// Sends a ticket or page to a running agent: the text is typed into its
+  /// terminal and submitted, and the item joins its context.
+  $grpc.ResponseFuture<$0.AgentSession> addContext(
+    $0.AddAgentContextRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$addContext, request, options: options);
+  }
+
   /// Forgets a finished session.
   $grpc.ResponseFuture<$0.DismissAgentResponse> dismiss(
     $0.DismissAgentRequest request, {
@@ -1003,6 +1069,11 @@ class AgentsClient extends $grpc.Client {
           '/kumo.v1.Agents/Stop',
           ($0.StopAgentRequest value) => value.writeToBuffer(),
           $0.StopAgentResponse.fromBuffer);
+  static final _$addContext =
+      $grpc.ClientMethod<$0.AddAgentContextRequest, $0.AgentSession>(
+          '/kumo.v1.Agents/AddContext',
+          ($0.AddAgentContextRequest value) => value.writeToBuffer(),
+          $0.AgentSession.fromBuffer);
   static final _$dismiss =
       $grpc.ClientMethod<$0.DismissAgentRequest, $0.DismissAgentResponse>(
           '/kumo.v1.Agents/Dismiss',
@@ -1078,6 +1149,14 @@ abstract class AgentsServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.StopAgentRequest.fromBuffer(value),
         ($0.StopAgentResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.AddAgentContextRequest, $0.AgentSession>(
+        'AddContext',
+        addContext_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.AddAgentContextRequest.fromBuffer(value),
+        ($0.AgentSession value) => value.writeToBuffer()));
     $addMethod(
         $grpc.ServiceMethod<$0.DismissAgentRequest, $0.DismissAgentResponse>(
             'Dismiss',
@@ -1156,6 +1235,14 @@ abstract class AgentsServiceBase extends $grpc.Service {
 
   $async.Future<$0.StopAgentResponse> stop(
       $grpc.ServiceCall call, $0.StopAgentRequest request);
+
+  $async.Future<$0.AgentSession> addContext_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.AddAgentContextRequest> $request) async {
+    return addContext($call, await $request);
+  }
+
+  $async.Future<$0.AgentSession> addContext(
+      $grpc.ServiceCall call, $0.AddAgentContextRequest request);
 
   $async.Future<$0.DismissAgentResponse> dismiss_Pre($grpc.ServiceCall $call,
       $async.Future<$0.DismissAgentRequest> $request) async {
@@ -1919,4 +2006,115 @@ abstract class DocsServiceBase extends $grpc.Service {
   }
 
   $async.Future<$0.Doc> read($grpc.ServiceCall call, $0.ReadDocRequest request);
+}
+
+/// A worktree's tests: its own command (a Makefile `test` target, else the
+/// usual one for its language), run in a terminal the user can open, and
+/// what the runner's output says as it goes.
+@$pb.GrpcServiceName('kumo.v1.Tests')
+class TestsClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  TestsClient(super.channel, {super.options, super.interceptors});
+
+  /// The detected command and the latest run, then again whenever the run
+  /// changes.
+  $grpc.ResponseStream<$0.TestsSnapshot> watch(
+    $0.WatchTestsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createStreamingCall(_$watch, $async.Stream.fromIterable([request]),
+        options: options);
+  }
+
+  /// Stops a run still going in the worktree first.
+  $grpc.ResponseFuture<$0.TestRun> run(
+    $0.RunTestsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$run, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.StopTestsResponse> stop(
+    $0.StopTestsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$stop, request, options: options);
+  }
+
+  // method descriptors
+
+  static final _$watch =
+      $grpc.ClientMethod<$0.WatchTestsRequest, $0.TestsSnapshot>(
+          '/kumo.v1.Tests/Watch',
+          ($0.WatchTestsRequest value) => value.writeToBuffer(),
+          $0.TestsSnapshot.fromBuffer);
+  static final _$run = $grpc.ClientMethod<$0.RunTestsRequest, $0.TestRun>(
+      '/kumo.v1.Tests/Run',
+      ($0.RunTestsRequest value) => value.writeToBuffer(),
+      $0.TestRun.fromBuffer);
+  static final _$stop =
+      $grpc.ClientMethod<$0.StopTestsRequest, $0.StopTestsResponse>(
+          '/kumo.v1.Tests/Stop',
+          ($0.StopTestsRequest value) => value.writeToBuffer(),
+          $0.StopTestsResponse.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Tests')
+abstract class TestsServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.Tests';
+
+  TestsServiceBase() {
+    $addMethod($grpc.ServiceMethod<$0.WatchTestsRequest, $0.TestsSnapshot>(
+        'Watch',
+        watch_Pre,
+        false,
+        true,
+        ($core.List<$core.int> value) => $0.WatchTestsRequest.fromBuffer(value),
+        ($0.TestsSnapshot value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.RunTestsRequest, $0.TestRun>(
+        'Run',
+        run_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.RunTestsRequest.fromBuffer(value),
+        ($0.TestRun value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.StopTestsRequest, $0.StopTestsResponse>(
+        'Stop',
+        stop_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.StopTestsRequest.fromBuffer(value),
+        ($0.StopTestsResponse value) => value.writeToBuffer()));
+  }
+
+  $async.Stream<$0.TestsSnapshot> watch_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WatchTestsRequest> $request) async* {
+    yield* watch($call, await $request);
+  }
+
+  $async.Stream<$0.TestsSnapshot> watch(
+      $grpc.ServiceCall call, $0.WatchTestsRequest request);
+
+  $async.Future<$0.TestRun> run_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.RunTestsRequest> $request) async {
+    return run($call, await $request);
+  }
+
+  $async.Future<$0.TestRun> run(
+      $grpc.ServiceCall call, $0.RunTestsRequest request);
+
+  $async.Future<$0.StopTestsResponse> stop_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.StopTestsRequest> $request) async {
+    return stop($call, await $request);
+  }
+
+  $async.Future<$0.StopTestsResponse> stop(
+      $grpc.ServiceCall call, $0.StopTestsRequest request);
 }

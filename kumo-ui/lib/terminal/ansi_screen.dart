@@ -32,7 +32,16 @@ class AnsiScreen {
   int get rows => _rows;
 
   late List<_Row> _grid;
-  final List<TermLine> _scrollback = [];
+  /// Rows that scrolled off the top, oldest first: cells, not text, so a
+  /// width change can re-wrap them.
+  final List<_Row> _scrollback = [];
+
+  /// Rows ever dropped from the top of the scrollback (trimmed or
+  /// cleared), so views can anchor a position across trims.
+  int _dropped = 0;
+
+  /// Width changes that re-wrapped the lines (positions move).
+  int _reflows = 0;
 
   int _cx = 0;
   int _cy = 0;
@@ -41,6 +50,8 @@ class AnsiScreen {
   bool _cursorVisible = true;
   bool _appCursorKeys = false;
   bool _bracketedPaste = false;
+  bool _mouseTracking = false;
+  bool _sgrMouse = false;
   int _top = 0;
   int _bottom = 0x7fffffff; // clamped to rows - 1
 
@@ -59,6 +70,15 @@ class AnsiScreen {
   /// The program wants pasted text wrapped in `ESC [200~ … ESC [201~`.
   bool get bracketedPaste => _bracketedPaste;
 
+  /// The program asked for mouse reports (modes 1000/1002/1003).
+  bool get mouseTracking => _mouseTracking;
+
+  /// … in the SGR encoding (mode 1006).
+  bool get sgrMouse => _sgrMouse;
+
+  /// A full-screen program (vim, less, htop) owns the screen.
+  bool get altScreen => _onAltScreen;
+
   int get _scrollBottom => math.min(_bottom, _rows - 1);
   bool get _onAltScreen => _mainGrid != null;
 
@@ -67,7 +87,7 @@ class AnsiScreen {
   /// Screen as lines: scrollback, then every row of the grid. The cursor is
   /// an index into those lines.
   TermBuffer snapshot({int seq = 0}) {
-    final lines = <TermLine>[..._scrollback];
+    final lines = <TermLine>[for (final row in _scrollback) row.line];
     for (final row in _grid) {
       lines.add(row.line);
     }
@@ -76,37 +96,116 @@ class AnsiScreen {
       cursorVisible: _cursorVisible,
       cursor: (_scrollback.length + _cy, math.min(_cx, _cols - 1)),
       seq: seq,
+      dropped: _dropped,
+      reflows: _reflows,
+      altScreen: _onAltScreen,
     );
   }
 
+  /// Re-wraps the main screen and its scrollback to the new width, like
+  /// iTerm or Terminal.app: a long line that wrapped at 80 columns reads as
+  /// one line at 120. A full-screen program redraws itself; the main screen
+  /// under it is re-wrapped for when it leaves.
   void resize(int cols, int rows) {
     cols = math.max(1, cols);
     rows = math.max(1, rows);
     if (cols == _cols && rows == _rows) return;
-    // Keep the cursor row on screen: push rows above it into scrollback.
-    final overflow = _cy - (rows - 1);
-    for (var i = 0; i < overflow; i++) {
-      _pushScrollback(_grid.removeAt(0));
+    if (_onAltScreen) {
+      final (mx, my) = _mainCursor ?? (0, 0);
+      final (grid, x, y, _) = _reflow(_mainGrid!, mx, my, false, cols, rows);
+      _mainGrid = grid;
+      _mainCursor = (x, y);
+      for (final row in _grid) {
+        row.resize(cols);
+      }
+      while (_grid.length > rows) {
+        _grid.removeLast();
+      }
+      while (_grid.length < rows) {
+        _grid.add(_Row(cols));
+      }
+      _cx = math.min(_cx, cols - 1);
+      _cy = math.min(_cy, rows - 1);
+      _wrapPending = false;
+    } else {
+      final (grid, x, y, pending) = _reflow(_grid, _cx, _cy, _wrapPending, cols, rows);
+      _grid = grid;
+      _cx = x;
+      _cy = y;
+      _wrapPending = pending;
     }
-    if (overflow > 0) _cy -= overflow;
-    for (final row in _grid) {
-      row.resize(cols);
-    }
-    while (_grid.length > rows) {
-      _grid.removeLast();
-    }
-    while (_grid.length < rows) {
-      _grid.add(_Row(cols));
-    }
-    _mainGrid = null;
-    _mainCursor = null;
+    if (_saved case (final x, final y, final pen)) _saved = (math.min(x, cols - 1), math.min(y, rows - 1), pen);
     _cols = cols;
     _rows = rows;
     _top = 0;
     _bottom = 0x7fffffff;
-    _cx = math.min(_cx, cols - 1);
-    _cy = math.min(_cy, rows - 1);
-    _wrapPending = false;
+    _reflows++;
+  }
+
+  /// The scrollback and [grid] (cursor at [cx], [cy]) laid out again at
+  /// [cols] × [rows]: rows that wrapped join their logical line, which then
+  /// wraps at the new width. Replaces the scrollback; returns the new grid
+  /// and cursor.
+  (List<_Row>, int, int, bool) _reflow(List<_Row> grid, int cx, int cy, bool pending, int cols, int rows) {
+    var last = cy;
+    for (var y = grid.length - 1; y > cy; y--) {
+      if (grid[y].contentEnd > 0) {
+        last = y;
+        break;
+      }
+    }
+    final source = [..._scrollback, ...grid.sublist(0, math.min(last + 1, grid.length))];
+    final cursorRow = _scrollback.length + cy;
+    final out = <_Row>[];
+    var cursorAt = 0;
+    var cursorX = 0;
+    var cursorPending = false;
+    var i = 0;
+    while (i < source.length) {
+      // Most lines didn't wrap and still fit: the same row, rendered once.
+      final row = source[i];
+      if (!row.wrapped && i != cursorRow && row.contentEnd <= cols) {
+        out.add(row);
+        i++;
+        continue;
+      }
+      final line = _Cells();
+      int? offset;
+      while (true) {
+        final row = source[i];
+        if (i == cursorRow) offset = line.length + cx + (pending ? 1 : 0);
+        line.add(row, row.wrapped ? row.length : row.contentEnd);
+        i++;
+        if (!row.wrapped || i >= source.length) break;
+      }
+      if (offset != null) line.pad(offset);
+      final first = out.length;
+      final starts = line.split(cols, out);
+      if (offset != null) {
+        // The row whose cells hold the cursor; at a row's very end it
+        // waits there to wrap, as it would have while typing.
+        final r = starts.lastIndexWhere((st) => st <= offset!);
+        final x = offset - starts[r];
+        cursorAt = first + r;
+        cursorX = math.min(x, cols - 1);
+        cursorPending = x >= cols;
+      }
+    }
+    if (out.isEmpty) out.add(_Row(cols));
+    // The screen shows the last rows, or every row from the top when they
+    // fit; the cursor stays on it.
+    var top = math.max(0, out.length - rows);
+    if (cursorAt < top) top = cursorAt;
+    final newGrid = [for (var y = top; y < math.min(out.length, top + rows); y++) out[y]..resize(cols)];
+    while (newGrid.length < rows) {
+      newGrid.add(_Row(cols));
+    }
+    _scrollback.clear();
+    for (var y = 0; y < top; y++) {
+      _scrollback.add(out[y].trimmed());
+    }
+    _trimScrollback();
+    return (newGrid, cursorX, cursorAt - top, cursorPending);
   }
 
   // ---------------------------------------------------------------------------
@@ -205,6 +304,7 @@ class AnsiScreen {
     final width = termCellWidth(rune);
     if (width == 0) return; // Combining marks / joiners: not composed (M1).
     if (_wrapPending || (width == 2 && _cx == _cols - 1 && _cols > 1)) {
+      _grid[_cy].wrapped = true;
       _cx = 0;
       _lineFeed();
       _wrapPending = false;
@@ -307,6 +407,10 @@ class AnsiScreen {
           _cursorVisible = on;
         case 2004:
           _bracketedPaste = on;
+        case 1000 || 1002 || 1003:
+          _mouseTracking = on;
+        case 1006:
+          _sgrMouse = on;
         case 1049 || 1047 || 47:
           on ? _enterAltScreen() : _leaveAltScreen();
       }
@@ -355,8 +459,21 @@ class AnsiScreen {
   }
 
   void _pushScrollback(_Row row) {
-    _scrollback.add(row.line);
-    if (_scrollback.length > maxScrollback) _scrollback.removeRange(0, _scrollback.length - maxScrollback);
+    _scrollback.add(row.trimmed());
+    _trimScrollback();
+  }
+
+  void _trimScrollback() {
+    final excess = _scrollback.length - maxScrollback;
+    if (excess <= 0) return;
+    _scrollback.removeRange(0, excess);
+    _dropped += excess;
+  }
+
+  /// Forgets the scrollback (⌘K): the screen stays.
+  void clearScrollback() {
+    _dropped += _scrollback.length;
+    _scrollback.clear();
   }
 
   void _eraseDisplay(int mode) {
@@ -377,7 +494,7 @@ class AnsiScreen {
           row.clear(0, _cols, bg);
         }
       case 3:
-        _scrollback.clear();
+        clearScrollback();
     }
   }
 
@@ -435,6 +552,8 @@ class AnsiScreen {
     _cursorVisible = true;
     _appCursorKeys = false;
     _bracketedPaste = false;
+    _mouseTracking = false;
+    _sgrMouse = false;
   }
 
   // ---------------------------------------------------------------------------
@@ -599,6 +718,38 @@ class _Row {
   Uint8List _attrs;
   TermLine? _line;
 
+  /// The line went on in the next row: it hit the right edge while being
+  /// written, not a line feed.
+  bool wrapped = false;
+
+  int get length => _runes.length;
+
+  /// Cells up to the last one that shows something.
+  int get contentEnd {
+    var end = _runes.length;
+    while (end > 0 && _isBlank(end - 1)) {
+      end--;
+    }
+    return end;
+  }
+
+  /// A copy without trailing blanks (whole, if it wrapped), for the
+  /// scrollback.
+  _Row trimmed() {
+    final end = wrapped ? _runes.length : contentEnd;
+    if (end == _runes.length) return this;
+    final row = _Row._cells(
+      Uint32List.fromList(_runes.sublist(0, end)),
+      Uint32List.fromList(_fg.sublist(0, end)),
+      Uint32List.fromList(_bg.sublist(0, end)),
+      Uint8List.fromList(_attrs.sublist(0, end)),
+    )..wrapped = wrapped;
+    row._line = _line;
+    return row;
+  }
+
+  _Row._cells(this._runes, this._fg, this._bg, this._attrs);
+
   void set(int x, int rune, _Pen pen) {
     _runes[x] = rune;
     _fg[x] = pen.fg;
@@ -610,6 +761,7 @@ class _Row {
   /// Erased cells keep the current background color (xterm BCE).
   void clear(int from, int to, int bg) {
     if (from >= to) return;
+    if (to >= _runes.length) wrapped = false;
     _runes.fillRange(from, to, 0x20);
     _fg.fillRange(from, to, _Color.none);
     _bg.fillRange(from, to, bg);
@@ -683,6 +835,71 @@ class _Row {
       if (x < end && _runes[x] != continuation) text.writeCharCode(_runes[x]);
     }
     return TermLine(spans);
+  }
+}
+
+/// The cells of one logical line (rows joined where they wrapped), to lay
+/// out again at another width.
+class _Cells {
+  var _runes = Uint32List(256);
+  var _fg = Uint32List(256);
+  var _bg = Uint32List(256);
+  var _attrs = Uint8List(256);
+  int length = 0;
+
+  void _reserve(int n) {
+    if (n <= _runes.length) return;
+    var size = _runes.length;
+    while (size < n) {
+      size *= 2;
+    }
+    _runes = Uint32List(size)..setRange(0, length, _runes);
+    _fg = Uint32List(size)..setRange(0, length, _fg);
+    _bg = Uint32List(size)..setRange(0, length, _bg);
+    _attrs = Uint8List(size)..setRange(0, length, _attrs);
+  }
+
+  void add(_Row row, int end) {
+    _reserve(length + end);
+    _runes.setRange(length, length + end, row._runes);
+    _fg.setRange(length, length + end, row._fg);
+    _bg.setRange(length, length + end, row._bg);
+    _attrs.setRange(length, length + end, row._attrs);
+    length += end;
+  }
+
+  /// Blanks up to [to] (where the cursor sits past the text).
+  void pad(int to) {
+    if (to <= length) return;
+    _reserve(to);
+    _runes.fillRange(length, to, 0x20);
+    _fg.fillRange(length, to, _Color.none);
+    _bg.fillRange(length, to, _Color.none);
+    _attrs.fillRange(length, to, 0);
+    length = to;
+  }
+
+  /// Appends the line as rows of [cols] cells to [out]; a wide glyph that
+  /// doesn't fit at the end of a row moves to the next. Returns where each
+  /// row starts in the line.
+  List<int> split(int cols, List<_Row> out) {
+    final starts = <int>[];
+    var at = 0;
+    do {
+      var end = math.min(at + cols, length);
+      // Don't cut a wide glyph from its second half.
+      if (end < length && _runes[end] == _Row.continuation && end - 1 > at) end--;
+      final row = _Row(cols);
+      row._runes.setRange(0, end - at, _runes, at);
+      row._fg.setRange(0, end - at, _fg, at);
+      row._bg.setRange(0, end - at, _bg, at);
+      row._attrs.setRange(0, end - at, _attrs, at);
+      starts.add(at);
+      at = end;
+      row.wrapped = at < length;
+      out.add(row);
+    } while (at < length);
+    return starts;
   }
 }
 

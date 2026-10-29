@@ -268,6 +268,63 @@ async fn files_are_listed_read_and_written_inside_the_worktree_only() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn files_and_folders_are_renamed_and_deleted() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = feature_worktree(&daemon, &mut client).await;
+    std::fs::write(wt.join("src/util.rs"), "pub fn u() {}\n").unwrap();
+
+    client
+        .git
+        .move_path(pb::MovePathRequest {
+            worktree_path: request(&wt),
+            from: "src/lib.rs".into(),
+            to: "src/core/lib.rs".into(),
+        })
+        .await
+        .unwrap();
+    assert!(wt.join("src/core/lib.rs").exists() && !wt.join("src/lib.rs").exists());
+    let taken = client
+        .git
+        .move_path(pb::MovePathRequest {
+            worktree_path: request(&wt),
+            from: "src/util.rs".into(),
+            to: "README.md".into(),
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(taken.code(), tonic::Code::Internal, "never overwrites");
+
+    client
+        .git
+        .remove_paths(pb::PathsRequest {
+            worktree_path: request(&wt),
+            paths: vec!["src".into(), "README.md".into()],
+        })
+        .await
+        .unwrap();
+    assert!(!wt.join("src").exists() && !wt.join("README.md").exists());
+    let changes = status(&mut client, &wt).await;
+    assert!(
+        changes.working.iter().any(|c| c.path == "README.md"),
+        "the deletion shows as a change: {changes:?}"
+    );
+
+    for path in [".git", "../outside"] {
+        let error = client
+            .git
+            .remove_paths(pb::PathsRequest {
+                worktree_path: request(&wt),
+                paths: vec![path.into()],
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), tonic::Code::InvalidArgument, "{path}");
+    }
+    assert!(wt.join(".git").exists());
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn stage_commit_undo_and_log() {
     let daemon = TestDaemon::start().await;
     let mut client = daemon.client().await;

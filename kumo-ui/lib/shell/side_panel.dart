@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
+import '../data/agents_source.dart';
 import '../data/changes.dart';
+import '../data/docs_source.dart';
+import '../data/models.dart';
 import '../data/pipelines_source.dart';
 import '../data/pull_requests_source.dart';
 import '../data/repo_activity.dart';
+import '../data/tasks_source.dart';
+import '../data/tests_source.dart';
+import '../overlays/new_agent_dialog.dart';
 import '../overlays/settings_dialog.dart';
 import '../platform/open_url.dart';
 import '../theme/kumo_theme.dart';
@@ -557,12 +563,161 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
   final Set<String> _open = {'internal', 'internal/discount', 'internal/kafka'};
   bool _changedOnly = false;
 
+  /// The row whose menu is open, the one being renamed, and the folder a
+  /// new file is being named in ('' is the worktree's root).
+  String? _menuFor;
+  String? _renaming;
+  String? _creatingIn;
+  final _name = TextEditingController();
+  final _nameFocus = FocusNode();
+  String? _nameError;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Clicking elsewhere gives up, like Esc.
+    _nameFocus.addListener(() {
+      if (!_nameFocus.hasFocus && !_busy) _stopNaming();
+    });
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _nameFocus.dispose();
+    super.dispose();
+  }
+
+  static String _dirOf(String? path) => path == null || !path.contains('/') ? '' : path.substring(0, path.lastIndexOf('/'));
+
+  void _focusName() => WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _nameFocus.requestFocus();
+      });
+
+  void _stopNaming() {
+    if (_renaming == null && _creatingIn == null) return;
+    setState(() {
+      _renaming = null;
+      _creatingIn = null;
+      _nameError = null;
+    });
+  }
+
+  /// The name is selected without its extension, ready to type over.
+  void _startRename(String path) {
+    final name = path.split('/').last;
+    final dot = name.lastIndexOf('.');
+    _name.value = TextEditingValue(text: name, selection: TextSelection(baseOffset: 0, extentOffset: dot > 0 ? dot : name.length));
+    setState(() {
+      _renaming = path;
+      _creatingIn = null;
+      _nameError = null;
+    });
+    _focusName();
+  }
+
+  void _startCreate(String dir) {
+    _name.clear();
+    setState(() {
+      _changedOnly = false; // its folder may be hidden
+      _creatingIn = dir;
+      _renaming = null;
+      _nameError = null;
+      if (dir.isNotEmpty) _openUpTo(dir);
+    });
+    _focusName();
+  }
+
+  void _openUpTo(String dir) {
+    final parts = dir.split('/');
+    for (var i = 1; i <= parts.length; i++) {
+      _open.add(parts.sublist(0, i).join('/'));
+    }
+  }
+
+  /// ↩ in the name field: renames, or creates the file and opens it.
+  Future<void> _submitName() async {
+    final s = AppScope.read(context);
+    final raw = _name.text.trim();
+    if (raw.isEmpty) {
+      _stopNaming();
+      return;
+    }
+    _busy = true;
+    String? error;
+    final renaming = _renaming;
+    if (renaming != null) {
+      final parent = _dirOf(renaming);
+      final to = AppState.cleanPath(parent.isEmpty ? raw : '$parent/$raw');
+      error = await s.movePath(renaming, to);
+      if (error == null) {
+        // Open folders keep showing under their new name.
+        final moved = [for (final k in _open) if (k == renaming || k.startsWith('$renaming/')) k];
+        _open
+          ..removeAll(moved)
+          ..addAll([for (final k in moved) to + k.substring(renaming.length)]);
+      }
+    } else {
+      final dir = _creatingIn ?? '';
+      final path = AppState.cleanPath(dir.isEmpty ? raw : '$dir/$raw');
+      error = await s.createFile(path);
+      if (error == null) {
+        _openUpTo(_dirOf(path));
+        widget.onOpen(path);
+      }
+    }
+    _busy = false;
+    if (!mounted) return;
+    if (error != null) {
+      setState(() => _nameError = error);
+      _nameFocus.requestFocus();
+      return;
+    }
+    setState(() {
+      _renaming = null;
+      _creatingIn = null;
+      _nameError = null;
+    });
+  }
+
+  void _menu(Offset at, String path, {required bool dir}) {
+    setState(() => _menuFor = path);
+    showKMenu(
+      context,
+      position: at,
+      onClosed: () {
+        if (mounted) setState(() => _menuFor = null);
+      },
+      builder: (context, close) => _FileTreeMenu(
+        path: path,
+        dir: dir,
+        close: close,
+        onOpen: dir ? null : () => widget.onOpen(path),
+        onNewFile: () => _startCreate(path),
+        onRename: () => _startRename(path),
+      ),
+    );
+  }
+
+  Widget _field(int depth, IconData icon, {required String hint}) => _NameField(
+        key: const ValueKey('tree-name-field'),
+        depth: depth,
+        icon: icon,
+        controller: _name,
+        focus: _nameFocus,
+        hint: hint,
+        error: _nameError,
+        onSubmit: _submitName,
+        onCancel: _stopNaming,
+      );
+
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final c = context.c;
     final status = {for (final f in s.pendingChanges) f.path: f.kind};
-    final paths = [for (final p in s.changes.files) if (!_changedOnly || status.containsKey(p)) p];
+    final paths = [for (final p in s.visibleFiles) if (!_changedOnly || status.containsKey(p)) p];
     final root = _Dir('');
     for (final p in paths) {
       final parts = p.split('/');
@@ -573,6 +728,7 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
       }
       node.files.add(p);
     }
+    const newHint = 'name.ext — a/b.ext makes folders';
     final rows = <Widget>[];
     void walk(_Dir node, int depth) {
       for (final name in node.dirs.keys.toList()..sort()) {
@@ -581,24 +737,37 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
         final inside = status.keys.where((p) => p.startsWith('${d.key}/')).toList();
         final allAdded = inside.isNotEmpty && inside.every((p) => status[p] == 'A');
         final tone = inside.isEmpty ? null : (allAdded ? c.ok : c.warn);
-        rows.add(_TreeRow(
-          depth: depth,
-          icon: KIcons.folder,
-          iconColor: c.text3,
-          name: name,
-          color: tone ?? c.text,
-          chevron: open ? KIcons.chevronDown : KIcons.chevronRight,
-          dot: !open ? tone : null,
-          semantic: '${d.key}/, ${open ? 'collapse' : 'expand'}${inside.isEmpty ? '' : ', ${inside.length} changed'}',
-          onTap: () => setState(() => _open.contains(d.key) ? _open.remove(d.key) : _open.add(d.key)),
-        ));
+        if (_renaming == d.key) {
+          rows.add(_field(depth, KIcons.folder, hint: 'Folder name'));
+        } else {
+          rows.add(_TreeRow(
+            key: ValueKey('dir:${d.key}'),
+            depth: depth,
+            icon: KIcons.folder,
+            iconColor: c.text3,
+            name: name,
+            color: tone ?? c.text,
+            chevron: open ? KIcons.chevronDown : KIcons.chevronRight,
+            dot: !open ? tone : null,
+            highlight: _menuFor == d.key,
+            semantic: '${d.key}/, ${open ? 'collapse' : 'expand'}${inside.isEmpty ? '' : ', ${inside.length} changed'}',
+            onTap: () => setState(() => _open.contains(d.key) ? _open.remove(d.key) : _open.add(d.key)),
+            onMenu: (at) => _menu(at, d.key, dir: true),
+          ));
+        }
+        if (open && _creatingIn == d.key) rows.add(_field(depth + 1, KIcons.file, hint: newHint));
         if (open) walk(d, depth + 1);
       }
       final files = [...node.files]..sort((a, b) => a.split('/').last.compareTo(b.split('/').last));
       for (final p in files) {
+        if (_renaming == p) {
+          rows.add(_field(depth, KIcons.file, hint: 'File name'));
+          continue;
+        }
         final k = status[p];
         final col = k == 'A' ? c.ok : (k == 'M' ? c.warn : null);
         rows.add(_TreeRow(
+          key: ValueKey('file:$p'),
           depth: depth,
           icon: KIcons.file,
           iconColor: col ?? c.text3,
@@ -606,12 +775,15 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
           color: col ?? c.text,
           kind: k,
           selected: widget.selected == p,
+          highlight: _menuFor == p,
           semantic: p,
           onTap: () => widget.onOpen(p),
+          onMenu: (at) => _menu(at, p, dir: false),
         ));
       }
     }
 
+    if (_creatingIn == '') rows.add(_field(0, KIcons.file, hint: newHint));
     walk(root, 0);
     final pending = s.pendingChanges;
     final added = pending.where((f) => f.kind == 'A').length;
@@ -640,6 +812,11 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
           ),
         ),
         KIconButton(
+          icon: KIcons.fileAdd,
+          label: 'New file (or right-click a folder)',
+          onTap: () => _startCreate(_dirOf(widget.selected)),
+        ),
+        KIconButton(
           icon: KIcons.collapseAll,
           label: 'Collapse all',
           onTap: () => setState(() {
@@ -660,6 +837,106 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
   }
 }
 
+/// Right-click on a file or folder of the Files tree.
+class _FileTreeMenu extends StatelessWidget {
+  const _FileTreeMenu({required this.path, required this.dir, required this.close, required this.onNewFile, required this.onRename, this.onOpen});
+  final String path;
+  final bool dir;
+  final VoidCallback close;
+  final VoidCallback? onOpen;
+  final VoidCallback onNewFile;
+  final VoidCallback onRename;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.read(context);
+    void then(VoidCallback f) {
+      close();
+      f();
+    }
+
+    final changed = [for (final f in s.pendingChanges) if (dir ? f.path.startsWith('$path/') : f.path == path) f.path];
+    final n = changed.length;
+    final discardLabel = dir && n > 0 ? 'Discard $n ${n == 1 ? 'change' : 'changes'}' : 'Discard changes';
+    return KMenuPanel(width: 248, children: [
+      if (dir) KMenuItem(icon: KIcons.fileAdd, label: 'New file…', onTap: () => then(onNewFile)),
+      if (onOpen != null) KMenuItem(icon: KIcons.file, label: 'Open', onTap: () => then(onOpen!)),
+      KMenuItem(icon: KIcons.rename, label: 'Rename…', onTap: () => then(onRename)),
+      KMenuItem(
+        icon: KIcons.discard,
+        label: discardLabel,
+        note: n == 0 ? (dir ? 'Nothing changed in this folder' : 'This file has no changes') : null,
+        onTap: n == 0 ? null : () => then(() => dir ? s.discardChangesIn(path) : s.discardChanges(path)),
+      ),
+      KMenuItem(icon: KIcons.copy, label: 'Copy path', onTap: () => then(() => Clipboard.setData(ClipboardData(text: path)))),
+      const KMenuDivider(),
+      KMenuItem(icon: KIcons.trash, label: dir ? 'Delete folder' : 'Delete', danger: true, onTap: () => then(() => s.deletePath(path))),
+    ]);
+  }
+}
+
+/// Inline name field of the Files tree: ↩ confirms, Esc or a click
+/// elsewhere gives up.
+class _NameField extends StatelessWidget {
+  const _NameField({
+    super.key,
+    required this.depth,
+    required this.icon,
+    required this.controller,
+    required this.focus,
+    required this.hint,
+    required this.onSubmit,
+    required this.onCancel,
+    this.error,
+  });
+
+  final int depth;
+  final IconData icon;
+  final TextEditingController controller;
+  final FocusNode focus;
+  final String hint;
+  final String? error;
+  final VoidCallback onSubmit;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Padding(
+      padding: EdgeInsets.only(left: 6.0 + depth * 14 + 18, right: 2, top: 1, bottom: 2),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Container(
+          height: 26,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(color: c.chip, borderRadius: BorderRadius.circular(7), border: Border.all(color: error == null ? c.acc : c.err)),
+          child: Row(children: [
+            Icon(icon, size: 14, color: c.text3),
+            const SizedBox(width: 6),
+            Expanded(
+              child: CallbackShortcuts(
+                bindings: {const SingleActivator(LogicalKeyboardKey.escape): onCancel},
+                child: TextField(
+                  key: const ValueKey('tree-name'),
+                  controller: controller,
+                  focusNode: focus,
+                  onSubmitted: (_) => onSubmit(),
+                  style: sans(12.5, color: c.text),
+                  cursorColor: c.acc,
+                  decoration: InputDecoration.collapsed(hintText: hint, hintStyle: sans(12.5, color: c.text3)),
+                ),
+              ),
+            ),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 3, left: 2),
+          child: Text(error ?? '↩ to confirm · Esc cancels', style: sans(11, color: error == null ? c.text3 : c.err)),
+        ),
+      ]),
+    );
+  }
+}
+
 class _Dir {
   _Dir(this.key);
   final String key;
@@ -669,6 +946,7 @@ class _Dir {
 
 class _TreeRow extends StatelessWidget {
   const _TreeRow({
+    super.key,
     required this.depth,
     required this.icon,
     required this.iconColor,
@@ -676,10 +954,12 @@ class _TreeRow extends StatelessWidget {
     required this.color,
     required this.semantic,
     required this.onTap,
+    this.onMenu,
     this.chevron,
     this.dot,
     this.kind,
     this.selected = false,
+    this.highlight = false,
   });
 
   final int depth;
@@ -689,33 +969,42 @@ class _TreeRow extends StatelessWidget {
   final Color color;
   final String semantic;
   final VoidCallback onTap;
+
+  /// Right-click, at the click's global position.
+  final ValueChanged<Offset>? onMenu;
   final IconData? chevron;
   final Color? dot;
   final String? kind;
   final bool selected;
 
+  /// Its menu is open.
+  final bool highlight;
+
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    return KPressable(
-      onTap: onTap,
-      semanticLabel: semantic,
-      selected: selected,
-      builder: (context, hover, focus) => Container(
-        height: 26,
-        padding: EdgeInsets.only(left: 6.0 + depth * 14, right: 6),
-        decoration: selected
-            ? chipDecoration(c, radius: 7, fill: c.navActive)
-            : BoxDecoration(color: hover || focus ? c.tile : null, borderRadius: BorderRadius.circular(7)),
-        child: Row(children: [
-          SizedBox(width: 14, child: chevron == null ? null : Icon(chevron, size: 14, color: c.text3)),
-          const SizedBox(width: 4),
-          Icon(icon, size: 14, color: iconColor),
-          const SizedBox(width: 6),
-          Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: color))),
-          if (dot != null) Dot(dot!, size: 6),
-          if (kind != null) SizedBox(width: 12, child: Text(kind!, textAlign: TextAlign.center, style: mono(11, weight: FontWeight.w700, color: color))),
-        ]),
+    return GestureDetector(
+      onSecondaryTapDown: onMenu == null ? null : (d) => onMenu!(d.globalPosition),
+      child: KPressable(
+        onTap: onTap,
+        semanticLabel: semantic,
+        selected: selected,
+        builder: (context, hover, focus) => Container(
+          height: 26,
+          padding: EdgeInsets.only(left: 6.0 + depth * 14, right: 6),
+          decoration: selected
+              ? chipDecoration(c, radius: 7, fill: c.navActive)
+              : BoxDecoration(color: hover || focus || highlight ? c.tile : null, borderRadius: BorderRadius.circular(7)),
+          child: Row(children: [
+            SizedBox(width: 14, child: chevron == null ? null : Icon(chevron, size: 14, color: c.text3)),
+            const SizedBox(width: 4),
+            Icon(icon, size: 14, color: iconColor),
+            const SizedBox(width: 6),
+            Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: color))),
+            if (dot != null) Dot(dot!, size: 6),
+            if (kind != null) SizedBox(width: 12, child: Text(kind!, textAlign: TextAlign.center, style: mono(11, weight: FontWeight.w700, color: color))),
+          ]),
+        ),
       ),
     );
   }
@@ -923,73 +1212,171 @@ IconData _iconOf(InspectorWidget w) => switch (w) {
       InspectorWidget.activity => KIcons.activity,
     };
 
+/// The selected worktree's agent: how it's doing, what it's working on and
+/// how much it did, with its diff and terminal one click away.
 class _AgentWidget extends StatelessWidget {
   const _AgentWidget();
+
+  void _menu(BuildContext context, AgentRun run) {
+    final s = AppScope.read(context);
+    final box = context.findRenderObject() as RenderBox;
+    showKMenu(
+      context,
+      position: box.localToGlobal(box.size.bottomRight(Offset.zero)) - const Offset(200, 0),
+      builder: (context, close) => KMenuPanel(width: 200, children: [
+        KMenuItem(
+          icon: KIcons.terminal,
+          label: 'Open terminal',
+          onTap: () {
+            close();
+            s.openTerminal(run.terminalId, title: run.title, agent: true, directory: run.worktreePath);
+          },
+        ),
+        KMenuItem(
+          icon: KIcons.agent,
+          label: 'New agent…',
+          onTap: () {
+            close();
+            showNewAgentDialog(context);
+          },
+        ),
+        const KMenuDivider(),
+        if (run.status == AgentStatus.done)
+          KMenuItem(
+            icon: KIcons.close,
+            label: 'Dismiss',
+            onTap: () {
+              close();
+              s.agents.dismiss(run.id);
+            },
+          )
+        else
+          KMenuItem(
+            icon: KIcons.close,
+            label: 'Stop agent',
+            danger: true,
+            onTap: () {
+              close();
+              s.agents.stop(run.id);
+            },
+          ),
+      ]),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final c = context.c;
-    const steps = [('Plan', '4 steps', 2), ('Implement', '3 of 4', 1), ('Test', '', 0), ('Open PR', 'GitHub', 0)];
+    final runs = s.worktreeAgents;
+    final run = s.activeAgent ?? runs.firstOrNull;
+    if (run == null) {
+      return Section(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const PanelHeading('Agent'),
+          const SizedBox(height: 4),
+          Text('No agent in this worktree yet. Start one with a prompt, or from a task.', style: sans(12, color: c.text3, height: 1.4)),
+          const SizedBox(height: 10),
+          KButton.primary(label: 'New agent', icon: KIcons.agent, height: 30, fontSize: 12, expand: true, onTap: () => showNewAgentDialog(context)),
+        ]),
+      );
+    }
+    final (state, color) = switch (run.status) {
+      AgentStatus.running => ('Working', c.acc),
+      AgentStatus.needsYou => ('Your turn', c.warn),
+      AgentStatus.done => run.exitCode == 0 ? ('Finished', c.text3) : ('Exited with code ${run.exitCode}', c.err),
+    };
+    final task = run.context.where((i) => i.kind == AgentContextKind.task).firstOrNull;
+    final done = _stepCounts(run.steps);
     final review = s.pendingChanges.isNotEmpty ? s.pendingChanges : s.branchChanges;
+    final others = runs.length - 1;
     return Section(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(color: c.accSoft, borderRadius: BorderRadius.circular(11)),
-            child: Icon(KIcons.agent, size: 18, color: c.acc),
-          ),
+          SourceTile(run.short, size: 34, tooltip: run.providerName),
           const SizedBox(width: 10),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Claude Code', style: sans(13, weight: FontWeight.w600, color: c.text)),
-              Text('Started 13:54 · auto-approve edits', style: sans(11.5, color: c.text3)),
+              Text(run.providerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, weight: FontWeight.w600, color: c.text)),
+              const SizedBox(height: 2),
+              Row(children: [
+                Dot(color),
+                const SizedBox(width: 6),
+                Flexible(child: Text('$state · started ${_clock(run.startedAt)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, color: c.text3))),
+              ]),
             ]),
           ),
-          KIconButton(icon: KIcons.more, label: 'More agent actions', onTap: () {}),
+          Builder(builder: (context) => KIconButton(icon: KIcons.more, label: 'More agent actions', onTap: () => _menu(context, run))),
         ]),
-        const SizedBox(height: 14),
-        Text('Bulk discounts by category', style: sans(17, weight: FontWeight.w600, color: c.text, letterSpacing: -0.2, height: 1.25)),
-        const SizedBox(height: 6),
-        Row(children: [
-          const TagChip('JI'),
-          const SizedBox(width: 6),
-          Text('PRC-412', style: mono(12, weight: FontWeight.w500, color: c.text)),
-          const SizedBox(width: 6),
-          Flexible(child: Text('Jira · Story · Sprint 44', overflow: TextOverflow.ellipsis, style: sans(12, color: c.text3))),
-        ]),
-        const SizedBox(height: 14),
-        for (final (label, meta, st) in steps)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(children: [
-              Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: st == 2 ? c.okSoft : null,
-                  border: Border.all(color: st == 2 ? c.ok : (st == 1 ? c.acc : c.chipBorder), width: 1.5),
-                ),
-                child: st == 2 ? Icon(KIcons.check, size: 12, color: c.ok) : (st == 1 ? Center(child: Dot(c.acc)) : null),
-              ),
-              const SizedBox(width: 10),
-              Expanded(child: Text(label, style: sans(13, weight: st == 1 ? FontWeight.w600 : FontWeight.w500, color: st == 0 ? c.text3 : c.text))),
-              Text(meta, style: sans(11.5, color: c.text3)),
-            ]),
+        const SizedBox(height: 12),
+        Text(run.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: sans(15, weight: FontWeight.w600, color: c.text, letterSpacing: -0.2, height: 1.25)),
+        if (task != null && task.detail.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(task.detail, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: c.text3)),
+        ],
+        if (run.lastLine.isNotEmpty && run.status != AgentStatus.done) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(8)),
+            child: Text(run.lastLine, maxLines: 2, overflow: TextOverflow.ellipsis, style: mono(11, color: c.text2, height: 1.4)),
           ),
-        const SizedBox(height: 4),
+        ],
+        if (done.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(done, style: sans(11.5, color: c.text3)),
+        ],
+        const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: KButton.primary(label: 'Review diff', expand: true, onTap: () => s.openAllFiles(review.map((f) => f.path)))),
+          Expanded(
+            child: KButton.primary(
+              label: 'Review diff',
+              height: 30,
+              fontSize: 12,
+              expand: true,
+              onTap: review.isEmpty ? null : () => s.openAllFiles(review.map((f) => f.path)),
+            ),
+          ),
           const SizedBox(width: 8),
-          KButton(label: s.agentPaused ? 'Resume' : 'Pause', onTap: s.toggleAgentPaused),
+          KButton(
+            label: 'Terminal',
+            icon: KIcons.terminal,
+            height: 30,
+            fontSize: 12,
+            onTap: () => s.openTerminal(run.terminalId, title: run.title, agent: true, directory: run.worktreePath),
+          ),
         ]),
+        if (others > 0) ...[
+          const SizedBox(height: 8),
+          KPressable(
+            onTap: () => s.view = KumoView.agents,
+            semanticLabel: 'See every agent',
+            builder: (context, hover, focus) => Text(
+              others == 1 ? '1 more agent in this worktree' : '$others more agents in this worktree',
+              style: sans(11.5, color: hover || focus ? c.acc : c.text3),
+            ),
+          ),
+        ],
       ]),
     );
   }
 }
+
+/// "4 edits · 6 commands · 9 reads".
+String _stepCounts(List<AgentStep> steps) {
+  int count(bool Function(AgentStep) test) => steps.where(test).length;
+  final edits = {for (final s in steps) if (s.kind == AgentStepKind.edited) s.text}.length;
+  final runs = count((s) => s.kind == AgentStepKind.ran);
+  final reads = count((s) => s.kind == AgentStepKind.read || s.kind == AgentStepKind.searched);
+  return [
+    if (edits > 0) edits == 1 ? '1 file edited' : '$edits files edited',
+    if (runs > 0) runs == 1 ? '1 command' : '$runs commands',
+    if (reads > 0) reads == 1 ? '1 look-up' : '$reads look-ups',
+  ].join(' · ');
+}
+
+String _clock(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
 class _ChangesWidget extends StatelessWidget {
   const _ChangesWidget();
@@ -1035,35 +1422,103 @@ class _ChangesWidget extends StatelessWidget {
   }
 }
 
+/// What the worktree's agent works from: the tickets and pages it was
+/// given, and tickets linked to the worktree it wasn't sent yet. "+" sends
+/// one to the running agent, or goes to Docs for a page.
 class _ContextWidget extends StatelessWidget {
   const _ContextWidget();
 
+  void _add(BuildContext context, AgentRun? agent, List<(TaskEntry, AgentContextItem)> unsent) {
+    final s = AppScope.read(context);
+    final box = context.findRenderObject() as RenderBox;
+    showKMenu(
+      context,
+      position: box.localToGlobal(box.size.bottomRight(Offset.zero)) - const Offset(240, 0),
+      builder: (context, close) => KMenuPanel(width: 240, children: [
+        for (final (task, item) in unsent)
+          KMenuItem(
+            icon: KIcons.tasks,
+            label: 'Send ${task.key}',
+            note: agent == null ? 'No agent running here' : task.title,
+            onTap: agent == null
+                ? null
+                : () {
+                    close();
+                    s.agents.addContext(agent.id, item, text: AppState.taskPrompt(task, detail: s.tasks.cachedDetail(task.id)));
+                  },
+          ),
+        KMenuItem(
+          icon: KIcons.docs,
+          label: 'Pick a page in Docs…',
+          onTap: () {
+            close();
+            s.view = KumoView.docs;
+          },
+        ),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final s = AppScope.of(context);
     final c = context.c;
-    const items = [('JI', 'PRC-412 · Bulk discounts by category', 'Jira · ticket + 3 comments'), ('CF', 'Discount rules v3', 'Confluence · Pricing space'), ('NO', 'ADR-014 · Kafka topic naming', 'Notion · Eng handbook')];
+    final agent = s.activeAgent;
+    final sent = (agent ?? s.worktreeAgents.firstOrNull)?.context ?? const <AgentContextItem>[];
+    final unsent = [
+      for (final task in s.worktreeTasks)
+        if (s.taskContext(task) case final item when !sent.any((i) => i.title == item.title)) (task, item),
+    ];
+    final rows = [for (final item in sent) (item, true), for (final (_, item) in unsent) (item, false)];
     return Section(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        PanelHeading('Context sent to agent', trailing: KIconButton(icon: KIcons.add, label: 'Add context', size: 24, iconSize: 14, onTap: () {})),
-        const SizedBox(height: 8),
-        for (final (k, title, src) in items)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
-            child: Row(children: [
-              SourceTile(k),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: c.text)),
-                  Text(src, style: sans(11, color: c.text3)),
-                ]),
-              ),
-            ]),
+        PanelHeading(
+          'Context',
+          trailing: Builder(
+            builder: (context) => KIconButton(icon: KIcons.add, label: 'Send context to the agent', size: 24, iconSize: 14, onTap: () => _add(context, agent, unsent)),
+          ),
+        ),
+        const SizedBox(height: 6),
+        if (rows.isEmpty) Text('Tickets linked to this worktree and pages sent to its agent show here.', style: sans(12, color: c.text3, height: 1.4)),
+        for (final (item, given) in rows)
+          KPressable(
+            onTap: item.url.isEmpty ? null : () => openUrl(item.url),
+            semanticLabel: item.title,
+            builder: (context, hover, focus) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(children: [
+                SourceTile(_contextBadge(item), tooltip: item.detail.isEmpty ? null : item.detail),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: hover || focus ? c.acc : c.text)),
+                    Text(
+                      given ? item.detail : 'Linked · not sent to the agent',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(11, color: c.text3),
+                    ),
+                  ]),
+                ),
+              ]),
+            ),
           ),
       ]),
     );
   }
+}
+
+/// Two letters for where [item] lives ("Jira · Story" → JI).
+String _contextBadge(AgentContextItem item) {
+  final from = item.detail.split(' · ').first;
+  for (final kind in TaskSourceKind.values) {
+    if (kind.label == from) return kind.badge;
+  }
+  for (final kind in DocKind.values) {
+    if (kind.label == from) return kind.badge;
+  }
+  return item.kind == AgentContextKind.doc ? 'DC' : 'TK';
 }
 
 /// CI runs of the selected worktree's branch, from its repository's host
@@ -1310,38 +1765,169 @@ String _dur(Duration d) {
   return '${d.inHours}h ${(m % 60).toString().padLeft(2, '0')}m';
 }
 
-class _TestsWidget extends StatelessWidget {
+/// The worktree's tests: the command its files point to (or the one the
+/// user typed), run in a terminal, with what the runner's output says.
+class _TestsWidget extends StatefulWidget {
   const _TestsWidget();
 
   @override
+  State<_TestsWidget> createState() => _TestsWidgetState();
+}
+
+class _TestsWidgetState extends State<_TestsWidget> {
+  bool _editing = false;
+  final _command = TextEditingController();
+
+  @override
+  void dispose() {
+    _command.dispose();
+    super.dispose();
+  }
+
+  void _edit(String current) {
+    _command.value = TextEditingValue(text: current, selection: TextSelection(baseOffset: 0, extentOffset: current.length));
+    setState(() => _editing = true);
+  }
+
+  void _save(AppState s) {
+    // The detected one again: nothing of the user's to keep.
+    s.testCommand = _command.text.trim() == s.tests.command ? '' : _command.text;
+    setState(() => _editing = false);
+  }
+
+  void _output(AppState s, TestRunInfo run) {
+    final entry = s.activeWorktreeEntry;
+    s.openTerminal(run.terminalId, title: 'Tests · ${s.activeWorktree}', directory: entry == null ? null : s.workspace.absolutePathOf(entry));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final s = AppScope.of(context);
     final c = context.c;
-    const pkgs = [('internal/discount', '412ms'), ('internal/http', '1.21s'), ('internal/kafka', '838ms'), ('internal/store/pg', '2.04s')];
+    final tests = s.tests;
+    final run = tests.run;
+    final mine = s.testCommand;
+    final command = mine.isNotEmpty ? mine : tests.command;
+    final running = run?.state == TestRunState.running;
+    final (icon, status) = switch (run) {
+      null => (c.text3, ''),
+      TestRunInfo(state: TestRunState.running) => (c.acc, 'Running…'),
+      TestRunInfo(state: TestRunState.passed, :final passed) => (c.ok, passed > 0 ? '$passed passed' : 'Passed'),
+      TestRunInfo(state: TestRunState.failed, :final failed) => (c.err, failed > 0 ? '$failed failed' : 'Failed'),
+      TestRunInfo(state: TestRunState.stopped) => (c.text3, 'Stopped'),
+    };
+    final suites = run == null ? const <TestSuiteResult>[] : [...run.suites.where((s) => !s.passed), ...run.suites.where((s) => s.passed)];
     return Section(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Icon(KIcons.flask, size: 15, color: c.ok),
+          Icon(KIcons.flask, size: 15, color: icon),
           const SizedBox(width: 8),
           Expanded(child: Text('Tests', style: sans(12.5, weight: FontWeight.w600, color: c.text))),
-          Text('148 passed', style: sans(11.5, weight: FontWeight.w600, color: c.ok)),
-          Text(' · 3.1s', style: sans(11.5, color: c.text3)),
+          if (run != null) ...[
+            Text(status, style: sans(11.5, weight: FontWeight.w600, color: icon)),
+            if (!running) Text(' · ${_testDur(run.elapsed())}', style: sans(11.5, color: c.text3)),
+          ],
         ]),
-        const SizedBox(height: 8),
-        for (final (pkg, t) in pkgs)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Row(children: [
-              Text('✓ ', style: mono(11.5, color: c.ok)),
-              Expanded(child: Text(pkg, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11.5, color: c.text2))),
-              Text(t, style: mono(11.5, color: c.text3)),
-            ]),
-          ),
         const SizedBox(height: 6),
-        Text('gotestsum --watch · re-runs on save', style: sans(11.5, color: c.text3)),
+        if (_editing)
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _command,
+                autofocus: true,
+                style: mono(11.5, color: c.text),
+                cursorColor: c.acc,
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: tests.command.isEmpty ? 'e.g. make test' : tests.command,
+                  hintStyle: mono(11.5, color: c.text3),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: c.chipBorder)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: c.acc)),
+                ),
+                onSubmitted: (_) => _save(s),
+              ),
+            ),
+            const SizedBox(width: 6),
+            KButton(label: 'Save', height: 28, fontSize: 12, onTap: () => _save(s)),
+          ])
+        else
+          Row(children: [
+            Expanded(
+              child: tests.loading
+                  ? Text('Looking for the test command…', style: sans(12, color: c.text3))
+                  : command.isEmpty
+                      ? Text('No test command found in this worktree.', style: sans(12, color: c.text3))
+                      : Text.rich(
+                          TextSpan(children: [
+                            TextSpan(text: command, style: mono(11.5, color: c.text2)),
+                            TextSpan(text: mine.isNotEmpty ? '  yours' : '  from ${tests.commandOrigin}', style: sans(11, color: c.text3)),
+                          ]),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+            ),
+            if (!tests.loading) KIconButton(icon: KIcons.rename, label: 'Change the test command', size: 24, iconSize: 13, onTap: () => _edit(command)),
+          ]),
+        if (run != null) ...[
+          const SizedBox(height: 8),
+          for (final suite in suites.take(6))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(children: [
+                Text(suite.passed ? '✓ ' : '✗ ', style: mono(11.5, color: suite.passed ? c.ok : c.err)),
+                Expanded(child: Text(suite.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11.5, color: c.text2))),
+                if (suite.duration case final d?) Text(_testDur(d), style: mono(11.5, color: c.text3)),
+              ]),
+            ),
+          if (suites.length > 6) Text('and ${suites.length - 6} more', style: sans(11.5, color: c.text3)),
+          for (final name in run.failures.take(5))
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: mono(11, color: c.err, height: 1.35)),
+            ),
+          if (run.failures.length > 5) Text('and ${run.failures.length - 5} more failing', style: sans(11.5, color: c.text3)),
+          if (running && run.lastLine.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(run.lastLine, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11, color: c.text3)),
+            ),
+          if (run.skipped > 0 && !running)
+            Padding(padding: const EdgeInsets.only(top: 4), child: Text('${run.skipped} skipped', style: sans(11.5, color: c.text3))),
+        ],
+        if (tests.error case final error?) ...[
+          const SizedBox(height: 6),
+          Text(error, style: sans(11.5, color: c.err, height: 1.35)),
+        ],
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(
+            child: running
+                ? KButton(label: 'Stop', height: 30, fontSize: 12, expand: true, onTap: tests.stop)
+                : KButton.primary(
+                    label: run == null ? 'Run tests' : 'Run again',
+                    height: 30,
+                    fontSize: 12,
+                    expand: true,
+                    onTap: command.isEmpty ? null : () => tests.runTests(command: mine),
+                  ),
+          ),
+          if (run != null) ...[
+            const SizedBox(width: 8),
+            KButton(label: 'Output', icon: KIcons.terminal, height: 30, fontSize: 12, onTap: () => _output(s, run)),
+          ],
+        ]),
       ]),
     );
   }
+}
+
+/// `412ms`, `3.1s`, `2m 05s`.
+String _testDur(Duration d) {
+  if (d.inMilliseconds < 1000) return '${d.inMilliseconds}ms';
+  if (d.inSeconds < 60) return '${(d.inMilliseconds / 1000).toStringAsFixed(1)}s';
+  return _dur(d);
 }
 
 /// The pull request of the selected worktree's branch, from its host:
@@ -1588,18 +2174,43 @@ class _PullRequestCardState extends State<PullRequestCard> {
   }
 }
 
-class _ActivityWidget extends StatelessWidget {
+/// What happened in the worktree, newest first: each agent's steps (read
+/// from its terminal) and the test runs.
+class _ActivityWidget extends StatefulWidget {
   const _ActivityWidget();
 
   @override
+  State<_ActivityWidget> createState() => _ActivityWidgetState();
+}
+
+class _ActivityWidgetState extends State<_ActivityWidget> {
+  static const _shown = 6;
+  bool _all = false;
+
+  @override
   Widget build(BuildContext context) {
+    final s = AppScope.of(context);
     final c = context.c;
-    final events = [
-      ('14:05', 'Editing internal/kafka/bulk_consumer.go', c.acc),
-      ('14:03', 'go test ./internal/discount/... passed', c.ok),
-      ('13:58', 'Read Confluence › Discount rules v3', c.text3),
-      ('13:54', 'Started from Jira PRC-412', c.text3),
-    ];
+    final agents = s.worktreeAgents;
+    final events = <(DateTime, String, Color)>[
+      for (final run in agents)
+        for (final step in run.steps) (step.at, '${agents.length > 1 ? '${run.short} · ' : ''}${_stepText(step)}', _stepColor(c, step)),
+      if (s.tests.run case final run?) ...[
+        (run.startedAt, 'Ran tests: ${run.command}', c.text3),
+        if (run.finishedAt case final at?)
+          switch (run.state) {
+            TestRunState.passed => (at, run.passed > 0 ? 'Tests passed · ${run.passed}' : 'Tests passed', c.ok),
+            TestRunState.failed => (at, run.failed > 0 ? '${run.failed} tests failed' : 'Tests failed', c.err),
+            _ => (at, 'Tests stopped', c.text3),
+          },
+      ],
+    ]..sort((a, b) => b.$1.compareTo(a.$1));
+    final shown = _all ? events.take(40) : events.take(_shown);
+    final who = switch (agents) {
+      [] => '',
+      [final run] => run.providerName,
+      _ => '${agents.length} agents',
+    };
     return Section(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -1607,20 +2218,54 @@ class _ActivityWidget extends StatelessWidget {
           Icon(KIcons.activity, size: 15, color: c.acc),
           const SizedBox(width: 8),
           Expanded(child: Text('Activity', style: sans(12.5, weight: FontWeight.w600, color: c.text))),
-          Text('Claude · PRC-412', style: sans(11.5, color: c.text3)),
+          if (who.isNotEmpty) Flexible(child: Text(who, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, color: c.text3))),
         ]),
         const SizedBox(height: 10),
-        for (final (t, text, col) in events)
+        if (events.isEmpty) Text('What agents and test runs do in this worktree shows here, step by step.', style: sans(12, color: c.text3, height: 1.4)),
+        for (final (at, text, color) in shown)
           Padding(
             padding: const EdgeInsets.only(bottom: 9),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SizedBox(width: 38, child: Text(t, style: mono(11, color: c.text3))),
-              Padding(padding: const EdgeInsets.only(top: 5), child: Dot(col)),
+              SizedBox(width: 38, child: Text(_clock(at), style: mono(11, color: c.text3))),
+              Padding(padding: const EdgeInsets.only(top: 5), child: Dot(color)),
               const SizedBox(width: 10),
-              Expanded(child: Text(text, style: sans(12, color: c.text2))),
+              Expanded(child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: sans(12, color: c.text2))),
             ]),
+          ),
+        if (events.length > _shown)
+          KPressable(
+            onTap: () => setState(() => _all = !_all),
+            semanticLabel: _all ? 'Show less' : 'Show all activity',
+            builder: (context, hover, focus) => Text(
+              _all ? 'Show less' : 'Show all ${events.length > 40 ? 'latest 40' : events.length}',
+              style: sans(11.5, color: hover || focus ? c.acc : c.text3),
+            ),
           ),
       ]),
     );
   }
 }
+
+String _stepText(AgentStep step) => switch (step.kind) {
+      AgentStepKind.started => 'Started ${step.text}',
+      AgentStepKind.edited => 'Edited ${step.text}',
+      AgentStepKind.ran => 'Ran ${step.text}',
+      AgentStepKind.read => step.text.startsWith('Read ') ? step.text : 'Read ${step.text}',
+      AgentStepKind.searched => step.text.startsWith('Searched ') || step.text.startsWith('Listed ') ? step.text : 'Searched ${step.text}',
+      AgentStepKind.tool => step.text,
+      AgentStepKind.waiting => step.text.isEmpty ? 'Waiting for you' : 'Waiting for you · ${step.text}',
+      AgentStepKind.context => 'Got ${step.text}',
+      AgentStepKind.exited => step.text,
+    };
+
+Color _stepColor(KumoPalette c, AgentStep step) => switch (step.kind) {
+      AgentStepKind.edited => c.acc,
+      AgentStepKind.ran => c.text2,
+      AgentStepKind.waiting => c.warn,
+      AgentStepKind.exited => switch (step.text) {
+        'Finished' => c.ok,
+        'Stopped' => c.text3,
+        _ => c.err,
+      },
+      _ => c.text3,
+    };

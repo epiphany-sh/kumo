@@ -74,6 +74,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Files tab: each file opened from the tree gets a tab; ⌘W closes it', (tester) async {
+    final state = await _pump(tester);
+    await tester.tap(find.byTooltip(ContextTab.files.tooltip));
+    await tester.pump();
+    await tester.tap(find.text('bulk.go').first);
+    await tester.pump();
+    await tester.tap(find.text('repository.go').first);
+    await tester.pump();
+    expect(state.contextFiles, ['internal/discount/bulk.go', 'internal/discount/repository.go']);
+    expect(state.contextFile, 'internal/discount/repository.go');
+    expect(find.byTooltip('Close bulk.go (⌘W)'), findsOneWidget);
+    // Back to the first file through its tab.
+    await tester.tap(find.byTooltip('internal/discount/bulk.go').last);
+    await tester.pump();
+    expect(state.contextFile, 'internal/discount/bulk.go');
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyW);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+    expect(state.contextFiles, ['internal/discount/repository.go']);
+    expect(state.contextFile, 'internal/discount/repository.go');
+    expect(state.activeContext, ContextTab.files, reason: 'the Files tab stays while it has files');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Terminal in the side-nav opens Home: a shell in ~, no widgets', (tester) async {
     final state = await _pump(tester);
     await tester.tap(find.byTooltip('Terminal in ~, not tied to a repository  ⌘1'));
@@ -91,6 +116,57 @@ void main() {
     expect(state.inHome, isFalse);
     expect(find.byType(SidePanel), findsOneWidget);
     expect(find.text('Claude Code'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('Files tab: close others keeps the file showing; close all empties it', () {
+    final s = AppState();
+    for (final p in ['go.mod', 'internal/discount/bulk.go', 'internal/http/routes.go']) {
+      s.showContextFile(p);
+    }
+    s.showContextFile('internal/discount/bulk.go');
+    s.closeOtherContextFiles();
+    expect(s.contextFiles, ['internal/discount/bulk.go']);
+    expect(s.contextFile, 'internal/discount/bulk.go');
+    s.closeAllContextFiles();
+    expect(s.contextFiles, isEmpty);
+    expect(s.contextFile, isNull);
+    s.dispose();
+  });
+
+  testWidgets('Files tab with many files: the strip scrolls, “N open” lists them all and closes others', (tester) async {
+    final state = await _pump(tester);
+    await tester.tap(find.byTooltip(ContextTab.files.tooltip));
+    await tester.pump();
+    const many = [
+      'cmd/price-admin/main.go', 'config/app.yaml', 'deploy/k8s/values.yaml', 'go.mod',
+      'internal/discount/bulk.go', 'internal/discount/bulk_test.go', 'internal/discount/discount.go',
+      'internal/discount/legacy_v1.go', 'internal/discount/repository.go', 'internal/discount/service.go',
+      'internal/http/handler.go', 'internal/http/routes.go', 'internal/kafka/bulk_consumer.go',
+      'migrations/0042_discount_category.sql',
+    ];
+    for (final p in many) {
+      state.showContextFile(p);
+    }
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('14 open'), findsOneWidget);
+    // The last file opened is the one showing, and its tab was scrolled into view.
+    final strip = tester.widget<SingleChildScrollView>(
+      find.ancestor(of: find.byTooltip('Close 0042_discount_category.sql (⌘W)'), matching: find.byType(SingleChildScrollView)).first,
+    );
+    expect(strip.controller!.offset, greaterThan(0));
+
+    await tester.tap(find.text('14 open'));
+    await tester.pump();
+    expect(find.text('Close others'), findsOneWidget);
+    expect(find.text('Close all'), findsOneWidget);
+    await tester.tap(find.text('Close others'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(state.contextFiles, ['migrations/0042_discount_category.sql']);
+    expect(find.text('1 open'), findsOneWidget);
+    expect(find.text('Close others'), findsNothing, reason: 'the menu closed');
     expect(tester.takeException(), isNull);
   });
 }

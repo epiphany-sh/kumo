@@ -4,6 +4,16 @@ import '../editor/working_copy.dart';
 import 'changes.dart';
 import 'mock_project.dart';
 
+/// A file as the editor gets it.
+@immutable
+class FileText {
+  const FileText(this.text, {this.readOnly});
+  final String text;
+
+  /// Why it can't be edited here, or null.
+  final String? readOnly;
+}
+
 /// A commit in the history.
 @immutable
 class CommitInfo {
@@ -42,6 +52,14 @@ abstract class WorktreeChanges extends ChangeNotifier {
 
   /// Text of a file; null when it can't be shown (binary, missing).
   Future<String?> read(String path);
+
+  /// The file for the editor: its text, or why it can't be edited (binary,
+  /// not UTF-8, cut off because it's big). Null when it doesn't exist.
+  /// Throws when the file couldn't be read right now.
+  Future<FileText?> readForEdit(String path) async {
+    final text = await read(path);
+    return text == null ? const FileText('', readOnly: 'This file can’t be shown as text') : FileText(text);
+  }
   Future<void> write(String path, String text);
 
   // ---- Status ----
@@ -89,6 +107,20 @@ abstract class WorktreeChanges extends ChangeNotifier {
   /// Back to HEAD (restores a deleted file).
   Future<void> restore(String path);
 
+  /// [restore] for several files at once (a folder's changes).
+  Future<void> restoreAll(List<String> paths) async {
+    for (final p in paths) {
+      await restore(p);
+    }
+  }
+
+  /// Renames or moves a file or folder ([to] must be free; its folders are
+  /// created). False when it failed ([error] says why).
+  Future<bool> move(String from, String to);
+
+  /// Deletes files, or folders with everything in them.
+  Future<bool> remove(List<String> paths);
+
   /// Writes the resolved text ([keep]: current / incoming / both) and stages.
   Future<void> resolveConflict(String path, String keep, String text);
 
@@ -119,6 +151,11 @@ class MockWorktreeChanges extends WorktreeChanges {
 
   final _wc = WorkingCopy();
   final _texts = <String, String>{};
+
+  /// Files deleted or moved away, and files created or moved here.
+  final _gone = <String>{};
+  final _made = <String>{};
+  List<String>? _files;
   bool _committed = false;
   bool _pushed = false;
 
@@ -138,13 +175,59 @@ class MockWorktreeChanges extends WorktreeChanges {
   String? get error => null;
 
   @override
-  List<String> get files => {...MockProject.files.keys, ...MockChanges.tree}.toList();
+  List<String> get files => _files ??= [
+        for (final p in {...MockProject.files.keys, ...MockChanges.tree, ..._made}) if (!_gone.contains(p)) p,
+      ];
 
   @override
-  Future<String?> read(String path) async => _texts[path] ?? MockProject.files[path];
+  Future<String?> read(String path) async => _gone.contains(path) ? null : (_texts[path] ?? MockProject.files[path]);
 
   @override
-  Future<void> write(String path, String text) async => _texts[path] = text;
+  Future<void> write(String path, String text) async {
+    _texts[path] = text;
+    if (!files.contains(path)) {
+      _gone.remove(path);
+      _made.add(path);
+      _files = null;
+      notifyListeners();
+    }
+  }
+
+  /// [path] itself, or the files under it when it is a folder.
+  List<String> _under(String path) => [for (final f in files) if (f == path || f.startsWith('$path/')) f];
+
+  @override
+  Future<bool> move(String from, String to) async {
+    final moving = _under(from);
+    if (moving.isEmpty || _under(to).isNotEmpty || to.startsWith('$from/')) return false;
+    for (final f in moving) {
+      final dest = to + f.substring(from.length);
+      final text = await read(f);
+      _texts[dest] = text ?? '';
+      _gone
+        ..add(f)
+        ..remove(dest);
+      _made
+        ..remove(f)
+        ..add(dest);
+    }
+    _files = null;
+    notifyListeners();
+    return true;
+  }
+
+  @override
+  Future<bool> remove(List<String> paths) async {
+    for (final p in paths) {
+      for (final f in _under(p)) {
+        _gone.add(f);
+        _made.remove(f);
+      }
+      _files = null;
+    }
+    notifyListeners();
+    return true;
+  }
 
   @override
   GitStatus? statusOf(String path) => _wc.statusOf(path);
@@ -311,6 +394,10 @@ class NoWorktreeChanges extends WorktreeChanges {
   void unstage(List<String> paths) {}
   @override
   Future<void> restore(String path) async {}
+  @override
+  Future<bool> move(String from, String to) async => false;
+  @override
+  Future<bool> remove(List<String> paths) async => false;
   @override
   Future<void> resolveConflict(String path, String keep, String text) async {}
   @override

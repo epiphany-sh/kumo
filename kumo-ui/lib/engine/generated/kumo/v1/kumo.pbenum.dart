@@ -123,6 +123,73 @@ class DiffLineKind extends $pb.ProtobufEnum {
   const DiffLineKind._(super.value, super.name);
 }
 
+class AgentContextKind extends $pb.ProtobufEnum {
+  static const AgentContextKind AGENT_CONTEXT_KIND_TASK =
+      AgentContextKind._(0, _omitEnumNames ? '' : 'AGENT_CONTEXT_KIND_TASK');
+  static const AgentContextKind AGENT_CONTEXT_KIND_DOC =
+      AgentContextKind._(1, _omitEnumNames ? '' : 'AGENT_CONTEXT_KIND_DOC');
+
+  static const $core.List<AgentContextKind> values = <AgentContextKind>[
+    AGENT_CONTEXT_KIND_TASK,
+    AGENT_CONTEXT_KIND_DOC,
+  ];
+
+  static final $core.List<AgentContextKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
+  static AgentContextKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const AgentContextKind._(super.value, super.name);
+}
+
+class AgentEventKind extends $pb.ProtobufEnum {
+  static const AgentEventKind AGENT_EVENT_KIND_STARTED =
+      AgentEventKind._(0, _omitEnumNames ? '' : 'AGENT_EVENT_KIND_STARTED');
+  static const AgentEventKind AGENT_EVENT_KIND_EDITED =
+      AgentEventKind._(1, _omitEnumNames ? '' : 'AGENT_EVENT_KIND_EDITED');
+  static const AgentEventKind AGENT_EVENT_KIND_RAN =
+      AgentEventKind._(2, _omitEnumNames ? '' : 'AGENT_EVENT_KIND_RAN');
+  static const AgentEventKind AGENT_EVENT_KIND_READ =
+      AgentEventKind._(3, _omitEnumNames ? '' : 'AGENT_EVENT_KIND_READ');
+  static const AgentEventKind AGENT_EVENT_KIND_SEARCHED =
+      AgentEventKind._(4, _omitEnumNames ? '' : 'AGENT_EVENT_KIND_SEARCHED');
+
+  /// Another tool, named in the text.
+  static const AgentEventKind AGENT_EVENT_KIND_TOOL =
+      AgentEventKind._(5, _omitEnumNames ? '' : 'AGENT_EVENT_KIND_TOOL');
+
+  /// Its turn ended; the text is what it said last.
+  static const AgentEventKind AGENT_EVENT_KIND_WAITING =
+      AgentEventKind._(6, _omitEnumNames ? '' : 'AGENT_EVENT_KIND_WAITING');
+
+  /// It was sent a ticket or page (the text is its title).
+  static const AgentEventKind AGENT_EVENT_KIND_CONTEXT =
+      AgentEventKind._(7, _omitEnumNames ? '' : 'AGENT_EVENT_KIND_CONTEXT');
+
+  /// The process ended; the text says how.
+  static const AgentEventKind AGENT_EVENT_KIND_EXITED =
+      AgentEventKind._(8, _omitEnumNames ? '' : 'AGENT_EVENT_KIND_EXITED');
+
+  static const $core.List<AgentEventKind> values = <AgentEventKind>[
+    AGENT_EVENT_KIND_STARTED,
+    AGENT_EVENT_KIND_EDITED,
+    AGENT_EVENT_KIND_RAN,
+    AGENT_EVENT_KIND_READ,
+    AGENT_EVENT_KIND_SEARCHED,
+    AGENT_EVENT_KIND_TOOL,
+    AGENT_EVENT_KIND_WAITING,
+    AGENT_EVENT_KIND_CONTEXT,
+    AGENT_EVENT_KIND_EXITED,
+  ];
+
+  static final $core.List<AgentEventKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 8);
+  static AgentEventKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const AgentEventKind._(super.value, super.name);
+}
+
 class AgentState extends $pb.ProtobufEnum {
   /// Producing output.
   static const AgentState AGENT_STATE_WORKING =
@@ -544,6 +611,33 @@ class DocKind extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const DocKind._(super.value, super.name);
+}
+
+class TestRunState extends $pb.ProtobufEnum {
+  static const TestRunState TEST_RUN_STATE_RUNNING =
+      TestRunState._(0, _omitEnumNames ? '' : 'TEST_RUN_STATE_RUNNING');
+  static const TestRunState TEST_RUN_STATE_PASSED =
+      TestRunState._(1, _omitEnumNames ? '' : 'TEST_RUN_STATE_PASSED');
+  static const TestRunState TEST_RUN_STATE_FAILED =
+      TestRunState._(2, _omitEnumNames ? '' : 'TEST_RUN_STATE_FAILED');
+
+  /// Stopped before it finished.
+  static const TestRunState TEST_RUN_STATE_STOPPED =
+      TestRunState._(3, _omitEnumNames ? '' : 'TEST_RUN_STATE_STOPPED');
+
+  static const $core.List<TestRunState> values = <TestRunState>[
+    TEST_RUN_STATE_RUNNING,
+    TEST_RUN_STATE_PASSED,
+    TEST_RUN_STATE_FAILED,
+    TEST_RUN_STATE_STOPPED,
+  ];
+
+  static final $core.List<TestRunState?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static TestRunState? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TestRunState._(super.value, super.name);
 }
 
 const $core.bool _omitEnumNames =

@@ -106,6 +106,30 @@ impl pb::git_server::Git for GitGrpc {
         Ok(Response::new(pb::WriteFileResponse {}))
     }
 
+    async fn move_path(
+        &self,
+        request: Request<pb::MovePathRequest>,
+    ) -> Result<Response<pb::GitActionResponse>, Status> {
+        let request = request.into_inner();
+        done(
+            self.service
+                .move_path(&path(request.worktree_path), &request.from, &request.to)
+                .await,
+        )
+    }
+
+    async fn remove_paths(
+        &self,
+        request: Request<pb::PathsRequest>,
+    ) -> Result<Response<pb::GitActionResponse>, Status> {
+        let request = request.into_inner();
+        done(
+            self.service
+                .remove_paths(&path(request.worktree_path), &request.paths)
+                .await,
+        )
+    }
+
     async fn diff(
         &self,
         request: Request<pb::DiffRequest>,

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
+import '../data/agents_source.dart';
 import '../data/docs_source.dart';
 import '../data/tasks_source.dart';
 import '../overlays/new_agent_dialog.dart';
@@ -45,6 +46,8 @@ class _DocsScreenState extends State<DocsScreen> {
   String? _pageError;
   int _readSeq = 0;
   bool _copied = false;
+  bool _sent = false;
+  String? _sendError;
 
   @override
   void dispose() {
@@ -100,6 +103,8 @@ class _DocsScreenState extends State<DocsScreen> {
       _pageLoading = true;
       _pageError = null;
       _copied = false;
+      _sent = false;
+      _sendError = null;
     });
     try {
       final page = await s.docs.read(id);
@@ -291,6 +296,19 @@ class _DocsScreenState extends State<DocsScreen> {
           Text('Start an agent in a worktree with this page as context.', style: sans(12, color: c.text3, height: 1.4)),
           const SizedBox(height: 12),
           KButton.primary(label: 'Start agent with this page', expand: true, onTap: () => _startAgent(page)),
+          if (AppScope.of(context).activeAgent case final agent? when AppScope.of(context).agents.live) ...[
+            const SizedBox(height: 8),
+            KButton(
+              label: _sent ? 'Sent to ${agent.providerName}' : 'Send to ${agent.providerName}',
+              icon: _sent ? KIcons.check : KIcons.send,
+              expand: true,
+              onTap: _sent ? null : () => _sendToAgent(page, agent),
+            ),
+            if (_sendError case final error?) ...[
+              const SizedBox(height: 6),
+              Text(error, style: sans(11.5, color: c.err, height: 1.35)),
+            ],
+          ],
           const SizedBox(height: 8),
           KButton(
             label: _copied ? 'Copied' : 'Copy as Markdown',
@@ -321,9 +339,10 @@ class _DocsScreenState extends State<DocsScreen> {
     ]);
   }
 
-  /// A vault note is read where it is; a Confluence page is saved as
-  /// Markdown in the temp folder first, since agents can't sign in to it.
-  Future<void> _startAgent(DocPage page) async {
+  /// What an agent is told about [page]. A vault note is read where it
+  /// is; a Confluence page is saved as Markdown in the temp folder first,
+  /// since agents can't sign in to it.
+  static Future<String> _promptFor(DocPage page) async {
     var file = page.file;
     if (file.isEmpty) {
       try {
@@ -332,12 +351,37 @@ class _DocsScreenState extends State<DocsScreen> {
         file = '';
       }
     }
-    if (!mounted) return;
     final where = file.isEmpty ? '' : ' (saved at $file)';
     final link = page.summary.url.isEmpty ? '' : ' — ${page.summary.url}';
-    await showNewAgentDialog(context, prompt: 'Read the ${page.source.kind.label} page “${page.summary.title}”$where$link and use it as context. ');
+    return 'Read the ${page.source.kind.label} page “${page.summary.title}”$where$link and use it as context.';
+  }
+
+  Future<void> _startAgent(DocPage page) async {
+    final prompt = await _promptFor(page);
+    if (!mounted) return;
+    await showNewAgentDialog(context, prompt: '$prompt ', about: [docContext(page)]);
+  }
+
+  /// Types the page into the worktree's running agent.
+  Future<void> _sendToAgent(DocPage page, AgentRun agent) async {
+    final s = AppScope.read(context);
+    final prompt = await _promptFor(page);
+    final sent = await s.agents.addContext(agent.id, docContext(page), text: prompt);
+    if (!mounted) return;
+    setState(() {
+      _sent = sent;
+      _sendError = sent ? null : (s.agents.error ?? 'The page didn’t reach ${agent.providerName}.');
+    });
   }
 }
+
+/// [page] as an agent's context: its title and where it lives.
+AgentContextItem docContext(DocPage page) => AgentContextItem(
+      kind: AgentContextKind.doc,
+      title: page.summary.title,
+      detail: [page.source.kind.label, page.summary.place].where((p) => p.isNotEmpty).join(' · '),
+      url: page.summary.url,
+    );
 
 /// Writes [page] as Markdown under the temp folder; returns the path.
 Future<String> saveDocForAgent(DocPage page) async {

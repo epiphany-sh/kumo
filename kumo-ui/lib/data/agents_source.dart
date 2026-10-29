@@ -46,6 +46,58 @@ class AgentProviderInfo {
   final bool hasLogin;
 }
 
+enum AgentContextKind { task, doc }
+
+/// A ticket or page an agent was given.
+@immutable
+class AgentContextItem {
+  const AgentContextItem({required this.kind, required this.title, this.detail = '', this.url = ''});
+  final AgentContextKind kind;
+
+  /// e.g. "PRC-412 · Bulk discounts by category".
+  final String title;
+
+  /// Where it lives, e.g. "Jira" or "Confluence · Pricing".
+  final String detail;
+  final String url;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AgentContextItem && other.kind == kind && other.title == title && other.detail == detail && other.url == url;
+
+  @override
+  int get hashCode => Object.hash(kind, title, detail, url);
+}
+
+enum AgentStepKind {
+  started,
+  edited,
+  ran,
+  read,
+  searched,
+
+  /// Another tool, named in the text.
+  tool,
+
+  /// Its turn ended; the text is what it said last.
+  waiting,
+
+  /// It was sent a ticket or page (the text is its title).
+  context,
+
+  /// The process ended; the text says how.
+  exited,
+}
+
+/// One step of an agent's timeline, as the daemon read it from its terminal.
+@immutable
+class AgentStep {
+  const AgentStep({required this.at, required this.kind, this.text = ''});
+  final DateTime at;
+  final AgentStepKind kind;
+  final String text;
+}
+
 /// An agent running (or that ran) in a worktree.
 @immutable
 class AgentRun {
@@ -62,6 +114,8 @@ class AgentRun {
     this.prompt = '',
     this.exitCode = 0,
     this.lastLine = '',
+    this.context = const [],
+    this.steps = const [],
   });
 
   final String id;
@@ -76,6 +130,12 @@ class AgentRun {
   final int exitCode;
   final DateTime startedAt;
   final String lastLine;
+
+  /// What it was given to work from, in the order it got it.
+  final List<AgentContextItem> context;
+
+  /// What it did, oldest first.
+  final List<AgentStep> steps;
 }
 
 /// Coding agents: the providers the user connected in Settings and the
@@ -108,7 +168,12 @@ abstract class AgentsSource extends ChangeNotifier {
   List<AgentRun> get runs;
 
   /// Starts an agent ([providerId] null: the default one) in a worktree.
-  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = ''});
+  /// [context] is what the prompt hands it (a ticket, a page).
+  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = '', List<AgentContextItem> context = const []});
+
+  /// Sends [item] to a running agent: [text] is typed into its terminal and
+  /// submitted. False when it couldn't be sent ([error] says why).
+  Future<bool> addContext(String id, AgentContextItem item, {String text = ''});
 
   Future<void> stop(String id);
   Future<void> dismiss(String id);
@@ -184,7 +249,10 @@ class MockAgentsSource extends AgentsSource {
   List<AgentRun> get runs => const [];
 
   @override
-  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = ''}) async => null;
+  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = '', List<AgentContextItem> context = const []}) async => null;
+
+  @override
+  Future<bool> addContext(String id, AgentContextItem item, {String text = ''}) async => false;
 
   @override
   Future<void> stop(String id) async {}

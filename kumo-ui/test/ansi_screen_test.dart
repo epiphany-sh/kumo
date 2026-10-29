@@ -111,4 +111,67 @@ void main() {
     final screen = fed('top\x1b[2;3r\x1b[2;1Ha\r\nb\r\nc', rows: 4);
     expect(screenText(screen), ['top', 'b', 'c', '']);
   });
+
+  group('resize re-wraps lines', () {
+    test('a wrapped line joins back when the terminal widens', () {
+      final screen = fed('0123456789abcdefghijklmnopqrstuvwxyz\r\n\$ ', cols: 10, rows: 6);
+      expect(screenText(screen).take(5), ['0123456789', 'abcdefghij', 'klmnopqrst', 'uvwxyz', r'$']);
+      screen.resize(40, 6);
+      expect(screenText(screen), ['0123456789abcdefghijklmnopqrstuvwxyz', r'$', '', '', '', '']);
+      expect(screen.snapshot().cursor, (1, 2), reason: 'still after the prompt');
+      screen.feed(utf8.encode('ls'));
+      expect(screenText(screen)[1], r'$ ls');
+    });
+
+    test('narrowing wraps long lines and pushes the oldest into scrollback', () {
+      final screen = fed('first line here\r\nsecond\r\n> ', cols: 20, rows: 3);
+      screen.resize(6, 3);
+      final lines = screenText(screen);
+      expect(lines.join('|'), 'first|line h|ere|second|>');
+      final b = screen.snapshot();
+      expect(b.cursor, (4, 2));
+      expect(b.reflows, 1);
+      screen.resize(20, 3);
+      expect(screenText(screen).where((l) => l.isNotEmpty), ['first line here', 'second', '>']);
+    });
+
+    test('hard line breaks stay where they were', () {
+      final screen = fed('ab\r\ncd\r\n', cols: 10, rows: 4);
+      screen.resize(3, 4);
+      expect(screenText(screen).take(2), ['ab', 'cd']);
+    });
+
+    test('a wide glyph never splits across rows', () {
+      final screen = fed('abc漢字', cols: 10, rows: 3);
+      screen.resize(4, 3);
+      expect(screenText(screen).take(2), ['abc', '漢字']);
+    });
+
+    test('a full-screen program keeps its screen; the main one re-wraps under it', () {
+      final screen = fed('0123456789abc\r\n\$ ', cols: 10, rows: 4);
+      screen.feed(utf8.encode('\x1b[?1049hVIM'));
+      screen.resize(20, 4);
+      expect(screen.snapshot().altScreen, isTrue);
+      expect(screenText(screen).last, '');
+      screen.feed(utf8.encode('\x1b[?1049l'));
+      expect(screenText(screen).take(2), ['0123456789abc', r'$']);
+    });
+
+    test('scrollback trims count as dropped lines', () {
+      final screen = AnsiScreen(cols: 10, rows: 2, maxScrollback: 3)..feed(utf8.encode('1\r\n2\r\n3\r\n4\r\n5\r\n6'));
+      final b = screen.snapshot();
+      expect(b.lines.map(text), ['2', '3', '4', '5', '6']);
+      expect(b.dropped, 1);
+      screen.clearScrollback();
+      expect(screen.snapshot().dropped, 4);
+      expect(screenText(screen), ['5', '6']);
+    });
+
+    test('mouse modes are tracked', () {
+      final screen = fed('\x1b[?1000h\x1b[?1006h');
+      expect((screen.mouseTracking, screen.sgrMouse), (true, true));
+      screen.feed(utf8.encode('\x1b[?1000l'));
+      expect(screen.mouseTracking, isFalse);
+    });
+  });
 }

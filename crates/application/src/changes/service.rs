@@ -124,6 +124,43 @@ impl ChangesService {
         blocking(move || files.write(&worktree, &path, &bytes)).await
     }
 
+    /// Renames or moves a file or folder inside the worktree.
+    pub async fn move_path(
+        &self,
+        worktree: &Path,
+        from: &str,
+        to: &str,
+    ) -> Result<(), ChangesError> {
+        let worktree = self.worktree(worktree).await?;
+        let (from, to) = (RelativePath::parse(from)?, RelativePath::parse(to)?);
+        let files = Arc::clone(&self.ports.files);
+        let target = worktree.clone();
+        blocking(move || files.rename(&target, &from, &to)).await?;
+        self.workspace.refresh_worktree(&worktree).await;
+        Ok(())
+    }
+
+    /// Deletes files, or folders with everything in them.
+    pub async fn remove_paths(
+        &self,
+        worktree: &Path,
+        paths: &[String],
+    ) -> Result<(), ChangesError> {
+        let worktree = self.worktree(worktree).await?;
+        let paths = paths
+            .iter()
+            .map(|p| RelativePath::parse(p))
+            .collect::<Result<Vec<_>, _>>()?;
+        if paths.is_empty() {
+            return Ok(());
+        }
+        let files = Arc::clone(&self.ports.files);
+        let target = worktree.clone();
+        blocking(move || paths.iter().try_for_each(|p| files.remove(&target, p))).await?;
+        self.workspace.refresh_worktree(&worktree).await;
+        Ok(())
+    }
+
     pub async fn diff(
         &self,
         worktree: &Path,

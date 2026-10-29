@@ -115,9 +115,31 @@ class EngineWorktreeChanges extends ui.WorktreeChanges {
       if (file.binary) return null;
       return utf8.decode(file.content, allowMalformed: true);
     } on GrpcError {
+      // A failure isn't the committed text: only a deleted file shows that.
+      if (statusOf(path) != GitStatus.deleted) return null;
       // Deleted in the working tree: show the last committed version.
       final diff = await this.diff(path);
       return diff == null ? null : [for (final l in diff.lines) if (l.kind != DiffKind.added) l.text].join('\n');
+    }
+  }
+
+  @override
+  Future<ui.FileText?> readForEdit(String path) async {
+    final ReadFileResponse file;
+    try {
+      file = await (await _conn).git.readFile(ReadFileRequest(worktreePath: worktree, path: path));
+    } on GrpcError {
+      if (statusOf(path) == GitStatus.deleted) return null;
+      rethrow;
+    }
+    if (file.binary) return const ui.FileText('', readOnly: 'A binary file: it can’t be edited here');
+    if (file.truncated) {
+      return ui.FileText(utf8.decode(file.content, allowMalformed: true), readOnly: 'Too big to edit here: only the beginning is shown');
+    }
+    try {
+      return ui.FileText(utf8.decode(file.content));
+    } on FormatException {
+      return ui.FileText(utf8.decode(file.content, allowMalformed: true), readOnly: 'Not UTF-8 text: saving it here would change its bytes');
     }
   }
 
@@ -241,6 +263,23 @@ class EngineWorktreeChanges extends ui.WorktreeChanges {
 
   @override
   Future<void> restore(String path) => _act((git) => git.restore(_paths([path])));
+
+  @override
+  Future<void> restoreAll(List<String> paths) => _act((git) => git.restore(_paths(paths)));
+
+  @override
+  Future<bool> move(String from, String to) async {
+    final ok = await _act((git) => git.movePath(MovePathRequest(worktreePath: worktree, from: from, to: to)));
+    if (ok) unawaited(_listFiles());
+    return ok;
+  }
+
+  @override
+  Future<bool> remove(List<String> paths) async {
+    final ok = await _act((git) => git.removePaths(_paths(paths)));
+    if (ok) unawaited(_listFiles());
+    return ok;
+  }
 
   @override
   Future<void> resolveConflict(String path, String keep, String text) async {

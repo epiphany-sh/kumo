@@ -8,6 +8,7 @@
 //! - [`terminal`]: open, attach to, drive and close terminal sessions.
 //! - [`daemon`]: daemon-level use cases (handshake).
 //! - [`tasks`]: tasks from the user's tools, synced in the background.
+//! - [`test_runs`]: a worktree's tests, run in a terminal and read.
 //! - [`workspace`]: namespaces, repositories and worktrees.
 
 pub mod agents;
@@ -18,4 +19,5 @@ pub mod pipelines;
 pub mod pulls;
 pub mod tasks;
 pub mod terminal;
+pub mod test_runs;
 pub mod workspace;

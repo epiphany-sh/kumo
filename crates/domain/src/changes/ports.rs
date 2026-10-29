@@ -46,6 +46,16 @@ pub trait FileStore: Send + Sync + 'static {
     ) -> Result<FileContent, ChangesError>;
     fn write(&self, worktree: &Path, path: &RelativePath, bytes: &[u8])
     -> Result<(), ChangesError>;
+    /// Renames or moves a file or folder, creating `to`'s folders. Fails
+    /// when `to` already exists.
+    fn rename(
+        &self,
+        worktree: &Path,
+        from: &RelativePath,
+        to: &RelativePath,
+    ) -> Result<(), ChangesError>;
+    /// Deletes a file, or a folder with everything in it.
+    fn remove(&self, worktree: &Path, path: &RelativePath) -> Result<(), ChangesError>;
 }
 
 /// Keeps a watch alive; dropping it stops watching.

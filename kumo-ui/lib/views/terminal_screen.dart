@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/gestures.dart' show PointerScrollEvent, PointerSignalEvent;
 import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
@@ -301,10 +302,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
       case TerminalCommand.closePane:
         final ctx = _app?.activeContext;
         final file = _app?.activeFile;
-        if (ctx != null) {
+        final ctxFile = _app?.contextFile;
+        if (ctx == ContextTab.files && ctxFile != null) {
+          // In the Files tab ⌘W closes the file showing, then the tab.
+          _app!.askClose(ctxFile, files: true);
+        } else if (ctx != null) {
           _app!.closeContext(ctx);
         } else if (file != null) {
-          _app!.closeFile(file);
+          _app!.askClose(file);
         } else {
           _close(_focus);
         }
@@ -650,10 +655,18 @@ class _TerminalScreenState extends State<TerminalScreen> {
               const SizedBox(width: 7),
               Text(name, style: mono(11.5, color: on || hover ? c.text : c.text2)),
               if (f != null) ...[const SizedBox(width: 6), Text(f.kind, style: mono(10, weight: FontWeight.w700, color: col))],
+              if (s.buffers.isDirty(path)) ...[const SizedBox(width: 6), Dot(c.text2, size: 7)],
             ]),
           ),
           const SizedBox(width: 6),
-          KIconButton(icon: KIcons.close, label: 'Close $name (⌘W)', size: 18, iconSize: 11, color: c.text3, onTap: () => s.closeFile(path)),
+          KIconButton(
+            icon: KIcons.close,
+            label: s.buffers.isDirty(path) ? 'Close $name, unsaved changes (⌘W)' : 'Close $name (⌘W)',
+            size: 18,
+            iconSize: 11,
+            color: c.text3,
+            onTap: () => s.askClose(path),
+          ),
         ]),
       ),
     );
@@ -864,7 +877,20 @@ class _ContextFiles extends StatelessWidget {
       Container(width: 1, color: c.divider),
       const SizedBox(width: 8),
       Expanded(
-        child: file == null
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (s.contextFiles.isNotEmpty) ...[
+            const _ContextFileStrip(),
+            const SizedBox(height: 8),
+          ],
+          Expanded(child: _contextFileBody(context, file)),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _contextFileBody(BuildContext context, String? file) {
+    final c = context.c;
+    return file == null
             ? Center(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Icon(KIcons.file, size: 26, color: c.text3),
@@ -874,9 +900,282 @@ class _ContextFiles extends StatelessWidget {
                   Text('Pick a file on the left. Changed files are marked M / A.', style: sans(12.5, color: c.text3)),
                 ]),
               )
-            : FileView(key: ValueKey('ctx:$file'), path: file),
+            : FileView(key: ValueKey('ctx:$file'), path: file, startEditing: true);
+  }
+}
+
+/// The Files tab's open files. The strip scrolls sideways (a mouse wheel
+/// too), fades where tabs are cut off, keeps the file showing in view and
+/// ends in “N open”: every open file, Close others and Close all.
+class _ContextFileStrip extends StatefulWidget {
+  const _ContextFileStrip();
+
+  @override
+  State<_ContextFileStrip> createState() => _ContextFileStripState();
+}
+
+class _ContextFileStripState extends State<_ContextFileStrip> {
+  final _scroll = ScrollController();
+  final _keys = <String, GlobalKey>{};
+  String? _shown;
+  int _shownAt = -1;
+  bool _fadeStart = false;
+  bool _fadeEnd = false;
+  bool _menuOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_updateFades);
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _updateFades() {
+    if (!mounted || !_scroll.hasClients) return;
+    final p = _scroll.position;
+    final start = p.extentBefore > 0.5;
+    final end = p.extentAfter > 0.5;
+    if (start != _fadeStart || end != _fadeEnd) {
+      setState(() {
+        _fadeStart = start;
+        _fadeEnd = end;
+      });
+    }
+  }
+
+  /// After layout: refresh the fades and bring a newly shown file's tab
+  /// into view, from whichever side it is cut off.
+  void _afterLayout(String? file, int index) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _updateFades();
+      if (file == null || file == _shown) return;
+      final forward = index >= _shownAt;
+      _shown = file;
+      _shownAt = index;
+      final ctx = _keys[file]?.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        alignmentPolicy: forward ? ScrollPositionAlignmentPolicy.keepVisibleAtEnd : ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+      );
+    });
+  }
+
+  void _wheel(PointerSignalEvent e) {
+    if (e is! PointerScrollEvent || !_scroll.hasClients) return;
+    final d = e.scrollDelta;
+    if (d.dx.abs() >= d.dy.abs()) return; // a trackpad already scrolls sideways
+    final p = _scroll.position;
+    _scroll.jumpTo((p.pixels + d.dy).clamp(p.minScrollExtent, p.maxScrollExtent).toDouble());
+  }
+
+  void _openMenu(BuildContext anchor) {
+    setState(() => _menuOpen = true);
+    showKMenu(
+      context,
+      position: belowOf(anchor),
+      alignRight: true,
+      onClosed: () {
+        if (mounted) setState(() => _menuOpen = false);
+      },
+      builder: (context, close) => _OpenFilesMenu(close: close),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    final files = s.contextFiles;
+    _keys.removeWhere((p, _) => !files.contains(p));
+    _afterLayout(s.contextFile, s.contextFile == null ? -1 : files.indexOf(s.contextFile!));
+    const fade = Color(0x00000000);
+    const solid = Color(0xFF000000);
+    return SizedBox(
+      height: 30,
+      child: Row(children: [
+        Expanded(
+          child: Listener(
+            onPointerSignal: _wheel,
+            child: ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (rect) => LinearGradient(
+                colors: [_fadeStart ? fade : solid, solid, solid, _fadeEnd ? fade : solid],
+                stops: [0.0, rect.width <= 0 ? 0.0 : (28 / rect.width).clamp(0.0, 0.5), rect.width <= 0 ? 1.0 : (1 - 36 / rect.width).clamp(0.5, 1.0), 1.0],
+              ).createShader(rect),
+              child: NotificationListener<ScrollMetricsNotification>(
+                onNotification: (_) {
+                  _updateFades();
+                  return false;
+                },
+                child: SingleChildScrollView(
+                  controller: _scroll,
+                  scrollDirection: Axis.horizontal,
+                  child: Row(children: [
+                    for (final p in files)
+                      Padding(
+                        key: _keys.putIfAbsent(p, () => GlobalKey()),
+                        padding: const EdgeInsets.only(right: 4),
+                        child: _ContextFileTab(path: p),
+                      ),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Builder(
+          builder: (anchor) => KPressable(
+            onTap: () => _openMenu(anchor),
+            semanticLabel: 'All open files, ${files.length} open',
+            tooltip: 'All open files',
+            builder: (context, hover, focus) => Container(
+              height: 28,
+              padding: const EdgeInsets.only(left: 10, right: 7),
+              decoration: BoxDecoration(color: hover || focus || _menuOpen ? c.tabActive : c.tile, borderRadius: BorderRadius.circular(9)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('${files.length} open', style: sans(11.5, weight: FontWeight.w500, color: c.text2)),
+                const SizedBox(width: 3),
+                Icon(KIcons.chevronDown, size: 14, color: c.text2),
+              ]),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+/// “N open”: every open file (the one showing checked) with its folder and
+/// change letter, each closable, then Close others and Close all.
+class _OpenFilesMenu extends StatelessWidget {
+  const _OpenFilesMenu({required this.close});
+  final VoidCallback close;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final files = s.contextFiles;
+    return KMenuPanel(width: 340, children: [
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 420),
+        child: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+            for (final p in files) _OpenFileRow(path: p, close: close),
+          ]),
+        ),
       ),
+      const KMenuDivider(),
+      KMenuItem(icon: KIcons.close, label: 'Close others', onTap: files.length > 1 && s.contextFile != null ? () => _then(s.closeOtherContextFiles) : null),
+      KMenuItem(icon: KIcons.close, label: 'Close all', onTap: () => _then(s.closeAllContextFiles)),
     ]);
+  }
+
+  void _then(VoidCallback f) {
+    close();
+    f();
+  }
+}
+
+class _OpenFileRow extends StatelessWidget {
+  const _OpenFileRow({required this.path, required this.close});
+  final String path;
+  final VoidCallback close;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    final f = s.changedFile(path);
+    final cut = path.lastIndexOf('/');
+    final name = path.substring(cut + 1);
+    final dir = cut < 0 ? '' : path.substring(0, cut);
+    final on = s.contextFile == path;
+    final col = f == null ? c.text3 : (f.kind == 'A' ? c.ok : c.warn);
+    return Row(children: [
+      Expanded(
+        child: KPressable(
+          onTap: () {
+            close();
+            s.showContextFile(path);
+          },
+          semanticLabel: 'Show $path',
+          selected: on,
+          builder: (context, hover, focus) => Container(
+            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(color: hover || focus ? c.tile : null, borderRadius: BorderRadius.circular(7)),
+            child: Row(children: [
+              SizedBox(width: 15, child: on ? Icon(KIcons.check, size: 14, color: c.acc) : null),
+              const SizedBox(width: 6),
+              Text(name, style: mono(11.5, weight: on ? FontWeight.w600 : FontWeight.w400, color: c.text)),
+              const SizedBox(width: 8),
+              Expanded(child: Text(dir, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(10.5, color: c.text3))),
+              if (f != null) ...[const SizedBox(width: 6), Text(f.kind, style: mono(10, weight: FontWeight.w700, color: col))],
+            ]),
+          ),
+        ),
+      ),
+      const SizedBox(width: 2),
+      KIconButton(icon: KIcons.close, label: 'Close $name', size: 22, iconSize: 11, color: c.text3, onTap: () => s.askClose(path, files: true)),
+    ]);
+  }
+}
+
+/// A file tab inside the Files tab: name, change letter, close.
+class _ContextFileTab extends StatelessWidget {
+  const _ContextFileTab({required this.path});
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final s = AppScope.of(context);
+    final f = s.changedFile(path);
+    final name = path.substring(path.lastIndexOf('/') + 1);
+    final col = f == null ? c.text3 : (f.kind == 'A' ? c.ok : c.warn);
+    final on = s.contextFile == path;
+    return Tooltip(
+      message: path,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        height: 30,
+        padding: const EdgeInsets.only(left: 10, right: 4),
+        decoration: on ? chipDecoration(c, radius: 10, fill: c.tabActive) : BoxDecoration(borderRadius: BorderRadius.circular(10)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          KPressable(
+            onTap: () => s.showContextFile(path),
+            semanticLabel: 'Open file $path',
+            selected: on,
+            builder: (context, hover, focus) => Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(KIcons.file, size: 13, color: col),
+              const SizedBox(width: 7),
+              Text(name, style: mono(11.5, color: on || hover ? c.text : c.text2)),
+              if (f != null) ...[const SizedBox(width: 6), Text(f.kind, style: mono(10, weight: FontWeight.w700, color: col))],
+              if (s.buffers.isDirty(path)) ...[const SizedBox(width: 6), Dot(c.text2, size: 7)],
+            ]),
+          ),
+          const SizedBox(width: 6),
+          KIconButton(
+            icon: KIcons.close,
+            label: s.buffers.isDirty(path) ? 'Close $name, unsaved changes (⌘W)' : 'Close $name (⌘W)',
+            size: 18,
+            iconSize: 11,
+            color: c.text3,
+            onTap: () => s.askClose(path, files: true),
+          ),
+        ]),
+      ),
+    );
   }
 }
 

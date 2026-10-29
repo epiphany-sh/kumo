@@ -77,6 +77,7 @@ class GrpcTerminalSurface implements TerminalSurface {
   bool _exited = false;
   bool _frameScheduled = false;
   bool _disposed = false;
+  Timer? _resizeTimer;
 
   @override
   ValueListenable<TermBuffer> get buffer => _buffer;
@@ -86,6 +87,15 @@ class GrpcTerminalSurface implements TerminalSurface {
 
   bool get applicationCursorKeys => _screen.applicationCursorKeys;
   bool get bracketedPaste => _screen.bracketedPaste;
+  bool get mouseTracking => _screen.mouseTracking;
+  bool get sgrMouse => _screen.sgrMouse;
+
+  /// Forgets the lines above the screen (the daemon's replay keeps them
+  /// for the next attach).
+  void clearScrollback() {
+    _screen.clearScrollback();
+    _render();
+  }
 
   static String get _shellPath =>
       Platform.environment['SHELL'] ?? (Platform.isWindows ? (Platform.environment['COMSPEC'] ?? 'cmd.exe') : '/bin/zsh');
@@ -205,7 +215,12 @@ class GrpcTerminalSurface implements TerminalSurface {
     if (!_size.isCompleted) {
       _size.complete((cols, rows));
     } else {
-      _input?.add(TerminalInput(resize: Resize(cols: cols, rows: rows)));
+      // Dragging a split resizes every frame: the program hears the last
+      // size only, so it redraws once instead of on top of itself.
+      _resizeTimer?.cancel();
+      _resizeTimer = Timer(const Duration(milliseconds: 80), () {
+        if (!_disposed) _input?.add(TerminalInput(resize: Resize(cols: _screen.cols, rows: _screen.rows)));
+      });
     }
   }
 
@@ -215,6 +230,7 @@ class GrpcTerminalSurface implements TerminalSurface {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _resizeTimer?.cancel();
     final conn = _engine.current;
     if (killOnClose && conn != null && _terminalId != null) unawaited(_closeRemote(conn));
     _input?.close();

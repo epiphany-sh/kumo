@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use super::AgentState;
+use crate::terminal::plain_text;
 
 /// Turns an agent's terminal output into "working" or "needs input".
 ///
@@ -149,7 +150,7 @@ impl LastLine {
     /// Feeds output; escape sequences are dropped.
     pub fn push(&mut self, bytes: &[u8]) {
         self.tail
-            .push_str(&strip_escapes(&String::from_utf8_lossy(bytes)));
+            .push_str(&plain_text(&String::from_utf8_lossy(bytes)));
         if self.tail.len() > Self::KEEP {
             let cut = self.tail.len() - Self::KEEP;
             let cut = (cut..self.tail.len())
@@ -181,40 +182,6 @@ impl LastLine {
 /// Box drawing, blocks and braille spinners.
 fn is_decoration(c: char) -> bool {
     matches!(c as u32, 0x2500..=0x259F | 0x2800..=0x28FF | 0x2190..=0x21FF | 0x25A0..=0x25FF)
-}
-
-fn strip_escapes(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c != '\u{1b}' {
-            if !c.is_control() || c == '\n' || c == '\r' {
-                out.push(c);
-            }
-            continue;
-        }
-        match chars.next() {
-            // CSI: parameters, then a final byte in @..~.
-            Some('[') => {
-                for c in chars.by_ref() {
-                    if ('@'..='~').contains(&c) {
-                        break;
-                    }
-                }
-            }
-            // OSC / DCS…: until BEL or ESC \.
-            Some(']' | 'P' | '_' | '^') => {
-                while let Some(c) = chars.next() {
-                    if c == '\u{7}' || (c == '\u{1b}' && chars.peek() == Some(&'\\')) {
-                        chars.next_if_eq(&'\\');
-                        break;
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    out
 }
 
 #[cfg(test)]

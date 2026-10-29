@@ -8,6 +8,7 @@ mod pipelines;
 mod pulls;
 mod tasks;
 mod terminals;
+mod tests;
 mod workspace;
 
 pub use self::agents::AgentsGrpc;
@@ -18,4 +19,5 @@ pub use self::pipelines::PipelinesGrpc;
 pub use self::pulls::PullRequestsGrpc;
 pub use self::tasks::TasksGrpc;
 pub use self::terminals::TerminalsGrpc;
+pub use self::tests::TestsGrpc;
 pub use self::workspace::WorkspaceGrpc;

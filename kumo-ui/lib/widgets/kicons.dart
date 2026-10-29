@@ -51,6 +51,8 @@ abstract final class KIcons {
   static const rename = Icons.edit_outlined;
   static const trash = Icons.delete_outline_rounded;
   static const copy = Icons.content_copy_rounded;
+  static const paste = Icons.content_paste_rounded;
+  static const selectAll = Icons.select_all_rounded;
   static const reveal = Icons.folder_open_outlined;
   static const collapse = Icons.unfold_less_rounded;
   static const expand = Icons.unfold_more_rounded;

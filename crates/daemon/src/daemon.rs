@@ -10,6 +10,7 @@ use kumo_application::pipelines::{PipelinesPorts, PipelinesService, PipelinesTim
 use kumo_application::pulls::{PullRequestPorts, PullRequestService};
 use kumo_application::tasks::{TaskPorts, TaskService, TaskTiming};
 use kumo_application::terminal::TerminalService;
+use kumo_application::test_runs::{TestPorts, TestService};
 use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
 use kumo_domain::agents::ProgramLocator;
 use kumo_domain::daemon::{ApiVersion, DaemonEndpoint, DiscoveryStore};
@@ -24,7 +25,7 @@ use kumo_infrastructure::ci::{
 };
 use kumo_infrastructure::discovery::FileDiscoveryStore;
 use kumo_infrastructure::docs::{ConfluenceDocs, VaultDocs};
-use kumo_infrastructure::fs::LocalFileStore;
+use kumo_infrastructure::fs::{LocalFileStore, LocalProjectReader};
 use kumo_infrastructure::git::{FsRepoFinder, GitCli};
 use kumo_infrastructure::pty::PortablePtySystem;
 use kumo_infrastructure::secrets::{KeychainSecretStore, MemorySecretStore};
@@ -174,6 +175,14 @@ impl Daemon {
             agents: Arc::new(AgentService::new(
                 AgentPorts {
                     store: Arc::new(SqliteAgentStore::open(&data_dir.join("kumo.db"))?),
+                    locator: Arc::clone(&locator),
+                },
+                Arc::clone(&terminals),
+                Arc::clone(&workspace),
+            )),
+            tests: Arc::new(TestService::new(
+                TestPorts {
+                    files: Arc::new(LocalProjectReader),
                     locator,
                 },
                 Arc::clone(&terminals),

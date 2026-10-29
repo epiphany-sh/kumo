@@ -8,10 +8,12 @@ import '../data/pipelines_source.dart';
 import '../data/docs_source.dart';
 import '../data/pull_requests_source.dart';
 import '../data/tasks_source.dart';
+import '../data/tests_source.dart';
 import '../data/changes.dart';
 import '../data/workspace_source.dart';
 import '../data/worktree_changes.dart';
 import '../data/models.dart';
+import '../editor/file_buffers.dart';
 import '../theme/palette.dart';
 import 'preferences.dart';
 
@@ -67,6 +69,7 @@ class AppState extends ChangeNotifier {
     AgentsSource? agents,
     TasksSource? tasks,
     PipelinesFactory? pipelinesFor,
+    TestsSource Function(String worktreePath)? testsFor,
     CiHostsSource? ciHosts,
     PullRequestsSource? pullRequests,
     DocsSource? docs,
@@ -76,6 +79,7 @@ class AppState extends ChangeNotifier {
         tasks = tasks ?? MockTasksSource(),
         _changesFor = changesFor,
         _pipelinesFor = pipelinesFor ?? mockPipelinesFor,
+        _testsFor = testsFor,
         ciHosts = ciHosts ?? MockCiHostsSource(),
         pullRequests = pullRequests ?? MockPullRequests(),
         docs = docs ?? MockDocsSource(),
@@ -83,6 +87,7 @@ class AppState extends ChangeNotifier {
     _changes = changesFor == null ? MockWorktreeChanges() : NoWorktreeChanges();
     _changes.addListener(notifyListeners);
     _bindPipelines();
+    _bindTests();
     this.workspace.addListener(_onWorkspaceChanged);
     this.agents.addListener(notifyListeners);
     final p = this.prefs;
@@ -158,6 +163,7 @@ class AppState extends ChangeNotifier {
     _home = false;
     _bindChanges();
     _bindPipelines();
+    _bindTests();
     notifyListeners();
   }
 
@@ -190,6 +196,7 @@ class AppState extends ChangeNotifier {
     }
     _bindChanges();
     _bindPipelines();
+    _bindTests();
     notifyListeners();
   }
 
@@ -430,12 +437,232 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The file shown in the Files tab (its tree picks it).
+  /// Files open in the Files tab (its tree opens them), in tab order, and
+  /// the one showing.
+  final List<String> _contextFiles = [];
   String? _contextFile;
+  List<String> get contextFiles => List.unmodifiable(_contextFiles);
   String? get contextFile => _contextFile;
+
+  /// Opens [path] in the Files tab (a tab of its own, or the one it has).
   void showContextFile(String path) {
+    if (!_contextFiles.contains(path)) _contextFiles.add(path);
     _contextFile = path;
     notifyListeners();
+  }
+
+  /// Closes [path]'s tab in the Files tab; its neighbour shows next.
+  void closeContextFile(String path) {
+    final i = _contextFiles.indexOf(path);
+    if (i < 0) return;
+    _contextFiles.removeAt(i);
+    if (_contextFile == path) _contextFile = _contextFiles.isEmpty ? null : _contextFiles[i > 0 ? i - 1 : 0];
+    _forgetBuffer(path);
+    notifyListeners();
+  }
+
+  /// Keeps only the file showing in the Files tab (and files with unsaved
+  /// edits: they never close without asking).
+  void closeOtherContextFiles() {
+    final keep = [for (final p in _contextFiles) if (p == _contextFile || buffers.isDirty(p)) p];
+    final gone = [for (final p in _contextFiles) if (!keep.contains(p)) p];
+    _contextFiles
+      ..clear()
+      ..addAll(keep);
+    gone.forEach(_forgetBuffer);
+    notifyListeners();
+  }
+
+  /// Closes every file in the Files tab but those with unsaved edits.
+  void closeAllContextFiles() {
+    final keep = [for (final p in _contextFiles) if (buffers.isDirty(p)) p];
+    final gone = [for (final p in _contextFiles) if (!keep.contains(p)) p];
+    _contextFiles
+      ..clear()
+      ..addAll(keep);
+    gone.forEach(_forgetBuffer);
+    if (!keep.contains(_contextFile)) _contextFile = keep.firstOrNull;
+    notifyListeners();
+  }
+
+  // ---- Editing (the file views) ----
+
+  FileBuffers? _buffers;
+
+  /// Unsaved edits of the current worktree's files.
+  FileBuffers get buffers {
+    final b = _buffers;
+    if (b != null && identical(b.changes, _changes)) return b;
+    b
+      ?..removeListener(notifyListeners)
+      ..dispose();
+    return _buffers = FileBuffers(_changes)..addListener(notifyListeners);
+  }
+
+  /// A buffer goes once no tab shows its file.
+  void _forgetBuffer(String path) {
+    if (_contextFiles.contains(path) || _openFiles.contains(path)) return;
+    buffers.forget(path);
+  }
+
+  /// A tab with unsaved edits that asked to close: its file view asks
+  /// whether to save them. `$2` is true for the Files tab's tabs.
+  (String, bool)? _closeAsk;
+  (String, bool)? get closeAsk => _closeAsk;
+
+  /// Closes [path]'s tab ([files]: in the Files tab, else a file tab of the
+  /// Terminal view); with unsaved edits, shows the file and asks first.
+  void askClose(String path, {bool files = false}) {
+    if (!buffers.isDirty(path)) {
+      files ? closeContextFile(path) : closeFile(path);
+      return;
+    }
+    files ? showContextFile(path) : openFile(path);
+    _closeAsk = (path, files);
+    notifyListeners();
+  }
+
+  /// The answer to [closeAsk]: save (or drop) the edits, then close. Returns
+  /// why saving failed (the tab stays), or null.
+  Future<String?> answerClose({required bool save}) async {
+    final ask = _closeAsk;
+    if (ask == null) return null;
+    _closeAsk = null;
+    final (path, files) = ask;
+    if (save) {
+      final error = await buffers.save(path);
+      if (error != null) {
+        notifyListeners();
+        return error;
+      }
+    } else {
+      buffers.revert(path);
+    }
+    files ? closeContextFile(path) : closeFile(path);
+    return null;
+  }
+
+  void cancelClose() {
+    if (_closeAsk == null) return;
+    _closeAsk = null;
+    notifyListeners();
+  }
+
+  // ---- Files and folders (the Files tree's menus) ----
+
+  /// Deleted files and folders still within the undo window: hidden until
+  /// the window closes, then deleted.
+  final Set<String> _deleting = {};
+
+  /// [path] is, or is inside, something being deleted.
+  bool isDeleting(String path) => _deleting.any((d) => path == d || path.startsWith('$d/'));
+
+  /// The worktree's files, minus those being deleted.
+  List<String> get visibleFiles => _deleting.isEmpty ? _changes.files : [for (final f in _changes.files) if (!isDeleting(f)) f];
+
+  static String cleanPath(String raw) => raw.trim().replaceAll(RegExp(r'^/+|/+$'), '').replaceAll(RegExp(r'/+'), '/');
+
+  /// Something is at [path]: a file, or a folder with files in it.
+  bool pathExists(String path) => _changes.files.any((f) => f == path || f.startsWith('$path/'));
+
+  /// A new empty file (its folders are created). Returns why not, or null.
+  Future<String?> createFile(String raw) async {
+    final path = cleanPath(raw);
+    if (path.isEmpty || path.endsWith('.')) return 'Give the file a name';
+    if (pathExists(path)) return '$path already exists';
+    final changes = _changes;
+    await changes.write(path, '');
+    if (!identical(changes, _changes)) return null;
+    return changes.error;
+  }
+
+  /// Renames or moves a file or folder; its tabs and unsaved edits follow.
+  /// Returns why not, or null.
+  Future<String?> movePath(String from, String raw) async {
+    final to = cleanPath(raw);
+    if (to.isEmpty) return 'Give it a name';
+    if (to == from) return null;
+    if (to.startsWith('$from/')) return 'A folder can’t go inside itself';
+    // Exact case: on a case-insensitive disk `Foo.go` → `foo.go` is a rename.
+    if (pathExists(to)) return '$to already exists';
+    final changes = _changes;
+    final ok = await changes.move(from, to);
+    if (_disposed || !identical(changes, _changes)) return null;
+    if (!ok) return changes.error ?? 'Couldn’t rename ${from.split('/').last}';
+    String follow(String p) => p == from ? to : (p.startsWith('$from/') ? to + p.substring(from.length) : p);
+    for (final list in [_contextFiles, _openFiles]) {
+      for (var i = 0; i < list.length; i++) {
+        list[i] = follow(list[i]);
+      }
+    }
+    if (_contextFile != null) _contextFile = follow(_contextFile!);
+    if (_activeFile != null) _activeFile = follow(_activeFile!);
+    buffers.moved(from, to);
+    notifyListeners();
+    return null;
+  }
+
+  /// Deletes a file, or a folder with everything in it. It leaves the tree
+  /// and its tabs close at once; the disk changes when the undo window
+  /// closes (Undo brings it all back).
+  void deletePath(String path) {
+    if (isDeleting(path)) return;
+    bool inside(String p) => p == path || p.startsWith('$path/');
+    final ctxBefore = List.of(_contextFiles);
+    final ctxFileBefore = _contextFile;
+    final openBefore = List.of(_openFiles);
+    final activeBefore = _activeFile;
+    // Buffers (unsaved edits included) stay until the deletion happens, so
+    // Undo brings the edits back with the tabs.
+    final closed = {..._contextFiles.where(inside), ..._openFiles.where(inside)};
+    _contextFiles.removeWhere(inside);
+    _openFiles.removeWhere(inside);
+    if (_contextFile != null && inside(_contextFile!)) _contextFile = _contextFiles.lastOrNull;
+    if (_activeFile != null && inside(_activeFile!)) _activeFile = _openFiles.lastOrNull;
+    _deleting.add(path);
+    final changes = _changes;
+    _offerUndo(
+      'Deleted ${path.split('/').last}',
+      () {
+        _deleting.remove(path);
+        if (!identical(changes, _changes)) return;
+        _contextFiles
+          ..clear()
+          ..addAll(ctxBefore);
+        _contextFile = ctxFileBefore;
+        _openFiles
+          ..clear()
+          ..addAll(openBefore);
+        _activeFile = activeBefore;
+      },
+      commit: () {
+        if (identical(changes, _changes)) closed.forEach(_forgetBuffer);
+        changes.remove([path]).whenComplete(() {
+          if (_disposed || !identical(changes, _changes)) return;
+          _deleting.remove(path);
+          notifyListeners();
+        });
+      },
+    );
+  }
+
+  /// Takes every changed file inside [dir] back to the last commit (files
+  /// git doesn't track yet are deleted), with an undo window like
+  /// [discardChanges].
+  void discardChangesIn(String dir) {
+    final paths = [for (final f in pendingChanges) if (f.path.startsWith('$dir/')) f.path];
+    if (paths.isEmpty) return;
+    _discarding.addAll(paths);
+    final changes = _changes;
+    _offerUndo(
+      'Discarded ${paths.length} ${paths.length == 1 ? 'change' : 'changes'} in ${dir.split('/').last}',
+      () => _discarding.removeAll(paths),
+      commit: () => _discarded = changes.restoreAll(paths).whenComplete(() {
+        if (_disposed || !identical(changes, _changes)) return;
+        _discarding.removeAll(paths);
+        notifyListeners();
+      }),
+    );
   }
 
   // ---- Inspector widgets (the Widgets tab) ----
@@ -525,6 +752,7 @@ class AppState extends ChangeNotifier {
     if (i < 0) return;
     _openFiles.removeAt(i);
     if (_activeFile == path) _activeFile = _openFiles.isEmpty ? null : _openFiles[i > 0 ? i - 1 : 0];
+    _forgetBuffer(path);
     notifyListeners();
   }
 
@@ -553,14 +781,24 @@ class AppState extends ChangeNotifier {
     final path = entry == null ? null : workspace.absolutePathOf(entry);
     if (path == _changesPath) return;
     // A discard still in its undo window happens now, on its own worktree.
-    if (_discarding.isNotEmpty) dismissUndo();
+    if (_discarding.isNotEmpty || _deleting.isNotEmpty) dismissUndo();
     _discarding.clear();
+    _deleting.clear();
+    _closeAsk = null;
+    // Unsaved edits are saved before leaving their worktree, never lost.
+    _buffers
+      ?..saveAll()
+      ..removeListener(notifyListeners)
+      ..dispose();
+    _buffers = null;
     _changes
       ..removeListener(notifyListeners)
       ..dispose();
     _changesPath = path;
     _changes = path == null ? NoWorktreeChanges() : factory(path);
     _changes.addListener(notifyListeners);
+    // Another worktree: its own files.
+    _contextFiles.clear();
     _contextFile = null;
     _commitNotice = null;
     _canUndoCommit = false;
@@ -725,6 +963,37 @@ class AppState extends ChangeNotifier {
     _pipelines.addListener(notifyListeners);
   }
 
+  // ---- Tests ----
+
+  final TestsSource Function(String worktreePath)? _testsFor;
+  TestsSource _tests = NoTests();
+  String? _testsPath;
+
+  /// Tests of the selected worktree: its command and latest run.
+  TestsSource get tests => _tests;
+
+  /// Follows the selection: one [TestsSource] per worktree.
+  void _bindTests() {
+    final entry = activeWorktreeEntry;
+    final path = entry == null ? null : workspace.absolutePathOf(entry);
+    if (path == _testsPath) return;
+    _testsPath = path;
+    _tests
+      ..removeListener(notifyListeners)
+      ..dispose();
+    final factory = _testsFor;
+    _tests = path == null || factory == null ? NoTests() : factory(path);
+    _tests.addListener(notifyListeners);
+  }
+
+  /// The test command the user typed for the selected repository (empty:
+  /// the detected one).
+  String get testCommand => activeRepo == null ? '' : setting<String>('tests.command.${activeRepo!.id}', '');
+  set testCommand(String command) {
+    final repo = activeRepo;
+    if (repo != null) setSetting('tests.command.${repo.id}', command.trim().isEmpty ? null : command.trim());
+  }
+
   // ---- Agents ----
 
   /// Coding agents (optional): connected providers and running sessions.
@@ -785,11 +1054,45 @@ class AppState extends ChangeNotifier {
         detail = null;
       }
     }
-    final run = await agents.start(providerId: providerId, worktreePath: worktreePath, prompt: taskPrompt(task, detail: detail), title: '${task.key} · ${task.title}');
+    final run = await agents.start(
+      providerId: providerId,
+      worktreePath: worktreePath,
+      prompt: taskPrompt(task, detail: detail),
+      title: '${task.key} · ${task.title}',
+      context: [taskContext(task)],
+    );
     if (run == null) return 'Worktree ready, but the agent didn’t start: ${agents.error ?? 'unknown error'}';
     openTerminal(run.terminalId, title: run.title, agent: true, directory: worktreePath);
     return null;
   }
+
+  /// Agents of the selected worktree, newest first.
+  List<AgentRun> get worktreeAgents {
+    final entry = activeWorktreeEntry;
+    if (entry == null) return const [];
+    final path = workspace.absolutePathOf(entry);
+    return [for (final r in agents.runs) if (r.worktreePath == path) r]..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+  }
+
+  /// Tasks linked to the selected worktree.
+  List<TaskEntry> get worktreeTasks {
+    final entry = activeWorktreeEntry;
+    if (entry == null) return const [];
+    final path = workspace.absolutePathOf(entry);
+    final ids = {for (final l in tasks.links) if (l.worktreePath == path) l.taskId};
+    return [for (final t in tasks.tasks) if (ids.contains(t.id)) t];
+  }
+
+  /// The selected worktree's agent that is still running (the newest).
+  AgentRun? get activeAgent => worktreeAgents.where((r) => r.status != AgentStatus.done).firstOrNull;
+
+  /// [task] as an agent's context: key and title, and where it lives.
+  AgentContextItem taskContext(TaskEntry task) => AgentContextItem(
+        kind: AgentContextKind.task,
+        title: '${task.key} · ${task.title}',
+        detail: [tasks.source(task.sourceId)?.kind.label ?? '', task.typeName].where((p) => p.isNotEmpty).join(' · '),
+        url: task.url,
+      );
 
   /// What an agent gets when it starts from a task: title, key and source,
   /// and with the [detail] its description, acceptance criteria (its
@@ -850,10 +1153,16 @@ class AppState extends ChangeNotifier {
       ..removeListener(notifyListeners)
       ..dispose();
     tasks.dispose();
+    _buffers
+      ?..removeListener(notifyListeners)
+      ..dispose();
     _changes
       ..removeListener(notifyListeners)
       ..dispose();
     _pipelines
+      ..removeListener(notifyListeners)
+      ..dispose();
+    _tests
       ..removeListener(notifyListeners)
       ..dispose();
     workspace
@@ -869,13 +1178,13 @@ class AppState extends ChangeNotifier {
 enum TerminalCommand { splitRight, splitDown, closePane, newTerminal }
 
 enum InspectorWidget {
-  agent('Agent', 'Ticket, plan steps, review and pause'),
+  agent('Agent', 'What this worktree’s agent is doing, its diff and terminal'),
   changes('Changes', 'Uncommitted files; click one to open its diff'),
-  context('Context', 'Tickets and docs sent to the agent'),
+  context('Context', 'Tickets and pages the agent works from'),
   pipelines('Pipelines', 'CI runs of this branch on GitHub, GitLab or Bitbucket'),
-  tests('Tests', 'Latest gotestsum run for this worktree'),
+  tests('Tests', 'Runs this worktree’s tests and reads the results'),
   pullRequest('Pull request', 'Checks and reviewers of this branch’s PR'),
-  activity('Activity', 'What the agent did, as a timeline');
+  activity('Activity', 'What agents and tests did, as a timeline');
 
   const InspectorWidget(this.label, this.description);
   final String label;

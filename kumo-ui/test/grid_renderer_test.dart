@@ -36,6 +36,15 @@ void main() {
     expect(paintDrawnGlyph(canvas, 0x61, cell, const Color(0xFFFFFFFF), stroke: 1), isFalse);
   });
 
+  test('inverse text (zsh’s pasted text) is dark letters on the text color, not white on white', () {
+    for (final palette in [KumoPalette.dark, KumoPalette.light]) {
+      final r = TerminalGridRenderer()..configure(palette: palette, style: mono(12, height: 1.25), cellWidth: 7.2, lineExtent: 15);
+      final bg = r.background;
+      double luminance(Color c) => c.computeLuminance();
+      expect((luminance(bg) - luminance(palette.text)).abs(), greaterThan(0.5), reason: '$palette');
+    }
+  });
+
   test('rows are cached until the line or the configuration changes', () {
     final r = renderer();
     const line = TermLine([TermSpan('hello')]);

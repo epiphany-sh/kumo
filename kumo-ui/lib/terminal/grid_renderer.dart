@@ -72,8 +72,11 @@ class TerminalGridRenderer {
   }
 
   /// Background color of the terminal (what inverse text on a default
-  /// background paints its letters with).
-  Color get background => _palette!.pane.withValues(alpha: 1);
+  /// background paints its letters with): the terminal's own tint, opaque.
+  /// Not the pane's: that one is a faint white veil, white once opaque, so
+  /// inverse text (zsh's pasted text, selections in TUIs) came out white on
+  /// white.
+  Color get background => _palette!.term.withValues(alpha: 1);
 
   /// Paints one glyph in the cell at [column], e.g. the character under a
   /// block cursor in the background color.

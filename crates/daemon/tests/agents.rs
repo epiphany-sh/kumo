@@ -244,6 +244,90 @@ async fn agent_gets_its_prompt_works_then_waits_and_exits() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn timeline_and_context_follow_what_the_agent_does() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    // Claude Code's tool lines, then its turn ends; what it's sent comes back.
+    fake_cli(
+        &daemon.bin(),
+        "claude",
+        "printf '\\342\\217\\272 Bash(make test)\\r\\n\\342\\217\\272 Edit(src/a.rs)\\r\\n\\342\\217\\272 Bash(make test)\\r\\nDone\\a'; read line; echo \"got: $line\"; read again",
+    );
+    connect(&mut client, "claude", true).await;
+    let ticket = pb::AgentContext {
+        kind: pb::AgentContextKind::Task.into(),
+        title: "PRC-412 · Bulk discounts".into(),
+        detail: "Jira".into(),
+        url: "https://acme.atlassian.net/browse/PRC-412".into(),
+    };
+    let session = client
+        .agents
+        .start(pb::StartAgentRequest {
+            context: vec![ticket.clone()],
+            ..start(&wt, "", "do PRC-412")
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(session.context, std::slice::from_ref(&ticket));
+
+    let waiting = session_where(&mut client, &session.id, |s| {
+        s.state() == pb::AgentState::NeedsInput
+    })
+    .await;
+    let steps: Vec<_> = waiting
+        .events
+        .iter()
+        .map(|e| (e.kind(), e.text.as_str()))
+        .collect();
+    assert_eq!(
+        steps,
+        [
+            (pb::AgentEventKind::Started, "Claude Code"),
+            (pb::AgentEventKind::Context, "PRC-412 · Bulk discounts"),
+            (pb::AgentEventKind::Ran, "make test"),
+            (pb::AgentEventKind::Edited, "src/a.rs"),
+            (pb::AgentEventKind::Waiting, "Done"),
+        ],
+        "a redrawn line is one step"
+    );
+
+    let page = pb::AgentContext {
+        kind: pb::AgentContextKind::Doc.into(),
+        title: "Discount rules v3".into(),
+        detail: "Confluence · Pricing".into(),
+        url: String::new(),
+    };
+    let updated = client
+        .agents
+        .add_context(pb::AddAgentContextRequest {
+            id: session.id.clone(),
+            context: Some(page.clone()),
+            text: "read /tmp/rules.md".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(updated.context, [ticket, page]);
+    let mut terminal = Attached::new(&mut client, &session.terminal_id, true).await;
+    terminal.read_until("got: read /tmp/rules.md").await;
+    client
+        .agents
+        .stop(pb::StopAgentRequest {
+            id: session.id.clone(),
+        })
+        .await
+        .unwrap();
+    let done = session_where(&mut client, &session.id, |s| {
+        s.state() == pb::AgentState::Exited
+    })
+    .await;
+    let last = done.events.last().unwrap();
+    assert_eq!(last.kind(), pb::AgentEventKind::Exited);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn cli_without_a_prompt_flag_gets_it_typed_in() {
     let daemon = TestDaemon::start().await;
     let mut client = daemon.client().await;

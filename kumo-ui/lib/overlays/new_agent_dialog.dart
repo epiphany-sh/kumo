@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
+import '../data/agents_source.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
@@ -10,8 +11,9 @@ import 'settings_dialog.dart';
 
 /// "New agent": pick one of the connected agents, a worktree and a prompt.
 /// The agent's terminal opens in the Terminal view.
-/// [prompt] starts the prompt field (e.g. about the file being read).
-Future<void> showNewAgentDialog(BuildContext context, {String prompt = ''}) {
+/// [prompt] starts the prompt field (e.g. about the file being read);
+/// [about] is the ticket or page it hands the agent, for the record.
+Future<void> showNewAgentDialog(BuildContext context, {String prompt = '', List<AgentContextItem> about = const []}) {
   final c = context.c;
   return showGeneralDialog<void>(
     context: context,
@@ -24,17 +26,20 @@ Future<void> showNewAgentDialog(BuildContext context, {String prompt = ''}) {
       alignment: Alignment.topCenter,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 96, 24, 24),
-        child: Material(type: MaterialType.transparency, child: NewAgentDialog(prompt: prompt)),
+        child: Material(type: MaterialType.transparency, child: NewAgentDialog(prompt: prompt, about: about)),
       ),
     ),
   );
 }
 
 class NewAgentDialog extends StatefulWidget {
-  const NewAgentDialog({super.key, this.prompt = ''});
+  const NewAgentDialog({super.key, this.prompt = '', this.about = const []});
 
   /// What the prompt field starts with.
   final String prompt;
+
+  /// The ticket or page the prompt hands the agent.
+  final List<AgentContextItem> about;
 
   @override
   State<NewAgentDialog> createState() => _NewAgentDialogState();
@@ -72,7 +77,7 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
       _starting = true;
       _error = null;
     });
-    final run = await s.agents.start(providerId: provider, worktreePath: worktree, prompt: _prompt.text.trim());
+    final run = await s.agents.start(providerId: provider, worktreePath: worktree, prompt: _prompt.text.trim(), context: widget.about);
     if (!mounted) return;
     if (run == null && s.agents.live) {
       setState(() {

@@ -2,9 +2,10 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
+use bytes::Bytes;
 use kumo_domain::agents::{
-    AgentError, AgentPreset, AgentProvider, AgentSession, AgentSessionId, AgentState, AgentStore,
-    PRESETS, ProgramLocator, StoredProvider,
+    AgentContext, AgentError, AgentEventKind, AgentPreset, AgentProvider, AgentSession,
+    AgentSessionId, AgentState, AgentStore, PRESETS, ProgramLocator, StoredProvider,
 };
 use kumo_domain::terminal::{LaunchSpec, TerminalError, TerminalId, TerminalSize};
 use kumo_domain::time::Timestamp;
@@ -193,13 +194,15 @@ impl AgentService {
     // ---- Sessions ----
 
     /// Starts an agent in a worktree of the workspace, in a new terminal.
-    /// `provider_id` None uses the default agent.
+    /// `provider_id` None uses the default agent; `context` is what the
+    /// prompt hands it (a ticket, a page), for the record.
     pub async fn start(
         self: &Arc<Self>,
         provider_id: Option<&str>,
         worktree: &Path,
         prompt: &str,
         title: &str,
+        context: Vec<AgentContext>,
         size: TerminalSize,
     ) -> Result<AgentSession, AgentError> {
         let provider = match provider_id {
@@ -232,7 +235,7 @@ impl AgentService {
             .map_err(launch_error)?;
 
         let now = Timestamp::now();
-        let session = AgentSession {
+        let mut session = AgentSession {
             id: AgentSessionId::generate(),
             provider_id: provider.id.clone(),
             provider_name: provider.name.clone(),
@@ -245,7 +248,14 @@ impl AgentService {
             started_at: now,
             state_since: now,
             last_line: String::new(),
+            context: Vec::new(),
+            events: Vec::new(),
         };
+        session.record(AgentEventKind::Started, provider.name.clone(), now);
+        for item in context {
+            session.record(AgentEventKind::Context, item.title.clone(), now);
+            session.context.push(item);
+        }
         self.update(|snapshot| snapshot.sessions.push(session.clone()));
         tracing::info!(agent = provider.id, session = %session.id, worktree = %session.worktree.display(), "agent started");
 
@@ -259,6 +269,60 @@ impl AgentService {
             self.quiet_after,
         ));
         Ok(session)
+    }
+
+    /// Sends a ticket or page to a running agent: `text` is typed into its
+    /// terminal and submitted, and `context` joins what it was given.
+    pub async fn add_context(
+        &self,
+        id: &AgentSessionId,
+        context: AgentContext,
+        text: &str,
+    ) -> Result<AgentSession, AgentError> {
+        let session = self.session(id)?;
+        if matches!(session.state, AgentState::Exited(_)) {
+            return Err(AgentError::Invalid(format!(
+                "{} already finished: start a new agent",
+                session.provider_name
+            )));
+        }
+        let text = text.trim();
+        if !text.is_empty() {
+            let attachment = self
+                .terminals
+                .attach(&session.terminal, false)
+                .map_err(launch_error)?;
+            // Several lines go as one paste (agent TUIs read bracketed
+            // paste); then it's submitted on its own, as a person would.
+            let text = text.replace('\x1b', "");
+            let typed = if text.contains('\n') {
+                format!("\x1b[200~{text}\x1b[201~")
+            } else {
+                text
+            };
+            attachment
+                .session
+                .write(Bytes::from(typed))
+                .await
+                .map_err(launch_error)?;
+            tokio::time::sleep(Duration::from_millis(80)).await;
+            attachment
+                .session
+                .write(Bytes::from_static(b"\r"))
+                .await
+                .map_err(launch_error)?;
+        }
+        self.update_session(id, |session| {
+            session.record(
+                AgentEventKind::Context,
+                context.title.clone(),
+                Timestamp::now(),
+            );
+            if !session.context.contains(&context) {
+                session.context.push(context);
+            }
+        });
+        self.session(id)
     }
 
     /// Kills the agent's process; its session ends as exited.

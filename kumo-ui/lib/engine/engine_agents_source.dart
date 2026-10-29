@@ -112,7 +112,7 @@ class EngineAgentsSource extends AgentsSource {
   Future<String?> login(String id) async => (await _call((c) => c.loginProvider(pb.LoginProviderRequest(id: id))))?.terminalId;
 
   @override
-  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = ''}) async {
+  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = '', List<AgentContextItem> context = const []}) async {
     final session = await _call((c) => c.start(pb.StartAgentRequest(
           providerId: providerId ?? '',
           worktreePath: worktreePath,
@@ -120,9 +120,23 @@ class EngineAgentsSource extends AgentsSource {
           title: title,
           cols: 120,
           rows: 40,
+          context: [for (final item in context) _contextTo(item)],
         )));
     return session == null ? null : _run(session);
   }
+
+  @override
+  Future<bool> addContext(String id, AgentContextItem item, {String text = ''}) async {
+    final session = await _call((c) => c.addContext(pb.AddAgentContextRequest(id: id, context: _contextTo(item), text: text)));
+    return session != null;
+  }
+
+  static pb.AgentContext _contextTo(AgentContextItem item) => pb.AgentContext(
+        kind: item.kind == AgentContextKind.doc ? pb.AgentContextKind.AGENT_CONTEXT_KIND_DOC : pb.AgentContextKind.AGENT_CONTEXT_KIND_TASK,
+        title: item.title,
+        detail: item.detail,
+        url: item.url,
+      );
 
   @override
   Future<void> stop(String id) => _call((c) => c.stop(pb.StopAgentRequest(id: id)));
@@ -163,6 +177,16 @@ class EngineAgentsSource extends AgentsSource {
         exitCode: s.exitCode,
         startedAt: DateTime.fromMillisecondsSinceEpoch(s.startedUnixMs.toInt()),
         lastLine: s.lastLine,
+        context: [
+          for (final item in s.context)
+            AgentContextItem(
+              kind: item.kind == pb.AgentContextKind.AGENT_CONTEXT_KIND_DOC ? AgentContextKind.doc : AgentContextKind.task,
+              title: item.title,
+              detail: item.detail,
+              url: item.url,
+            ),
+        ],
+        steps: [for (final e in s.events) agentStepFrom(e)],
       );
 
   @override
@@ -172,3 +196,18 @@ class EngineAgentsSource extends AgentsSource {
   }
 }
 
+AgentStep agentStepFrom(pb.AgentEvent e) => AgentStep(
+      at: DateTime.fromMillisecondsSinceEpoch(e.atUnixMs.toInt()),
+      kind: switch (e.kind) {
+        pb.AgentEventKind.AGENT_EVENT_KIND_EDITED => AgentStepKind.edited,
+        pb.AgentEventKind.AGENT_EVENT_KIND_RAN => AgentStepKind.ran,
+        pb.AgentEventKind.AGENT_EVENT_KIND_READ => AgentStepKind.read,
+        pb.AgentEventKind.AGENT_EVENT_KIND_SEARCHED => AgentStepKind.searched,
+        pb.AgentEventKind.AGENT_EVENT_KIND_TOOL => AgentStepKind.tool,
+        pb.AgentEventKind.AGENT_EVENT_KIND_WAITING => AgentStepKind.waiting,
+        pb.AgentEventKind.AGENT_EVENT_KIND_CONTEXT => AgentStepKind.context,
+        pb.AgentEventKind.AGENT_EVENT_KIND_EXITED => AgentStepKind.exited,
+        _ => AgentStepKind.started,
+      },
+      text: e.text,
+    );

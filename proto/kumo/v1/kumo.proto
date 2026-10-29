@@ -298,6 +298,11 @@ service Git {
   rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
   rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
   rpc WriteFile(WriteFileRequest) returns (WriteFileResponse);
+  // Renames or moves a file or folder; its new folders are created. Fails
+  // when something is already there.
+  rpc MovePath(MovePathRequest) returns (GitActionResponse);
+  // Deletes files, or folders with everything in them.
+  rpc RemovePaths(PathsRequest) returns (GitActionResponse);
   // The whole file with its changes (unchanged lines as context).
   rpc Diff(DiffRequest) returns (DiffResponse);
   rpc Stage(PathsRequest) returns (GitActionResponse);
@@ -389,6 +394,12 @@ message WriteFileRequest {
 
 message WriteFileResponse {}
 
+message MovePathRequest {
+  string worktree_path = 1;
+  string from = 2;
+  string to = 3;
+}
+
 enum DiffScope {
   // Working tree (staged and not) vs HEAD.
   DIFF_SCOPE_WORKING = 0;
@@ -478,6 +489,9 @@ service Agents {
   rpc Start(StartAgentRequest) returns (AgentSession);
   // Kills the agent's process.
   rpc Stop(StopAgentRequest) returns (StopAgentResponse);
+  // Sends a ticket or page to a running agent: the text is typed into its
+  // terminal and submitted, and the item joins its context.
+  rpc AddContext(AddAgentContextRequest) returns (AgentSession);
   // Forgets a finished session.
   rpc Dismiss(DismissAgentRequest) returns (DismissAgentResponse);
   // Every session now, then again whenever one changes (last wins).
@@ -553,6 +567,47 @@ message StartAgentRequest {
   string title = 4;
   uint32 cols = 5;
   uint32 rows = 6;
+  // What the prompt hands it (a ticket, a page), for the record.
+  repeated AgentContext context = 7;
+}
+
+enum AgentContextKind {
+  AGENT_CONTEXT_KIND_TASK = 0;
+  AGENT_CONTEXT_KIND_DOC = 1;
+}
+
+// A ticket or page an agent was given.
+message AgentContext {
+  AgentContextKind kind = 1;
+  // e.g. "PRC-412 · Bulk discounts by category".
+  string title = 2;
+  // Where it lives, e.g. "Jira" or "Confluence · Pricing".
+  string detail = 3;
+  string url = 4;
+}
+
+enum AgentEventKind {
+  AGENT_EVENT_KIND_STARTED = 0;
+  AGENT_EVENT_KIND_EDITED = 1;
+  AGENT_EVENT_KIND_RAN = 2;
+  AGENT_EVENT_KIND_READ = 3;
+  AGENT_EVENT_KIND_SEARCHED = 4;
+  // Another tool, named in the text.
+  AGENT_EVENT_KIND_TOOL = 5;
+  // Its turn ended; the text is what it said last.
+  AGENT_EVENT_KIND_WAITING = 6;
+  // It was sent a ticket or page (the text is its title).
+  AGENT_EVENT_KIND_CONTEXT = 7;
+  // The process ended; the text says how.
+  AGENT_EVENT_KIND_EXITED = 8;
+}
+
+// One step of an agent's timeline, read from its terminal.
+message AgentEvent {
+  uint64 at_unix_ms = 1;
+  AgentEventKind kind = 2;
+  // The file, command or tool it acted on.
+  string text = 3;
 }
 
 enum AgentState {
@@ -578,6 +633,9 @@ message AgentSession {
   uint64 state_since_unix_ms = 12;
   // Last readable line of output.
   string last_line = 13;
+  repeated AgentContext context = 14;
+  // Oldest first; the last 80.
+  repeated AgentEvent events = 15;
 }
 
 message StopAgentRequest {
@@ -585,6 +643,13 @@ message StopAgentRequest {
 }
 
 message StopAgentResponse {}
+
+message AddAgentContextRequest {
+  string id = 1;
+  AgentContext context = 2;
+  // Typed into the agent's terminal and submitted; empty only records it.
+  string text = 3;
+}
 
 message DismissAgentRequest {
   string id = 1;
@@ -1307,3 +1372,83 @@ message Doc {
   // The note's file, for a vault; empty otherwise.
   string file = 5;
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+// A worktree's tests: its own command (a Makefile `test` target, else the
+// usual one for its language), run in a terminal the user can open, and
+// what the runner's output says as it goes.
+service Tests {
+  // The detected command and the latest run, then again whenever the run
+  // changes.
+  rpc Watch(WatchTestsRequest) returns (stream TestsSnapshot);
+  // Stops a run still going in the worktree first.
+  rpc Run(RunTestsRequest) returns (TestRun);
+  rpc Stop(StopTestsRequest) returns (StopTestsResponse);
+}
+
+message WatchTestsRequest {
+  string worktree_path = 1;
+}
+
+message TestsSnapshot {
+  // Empty when none was found.
+  string command = 1;
+  // Why it was picked, e.g. "Makefile".
+  string command_origin = 2;
+  // Absent until the worktree runs its tests.
+  TestRun run = 3;
+}
+
+enum TestRunState {
+  TEST_RUN_STATE_RUNNING = 0;
+  TEST_RUN_STATE_PASSED = 1;
+  TEST_RUN_STATE_FAILED = 2;
+  // Stopped before it finished.
+  TEST_RUN_STATE_STOPPED = 3;
+}
+
+// One package, crate or file of tests.
+message TestSuite {
+  string name = 1;
+  bool passed = 2;
+  // 0 when the runner doesn't say.
+  uint64 duration_ms = 3;
+  uint32 tests = 4;
+}
+
+message TestRun {
+  string worktree_path = 1;
+  string command = 2;
+  // Where it runs (open it to see the whole output).
+  string terminal_id = 3;
+  TestRunState state = 4;
+  int32 exit_code = 5;
+  uint64 started_unix_ms = 6;
+  // 0 while running.
+  uint64 finished_unix_ms = 7;
+  uint32 passed = 8;
+  uint32 failed = 9;
+  uint32 skipped = 10;
+  repeated TestSuite suites = 11;
+  // Names of the failing tests.
+  repeated string failures = 12;
+  // The latest line printed.
+  string last_line = 13;
+}
+
+message RunTestsRequest {
+  string worktree_path = 1;
+  // Empty: the detected command.
+  string command = 2;
+  uint32 cols = 3;
+  uint32 rows = 4;
+}
+
+message StopTestsRequest {
+  string worktree_path = 1;
+}
+
+message StopTestsResponse {}

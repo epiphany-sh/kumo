@@ -10,6 +10,7 @@
 //! - [`pipelines`]: CI runs of a worktree's branch on its repository's host.
 //! - [`pulls`]: pull requests of the workspace's repositories.
 //! - [`tasks`]: tasks from the user's tools, cached locally.
+//! - [`test_runs`]: a worktree's tests, run and read as they go.
 //! - [`workspace`]: namespaces, git repositories and their worktrees.
 
 pub mod agents;
@@ -20,5 +21,6 @@ pub mod pipelines;
 pub mod pulls;
 pub mod tasks;
 pub mod terminal;
+pub mod test_runs;
 pub mod time;
 pub mod workspace;
