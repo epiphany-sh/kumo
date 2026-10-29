@@ -7,6 +7,7 @@ import 'package:grpc/grpc.dart';
 
 import '../data/models.dart' as ui;
 import '../data/workspace_source.dart';
+import '../data/worktree_arrivals.dart';
 import 'generated/kumo/v1/kumo.pbgrpc.dart';
 import 'kumo_engine.dart';
 
@@ -27,6 +28,7 @@ class EngineWorkspaceSource extends WorkspaceSource {
   Map<String, ui.Repo> _repos = const {};
   List<ui.RepoCandidate> _discovered = const [];
   String? _error;
+  final WorktreeArrivals _arrivals = WorktreeArrivals();
 
   /// Displayed worktree path (`~/…`) → absolute path, for daemon calls.
   final Map<String, String> _absolute = {};
@@ -84,6 +86,20 @@ class EngineWorkspaceSource extends WorkspaceSource {
       for (final n in snapshot.namespaces) ui.Namespace(id: n.id, name: n.name, repos: List.of(n.repoPaths), collapsed: n.collapsed),
     ];
     _repos = {for (final r in snapshot.repositories) r.path: _repo(r)};
+    _arrivals.update([
+      for (final r in _repos.values)
+        for (final w in r.worktrees) (r.id, w.branch, w.path),
+    ]);
+    notifyListeners();
+  }
+
+  @override
+  Set<String> get arrived => _arrivals.arrived;
+
+  @override
+  void acknowledge(String path) {
+    if (!_arrivals.arrived.contains(path)) return;
+    _arrivals.acknowledge(path);
     notifyListeners();
   }
 
@@ -149,14 +165,19 @@ class EngineWorkspaceSource extends WorkspaceSource {
   }
 
   @override
-  Future<void> createWorktree(ui.Repo repo, {required String branch, required bool createBranch, String base = '', String path = ''}) =>
-      _call((conn) => conn.workspace.createWorktree(CreateWorktreeRequest(
-            repoPath: repo.id,
-            branch: branch.trim(),
-            createBranch: createBranch,
-            base: base,
-            path: path.trim(),
-          )));
+  Future<void> createWorktree(ui.Repo repo, {required String branch, required bool createBranch, String base = '', String path = ''}) {
+    _arrivals.expect(repo.id, branch);
+    return _call((conn) => conn.workspace.createWorktree(CreateWorktreeRequest(
+          repoPath: repo.id,
+          branch: branch.trim(),
+          createBranch: createBranch,
+          base: base,
+          path: path.trim(),
+        ))).catchError((Object e) {
+      _arrivals.forget(repo.id, branch);
+      throw e;
+    });
+  }
 
   @override
   Future<void> removeWorktree(ui.Repo repo, ui.Worktree worktree) => _call((conn) => conn.workspace.removeWorktree(RemoveWorktreeRequest(
@@ -215,6 +236,7 @@ class EngineWorkspaceSource extends WorkspaceSource {
       unpushed: status.ahead,
       everPushed: pushed,
       principal: w.isMain,
+      changedFiles: changed,
     );
   }
 

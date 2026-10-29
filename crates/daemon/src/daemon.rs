@@ -36,7 +36,7 @@ use kumo_infrastructure::tasks::{
 };
 use kumo_infrastructure::watch::NotifyWatcher;
 
-use crate::single_instance::ensure_not_running;
+use crate::single_instance::{InstanceLock, ensure_not_running, lock};
 use crate::{DaemonConfig, SecretsBackend};
 
 /// A started daemon: listening, advertised, not yet serving.
@@ -46,6 +46,7 @@ pub struct Daemon {
     endpoint: DaemonEndpoint,
     discovery: FileDiscoveryStore,
     terminals: Arc<TerminalService>,
+    _lock: InstanceLock,
 }
 
 impl Daemon {
@@ -64,12 +65,14 @@ impl Daemon {
         };
         let discovery = FileDiscoveryStore::in_dir(&data_dir);
         ensure_not_running(&discovery).await?;
+        let instance = lock(&data_dir)?;
 
         let workspace = Arc::new(
             WorkspaceService::load(WorkspacePorts {
                 git: Arc::new(GitCli::default()),
                 store: Arc::new(SqliteWorkspaceStore::open(&data_dir.join("kumo.db"))?),
                 finder: Arc::new(FsRepoFinder::new(&home)),
+                watcher: Arc::new(NotifyWatcher),
                 location: WorktreeLocation::new(&home),
             })
             .await?,
@@ -77,6 +80,8 @@ impl Daemon {
         // Git state is read in the background: the daemon answers right away.
         let initial = Arc::clone(&workspace);
         tokio::spawn(async move { initial.refresh().await });
+        // Worktrees and changes made from a terminal show without a refresh.
+        workspace.sync();
 
         let token = generate_auth_token().context("generating auth token")?;
         let terminals = Arc::new(TerminalService::new(
@@ -212,6 +217,7 @@ impl Daemon {
             endpoint,
             discovery,
             terminals,
+            _lock: instance,
         })
     }
 

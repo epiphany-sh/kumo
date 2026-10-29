@@ -17,7 +17,7 @@ make run
 ```
 
 Compila `kumod` y la app Flutter en release, mete `kumod` adentro del bundle
-(`kumo_ui.app/Contents/MacOS/kumod`), reinicia el daemon y abre la app. La app
+(`Kumo.app/Contents/MacOS/kumod`), reinicia el daemon y abre la app. La app
 descubre el daemon por `daemon.json` o lo lanza desacoplado si no está corriendo.
 
 | Comando | Qué hace |

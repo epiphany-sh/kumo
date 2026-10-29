@@ -388,3 +388,44 @@ async fn a_failed_worktree_leaves_no_folders_behind() {
     );
     assert!(!daemon.home().join("wt").exists(), "nothing left in ~/wt");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn worktrees_and_changes_made_outside_show_without_a_refresh() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let root = git_repo(&daemon.home().join("dev/engine"), None);
+    save_namespace(&mut client, "engine", &[&root]).await;
+    snapshot_where(&mut client, |s| {
+        s.repositories.iter().any(|r| r.worktrees.len() == 1)
+    })
+    .await;
+
+    // An agent in a terminal, next to the repository.
+    let sibling = root.with_file_name("engine-delete");
+    let added = Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .args(["worktree", "add", "-b", "feat/delete"])
+        .arg(&sibling)
+        .output()
+        .unwrap();
+    assert!(added.status.success(), "{added:?}");
+    let sibling = std::fs::canonicalize(sibling)
+        .unwrap()
+        .display()
+        .to_string();
+    snapshot_where(&mut client, |s| {
+        repo(s, &root).worktrees.iter().any(|w| w.path == sibling)
+    })
+    .await;
+
+    std::fs::write(Path::new(&sibling).join("handler.go"), "package x").unwrap();
+    let snapshot = snapshot_where(&mut client, |s| {
+        repo(s, &root)
+            .worktrees
+            .iter()
+            .any(|w| w.path == sibling && w.status.as_ref().unwrap().changed_files == 1)
+    })
+    .await;
+    assert_eq!(repo(&snapshot, &root).worktrees.len(), 2);
+}

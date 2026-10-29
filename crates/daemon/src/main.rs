@@ -58,6 +58,10 @@ async fn async_main(args: Args) -> ExitCode {
                 eprintln!("kumod is already running at {addr} (pid {pid})");
                 return ExitCode::SUCCESS;
             }
+            if let Some(DaemonError::AlreadyStarting(_)) = error.downcast_ref() {
+                eprintln!("kumod: {error}");
+                return ExitCode::SUCCESS;
+            }
             eprintln!("kumod: {error:#}");
             ExitCode::FAILURE
         }

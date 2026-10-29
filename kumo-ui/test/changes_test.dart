@@ -48,6 +48,25 @@ void main() {
     s.dispose();
   });
 
+  test('file and context tabs belong to their worktree', () {
+    final s = AppState();
+    s.selectWorktree('feat/PRC-412-bulk-discounts', path: '~/wt/price-admin/PRC-412');
+    s.openAllFiles(['src/DashboardContext.tsx', 'src/api.ts']);
+    s.openContext(ContextTab.git);
+    s.showContextFile('src/api.ts');
+
+    s.selectWorktree('fix/PRC-398-rounding', path: '~/wt/price-admin/PRC-398');
+    expect(s.openFiles, isEmpty, reason: 'those paths are inside the other worktree');
+    expect(s.contextTabs, isEmpty);
+    expect((s.activeFile, s.contextFile), (null, null));
+    s.openFile('internal/rounding.go');
+
+    s.selectWorktree('feat/PRC-412-bulk-discounts', path: '~/wt/price-admin/PRC-412');
+    expect(s.openFiles, ['src/DashboardContext.tsx', 'src/api.ts']);
+    expect((s.activeContext, s.contextFile), (ContextTab.git, 'src/api.ts'));
+    s.dispose();
+  });
+
   test('commit moves pending files onto the branch; undo restores', () {
     final s = AppState();
     expect(s.pendingChanges.length, 4);

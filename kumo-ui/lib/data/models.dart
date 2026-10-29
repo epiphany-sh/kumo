@@ -18,6 +18,7 @@ class Worktree {
     this.unpushed = 0,
     this.everPushed = true,
     this.principal,
+    this.changedFiles,
   });
   final String branch;
   final String note;
@@ -37,6 +38,10 @@ class Worktree {
   /// unset and use the branch name.
   final bool? principal;
   bool get isMain => principal ?? branch == 'main';
+
+  /// Uncommitted files. Mocks leave it unset and read it from [changes].
+  final int? changedFiles;
+  int get changed => changedFiles ?? int.tryParse(RegExp(r'^(\d+) files?$').firstMatch(changes)?.group(1) ?? '') ?? 0;
 }
 
 enum CheckState { ok, running, waiting }

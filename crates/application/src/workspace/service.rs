@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use kumo_domain::changes::ChangeWatcher;
 use kumo_domain::workspace::{
     BranchName, Branches, Git, Namespace, NamespaceId, NewWorktree, Remote, Repo, RepoFinder,
     RepoState, WorkspaceError, WorkspaceSnapshot, WorkspaceStore, Worktree, WorktreeLocation,
@@ -14,6 +15,8 @@ pub struct WorkspacePorts {
     pub git: Arc<dyn Git>,
     pub store: Arc<dyn WorkspaceStore>,
     pub finder: Arc<dyn RepoFinder>,
+    /// Notices changes made outside the app (see [`WorkspaceService::sync`]).
+    pub watcher: Arc<dyn ChangeWatcher>,
     pub location: WorktreeLocation,
 }
 
@@ -81,6 +84,17 @@ impl WorkspaceService {
     /// skipped: last wins).
     pub fn watch(&self) -> watch::Receiver<Arc<WorkspaceSnapshot>> {
         self.published.subscribe()
+    }
+
+    /// Watches the repositories in the workspace and re-reads one whenever
+    /// something changes on disk, wherever it came from (a `git worktree
+    /// add` or an agent in a terminal). Runs until the service is dropped.
+    pub fn sync(self: &Arc<Self>) {
+        tokio::spawn(super::sync::run(
+            Arc::downgrade(self),
+            Arc::clone(&self.ports.watcher),
+            self.watch(),
+        ));
     }
 
     /// Re-reads git for every repository in a namespace.
@@ -260,17 +274,22 @@ impl WorkspaceService {
     /// files changing on disk). Publishes only if something changed.
     pub async fn refresh_worktree(&self, worktree: &Path) {
         let mut state = self.state.lock().await;
-        let Some(owner) = state
+        let owner = state
             .repos
             .values()
             .find(|r| r.worktrees.iter().any(|w| same_path(&w.path, worktree)))
-            .cloned()
-        else {
-            return;
-        };
-        let before = owner.clone();
-        if *self.reread(&mut state, owner.repo).await != before {
-            self.publish(&mut state);
+            .cloned();
+        if let Some(owner) = owner {
+            self.reread_if_changed(&mut state, owner).await;
+        }
+    }
+
+    /// Re-reads a repository in the workspace (its main checkout's path).
+    /// Publishes only if something changed.
+    pub async fn refresh_repo(&self, repo: &Path) {
+        let mut state = self.state.lock().await;
+        if let Some(owner) = state.repos.get(repo).cloned() {
+            self.reread_if_changed(&mut state, owner).await;
         }
     }
 
@@ -357,6 +376,13 @@ impl WorkspaceService {
             .unwrap_or_else(|e| unreachable_read(&path, &e));
         state.repos.insert(read.repo.path.clone(), read);
         &state.repos[&path]
+    }
+
+    async fn reread_if_changed(&self, state: &mut State, before: RepoState) {
+        let repo = before.repo.clone();
+        if *self.reread(state, repo).await != before {
+            self.publish(state);
+        }
     }
 
     fn publish(&self, state: &mut State) {

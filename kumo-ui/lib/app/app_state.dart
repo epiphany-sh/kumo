@@ -160,6 +160,7 @@ class AppState extends ChangeNotifier {
   void selectWorktree(String branch, {String? path}) {
     activeWorktree = branch;
     activeWorktreePath = path;
+    if (path != null) workspace.acknowledge(path);
     _home = false;
     _bindChanges();
     _bindPipelines();
@@ -181,10 +182,70 @@ class AppState extends ChangeNotifier {
   /// The selected worktree itself, if it is still there.
   Worktree? get activeWorktreeEntry => activeRepo?.worktrees.where(isActiveWorktree).firstOrNull;
 
+  /// Worktrees with uncommitted files in the namespaces of the selected one,
+  /// other than it: where an agent started from here may be working.
+  List<(Repo, Worktree)> get otherChangedWorktrees {
+    final active = activeRepo;
+    if (active == null) return const [];
+    final ids = {
+      for (final n in namespaces)
+        if (n.repos.contains(active.id)) ...n.repos,
+    };
+    return [
+      for (final r in workspace.repos)
+        if (ids.contains(r.id))
+          for (final w in worktreesOf(r))
+            if (w.changed > 0 && !isActiveWorktree(w)) (r, w),
+    ];
+  }
+
+  // ---- Worktrees made outside the app ----
+
+  /// Arrivals already announced, so each one is announced once.
+  final Set<String> _announced = {};
+  String? _arrivedPath;
+
+  /// The latest worktree made from a terminal or by an agent, until opened
+  /// or dismissed.
+  (Repo, Worktree)? get arrivedWorktree {
+    final path = _arrivedPath;
+    if (path == null || !workspace.arrived.contains(path)) return null;
+    for (final r in workspace.repos) {
+      for (final w in worktreesOf(r)) {
+        if (w.path == path) return (r, w);
+      }
+    }
+    return null;
+  }
+
+  void openArrivedWorktree() {
+    final arrived = arrivedWorktree;
+    if (arrived != null) selectWorktree(arrived.$2.branch, path: arrived.$2.path);
+  }
+
+  void dismissArrivedWorktree() {
+    _arrivedPath = null;
+    notifyListeners();
+  }
+
   void _onWorkspaceChanged() {
     if (workspace.error != _lastWorkspaceError) {
       _lastWorkspaceError = workspace.error;
       _workspaceErrorDismissed = false;
+    }
+    // The tabs of a worktree that is gone go with it.
+    if (workspace.loaded && workspace.repos.isNotEmpty) {
+      final live = {
+        '',
+        for (final r in workspace.repos)
+          for (final w in r.worktrees) workspace.absolutePathOf(w),
+      };
+      _worktreeTabs.removeWhere((key, _) => !live.contains(key));
+    }
+    final arrived = workspace.arrived.difference(_announced);
+    if (arrived.isNotEmpty) {
+      _announced.addAll(arrived);
+      _arrivedPath = arrived.last;
     }
     // Nothing selected yet (or it was removed): pick the first main checkout.
     if (activeWorktreeEntry == null) {
@@ -413,50 +474,60 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  final List<ContextTab> _contextTabs = [];
-  ContextTab? _activeContext;
+  /// File and context tabs of each worktree, by its absolute path ('' when
+  /// none is selected). Their paths are inside that worktree, so switching
+  /// shows the other worktree's own tabs, like its terminals.
+  final Map<String, _WorktreeTabs> _worktreeTabs = {};
+  String get _tabsKey {
+    final entry = activeWorktreeEntry;
+    return entry == null ? '' : workspace.absolutePathOf(entry);
+  }
+
+  _WorktreeTabs get _tabs => _worktreeTabs.putIfAbsent(_tabsKey, _WorktreeTabs.new);
 
   /// The worktree's Files / Git tabs that are open (none in Home).
-  List<ContextTab> get contextTabs => _home ? const [] : List.unmodifiable(_contextTabs);
+  List<ContextTab> get contextTabs => _home ? const [] : List.unmodifiable(_tabs.context);
 
   /// The context tab showing, or null when terminals or a file tab are.
-  ContextTab? get activeContext => _home ? null : _activeContext;
+  ContextTab? get activeContext => _home ? null : _tabs.activeContext;
 
   /// Opens (or goes to) the worktree's [t] tab in the Terminal view.
   void openContext(ContextTab t) {
     _home = false;
-    if (!_contextTabs.contains(t)) _contextTabs.add(t);
-    _activeContext = t;
+    final tabs = _tabs;
+    if (!tabs.context.contains(t)) tabs.context.add(t);
+    tabs.activeContext = t;
     _view = KumoView.terminal;
     notifyListeners();
   }
 
   void closeContext(ContextTab t) {
-    if (!_contextTabs.remove(t)) return;
-    if (_activeContext == t) _activeContext = null;
+    final tabs = _tabs;
+    if (!tabs.context.remove(t)) return;
+    if (tabs.activeContext == t) tabs.activeContext = null;
     notifyListeners();
   }
 
   /// Files open in the Files tab (its tree opens them), in tab order, and
   /// the one showing.
-  final List<String> _contextFiles = [];
-  String? _contextFile;
-  List<String> get contextFiles => List.unmodifiable(_contextFiles);
-  String? get contextFile => _contextFile;
+  List<String> get contextFiles => List.unmodifiable(_tabs.contextFiles);
+  String? get contextFile => _tabs.contextFile;
 
   /// Opens [path] in the Files tab (a tab of its own, or the one it has).
   void showContextFile(String path) {
-    if (!_contextFiles.contains(path)) _contextFiles.add(path);
-    _contextFile = path;
+    final tabs = _tabs;
+    if (!tabs.contextFiles.contains(path)) tabs.contextFiles.add(path);
+    tabs.contextFile = path;
     notifyListeners();
   }
 
   /// Closes [path]'s tab in the Files tab; its neighbour shows next.
   void closeContextFile(String path) {
-    final i = _contextFiles.indexOf(path);
+    final tabs = _tabs;
+    final i = tabs.contextFiles.indexOf(path);
     if (i < 0) return;
-    _contextFiles.removeAt(i);
-    if (_contextFile == path) _contextFile = _contextFiles.isEmpty ? null : _contextFiles[i > 0 ? i - 1 : 0];
+    tabs.contextFiles.removeAt(i);
+    if (tabs.contextFile == path) tabs.contextFile = tabs.contextFiles.isEmpty ? null : tabs.contextFiles[i > 0 ? i - 1 : 0];
     _forgetBuffer(path);
     notifyListeners();
   }
@@ -464,9 +535,10 @@ class AppState extends ChangeNotifier {
   /// Keeps only the file showing in the Files tab (and files with unsaved
   /// edits: they never close without asking).
   void closeOtherContextFiles() {
-    final keep = [for (final p in _contextFiles) if (p == _contextFile || buffers.isDirty(p)) p];
-    final gone = [for (final p in _contextFiles) if (!keep.contains(p)) p];
-    _contextFiles
+    final tabs = _tabs;
+    final keep = [for (final p in tabs.contextFiles) if (p == tabs.contextFile || buffers.isDirty(p)) p];
+    final gone = [for (final p in tabs.contextFiles) if (!keep.contains(p)) p];
+    tabs.contextFiles
       ..clear()
       ..addAll(keep);
     gone.forEach(_forgetBuffer);
@@ -475,13 +547,14 @@ class AppState extends ChangeNotifier {
 
   /// Closes every file in the Files tab but those with unsaved edits.
   void closeAllContextFiles() {
-    final keep = [for (final p in _contextFiles) if (buffers.isDirty(p)) p];
-    final gone = [for (final p in _contextFiles) if (!keep.contains(p)) p];
-    _contextFiles
+    final tabs = _tabs;
+    final keep = [for (final p in tabs.contextFiles) if (buffers.isDirty(p)) p];
+    final gone = [for (final p in tabs.contextFiles) if (!keep.contains(p)) p];
+    tabs.contextFiles
       ..clear()
       ..addAll(keep);
     gone.forEach(_forgetBuffer);
-    if (!keep.contains(_contextFile)) _contextFile = keep.firstOrNull;
+    if (!keep.contains(tabs.contextFile)) tabs.contextFile = keep.firstOrNull;
     notifyListeners();
   }
 
@@ -499,9 +572,10 @@ class AppState extends ChangeNotifier {
     return _buffers = FileBuffers(_changes)..addListener(notifyListeners);
   }
 
-  /// A buffer goes once no tab shows its file.
+  /// A buffer goes once no tab of its worktree shows its file.
   void _forgetBuffer(String path) {
-    if (_contextFiles.contains(path) || _openFiles.contains(path)) return;
+    final tabs = _tabs;
+    if (tabs.contextFiles.contains(path) || tabs.files.contains(path)) return;
     buffers.forget(path);
   }
 
@@ -590,13 +664,14 @@ class AppState extends ChangeNotifier {
     if (_disposed || !identical(changes, _changes)) return null;
     if (!ok) return changes.error ?? 'Couldn’t rename ${from.split('/').last}';
     String follow(String p) => p == from ? to : (p.startsWith('$from/') ? to + p.substring(from.length) : p);
-    for (final list in [_contextFiles, _openFiles]) {
+    final tabs = _tabs;
+    for (final list in [tabs.contextFiles, tabs.files]) {
       for (var i = 0; i < list.length; i++) {
         list[i] = follow(list[i]);
       }
     }
-    if (_contextFile != null) _contextFile = follow(_contextFile!);
-    if (_activeFile != null) _activeFile = follow(_activeFile!);
+    if (tabs.contextFile != null) tabs.contextFile = follow(tabs.contextFile!);
+    if (tabs.activeFile != null) tabs.activeFile = follow(tabs.activeFile!);
     buffers.moved(from, to);
     notifyListeners();
     return null;
@@ -608,17 +683,18 @@ class AppState extends ChangeNotifier {
   void deletePath(String path) {
     if (isDeleting(path)) return;
     bool inside(String p) => p == path || p.startsWith('$path/');
-    final ctxBefore = List.of(_contextFiles);
-    final ctxFileBefore = _contextFile;
-    final openBefore = List.of(_openFiles);
-    final activeBefore = _activeFile;
+    final tabs = _tabs;
+    final ctxBefore = List.of(tabs.contextFiles);
+    final ctxFileBefore = tabs.contextFile;
+    final openBefore = List.of(tabs.files);
+    final activeBefore = tabs.activeFile;
     // Buffers (unsaved edits included) stay until the deletion happens, so
     // Undo brings the edits back with the tabs.
-    final closed = {..._contextFiles.where(inside), ..._openFiles.where(inside)};
-    _contextFiles.removeWhere(inside);
-    _openFiles.removeWhere(inside);
-    if (_contextFile != null && inside(_contextFile!)) _contextFile = _contextFiles.lastOrNull;
-    if (_activeFile != null && inside(_activeFile!)) _activeFile = _openFiles.lastOrNull;
+    final closed = {...tabs.contextFiles.where(inside), ...tabs.files.where(inside)};
+    tabs.contextFiles.removeWhere(inside);
+    tabs.files.removeWhere(inside);
+    if (tabs.contextFile != null && inside(tabs.contextFile!)) tabs.contextFile = tabs.contextFiles.lastOrNull;
+    if (tabs.activeFile != null && inside(tabs.activeFile!)) tabs.activeFile = tabs.files.lastOrNull;
     _deleting.add(path);
     final changes = _changes;
     _offerUndo(
@@ -626,14 +702,14 @@ class AppState extends ChangeNotifier {
       () {
         _deleting.remove(path);
         if (!identical(changes, _changes)) return;
-        _contextFiles
+        tabs.contextFiles
           ..clear()
           ..addAll(ctxBefore);
-        _contextFile = ctxFileBefore;
-        _openFiles
+        tabs.contextFile = ctxFileBefore;
+        tabs.files
           ..clear()
           ..addAll(openBefore);
-        _activeFile = activeBefore;
+        tabs.activeFile = activeBefore;
       },
       commit: () {
         if (identical(changes, _changes)) closed.forEach(_forgetBuffer);
@@ -715,52 +791,48 @@ class AppState extends ChangeNotifier {
 
   // ---- File tabs in the Terminal view ----
 
-  final List<String> _openFiles = [];
   /// File tabs belong to the worktree's context: none in Home.
-  List<String> get openFiles => _home ? const [] : List.unmodifiable(_openFiles);
-  String? _activeFile;
+  List<String> get openFiles => _home ? const [] : List.unmodifiable(_tabs.files);
 
   /// The file tab showing, or null when the terminal panes (or a context
   /// tab) are showing.
-  String? get activeFile => _home || activeContext != null ? null : _activeFile;
+  String? get activeFile => _home || activeContext != null ? null : _tabs.activeFile;
 
-  void openFile(String path) {
-    if (!_openFiles.contains(path)) _openFiles.add(path);
-    _activeFile = path;
-    _activeContext = null;
-    _home = false;
-    _view = KumoView.terminal;
-    notifyListeners();
-  }
+  void openFile(String path) => openAllFiles([path]);
 
   void openAllFiles(Iterable<String> paths) {
+    final tabs = _tabs;
     String? first;
     for (final p in paths) {
       first ??= p;
-      if (!_openFiles.contains(p)) _openFiles.add(p);
+      if (!tabs.files.contains(p)) tabs.files.add(p);
     }
     if (first == null) return;
-    _activeFile = first;
-    _activeContext = null;
+    tabs
+      ..activeFile = first
+      ..activeContext = null;
     _home = false;
     _view = KumoView.terminal;
     notifyListeners();
   }
 
   void closeFile(String path) {
-    final i = _openFiles.indexOf(path);
+    final tabs = _tabs;
+    final i = tabs.files.indexOf(path);
     if (i < 0) return;
-    _openFiles.removeAt(i);
-    if (_activeFile == path) _activeFile = _openFiles.isEmpty ? null : _openFiles[i > 0 ? i - 1 : 0];
+    tabs.files.removeAt(i);
+    if (tabs.activeFile == path) tabs.activeFile = tabs.files.isEmpty ? null : tabs.files[i > 0 ? i - 1 : 0];
     _forgetBuffer(path);
     notifyListeners();
   }
 
   /// Back to the terminal panes (a terminal tab was clicked).
   void showTerminals() {
-    if (_activeFile == null && _activeContext == null) return;
-    _activeFile = null;
-    _activeContext = null;
+    final tabs = _tabs;
+    if (tabs.activeFile == null && tabs.activeContext == null) return;
+    tabs
+      ..activeFile = null
+      ..activeContext = null;
     notifyListeners();
   }
 
@@ -797,9 +869,6 @@ class AppState extends ChangeNotifier {
     _changesPath = path;
     _changes = path == null ? NoWorktreeChanges() : factory(path);
     _changes.addListener(notifyListeners);
-    // Another worktree: its own files.
-    _contextFiles.clear();
-    _contextFile = null;
     _commitNotice = null;
     _canUndoCommit = false;
   }
@@ -1189,6 +1258,18 @@ enum InspectorWidget {
   const InspectorWidget(this.label, this.description);
   final String label;
   final String description;
+}
+
+/// The file and context tabs open in one worktree.
+class _WorktreeTabs {
+  final List<String> files = [];
+  String? activeFile;
+  final List<ContextTab> context = [];
+  ContextTab? activeContext;
+
+  /// Files open in the Files tab, and the one showing.
+  final List<String> contextFiles = [];
+  String? contextFile;
 }
 
 class UndoNotice {

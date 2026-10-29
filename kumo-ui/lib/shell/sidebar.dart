@@ -100,6 +100,7 @@ class Sidebar extends StatelessWidget {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
+                  if (s.arrivedWorktree case (final repo, final worktree)) _ArrivedToast(repo: repo, worktree: worktree),
                   for (final ns in s.namespaces)
                     _NamespaceGroup(key: ValueKey(ns.id), ns: ns, signalRepo: signal != null && signal.$1 == ns.id ? signal.$2 : null),
                   if (s.undo != null) _UndoToast(notice: s.undo!),
@@ -576,6 +577,46 @@ class _NamespaceMenuState extends State<_NamespaceMenu> {
   }
 }
 
+/// A worktree that appeared from a terminal or an agent, one click away.
+class _ArrivedToast extends StatelessWidget {
+  const _ArrivedToast({required this.repo, required this.worktree});
+  final Repo repo;
+  final Worktree worktree;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    final changed = worktree.changed;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+        padding: const EdgeInsets.fromLTRB(10, 6, 3, 6),
+        decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(10)),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('New worktree in ${repo.name}', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: c.text2)),
+              Text(changed == 0 ? worktree.branch : '${worktree.branch} · $changed changed', maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11, color: c.text3)),
+            ]),
+          ),
+          KPressable(
+            onTap: s.openArrivedWorktree,
+            semanticLabel: 'Open ${worktree.branch}',
+            builder: (context, hover, focus) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(color: hover || focus ? c.accSoft : null, borderRadius: BorderRadius.circular(6)),
+              child: Text('Open', style: sans(12, weight: FontWeight.w600, color: c.acc)),
+            ),
+          ),
+          KIconButton(icon: KIcons.close, label: 'Dismiss', size: 22, iconSize: 12, color: c.text3, onTap: s.dismissArrivedWorktree),
+        ]),
+      ),
+    );
+  }
+}
+
 /// A daemon error about the workspace (e.g. git refused to remove a worktree
 /// with uncommitted changes).
 class _ErrorToast extends StatelessWidget {
@@ -754,6 +795,17 @@ class _RepoGroupState extends State<_RepoGroup> {
                                 padding: const EdgeInsets.symmetric(horizontal: 5),
                                 decoration: BoxDecoration(color: c.accSoft, borderRadius: BorderRadius.circular(5)),
                                 child: Text('principal', style: sans(9.5, weight: FontWeight.w600, color: c.acc, height: 1.6, letterSpacing: 0.2)),
+                              ),
+                            ],
+                            if (s.workspace.arrived.contains(w.path)) ...[
+                              const SizedBox(width: 6),
+                              Tooltip(
+                                message: 'Made outside Kumo (a terminal or an agent)',
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                                  decoration: BoxDecoration(color: c.okSoft, borderRadius: BorderRadius.circular(5)),
+                                  child: Text('new', style: sans(9.5, weight: FontWeight.w600, color: c.ok, height: 1.6, letterSpacing: 0.2)),
+                                ),
                               ),
                             ],
                           ]),
