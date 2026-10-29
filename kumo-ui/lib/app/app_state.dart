@@ -155,6 +155,7 @@ class AppState extends ChangeNotifier {
   void selectWorktree(String branch, {String? path}) {
     activeWorktree = branch;
     activeWorktreePath = path;
+    if (path != null) workspace.acknowledge(path);
     _home = false;
     _bindChanges();
     _bindPipelines();
@@ -175,10 +176,61 @@ class AppState extends ChangeNotifier {
   /// The selected worktree itself, if it is still there.
   Worktree? get activeWorktreeEntry => activeRepo?.worktrees.where(isActiveWorktree).firstOrNull;
 
+  /// Worktrees with uncommitted files in the namespaces of the selected one,
+  /// other than it: where an agent started from here may be working.
+  List<(Repo, Worktree)> get otherChangedWorktrees {
+    final active = activeRepo;
+    if (active == null) return const [];
+    final ids = {
+      for (final n in namespaces)
+        if (n.repos.contains(active.id)) ...n.repos,
+    };
+    return [
+      for (final r in workspace.repos)
+        if (ids.contains(r.id))
+          for (final w in worktreesOf(r))
+            if (w.changed > 0 && !isActiveWorktree(w)) (r, w),
+    ];
+  }
+
+  // ---- Worktrees made outside the app ----
+
+  /// Arrivals already announced, so each one is announced once.
+  final Set<String> _announced = {};
+  String? _arrivedPath;
+
+  /// The latest worktree made from a terminal or by an agent, until opened
+  /// or dismissed.
+  (Repo, Worktree)? get arrivedWorktree {
+    final path = _arrivedPath;
+    if (path == null || !workspace.arrived.contains(path)) return null;
+    for (final r in workspace.repos) {
+      for (final w in worktreesOf(r)) {
+        if (w.path == path) return (r, w);
+      }
+    }
+    return null;
+  }
+
+  void openArrivedWorktree() {
+    final arrived = arrivedWorktree;
+    if (arrived != null) selectWorktree(arrived.$2.branch, path: arrived.$2.path);
+  }
+
+  void dismissArrivedWorktree() {
+    _arrivedPath = null;
+    notifyListeners();
+  }
+
   void _onWorkspaceChanged() {
     if (workspace.error != _lastWorkspaceError) {
       _lastWorkspaceError = workspace.error;
       _workspaceErrorDismissed = false;
+    }
+    final arrived = workspace.arrived.difference(_announced);
+    if (arrived.isNotEmpty) {
+      _announced.addAll(arrived);
+      _arrivedPath = arrived.last;
     }
     // Nothing selected yet (or it was removed): pick the first main checkout.
     if (activeWorktreeEntry == null) {

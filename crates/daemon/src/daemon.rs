@@ -69,6 +69,7 @@ impl Daemon {
                 git: Arc::new(GitCli::default()),
                 store: Arc::new(SqliteWorkspaceStore::open(&data_dir.join("kumo.db"))?),
                 finder: Arc::new(FsRepoFinder::new(&home)),
+                watcher: Arc::new(NotifyWatcher),
                 location: WorktreeLocation::new(&home),
             })
             .await?,
@@ -76,6 +77,8 @@ impl Daemon {
         // Git state is read in the background: the daemon answers right away.
         let initial = Arc::clone(&workspace);
         tokio::spawn(async move { initial.refresh().await });
+        // Worktrees and changes made from a terminal show without a refresh.
+        workspace.sync();
 
         let token = generate_auth_token().context("generating auth token")?;
         let terminals = Arc::new(TerminalService::new(

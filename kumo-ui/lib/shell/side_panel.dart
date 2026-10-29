@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
 import '../data/changes.dart';
+import '../data/models.dart';
 import '../data/pipelines_source.dart';
 import '../data/pull_requests_source.dart';
 import '../data/repo_activity.dart';
@@ -999,6 +1000,7 @@ class _ChangesWidget extends StatelessWidget {
     final s = AppScope.of(context);
     final c = context.c;
     final files = s.pendingChanges;
+    final others = s.otherChangedWorktrees;
     final add = files.fold<int>(0, (n, f) => n + f.added);
     final del = files.fold<int>(0, (n, f) => n + f.deleted);
     return Section(
@@ -1016,6 +1018,12 @@ class _ChangesWidget extends StatelessWidget {
         const SizedBox(height: 8),
         for (final f in files) ChangedFileRow(file: f),
         if (files.isEmpty) Text('Working tree clean.', style: sans(12, color: c.text3)),
+        if (others.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text('In other worktrees', style: sans(11, weight: FontWeight.w600, color: c.text3, letterSpacing: 0.2)),
+          const SizedBox(height: 4),
+          for (final (repo, w) in others) _OtherWorktreeRow(repo: repo, worktree: w),
+        ],
         const SizedBox(height: 10),
         Row(children: [
           Expanded(
@@ -1031,6 +1039,38 @@ class _ChangesWidget extends StatelessWidget {
           KButton(label: 'Commit…', height: 30, fontSize: 12, onTap: () => s.openContext(ContextTab.git)),
         ]),
       ]),
+    );
+  }
+}
+
+/// A worktree with uncommitted files that isn't the selected one; a click
+/// switches to it.
+class _OtherWorktreeRow extends StatelessWidget {
+  const _OtherWorktreeRow({required this.repo, required this.worktree});
+  final Repo repo;
+  final Worktree worktree;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.read(context);
+    final c = context.c;
+    final w = worktree;
+    final arrived = s.workspace.arrived.contains(w.path);
+    return KPressable(
+      onTap: () => s.selectWorktree(w.branch, path: w.path),
+      semanticLabel: 'Open ${w.branch} in ${repo.name}, ${w.changed} changed',
+      tooltip: s.workspace.absolutePathOf(w),
+      builder: (context, hover, focus) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(color: hover || focus ? c.tile : null, borderRadius: BorderRadius.circular(7)),
+        child: Row(children: [
+          Dot(arrived ? c.ok : c.warn),
+          const SizedBox(width: 8),
+          Flexible(child: Text(w.branch, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11.5, color: c.text))),
+          const SizedBox(width: 6),
+          Expanded(child: Text('${repo.name} · ${w.changed} changed', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11, color: c.text3))),
+        ]),
+      ),
     );
   }
 }

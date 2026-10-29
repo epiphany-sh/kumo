@@ -49,6 +49,13 @@ abstract class WorkspaceSource extends ChangeNotifier {
 
   /// Where [worktree] is on disk ([Worktree.path] may be shortened to `~/…`).
   String absolutePathOf(Worktree worktree) => worktree.path;
+
+  /// Worktrees ([Worktree.path]) that appeared while the app was open and
+  /// that it didn't create (a terminal, an agent), until looked at.
+  Set<String> get arrived => const {};
+
+  /// The user selected the worktree at [path]: it is no longer news.
+  void acknowledge(String path) {}
 }
 
 /// Branches to start a worktree from or check out.
