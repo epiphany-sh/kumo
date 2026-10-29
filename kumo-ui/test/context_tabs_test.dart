@@ -149,6 +149,9 @@ void main() {
       state.showContextFile(p);
     }
     await tester.pump();
+    // The scroll animation starts on the frame after the one that asked
+    // for it: one frame to start, one to finish.
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('14 open'), findsOneWidget);
     // The last file opened is the one showing, and its tab was scrolled into view.

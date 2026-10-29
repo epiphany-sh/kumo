@@ -1117,7 +1117,11 @@ class _OpenFileRow extends StatelessWidget {
             child: Row(children: [
               SizedBox(width: 15, child: on ? Icon(KIcons.check, size: 14, color: c.acc) : null),
               const SizedBox(width: 6),
-              Text(name, style: mono(11.5, weight: on ? FontWeight.w600 : FontWeight.w400, color: c.text)),
+              // A long name keeps some room for its folder.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 190),
+                child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11.5, weight: on ? FontWeight.w600 : FontWeight.w400, color: c.text)),
+              ),
               const SizedBox(width: 8),
               Expanded(child: Text(dir, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(10.5, color: c.text3))),
               if (f != null) ...[const SizedBox(width: 6), Text(f.kind, style: mono(10, weight: FontWeight.w700, color: col))],

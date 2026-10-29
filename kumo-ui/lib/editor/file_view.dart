@@ -182,7 +182,8 @@ class _FileViewState extends State<FileView> {
                   ),
                   const SizedBox(width: 8),
                 ],
-                if (file != null) ...[
+                // Narrow with unsaved edits: the Save button needs the room.
+                if (file != null && !(compact && dirty)) ...[
                   Text.rich(TextSpan(children: [
                     TextSpan(text: '+${file.added} ', style: mono(11.5, color: c.ok)),
                     TextSpan(text: '−${file.deleted}', style: mono(11.5, color: c.err)),
@@ -209,7 +210,7 @@ class _FileViewState extends State<FileView> {
                     items: [
                       if (!deleted) (FileViewMode.edit, 'Edit', null),
                       (FileViewMode.diff, 'Diff', null),
-                      (FileViewMode.changesOnly, 'Changes only', null),
+                      (FileViewMode.changesOnly, compact ? 'Changes' : 'Changes only', null),
                     ],
                   ),
                   const SizedBox(width: 8),
