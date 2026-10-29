@@ -245,6 +245,8 @@ pub fn git_repo(dir: &std::path::Path, remote: Option<&str>) -> std::path::PathB
         &["init", "-q", "-b", "main"][..],
         &["config", "user.email", "test@kumo.dev"],
         &["config", "user.name", "Kumo Test"],
+        // Git for Windows turns LF into CRLF on checkout; tests compare bytes.
+        &["config", "core.autocrlf", "false"],
     ] {
         git(dir, args);
     }

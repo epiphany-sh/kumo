@@ -400,11 +400,12 @@ async fn worktrees_and_changes_made_outside_show_without_a_refresh() {
     })
     .await;
 
-    // An agent in a terminal, next to the repository.
-    let sibling = root.with_file_name("engine-delete");
+    // An agent in a terminal, next to the repository. Git gets plain paths:
+    // it can't create Windows' canonical `\\?\C:\…` ones.
+    let sibling = daemon.home().join("dev/engine-delete");
     let added = Command::new("git")
         .arg("-C")
-        .arg(&root)
+        .arg(daemon.home().join("dev/engine"))
         .args(["worktree", "add", "-b", "feat/delete"])
         .arg(&sibling)
         .output()
