@@ -9,13 +9,13 @@ cask "kumo" do
   homepage "https://github.com/@RELEASE_REPO@"
 
   auto_updates true
-  depends_on macos: ">= :monterey"
+  depends_on macos: :monterey
 
   app "Kumo.app"
 
   # Kumo isn't notarized: without this, Gatekeeper stops its first launch.
-  postflight do
-    system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{appdir}/Kumo.app"]
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/Kumo.app"]
   end
 
   zap trash: [
