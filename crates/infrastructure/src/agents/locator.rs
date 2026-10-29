@@ -5,7 +5,9 @@ use std::time::{Duration, Instant};
 
 use kumo_domain::agents::{AgentError, ProgramLocator};
 
+#[cfg(unix)]
 const MARK: &str = "__KUMO_PATH__";
+#[cfg(unix)]
 const SHELL_TIMEOUT: Duration = Duration::from_secs(5);
 const VERSION_TIMEOUT: Duration = Duration::from_secs(15);
 
