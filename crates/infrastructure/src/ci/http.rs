@@ -340,7 +340,7 @@ fn missing_scope(answer: &Answer, body: &Value) -> String {
 }
 
 /// Percent-encodes a path segment or query value.
-pub(super) fn enc(raw: &str) -> String {
+pub(crate) fn enc(raw: &str) -> String {
     let mut out = String::with_capacity(raw.len());
     for b in raw.bytes() {
         if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~') {

@@ -6,13 +6,13 @@
 //! - [`JiraConnector`]: Jira Cloud's REST API.
 //! - [`TodoistConnector`]: Todoist's API.
 
-mod adf;
+pub(crate) mod adf;
 mod bear;
 pub(crate) mod dates;
 mod github;
-mod http;
+pub(crate) mod http;
 mod jira;
-mod obsidian;
+pub(crate) mod obsidian;
 mod todoist;
 
 pub use bear::BearConnector;

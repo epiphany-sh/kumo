@@ -1226,3 +1226,84 @@ message CreatePullRequestRequest {
   string base = 4;
   bool draft = 5;
 }
+
+// ---------------------------------------------------------------------------
+// Docs
+// ---------------------------------------------------------------------------
+
+// Pages of the knowledge bases behind the task sources, read only:
+// Confluence through a Jira source's Atlassian account, and the notes of
+// Obsidian vault sources. Nothing to configure apart from those sources.
+service Docs {
+  // Each knowledge base's recent pages (the user's own first), or the ones
+  // matching a query. Answers are reused for a minute unless `refresh`.
+  rpc List(ListDocsRequest) returns (DocList);
+  rpc Read(ReadDocRequest) returns (Doc);
+}
+
+enum DocKind {
+  DOC_KIND_UNSPECIFIED = 0;
+  DOC_KIND_CONFLUENCE = 1;
+  DOC_KIND_OBSIDIAN = 2;
+}
+
+message DocSource {
+  // The task source it reads through.
+  string id = 1;
+  DocKind kind = 2;
+  // `acme.atlassian.net`, the vault's folder name.
+  string name = 3;
+  // The site URL or the vault's path.
+  string location = 4;
+}
+
+message DocSummary {
+  // `<source>/<external>`.
+  string id = 1;
+  string title = 2;
+  // The Confluence space, or the note's folder.
+  string place = 3;
+  // Unix ms; 0 when unknown.
+  int64 updated_at = 4;
+  // Who last edited it; empty when unknown.
+  string author = 5;
+  // Where it opens: the page on the site, `obsidian://` for a note.
+  string url = 6;
+  // Text around a search match; empty outside a search.
+  string excerpt = 7;
+}
+
+message DocGroup {
+  DocSource source = 1;
+  repeated DocSummary docs = 2;
+  // Why its pages can't be read; empty when they can.
+  string problem = 3;
+  // The problem is the account's credentials (fixed in Settings › Tasks).
+  bool problem_is_auth = 4;
+}
+
+message ListDocsRequest {
+  // Empty: recent pages.
+  string query = 1;
+  // Per knowledge base; 0 = 30.
+  uint32 limit = 2;
+  bool refresh = 3;
+}
+
+message DocList {
+  repeated DocGroup groups = 1;
+}
+
+message ReadDocRequest {
+  string id = 1;
+}
+
+message Doc {
+  DocSummary summary = 1;
+  DocSource source = 2;
+  string markdown = 3;
+  // Titles above the page: the space or vault, then folders.
+  repeated string path = 4;
+  // The note's file, for a vault; empty otherwise.
+  string file = 5;
+}

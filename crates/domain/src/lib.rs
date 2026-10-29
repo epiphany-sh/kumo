@@ -15,6 +15,7 @@
 pub mod agents;
 pub mod changes;
 pub mod daemon;
+pub mod docs;
 pub mod pipelines;
 pub mod pulls;
 pub mod tasks;

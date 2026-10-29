@@ -8,13 +8,18 @@ use serde_json::Value;
 use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
 
 #[derive(Debug, Clone)]
-pub(super) struct Http {
+pub(crate) struct Http {
     agent: ureq::Agent,
-    kind: SourceKind,
+    /// Who's speaking, in messages.
+    name: &'static str,
 }
 
 impl Http {
     pub(super) fn new(kind: SourceKind) -> Self {
+        Self::named(kind.name())
+    }
+
+    pub(crate) fn named(name: &'static str) -> Self {
         let tls = TlsConfig::builder()
             .provider(TlsProvider::NativeTls)
             .root_certs(RootCerts::PlatformVerifier)
@@ -26,10 +31,10 @@ impl Http {
             .user_agent(concat!("kumo/", env!("CARGO_PKG_VERSION")))
             .build()
             .into();
-        Self { agent, kind }
+        Self { agent, name }
     }
 
-    pub(super) fn get(&self, url: &str, auth: &str) -> Result<Value, TaskError> {
+    pub(crate) fn get(&self, url: &str, auth: &str) -> Result<Value, TaskError> {
         let response = self
             .agent
             .get(url)
@@ -73,7 +78,7 @@ impl Http {
         url: &str,
         response: Result<ureq::http::Response<ureq::Body>, ureq::Error>,
     ) -> Result<Value, TaskError> {
-        let kind = self.kind;
+        let kind = self.name;
         let mut response = response.map_err(|e| {
             TaskError::Unavailable(format!("can't reach {kind} ({}): {e}", host(url)))
         })?;

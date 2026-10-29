@@ -13,7 +13,7 @@ use kumo_domain::tasks::{
 };
 
 /// Notes bigger than this are skipped (exports, logs pasted in a note).
-const MAX_NOTE_BYTES: u64 = 4 * 1024 * 1024;
+pub(crate) const MAX_NOTE_BYTES: u64 = 4 * 1024 * 1024;
 
 /// Parsed checkboxes of one note, valid while its mtime and size hold.
 #[derive(Debug)]
@@ -262,7 +262,7 @@ impl TaskConnector for ObsidianConnector {
 
 /// `.md` files under `dir`, relative to `vault`, skipping hidden folders
 /// (`.obsidian`, `.trash`, `.git`) and symlinked ones.
-fn collect_notes(vault: &Path, dir: &Path, notes: &mut Vec<PathBuf>) {
+pub(crate) fn collect_notes(vault: &Path, dir: &Path, notes: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
@@ -321,7 +321,7 @@ fn to_task(source: &SourceId, vault: &str, note: &Path, b: &Checkbox) -> Task {
 }
 
 /// A relative path inside the vault (task ids come from clients).
-fn safe_note(note: &str) -> Result<&Path, TaskError> {
+pub(crate) fn safe_note(note: &str) -> Result<&Path, TaskError> {
     let path = Path::new(note);
     let inside = path
         .components()
@@ -357,7 +357,7 @@ fn write_atomically(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 }
 
 /// Percent-encodes for a URL query value.
-fn encode(raw: &str) -> String {
+pub(crate) fn encode(raw: &str) -> String {
     raw.bytes()
         .map(|b| match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {

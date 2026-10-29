@@ -1840,3 +1840,83 @@ abstract class PullRequestsServiceBase extends $grpc.Service {
   $async.Future<$0.PullRequest> create(
       $grpc.ServiceCall call, $0.CreatePullRequestRequest request);
 }
+
+/// Pages of the knowledge bases behind the task sources, read only:
+/// Confluence through a Jira source's Atlassian account, and the notes of
+/// Obsidian vault sources. Nothing to configure apart from those sources.
+@$pb.GrpcServiceName('kumo.v1.Docs')
+class DocsClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  DocsClient(super.channel, {super.options, super.interceptors});
+
+  /// Each knowledge base's recent pages (the user's own first), or the ones
+  /// matching a query. Answers are reused for a minute unless `refresh`.
+  $grpc.ResponseFuture<$0.DocList> list(
+    $0.ListDocsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$list, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.Doc> read(
+    $0.ReadDocRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$read, request, options: options);
+  }
+
+  // method descriptors
+
+  static final _$list = $grpc.ClientMethod<$0.ListDocsRequest, $0.DocList>(
+      '/kumo.v1.Docs/List',
+      ($0.ListDocsRequest value) => value.writeToBuffer(),
+      $0.DocList.fromBuffer);
+  static final _$read = $grpc.ClientMethod<$0.ReadDocRequest, $0.Doc>(
+      '/kumo.v1.Docs/Read',
+      ($0.ReadDocRequest value) => value.writeToBuffer(),
+      $0.Doc.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Docs')
+abstract class DocsServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.Docs';
+
+  DocsServiceBase() {
+    $addMethod($grpc.ServiceMethod<$0.ListDocsRequest, $0.DocList>(
+        'List',
+        list_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.ListDocsRequest.fromBuffer(value),
+        ($0.DocList value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ReadDocRequest, $0.Doc>(
+        'Read',
+        read_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.ReadDocRequest.fromBuffer(value),
+        ($0.Doc value) => value.writeToBuffer()));
+  }
+
+  $async.Future<$0.DocList> list_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ListDocsRequest> $request) async {
+    return list($call, await $request);
+  }
+
+  $async.Future<$0.DocList> list(
+      $grpc.ServiceCall call, $0.ListDocsRequest request);
+
+  $async.Future<$0.Doc> read_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ReadDocRequest> $request) async {
+    return read($call, await $request);
+  }
+
+  $async.Future<$0.Doc> read($grpc.ServiceCall call, $0.ReadDocRequest request);
+}

@@ -524,5 +524,27 @@ class ReviewState extends $pb.ProtobufEnum {
   const ReviewState._(super.value, super.name);
 }
 
+class DocKind extends $pb.ProtobufEnum {
+  static const DocKind DOC_KIND_UNSPECIFIED =
+      DocKind._(0, _omitEnumNames ? '' : 'DOC_KIND_UNSPECIFIED');
+  static const DocKind DOC_KIND_CONFLUENCE =
+      DocKind._(1, _omitEnumNames ? '' : 'DOC_KIND_CONFLUENCE');
+  static const DocKind DOC_KIND_OBSIDIAN =
+      DocKind._(2, _omitEnumNames ? '' : 'DOC_KIND_OBSIDIAN');
+
+  static const $core.List<DocKind> values = <DocKind>[
+    DOC_KIND_UNSPECIFIED,
+    DOC_KIND_CONFLUENCE,
+    DOC_KIND_OBSIDIAN,
+  ];
+
+  static final $core.List<DocKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static DocKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const DocKind._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

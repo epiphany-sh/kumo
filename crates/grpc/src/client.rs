@@ -6,6 +6,7 @@ use kumo_domain::daemon::{ApiVersion, AuthToken};
 use kumo_proto::v1 as pb;
 use kumo_proto::v1::agents_client::AgentsClient;
 use kumo_proto::v1::core_client::CoreClient;
+use kumo_proto::v1::docs_client::DocsClient;
 use kumo_proto::v1::git_client::GitClient;
 use kumo_proto::v1::pipelines_client::PipelinesClient;
 use kumo_proto::v1::pull_requests_client::PullRequestsClient;
@@ -31,6 +32,7 @@ pub struct KumoClient {
     pub tasks: TasksClient<AuthChannel>,
     pub pipelines: PipelinesClient<AuthChannel>,
     pub pulls: PullRequestsClient<AuthChannel>,
+    pub docs: DocsClient<AuthChannel>,
 }
 
 impl KumoClient {
@@ -51,7 +53,8 @@ impl KumoClient {
             agents: AgentsClient::with_interceptor(channel.clone(), auth.clone()),
             tasks: TasksClient::with_interceptor(channel.clone(), auth.clone()),
             pipelines: PipelinesClient::with_interceptor(channel.clone(), auth.clone()),
-            pulls: PullRequestsClient::with_interceptor(channel, auth),
+            pulls: PullRequestsClient::with_interceptor(channel.clone(), auth.clone()),
+            docs: DocsClient::with_interceptor(channel, auth),
         })
     }
 

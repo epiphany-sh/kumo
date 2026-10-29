@@ -10276,6 +10276,619 @@ class CreatePullRequestRequest extends $pb.GeneratedMessage {
   void clearDraft() => $_clearField(5);
 }
 
+class DocSource extends $pb.GeneratedMessage {
+  factory DocSource({
+    $core.String? id,
+    DocKind? kind,
+    $core.String? name,
+    $core.String? location,
+  }) {
+    final result = DocSource._();
+    if (id != null) result.id = id;
+    if (kind != null) result.kind = kind;
+    if (name != null) result.name = name;
+    if (location != null) result.location = location;
+    return result;
+  }
+
+  DocSource._();
+
+  factory DocSource.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DocSource()..mergeFromBuffer(data, registry);
+  factory DocSource.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DocSource()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DocSource',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DocSource.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aE<DocKind>(2, _omitFieldNames ? '' : 'kind', enumValues: DocKind.values)
+    ..aOS(3, _omitFieldNames ? '' : 'name')
+    ..aOS(4, _omitFieldNames ? '' : 'location')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DocSource clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DocSource copyWith(void Function(DocSource) updates) =>
+      super.copyWith((message) => updates(message as DocSource)) as DocSource;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use DocSource() / DocSource.new instead')
+  static DocSource create() => DocSource._();
+  static $pb.GeneratedMessage $_createMessage() => DocSource._();
+  @$core.override
+  DocSource createEmptyInstance() => DocSource._();
+  @$core.pragma('dart2js:noInline')
+  static DocSource getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DocSource>(DocSource.$_createMessage);
+  static DocSource? _defaultInstance;
+
+  /// The task source it reads through.
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  DocKind get kind => $_getN(1);
+  @$pb.TagNumber(2)
+  set kind(DocKind value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKind() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKind() => $_clearField(2);
+
+  /// `acme.atlassian.net`, the vault's folder name.
+  @$pb.TagNumber(3)
+  $core.String get name => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set name($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearName() => $_clearField(3);
+
+  /// The site URL or the vault's path.
+  @$pb.TagNumber(4)
+  $core.String get location => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set location($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasLocation() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearLocation() => $_clearField(4);
+}
+
+class DocSummary extends $pb.GeneratedMessage {
+  factory DocSummary({
+    $core.String? id,
+    $core.String? title,
+    $core.String? place,
+    $fixnum.Int64? updatedAt,
+    $core.String? author,
+    $core.String? url,
+    $core.String? excerpt,
+  }) {
+    final result = DocSummary._();
+    if (id != null) result.id = id;
+    if (title != null) result.title = title;
+    if (place != null) result.place = place;
+    if (updatedAt != null) result.updatedAt = updatedAt;
+    if (author != null) result.author = author;
+    if (url != null) result.url = url;
+    if (excerpt != null) result.excerpt = excerpt;
+    return result;
+  }
+
+  DocSummary._();
+
+  factory DocSummary.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DocSummary()..mergeFromBuffer(data, registry);
+  factory DocSummary.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DocSummary()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DocSummary',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DocSummary.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'title')
+    ..aOS(3, _omitFieldNames ? '' : 'place')
+    ..aInt64(4, _omitFieldNames ? '' : 'updatedAt')
+    ..aOS(5, _omitFieldNames ? '' : 'author')
+    ..aOS(6, _omitFieldNames ? '' : 'url')
+    ..aOS(7, _omitFieldNames ? '' : 'excerpt')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DocSummary clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DocSummary copyWith(void Function(DocSummary) updates) =>
+      super.copyWith((message) => updates(message as DocSummary)) as DocSummary;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use DocSummary() / DocSummary.new instead')
+  static DocSummary create() => DocSummary._();
+  static $pb.GeneratedMessage $_createMessage() => DocSummary._();
+  @$core.override
+  DocSummary createEmptyInstance() => DocSummary._();
+  @$core.pragma('dart2js:noInline')
+  static DocSummary getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DocSummary>(DocSummary.$_createMessage);
+  static DocSummary? _defaultInstance;
+
+  /// `<source>/<external>`.
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get title => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set title($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTitle() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTitle() => $_clearField(2);
+
+  /// The Confluence space, or the note's folder.
+  @$pb.TagNumber(3)
+  $core.String get place => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set place($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPlace() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPlace() => $_clearField(3);
+
+  /// Unix ms; 0 when unknown.
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get updatedAt => $_getI64(3);
+  @$pb.TagNumber(4)
+  set updatedAt($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasUpdatedAt() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearUpdatedAt() => $_clearField(4);
+
+  /// Who last edited it; empty when unknown.
+  @$pb.TagNumber(5)
+  $core.String get author => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set author($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasAuthor() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearAuthor() => $_clearField(5);
+
+  /// Where it opens: the page on the site, `obsidian://` for a note.
+  @$pb.TagNumber(6)
+  $core.String get url => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set url($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasUrl() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearUrl() => $_clearField(6);
+
+  /// Text around a search match; empty outside a search.
+  @$pb.TagNumber(7)
+  $core.String get excerpt => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set excerpt($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasExcerpt() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearExcerpt() => $_clearField(7);
+}
+
+class DocGroup extends $pb.GeneratedMessage {
+  factory DocGroup({
+    DocSource? source,
+    $core.Iterable<DocSummary>? docs,
+    $core.String? problem,
+    $core.bool? problemIsAuth,
+  }) {
+    final result = DocGroup._();
+    if (source != null) result.source = source;
+    if (docs != null) result.docs.addAll(docs);
+    if (problem != null) result.problem = problem;
+    if (problemIsAuth != null) result.problemIsAuth = problemIsAuth;
+    return result;
+  }
+
+  DocGroup._();
+
+  factory DocGroup.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DocGroup()..mergeFromBuffer(data, registry);
+  factory DocGroup.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DocGroup()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DocGroup',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DocGroup.$_createMessage)
+    ..aOM<DocSource>(1, _omitFieldNames ? '' : 'source',
+        subBuilder: DocSource.$_createMessage)
+    ..pPM<DocSummary>(2, _omitFieldNames ? '' : 'docs',
+        subBuilder: DocSummary.$_createMessage)
+    ..aOS(3, _omitFieldNames ? '' : 'problem')
+    ..aOB(4, _omitFieldNames ? '' : 'problemIsAuth')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DocGroup clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DocGroup copyWith(void Function(DocGroup) updates) =>
+      super.copyWith((message) => updates(message as DocGroup)) as DocGroup;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use DocGroup() / DocGroup.new instead')
+  static DocGroup create() => DocGroup._();
+  static $pb.GeneratedMessage $_createMessage() => DocGroup._();
+  @$core.override
+  DocGroup createEmptyInstance() => DocGroup._();
+  @$core.pragma('dart2js:noInline')
+  static DocGroup getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DocGroup>(DocGroup.$_createMessage);
+  static DocGroup? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  DocSource get source => $_getN(0);
+  @$pb.TagNumber(1)
+  set source(DocSource value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSource() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSource() => $_clearField(1);
+  @$pb.TagNumber(1)
+  DocSource ensureSource() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<DocSummary> get docs => $_getList(1);
+
+  /// Why its pages can't be read; empty when they can.
+  @$pb.TagNumber(3)
+  $core.String get problem => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set problem($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasProblem() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearProblem() => $_clearField(3);
+
+  /// The problem is the account's credentials (fixed in Settings › Tasks).
+  @$pb.TagNumber(4)
+  $core.bool get problemIsAuth => $_getBF(3);
+  @$pb.TagNumber(4)
+  set problemIsAuth($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasProblemIsAuth() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearProblemIsAuth() => $_clearField(4);
+}
+
+class ListDocsRequest extends $pb.GeneratedMessage {
+  factory ListDocsRequest({
+    $core.String? query,
+    $core.int? limit,
+    $core.bool? refresh,
+  }) {
+    final result = ListDocsRequest._();
+    if (query != null) result.query = query;
+    if (limit != null) result.limit = limit;
+    if (refresh != null) result.refresh = refresh;
+    return result;
+  }
+
+  ListDocsRequest._();
+
+  factory ListDocsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListDocsRequest()..mergeFromBuffer(data, registry);
+  factory ListDocsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListDocsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListDocsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ListDocsRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'query')
+    ..aI(2, _omitFieldNames ? '' : 'limit', fieldType: $pb.PbFieldType.OU3)
+    ..aOB(3, _omitFieldNames ? '' : 'refresh')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListDocsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListDocsRequest copyWith(void Function(ListDocsRequest) updates) =>
+      super.copyWith((message) => updates(message as ListDocsRequest))
+          as ListDocsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ListDocsRequest() / ListDocsRequest.new instead')
+  static ListDocsRequest create() => ListDocsRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListDocsRequest._();
+  @$core.override
+  ListDocsRequest createEmptyInstance() => ListDocsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListDocsRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ListDocsRequest>(
+          ListDocsRequest.$_createMessage);
+  static ListDocsRequest? _defaultInstance;
+
+  /// Empty: recent pages.
+  @$pb.TagNumber(1)
+  $core.String get query => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set query($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasQuery() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearQuery() => $_clearField(1);
+
+  /// Per knowledge base; 0 = 30.
+  @$pb.TagNumber(2)
+  $core.int get limit => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set limit($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLimit() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLimit() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get refresh => $_getBF(2);
+  @$pb.TagNumber(3)
+  set refresh($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRefresh() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRefresh() => $_clearField(3);
+}
+
+class DocList extends $pb.GeneratedMessage {
+  factory DocList({
+    $core.Iterable<DocGroup>? groups,
+  }) {
+    final result = DocList._();
+    if (groups != null) result.groups.addAll(groups);
+    return result;
+  }
+
+  DocList._();
+
+  factory DocList.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DocList()..mergeFromBuffer(data, registry);
+  factory DocList.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DocList()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DocList',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DocList.$_createMessage)
+    ..pPM<DocGroup>(1, _omitFieldNames ? '' : 'groups',
+        subBuilder: DocGroup.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DocList clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DocList copyWith(void Function(DocList) updates) =>
+      super.copyWith((message) => updates(message as DocList)) as DocList;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use DocList() / DocList.new instead')
+  static DocList create() => DocList._();
+  static $pb.GeneratedMessage $_createMessage() => DocList._();
+  @$core.override
+  DocList createEmptyInstance() => DocList._();
+  @$core.pragma('dart2js:noInline')
+  static DocList getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DocList>(DocList.$_createMessage);
+  static DocList? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<DocGroup> get groups => $_getList(0);
+}
+
+class ReadDocRequest extends $pb.GeneratedMessage {
+  factory ReadDocRequest({
+    $core.String? id,
+  }) {
+    final result = ReadDocRequest._();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  ReadDocRequest._();
+
+  factory ReadDocRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReadDocRequest()..mergeFromBuffer(data, registry);
+  factory ReadDocRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReadDocRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReadDocRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ReadDocRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReadDocRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReadDocRequest copyWith(void Function(ReadDocRequest) updates) =>
+      super.copyWith((message) => updates(message as ReadDocRequest))
+          as ReadDocRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ReadDocRequest() / ReadDocRequest.new instead')
+  static ReadDocRequest create() => ReadDocRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ReadDocRequest._();
+  @$core.override
+  ReadDocRequest createEmptyInstance() => ReadDocRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ReadDocRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ReadDocRequest>(
+          ReadDocRequest.$_createMessage);
+  static ReadDocRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+}
+
+class Doc extends $pb.GeneratedMessage {
+  factory Doc({
+    DocSummary? summary,
+    DocSource? source,
+    $core.String? markdown,
+    $core.Iterable<$core.String>? path,
+    $core.String? file,
+  }) {
+    final result = Doc._();
+    if (summary != null) result.summary = summary;
+    if (source != null) result.source = source;
+    if (markdown != null) result.markdown = markdown;
+    if (path != null) result.path.addAll(path);
+    if (file != null) result.file = file;
+    return result;
+  }
+
+  Doc._();
+
+  factory Doc.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Doc()..mergeFromBuffer(data, registry);
+  factory Doc.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Doc()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Doc',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: Doc.$_createMessage)
+    ..aOM<DocSummary>(1, _omitFieldNames ? '' : 'summary',
+        subBuilder: DocSummary.$_createMessage)
+    ..aOM<DocSource>(2, _omitFieldNames ? '' : 'source',
+        subBuilder: DocSource.$_createMessage)
+    ..aOS(3, _omitFieldNames ? '' : 'markdown')
+    ..pPS(4, _omitFieldNames ? '' : 'path')
+    ..aOS(5, _omitFieldNames ? '' : 'file')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Doc clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Doc copyWith(void Function(Doc) updates) =>
+      super.copyWith((message) => updates(message as Doc)) as Doc;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Doc() / Doc.new instead')
+  static Doc create() => Doc._();
+  static $pb.GeneratedMessage $_createMessage() => Doc._();
+  @$core.override
+  Doc createEmptyInstance() => Doc._();
+  @$core.pragma('dart2js:noInline')
+  static Doc getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Doc>(Doc.$_createMessage);
+  static Doc? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  DocSummary get summary => $_getN(0);
+  @$pb.TagNumber(1)
+  set summary(DocSummary value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSummary() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSummary() => $_clearField(1);
+  @$pb.TagNumber(1)
+  DocSummary ensureSummary() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  DocSource get source => $_getN(1);
+  @$pb.TagNumber(2)
+  set source(DocSource value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSource() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSource() => $_clearField(2);
+  @$pb.TagNumber(2)
+  DocSource ensureSource() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $core.String get markdown => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set markdown($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMarkdown() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMarkdown() => $_clearField(3);
+
+  /// Titles above the page: the space or vault, then folders.
+  @$pb.TagNumber(4)
+  $pb.PbList<$core.String> get path => $_getList(3);
+
+  /// The note's file, for a vault; empty otherwise.
+  @$pb.TagNumber(5)
+  $core.String get file => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set file($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasFile() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearFile() => $_clearField(5);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

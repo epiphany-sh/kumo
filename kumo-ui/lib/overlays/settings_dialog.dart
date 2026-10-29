@@ -8,8 +8,8 @@ import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
-import '../widgets/kicons.dart';
 import 'agent_settings.dart';
+import 'docs_settings.dart';
 import 'host_settings.dart';
 import 'task_settings.dart';
 
@@ -63,9 +63,6 @@ class SettingsDialog extends StatefulWidget {
 
 class _SettingsDialogState extends State<SettingsDialog> {
   late SettingsTab _tab = widget.initial;
-  String? _open;
-  final Map<String, String> _tested = {};
-  bool _showAddNote = false;
 
   void _close() => Navigator.of(context).maybePop();
 
@@ -126,11 +123,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                       for (final t in SettingsTab.values) ...[
                         if (t == SettingsTab.ai) Container(width: 1, height: 34, margin: const EdgeInsets.symmetric(horizontal: 8), color: c.divider),
-                        _TabButton(tab: t, selected: t == _tab, onTap: () => setState(() {
-                          _tab = t;
-                          _open = null;
-                          _showAddNote = false;
-                        })),
+                        _TabButton(tab: t, selected: t == _tab, onTap: () => setState(() => _tab = t)),
                         const SizedBox(width: 2),
                       ],
                     ]),
@@ -173,117 +166,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
             Text(page.intro, style: sans(12.5, color: c.text3, height: 1.45)),
           ]),
         ),
-        if (page.addLabel != null) ...[
-          const SizedBox(width: 16),
-          KButton(label: page.addLabel!, icon: KIcons.add, height: 30, fontSize: 12.5, onTap: () => setState(() => _showAddNote = !_showAddNote)),
-        ],
       ]),
-      if (_showAddNote && page.addNote != null) ...[
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(12)),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(KIcons.info, size: 15, color: c.text3),
-            const SizedBox(width: 8),
-            Expanded(child: Text(page.addNote!, style: sans(12, color: c.text2, height: 1.45))),
-          ]),
-        ),
-      ],
-      for (final p in page.providers) ...[const SizedBox(height: 8), _providerCard(context, s, p)],
       if (page.custom != null) page.custom!,
       for (final sec in page.sections) ...[const SizedBox(height: 16), _Section(title: sec.$1, rows: sec.$2)],
     ];
-  }
-
-  Widget _providerCard(BuildContext context, AppState s, _Provider p) {
-    final c = context.c;
-    final state = s.setting<String>('conn.${p.id}', p.initial);
-    final on = state == 'on' || state == 'warn';
-    final expanded = on && _open == p.id;
-    final (status, statusColor) = switch (state) {
-      'on' => ('Connected', c.ok),
-      'warn' => ('Needs attention', c.warn),
-      'missing' => ('Not installed', c.text3),
-      _ => ('Not connected', c.text3),
-    };
-    final action = on ? (expanded ? 'Done' : 'Configure') : (state == 'missing' ? 'Install' : 'Connect');
-    return Container(
-      decoration: BoxDecoration(
-        color: c.codeBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: expanded ? c.accSoft : c.paneBorder),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(children: [
-            Container(
-              width: 34,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: on ? c.accSoft : c.tile, borderRadius: BorderRadius.circular(10)),
-              child: Text(p.k, style: mono(11, weight: FontWeight.w700, color: on ? c.acc : c.text3)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13.5, weight: FontWeight.w600, color: c.text)),
-                Text(p.meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: c.text3)),
-              ]),
-            ),
-            const SizedBox(width: 10),
-            Dot(statusColor),
-            const SizedBox(width: 6),
-            Text(status, style: sans(12, weight: FontWeight.w500, color: statusColor)),
-            const SizedBox(width: 12),
-            on
-                ? KButton(label: action, height: 30, fontSize: 12.5, onTap: () => setState(() => _open = expanded ? null : p.id))
-                : KButton.primary(
-                    label: action,
-                    height: 30,
-                    fontSize: 12.5,
-                    onTap: () {
-                      s.setSetting('conn.${p.id}', 'on');
-                      setState(() => _open = p.id);
-                    },
-                  ),
-          ]),
-        ),
-        if (expanded) ...[
-          for (final r in p.rows()) r,
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(border: Border(top: BorderSide(color: c.divider))),
-            child: Row(children: [
-              KButton(label: 'Test connection', height: 30, fontSize: 12.5, onTap: () => setState(() => _tested[p.id] = p.testNote)),
-              if (_tested[p.id] != null) ...[
-                const SizedBox(width: 10),
-                Icon(KIcons.check, size: 14, color: c.ok),
-                const SizedBox(width: 6),
-                Flexible(child: Text(_tested[p.id]!, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: c.ok))),
-              ],
-              const Spacer(),
-              KPressable(
-                onTap: () {
-                  s.setSetting('conn.${p.id}', 'off');
-                  setState(() => _open = null);
-                },
-                semanticLabel: 'Disconnect ${p.name}',
-                builder: (context, hover, focus) => Container(
-                  height: 30,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(color: hover || focus ? c.errSoft : null, borderRadius: BorderRadius.circular(15)),
-                  child: Text('Disconnect', style: sans(12.5, weight: FontWeight.w500, color: c.err)),
-                ),
-              ),
-            ]),
-          ),
-        ],
-      ]),
-    );
   }
 
   // ------------------------------------------------------------ pages
@@ -406,31 +292,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
       case SettingsTab.docs:
         return _Page(
           'Docs',
-          'Knowledge bases agents can read for context: specs, ADRs, runbooks. Kumo only reads the spaces you pick.',
-          addLabel: 'Add source',
-          addNote: 'Markdown folders in a repo count as docs too: add the path and Kumo indexes it like a vault.',
-          providers: [
-            _Provider('confluence', 'CF', 'Confluence', 'fravega.atlassian.net · spaces Pricing, Engineering', 'on', rows: () => [
-                  _text(s, 'docs.confluence.spaces', 'Spaces', null, 'Pricing, Engineering'),
-                  _toggle(s, 'docs.confluence.write', 'Let agents update pages', 'They always ask before publishing.', false),
-                ]),
-            _Provider('notion', 'NO', 'Notion', 'Workspace “Eng handbook” · 42 pages shared', 'on', rows: () => [
-                  _toggle(s, 'docs.notion.write', 'Let agents update pages', 'They always ask before publishing.', true),
-                ]),
-            _Provider('obsidian', 'OB', 'Obsidian', 'Local vault ~/notes/work', 'on', testNote: 'Vault found', rows: () => [
-                  _text(s, 'docs.obsidian.vault', 'Vault', null, '~/notes/work', mono: true),
-                ]),
-            _Provider('gdocs', 'GD', 'Google Docs', 'Docs and Drive folders', 'off', rows: () => [
-                  _text(s, 'docs.gdocs.folder', 'Folder', null, 'Engineering'),
-                ]),
-          ],
-          sections: [
-            ('Context', [
-              _toggle(s, 'docs.index', 'Index docs for agent context', 'Kept on this Mac; refreshed in the background.', true),
-              _select(s, 'docs.refresh', 'Refresh index', null, const ['Every hour', 'Every 6 hours', 'Daily', 'Manually'], 'Every hour'),
-              _toggle(s, 'docs.attach', 'Attach docs mentioned in a ticket automatically', null, true),
-            ]),
-          ],
+          'Knowledge bases agents can read for context: specs, ADRs, runbooks. Docs reads them through your task sources, so there is nothing else to connect.',
+          custom: const DocsSourcesPanel(),
         );
     }
   }
@@ -455,29 +318,13 @@ class _SettingsDialogState extends State<SettingsDialog> {
 }
 
 class _Page {
-  _Page(this.heading, this.intro, {this.addLabel, this.addNote, this.providers = const [], this.sections = const [], this.custom});
+  _Page(this.heading, this.intro, {this.sections = const [], this.custom});
   final String heading;
   final String intro;
-  final String? addLabel;
-  final String? addNote;
-  final List<_Provider> providers;
   final List<(String, List<Widget>)> sections;
 
   /// A page-specific panel shown before the sections (AI agents).
   final Widget? custom;
-}
-
-class _Provider {
-  _Provider(this.id, this.k, this.name, this.meta, this.initial, {required this.rows, this.testNote = 'Connected · token valid'});
-  final String id;
-  final String k;
-  final String name;
-  final String meta;
-
-  /// on / warn / off / missing (before the user changes it).
-  final String initial;
-  final List<Widget> Function() rows;
-  final String testNote;
 }
 
 // ------------------------------------------------------------ pieces

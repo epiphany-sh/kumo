@@ -15,7 +15,7 @@ mod github;
 mod github_pulls;
 mod gitlab;
 mod gitlab_pulls;
-mod http;
+pub(crate) mod http;
 
 pub use bitbucket::BitbucketPipelines;
 pub use bitbucket_pulls::BitbucketPulls;

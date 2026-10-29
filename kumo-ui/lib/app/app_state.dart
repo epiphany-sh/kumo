@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../data/agents_source.dart';
 import '../data/ci_hosts_source.dart';
 import '../data/pipelines_source.dart';
+import '../data/docs_source.dart';
 import '../data/pull_requests_source.dart';
 import '../data/tasks_source.dart';
 import '../data/changes.dart';
@@ -68,6 +69,7 @@ class AppState extends ChangeNotifier {
     PipelinesFactory? pipelinesFor,
     CiHostsSource? ciHosts,
     PullRequestsSource? pullRequests,
+    DocsSource? docs,
   })  : prefs = prefs ?? Preferences.memory(),
         workspace = workspace ?? MockWorkspaceSource(),
         agents = agents ?? MockAgentsSource(),
@@ -76,6 +78,7 @@ class AppState extends ChangeNotifier {
         _pipelinesFor = pipelinesFor ?? mockPipelinesFor,
         ciHosts = ciHosts ?? MockCiHostsSource(),
         pullRequests = pullRequests ?? MockPullRequests(),
+        docs = docs ?? MockDocsSource(),
         _mode = mode {
     _changes = changesFor == null ? MockWorktreeChanges() : NoWorktreeChanges();
     _changes.addListener(notifyListeners);
@@ -703,6 +706,9 @@ class AppState extends ChangeNotifier {
 
   /// Pull requests of the repositories' hosts (same tokens as pipelines).
   final PullRequestsSource pullRequests;
+
+  /// Confluence and Obsidian pages, through the task sources.
+  final DocsSource docs;
 
   /// Follows the selection: one [PipelinesSource] per worktree.
   void _bindPipelines() {

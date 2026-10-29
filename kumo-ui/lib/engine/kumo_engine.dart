@@ -22,7 +22,8 @@ class EngineConnection {
         agents = AgentsClient(channel, options: auth),
         tasks = TasksClient(channel, options: auth),
         pipelines = PipelinesClient(channel, options: auth),
-        pulls = PullRequestsClient(channel, options: auth);
+        pulls = PullRequestsClient(channel, options: auth),
+        docs = DocsClient(channel, options: auth);
 
   final ClientChannel channel;
   final DaemonEndpoint endpoint;
@@ -35,6 +36,7 @@ class EngineConnection {
   final TasksClient tasks;
   final PipelinesClient pipelines;
   final PullRequestsClient pulls;
+  final DocsClient docs;
 }
 
 /// Discovers or launches the daemon, handshakes and hands out the

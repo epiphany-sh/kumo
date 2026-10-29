@@ -321,6 +321,21 @@ final $typed_data.Uint8List reviewStateDescriptor = $convert.base64Decode(
     'FVSVJFRBABEiIKHlJFVklFV19TVEFURV9DSEFOR0VTX1JFUVVFU1RFRBACEhkKFVJFVklFV19T'
     'VEFURV9BUFBST1ZFRBAD');
 
+@$core.Deprecated('Use docKindDescriptor instead')
+const DocKind$json = {
+  '1': 'DocKind',
+  '2': [
+    {'1': 'DOC_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'DOC_KIND_CONFLUENCE', '2': 1},
+    {'1': 'DOC_KIND_OBSIDIAN', '2': 2},
+  ],
+};
+
+/// Descriptor for `DocKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List docKindDescriptor = $convert.base64Decode(
+    'CgdEb2NLaW5kEhgKFERPQ19LSU5EX1VOU1BFQ0lGSUVEEAASFwoTRE9DX0tJTkRfQ09ORkxVRU'
+    '5DRRABEhUKEURPQ19LSU5EX09CU0lESUFOEAI=');
+
 @$core.Deprecated('Use helloRequestDescriptor instead')
 const HelloRequest$json = {
   '1': 'HelloRequest',
@@ -2999,3 +3014,157 @@ final $typed_data.Uint8List createPullRequestRequestDescriptor = $convert.base64
     'ChhDcmVhdGVQdWxsUmVxdWVzdFJlcXVlc3QSIwoNd29ya3RyZWVfcGF0aBgBIAEoCVIMd29ya3'
     'RyZWVQYXRoEhQKBXRpdGxlGAIgASgJUgV0aXRsZRISCgRib2R5GAMgASgJUgRib2R5EhIKBGJh'
     'c2UYBCABKAlSBGJhc2USFAoFZHJhZnQYBSABKAhSBWRyYWZ0');
+
+@$core.Deprecated('Use docSourceDescriptor instead')
+const DocSource$json = {
+  '1': 'DocSource',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {
+      '1': 'kind',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.DocKind',
+      '10': 'kind'
+    },
+    {'1': 'name', '3': 3, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'location', '3': 4, '4': 1, '5': 9, '10': 'location'},
+  ],
+};
+
+/// Descriptor for `DocSource`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List docSourceDescriptor = $convert.base64Decode(
+    'CglEb2NTb3VyY2USDgoCaWQYASABKAlSAmlkEiQKBGtpbmQYAiABKA4yEC5rdW1vLnYxLkRvY0'
+    'tpbmRSBGtpbmQSEgoEbmFtZRgDIAEoCVIEbmFtZRIaCghsb2NhdGlvbhgEIAEoCVIIbG9jYXRp'
+    'b24=');
+
+@$core.Deprecated('Use docSummaryDescriptor instead')
+const DocSummary$json = {
+  '1': 'DocSummary',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'title', '3': 2, '4': 1, '5': 9, '10': 'title'},
+    {'1': 'place', '3': 3, '4': 1, '5': 9, '10': 'place'},
+    {'1': 'updated_at', '3': 4, '4': 1, '5': 3, '10': 'updatedAt'},
+    {'1': 'author', '3': 5, '4': 1, '5': 9, '10': 'author'},
+    {'1': 'url', '3': 6, '4': 1, '5': 9, '10': 'url'},
+    {'1': 'excerpt', '3': 7, '4': 1, '5': 9, '10': 'excerpt'},
+  ],
+};
+
+/// Descriptor for `DocSummary`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List docSummaryDescriptor = $convert.base64Decode(
+    'CgpEb2NTdW1tYXJ5Eg4KAmlkGAEgASgJUgJpZBIUCgV0aXRsZRgCIAEoCVIFdGl0bGUSFAoFcG'
+    'xhY2UYAyABKAlSBXBsYWNlEh0KCnVwZGF0ZWRfYXQYBCABKANSCXVwZGF0ZWRBdBIWCgZhdXRo'
+    'b3IYBSABKAlSBmF1dGhvchIQCgN1cmwYBiABKAlSA3VybBIYCgdleGNlcnB0GAcgASgJUgdleG'
+    'NlcnB0');
+
+@$core.Deprecated('Use docGroupDescriptor instead')
+const DocGroup$json = {
+  '1': 'DocGroup',
+  '2': [
+    {
+      '1': 'source',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.DocSource',
+      '10': 'source'
+    },
+    {
+      '1': 'docs',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.DocSummary',
+      '10': 'docs'
+    },
+    {'1': 'problem', '3': 3, '4': 1, '5': 9, '10': 'problem'},
+    {'1': 'problem_is_auth', '3': 4, '4': 1, '5': 8, '10': 'problemIsAuth'},
+  ],
+};
+
+/// Descriptor for `DocGroup`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List docGroupDescriptor = $convert.base64Decode(
+    'CghEb2NHcm91cBIqCgZzb3VyY2UYASABKAsyEi5rdW1vLnYxLkRvY1NvdXJjZVIGc291cmNlEi'
+    'cKBGRvY3MYAiADKAsyEy5rdW1vLnYxLkRvY1N1bW1hcnlSBGRvY3MSGAoHcHJvYmxlbRgDIAEo'
+    'CVIHcHJvYmxlbRImCg9wcm9ibGVtX2lzX2F1dGgYBCABKAhSDXByb2JsZW1Jc0F1dGg=');
+
+@$core.Deprecated('Use listDocsRequestDescriptor instead')
+const ListDocsRequest$json = {
+  '1': 'ListDocsRequest',
+  '2': [
+    {'1': 'query', '3': 1, '4': 1, '5': 9, '10': 'query'},
+    {'1': 'limit', '3': 2, '4': 1, '5': 13, '10': 'limit'},
+    {'1': 'refresh', '3': 3, '4': 1, '5': 8, '10': 'refresh'},
+  ],
+};
+
+/// Descriptor for `ListDocsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listDocsRequestDescriptor = $convert.base64Decode(
+    'Cg9MaXN0RG9jc1JlcXVlc3QSFAoFcXVlcnkYASABKAlSBXF1ZXJ5EhQKBWxpbWl0GAIgASgNUg'
+    'VsaW1pdBIYCgdyZWZyZXNoGAMgASgIUgdyZWZyZXNo');
+
+@$core.Deprecated('Use docListDescriptor instead')
+const DocList$json = {
+  '1': 'DocList',
+  '2': [
+    {
+      '1': 'groups',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.DocGroup',
+      '10': 'groups'
+    },
+  ],
+};
+
+/// Descriptor for `DocList`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List docListDescriptor = $convert.base64Decode(
+    'CgdEb2NMaXN0EikKBmdyb3VwcxgBIAMoCzIRLmt1bW8udjEuRG9jR3JvdXBSBmdyb3Vwcw==');
+
+@$core.Deprecated('Use readDocRequestDescriptor instead')
+const ReadDocRequest$json = {
+  '1': 'ReadDocRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+  ],
+};
+
+/// Descriptor for `ReadDocRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List readDocRequestDescriptor =
+    $convert.base64Decode('Cg5SZWFkRG9jUmVxdWVzdBIOCgJpZBgBIAEoCVICaWQ=');
+
+@$core.Deprecated('Use docDescriptor instead')
+const Doc$json = {
+  '1': 'Doc',
+  '2': [
+    {
+      '1': 'summary',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.DocSummary',
+      '10': 'summary'
+    },
+    {
+      '1': 'source',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.DocSource',
+      '10': 'source'
+    },
+    {'1': 'markdown', '3': 3, '4': 1, '5': 9, '10': 'markdown'},
+    {'1': 'path', '3': 4, '4': 3, '5': 9, '10': 'path'},
+    {'1': 'file', '3': 5, '4': 1, '5': 9, '10': 'file'},
+  ],
+};
+
+/// Descriptor for `Doc`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List docDescriptor = $convert.base64Decode(
+    'CgNEb2MSLQoHc3VtbWFyeRgBIAEoCzITLmt1bW8udjEuRG9jU3VtbWFyeVIHc3VtbWFyeRIqCg'
+    'Zzb3VyY2UYAiABKAsyEi5rdW1vLnYxLkRvY1NvdXJjZVIGc291cmNlEhoKCG1hcmtkb3duGAMg'
+    'ASgJUghtYXJrZG93bhISCgRwYXRoGAQgAygJUgRwYXRoEhIKBGZpbGUYBSABKAlSBGZpbGU=');

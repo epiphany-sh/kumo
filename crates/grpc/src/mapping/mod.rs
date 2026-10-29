@@ -2,6 +2,7 @@
 
 mod agents;
 mod changes;
+mod docs;
 mod error;
 mod pipelines;
 mod pulls;
@@ -11,6 +12,7 @@ mod workspace;
 
 pub use agents::{agent_session_to, agents_snapshot_to, provider_to};
 pub use changes::{commit_to, diff_scope_from, diff_to, worktree_changes_to};
+pub use docs::{doc_list_to, doc_to};
 pub use error::{
     agents_status_from, changes_status_from, pipelines_status_from, status_from, tasks_status_from,
     workspace_status_from,

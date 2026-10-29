@@ -7,7 +7,7 @@ use serde_json::Value;
 use super::dates::date_of_unix_ms;
 
 /// The document (or any ADF node) as Markdown.
-pub(super) fn to_markdown(node: &Value) -> String {
+pub(crate) fn to_markdown(node: &Value) -> String {
     let markdown = block(node);
     markdown.trim_matches('\n').to_owned()
 }

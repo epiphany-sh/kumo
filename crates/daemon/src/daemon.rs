@@ -5,6 +5,7 @@ use anyhow::Context;
 use kumo_application::agents::{AgentPorts, AgentService};
 use kumo_application::changes::{ChangesPorts, ChangesService};
 use kumo_application::daemon::HelloService;
+use kumo_application::docs::{DocsPorts, DocsService};
 use kumo_application::pipelines::{PipelinesPorts, PipelinesService, PipelinesTiming};
 use kumo_application::pulls::{PullRequestPorts, PullRequestService};
 use kumo_application::tasks::{TaskPorts, TaskService, TaskTiming};
@@ -22,6 +23,7 @@ use kumo_infrastructure::ci::{
     GitLabPulls,
 };
 use kumo_infrastructure::discovery::FileDiscoveryStore;
+use kumo_infrastructure::docs::{ConfluenceDocs, VaultDocs};
 use kumo_infrastructure::fs::LocalFileStore;
 use kumo_infrastructure::git::{FsRepoFinder, GitCli};
 use kumo_infrastructure::pty::PortablePtySystem;
@@ -103,9 +105,19 @@ impl Daemon {
             Arc::new(JiraConnector::default()),
             Arc::new(TodoistConnector::default()),
         ];
+        let task_store = Arc::new(SqliteTaskStore::open(&data_dir.join("kumo.db"))?);
+        // Docs read through the task sources' accounts and vaults.
+        let docs = Arc::new(DocsService::new(
+            DocsPorts {
+                sources: task_store.clone(),
+                secrets: Arc::clone(&secrets),
+                connectors: vec![Arc::new(ConfluenceDocs::default()), Arc::new(VaultDocs)],
+            },
+            std::time::Duration::from_secs(60),
+        ));
         let tasks = TaskService::load(
             TaskPorts {
-                store: Arc::new(SqliteTaskStore::open(&data_dir.join("kumo.db"))?),
+                store: task_store,
                 secrets,
                 connectors,
                 watcher: Arc::new(NotifyWatcher),
@@ -170,6 +182,7 @@ impl Daemon {
             tasks,
             pipelines,
             pulls,
+            docs,
         };
         let server = GrpcServer::bind(config.listen, token.clone(), services).await?;
 

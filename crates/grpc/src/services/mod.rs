@@ -2,6 +2,7 @@
 
 mod agents;
 mod core;
+mod docs;
 mod git;
 mod pipelines;
 mod pulls;
@@ -11,6 +12,7 @@ mod workspace;
 
 pub use self::agents::AgentsGrpc;
 pub use self::core::CoreGrpc;
+pub use self::docs::DocsGrpc;
 pub use self::git::GitGrpc;
 pub use self::pipelines::PipelinesGrpc;
 pub use self::pulls::PullRequestsGrpc;
