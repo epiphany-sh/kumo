@@ -49,6 +49,17 @@ enum ContextTab {
   final String tooltip;
 }
 
+/// What the side panel shows: compact views of the current worktree (the
+/// header's Files / Git tabs have the full ones), or the widgets.
+enum SidePanelTab {
+  git('Source control'),
+  files('Files'),
+  widgets('Widgets');
+
+  const SidePanelTab(this.label);
+  final String label;
+}
+
 /// App-wide UI state. Everything here changes optimistically in the same
 /// frame (kumo.md §5.2); once the daemon exists, it confirms or reverts.
 class AppState extends ChangeNotifier {
@@ -102,6 +113,7 @@ class AppState extends ChangeNotifier {
     _translucency = p.get<double>('translucency', _translucency).clamp(0.25, 0.9).toDouble();
     _sidePanelRight = p.get<bool>('sidePanel.right', false);
     _sidePanelOpen = p.get<bool>('sidePanel.onLaunch', true);
+    _sidePanelTab = SidePanelTab.values.where((t) => t.name == p.get<String>('sidePanel.tab', 'widgets')).firstOrNull ?? SidePanelTab.widgets;
   }
 
   /// New versions of Kumo, ready to install.
@@ -468,6 +480,18 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  SidePanelTab _sidePanelTab = SidePanelTab.widgets;
+  SidePanelTab get sidePanelTab => _sidePanelTab;
+
+  /// Shows [tab] in the side panel (opening the panel if it was hidden).
+  void showSidePanelTab(SidePanelTab tab) {
+    if (tab == _sidePanelTab && _sidePanelOpen) return;
+    _sidePanelTab = tab;
+    _sidePanelOpen = true;
+    prefs.set('sidePanel.tab', tab.name);
+    notifyListeners();
+  }
+
   // ---- Context: the selected worktree, or Home ----
 
   /// Home: plain shells in the home folder that belong to no repository
@@ -735,10 +759,17 @@ class AppState extends ChangeNotifier {
   void discardChangesIn(String dir) {
     final paths = [for (final f in pendingChanges) if (f.path.startsWith('$dir/')) f.path];
     if (paths.isEmpty) return;
+    discardPaths(paths, label: '${paths.length} ${paths.length == 1 ? 'change' : 'changes'} in ${dir.split('/').last}');
+  }
+
+  /// [discardChanges] for several files at once ("Discard all"), one undo.
+  void discardPaths(List<String> all, {String? label}) {
+    final paths = [for (final p in all) if (!_discarding.contains(p)) p];
+    if (paths.isEmpty) return;
     _discarding.addAll(paths);
     final changes = _changes;
     _offerUndo(
-      'Discarded ${paths.length} ${paths.length == 1 ? 'change' : 'changes'} in ${dir.split('/').last}',
+      'Discarded ${label ?? (paths.length == 1 ? 'changes to ${paths.first.split('/').last}' : '${paths.length} changes')}',
       () => _discarding.removeAll(paths),
       commit: () => _discarded = changes.restoreAll(paths).whenComplete(() {
         if (_disposed || !identical(changes, _changes)) return;

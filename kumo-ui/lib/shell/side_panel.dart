@@ -22,32 +22,108 @@ import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
 import 'screen_chrome.dart';
 
-/// Panel beside the Terminal view's tabs: the inspector widgets of the
-/// current worktree (agent, pipelines, changes…). ⌥⌘B hides / shows it.
-/// The worktree's files and source control live in its context tabs
-/// ([WorktreeFilesTree], [SourceControlPanel]).
+/// Panel beside the Terminal view's tabs, for the current worktree:
+/// compact source control (stage, discard, commit), its files, or the
+/// inspector widgets (agent, pipelines, changes…). The header's Files / Git
+/// tabs have the full views. ⌥⌘B hides / shows it.
 class SidePanel extends StatelessWidget {
   const SidePanel({super.key});
+
+  static const _icons = {SidePanelTab.git: KIcons.branch, SidePanelTab.files: KIcons.files, SidePanelTab.widgets: KIcons.widgets};
 
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final c = context.c;
+    final tab = s.sidePanelTab;
     return GlassPanel(
       clip: true,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Container(
           height: 46,
-          padding: const EdgeInsets.only(left: 16, right: 8),
+          padding: const EdgeInsets.only(left: 8, right: 8),
           decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.divider))),
           child: Row(children: [
-            Icon(KIcons.widgets, size: 16, color: c.text3),
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(10)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                for (final t in SidePanelTab.values)
+                  KPressable(
+                    onTap: () => s.showSidePanelTab(t),
+                    semanticLabel: t.label,
+                    tooltip: t.label,
+                    selected: t == tab,
+                    builder: (context, hover, focus) => AnimatedContainer(
+                      duration: const Duration(milliseconds: 100),
+                      width: 30,
+                      height: 26,
+                      decoration: t == tab ? chipDecoration(c, radius: 8, fill: c.tabActive) : BoxDecoration(borderRadius: BorderRadius.circular(8)),
+                      child: Icon(_icons[t], size: 15, color: t == tab || hover ? c.text : c.text3),
+                    ),
+                  ),
+              ]),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: Text('Widgets', style: sans(12.5, weight: FontWeight.w600, color: c.text))),
+            Expanded(child: Text(tab.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, weight: FontWeight.w600, color: c.text))),
             KIconButton(icon: KIcons.sidePanel, label: 'Hide side panel (⌥⌘B)', onTap: s.toggleSidePanel),
           ]),
         ),
-        const Expanded(child: _WidgetsTab()),
+        Expanded(
+          child: switch (tab) {
+            SidePanelTab.git => const SourceControlPanel(compact: true),
+            SidePanelTab.files => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Expanded(
+                  child: WorktreeFilesTree(
+                    selected: s.contextFile,
+                    // A file opens in the Files tab, where it can be edited.
+                    onOpen: (p) {
+                      s.openContext(ContextTab.files);
+                      s.showContextFile(p);
+                    },
+                  ),
+                ),
+                _PanelFooter(label: 'Open Files tab', tooltip: 'The tree with open files, editing and diffs', onTap: () => s.openContext(ContextTab.files)),
+              ]),
+            SidePanelTab.widgets => const _WidgetsTab(),
+          },
+        ),
+      ]),
+    );
+  }
+}
+
+/// "Open … tab ↗" at the bottom of a compact side panel view.
+class _PanelFooter extends StatelessWidget {
+  const _PanelFooter({required this.label, required this.tooltip, required this.onTap, this.summary});
+  final String label;
+  final String tooltip;
+  final VoidCallback onTap;
+  final String? summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 6, 8, 8),
+      decoration: BoxDecoration(border: Border(top: BorderSide(color: c.divider))),
+      child: Row(children: [
+        Expanded(child: Text(summary ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, color: c.text3))),
+        KPressable(
+          onTap: onTap,
+          semanticLabel: label,
+          tooltip: tooltip,
+          builder: (context, hover, focus) => Container(
+            height: 26,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(color: hover || focus ? c.accSoft : null, borderRadius: BorderRadius.circular(8)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(label, style: sans(12, weight: FontWeight.w500, color: c.acc)),
+              const SizedBox(width: 5),
+              Icon(KIcons.external, size: 12, color: c.acc),
+            ]),
+          ),
+        ),
       ]),
     );
   }
@@ -55,10 +131,13 @@ class SidePanel extends StatelessWidget {
 
 // ---------------------------------------------------------------- Source control
 
-/// Source control of the current worktree (the Git context tab): branch,
-/// commit box, actions and the changed files.
+/// Source control of the current worktree: branch, commit box, actions and
+/// the changed files. In the Git context tab it also lists what's committed
+/// on the branch; [compact] (the side panel) keeps to staging, discarding
+/// and committing, with a way to the Git tab.
 class SourceControlPanel extends StatefulWidget {
-  const SourceControlPanel({super.key});
+  const SourceControlPanel({super.key, this.compact = false});
+  final bool compact;
 
   @override
   State<SourceControlPanel> createState() => _SourceControlPanelState();
@@ -129,8 +208,10 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
     ];
     final ahead = git.ahead;
     final base = git.base.isEmpty ? 'its base' : git.base;
+    final compact = widget.compact;
+    final paths = [for (final f in unstaged) f.path];
 
-    return ListView(padding: const EdgeInsets.fromLTRB(14, 12, 14, 14), children: [
+    final list = ListView(padding: EdgeInsets.fromLTRB(14, 12, 14, compact ? 10 : 14), children: [
       Row(children: [
         Icon(KIcons.branch, size: 15, color: c.text2),
         const SizedBox(width: 8),
@@ -142,6 +223,11 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
             style: mono(12.5, weight: FontWeight.w500, color: c.text),
           ),
         ),
+        if (compact)
+          Tooltip(
+            message: '$ahead to push · ${git.behind} to pull${git.pushed ? '' : ' · not published yet'}',
+            child: Text('↑$ahead ↓${git.behind}', style: mono(11.5, color: c.text3)),
+          ),
         KIconButton(
           icon: KIcons.search,
           label: 'Filter files',
@@ -174,14 +260,24 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
                     },
                   ),
                 const KMenuDivider(),
-                KMenuItem(
-                  icon: KIcons.external,
-                  label: 'Open Git view',
-                  onTap: () {
-                    close();
-                    s.view = KumoView.git;
-                  },
-                ),
+                if (widget.compact)
+                  KMenuItem(
+                    icon: KIcons.external,
+                    label: 'Open the Git tab',
+                    onTap: () {
+                      close();
+                      s.openContext(ContextTab.git);
+                    },
+                  )
+                else
+                  KMenuItem(
+                    icon: KIcons.external,
+                    label: 'Open Git view',
+                    onTap: () {
+                      close();
+                      s.view = KumoView.git;
+                    },
+                  ),
               ]),
             ),
           ),
@@ -191,7 +287,7 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
         const SizedBox(height: 10),
         _Field(controller: _query, hint: 'Filter changed files', autofocus: true),
       ],
-      if (git.base.isNotEmpty) ...[
+      if (git.base.isNotEmpty && !compact) ...[
         const SizedBox(height: 6),
         Row(children: [
           Icon(KIcons.arrowRight, size: 13, color: c.text3),
@@ -216,7 +312,7 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
         },
         child: Stack(children: [
           Container(
-            constraints: const BoxConstraints(minHeight: 78),
+            constraints: BoxConstraints(minHeight: compact ? 58 : 78),
             padding: const EdgeInsets.fromLTRB(12, 10, 36, 10),
             decoration: BoxDecoration(
               color: c.chip,
@@ -228,7 +324,7 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
               textField: true,
               child: TextField(
                 controller: _msg,
-                minLines: 3,
+                minLines: compact ? 2 : 3,
                 maxLines: 8,
                 onChanged: (_) {
                   if (_needMsg) setState(() => _needMsg = false);
@@ -263,6 +359,8 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
       const SizedBox(height: 10),
       _CommitButton(
         enabled: pending.isNotEmpty,
+        // Says what the commit takes: the staged files, or every change.
+        label: !compact ? 'Commit' : (staged.isNotEmpty ? 'Commit ${staged.length} staged' : 'Commit all ${pending.length}'),
         onCommit: _commit,
         // Nothing to commit: the button pushes what was committed.
         push: pending.isEmpty && s.canPush ? (!git.pushed ? 'Publish branch' : 'Push ↑$ahead') : null,
@@ -291,6 +389,9 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
           onToggle: () => setState(() => _collapsed.contains('staged') ? _collapsed.remove('staged') : _collapsed.add('staged')),
           empty: 'No files match “$q”.',
           staged: true,
+          actions: [
+            KIconButton(icon: KIcons.remove, label: 'Unstage all', size: 24, iconSize: 14, onTap: () => git.unstage([for (final f in staged) f.path])),
+          ],
         ),
         const SizedBox(height: 6),
       ],
@@ -304,7 +405,12 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
             ? 'No files match “$q”.'
             : (staged.isNotEmpty ? 'Everything is staged.' : (s.commitNotice != null ? 'Nothing to commit. Working tree clean.' : 'No changes.')),
         staged: false,
+        actions: [
+          if (paths.length > 1) KIconButton(icon: KIcons.discard, label: 'Discard all changes', size: 24, iconSize: 13, onTap: () => s.discardPaths(paths)),
+          if (paths.isNotEmpty) KIconButton(icon: KIcons.add, label: 'Stage all', size: 24, iconSize: 15, onTap: () => git.stage(paths)),
+        ],
       ),
+      if (!compact) ...[
       const SizedBox(height: 6),
       _ScSection(
         title: 'Committed on branch',
@@ -315,6 +421,17 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
         empty: q.isNotEmpty && onBranch.isNotEmpty ? 'No files match “$q”.' : 'No commits ahead of $base.',
         onViewAll: onBranch.isEmpty ? null : () => s.openAllFiles(onBranch.map((f) => f.path)),
       ),
+      ],
+    ]);
+    if (!compact) return list;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Expanded(child: list),
+      _PanelFooter(
+        summary: pending.isEmpty ? 'Working tree clean' : '${staged.length} of ${pending.length} staged',
+        label: 'Open Git tab',
+        tooltip: 'Commits, pull request and pipelines of this branch',
+        onTap: () => s.openContext(ContextTab.git),
+      ),
     ]);
   }
 }
@@ -322,8 +439,9 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
 /// Commit button with a ⌄ menu: Commit & Push, Amend. With nothing to
 /// commit and commits to push, it pushes ([push] is its label).
 class _CommitButton extends StatelessWidget {
-  const _CommitButton({required this.enabled, required this.onCommit, this.push, required this.onPush});
+  const _CommitButton({required this.enabled, required this.onCommit, this.push, required this.onPush, this.label = 'Commit'});
   final bool enabled;
+  final String label;
   final void Function(String how) onCommit;
   final String? push;
   final VoidCallback onPush;
@@ -338,7 +456,7 @@ class _CommitButton extends StatelessWidget {
         Expanded(
           child: KPressable(
             onTap: enabled ? () => onCommit('commit') : (push != null ? onPush : null),
-            semanticLabel: enabled ? 'Commit' : (push ?? 'Nothing to commit'),
+            semanticLabel: enabled ? label : (push ?? 'Nothing to commit'),
             builder: (context, hover, focus) {
               final on = enabled || push != null;
               return Container(
@@ -352,7 +470,7 @@ class _CommitButton extends StatelessWidget {
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      enabled ? 'Commit' : (push ?? 'Nothing to commit'),
+                      enabled ? label : (push ?? 'Nothing to commit'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: sans(12.5, weight: FontWeight.w600, color: on ? c.text : c.text3),
@@ -402,7 +520,10 @@ class _CommitButton extends StatelessWidget {
 }
 
 class _ScSection extends StatelessWidget {
-  const _ScSection({required this.title, required this.total, required this.files, required this.open, required this.onToggle, required this.empty, this.onViewAll, this.staged});
+  const _ScSection({required this.title, required this.total, required this.files, required this.open, required this.onToggle, required this.empty, this.onViewAll, this.staged, this.actions = const []});
+
+  /// Buttons for the whole section (Stage all, Discard all…).
+  final List<Widget> actions;
 
   final String title;
   final int total;
@@ -437,6 +558,7 @@ class _ScSection extends StatelessWidget {
             ),
           ),
         ),
+        ...actions,
         if (onViewAll != null) KButton(label: 'View all', kind: KButtonKind.ghost, height: 24, fontSize: 12, onTap: onViewAll),
       ]),
       if (open) ...[
