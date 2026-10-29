@@ -23,7 +23,7 @@ ifeq ($(OS),Windows_NT)
 else
   PLATFORM  := macos
   EXE       :=
-  APP       := $(UI)/build/macos/Build/Products/Release/kumo_ui.app
+  APP       := $(UI)/build/macos/Build/Products/Release/Kumo.app
   APP_BIN   := $(APP)/Contents/MacOS
   DISCOVERY := $(HOME)/Library/Application Support/kumo/daemon.json
 endif
