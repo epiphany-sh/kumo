@@ -65,7 +65,7 @@ impl Daemon {
         };
         let discovery = FileDiscoveryStore::in_dir(&data_dir);
         ensure_not_running(&discovery).await?;
-        let instance = lock(&data_dir)?;
+        let instance = lock(&data_dir).await?;
 
         let workspace = Arc::new(
             WorkspaceService::load(WorkspacePorts {

@@ -9,6 +9,10 @@ use kumo_domain::daemon::{DaemonEndpoint, DaemonError, DiscoveryStore};
 use kumo_grpc::client::KumoClient;
 
 const PROBE_TIMEOUT: Duration = Duration::from_millis(500);
+/// A daemon that just stopped can keep the lock a moment longer: a process
+/// it started inherits the file until it runs its program.
+const LOCK_PATIENCE: Duration = Duration::from_secs(1);
+const LOCK_RETRY: Duration = Duration::from_millis(50);
 
 /// Fails if the advertised daemon answers `Hello`. A stale record (the
 /// process died without cleaning up) is ignored and later overwritten.
@@ -33,7 +37,7 @@ pub(crate) struct InstanceLock(#[allow(dead_code)] File);
 
 /// Fails if another daemon holds the lock: it is still starting (e.g. the
 /// keychain is asking the user something), so a second one must not.
-pub(crate) fn lock(data_dir: &Path) -> Result<InstanceLock, DaemonError> {
+pub(crate) async fn lock(data_dir: &Path) -> Result<InstanceLock, DaemonError> {
     let path = data_dir.join("kumod.lock");
     let failed = |reason: String| DaemonError::Lock {
         path: path.clone(),
@@ -41,10 +45,16 @@ pub(crate) fn lock(data_dir: &Path) -> Result<InstanceLock, DaemonError> {
     };
     std::fs::create_dir_all(data_dir).map_err(|e| failed(e.to_string()))?;
     let file = File::create(&path).map_err(|e| failed(e.to_string()))?;
-    match file.try_lock() {
-        Ok(()) => Ok(InstanceLock(file)),
-        Err(TryLockError::WouldBlock) => Err(DaemonError::AlreadyStarting(path)),
-        Err(TryLockError::Error(e)) => Err(failed(e.to_string())),
+    let deadline = tokio::time::Instant::now() + LOCK_PATIENCE;
+    loop {
+        match file.try_lock() {
+            Ok(()) => return Ok(InstanceLock(file)),
+            Err(TryLockError::WouldBlock) if tokio::time::Instant::now() < deadline => {
+                tokio::time::sleep(LOCK_RETRY).await;
+            }
+            Err(TryLockError::WouldBlock) => return Err(DaemonError::AlreadyStarting(path)),
+            Err(TryLockError::Error(e)) => return Err(failed(e.to_string())),
+        }
     }
 }
 
@@ -65,15 +75,30 @@ async fn responds(endpoint: &DaemonEndpoint) -> bool {
 mod tests {
     use super::*;
 
-    #[test]
-    fn a_second_daemon_cant_start_while_the_first_holds_the_lock() {
+    #[tokio::test]
+    async fn a_second_daemon_cant_start_while_the_first_holds_the_lock() {
         let dir = tempfile::tempdir().unwrap();
-        let first = lock(dir.path()).unwrap();
+        let first = lock(dir.path()).await.unwrap();
         assert!(matches!(
-            lock(dir.path()),
+            lock(dir.path()).await,
             Err(DaemonError::AlreadyStarting(_))
         ));
         drop(first);
-        lock(dir.path()).expect("free once the first one is gone");
+        lock(dir.path())
+            .await
+            .expect("free once the first one is gone");
+    }
+
+    #[tokio::test]
+    async fn a_lock_released_meanwhile_is_taken() {
+        let dir = tempfile::tempdir().unwrap();
+        let first = lock(dir.path()).await.unwrap();
+        let second = tokio::spawn({
+            let dir = dir.path().to_path_buf();
+            async move { lock(&dir).await.map(drop) }
+        });
+        tokio::time::sleep(LOCK_RETRY * 3).await;
+        drop(first);
+        second.await.unwrap().expect("taken within the patience");
     }
 }
