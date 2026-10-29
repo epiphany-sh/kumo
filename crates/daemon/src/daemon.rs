@@ -35,7 +35,7 @@ use kumo_infrastructure::tasks::{
 };
 use kumo_infrastructure::watch::NotifyWatcher;
 
-use crate::single_instance::ensure_not_running;
+use crate::single_instance::{InstanceLock, ensure_not_running, lock};
 use crate::{DaemonConfig, SecretsBackend};
 
 /// A started daemon: listening, advertised, not yet serving.
@@ -45,6 +45,7 @@ pub struct Daemon {
     endpoint: DaemonEndpoint,
     discovery: FileDiscoveryStore,
     terminals: Arc<TerminalService>,
+    _lock: InstanceLock,
 }
 
 impl Daemon {
@@ -63,6 +64,7 @@ impl Daemon {
         };
         let discovery = FileDiscoveryStore::in_dir(&data_dir);
         ensure_not_running(&discovery).await?;
+        let instance = lock(&data_dir)?;
 
         let workspace = Arc::new(
             WorkspaceService::load(WorkspacePorts {
@@ -206,6 +208,7 @@ impl Daemon {
             endpoint,
             discovery,
             terminals,
+            _lock: instance,
         })
     }
 

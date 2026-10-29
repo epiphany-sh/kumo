@@ -134,19 +134,24 @@ impl TaskService {
             .iter()
             .map(|v| v.source.clone())
             .collect();
-        for source in sources {
-            if source.kind().needs_secret() {
-                let has_secret = service.secret(&source.id).await.ok().flatten().is_some();
-                service.update(|b| {
-                    b.source_mut(&source.id)
-                        .into_iter()
-                        .for_each(|v| v.has_secret = has_secret)
-                });
+        // The keychain may ask the user first (a new build, a new item): the
+        // daemon must answer meanwhile, so secrets are read afterwards.
+        let starting = Arc::clone(&service);
+        tokio::spawn(async move {
+            for source in sources {
+                if source.kind().needs_secret() {
+                    let has_secret = starting.secret(&source.id).await.ok().flatten().is_some();
+                    starting.update(|b| {
+                        b.source_mut(&source.id)
+                            .into_iter()
+                            .for_each(|v| v.has_secret = has_secret)
+                    });
+                }
+                if source.enabled {
+                    starting.start_worker(&source);
+                }
             }
-            if source.enabled {
-                service.start_worker(&source);
-            }
-        }
+        });
         Ok(service)
     }
 

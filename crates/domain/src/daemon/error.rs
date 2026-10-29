@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum DaemonError {
@@ -12,4 +13,9 @@ pub enum DaemonError {
     Discovery(String),
     #[error("a daemon is already running at {addr} (pid {pid})")]
     AlreadyRunning { addr: SocketAddr, pid: u32 },
+    /// Another daemon holds the lock but hasn't advertised itself yet.
+    #[error("another daemon is starting (it holds {0})")]
+    AlreadyStarting(PathBuf),
+    #[error("can't take the instance lock {path}: {reason}")]
+    Lock { path: PathBuf, reason: String },
 }

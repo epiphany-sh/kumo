@@ -50,6 +50,11 @@ all: app ## Same as `app`
 
 engine: ## Build kumod (release)
 	$(CARGO) build --release -p kumod
+ifeq ($(PLATFORM),macos)
+	@# `make dev` runs this binary: with the stable identity, the keychain's
+	@# "Always Allow" survives rebuilds (ad-hoc it would be a new program).
+	$(if $(SIGN_ID),codesign --force --sign "$(SIGN_ID)" --identifier dev.kumo.kumod "$(KUMOD)")
+endif
 
 ui: ## Build the Flutter app (release)
 	cd $(UI) && $(FLUTTER) pub get && $(FLUTTER) build $(PLATFORM) --release
