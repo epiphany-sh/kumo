@@ -69,4 +69,15 @@ class DaemonDiscovery {
     }
     throw TimeoutException('kumod did not write ${file.path} within ${timeout.inMilliseconds} ms');
   }
+
+  /// Polls until the daemon [pid] no longer advertises itself: it stopped.
+  Future<void> waitGone(int pid, {Duration timeout = const Duration(seconds: 5)}) async {
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      final endpoint = await read();
+      if (endpoint == null || endpoint.pid != pid) return;
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    throw TimeoutException('kumod (pid $pid) did not stop within ${timeout.inMilliseconds} ms');
+  }
 }

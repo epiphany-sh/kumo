@@ -16,6 +16,9 @@ service Core {
   // Version handshake. Clients must refuse to operate if
   // `server_api_version` differs from their own.
   rpc Hello(HelloRequest) returns (HelloResponse);
+  // Stops the daemon; its terminals end with it. With `if_idle`, refused
+  // (FAILED_PRECONDITION) while a terminal is running.
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
 }
 
 message HelloRequest {
@@ -27,7 +30,16 @@ message HelloResponse {
   uint32 server_api_version = 1;
   string server_version = 2;
   uint64 server_time_unix_nanos = 3;
+  // The daemon's program was replaced on disk (an update or a rebuild):
+  // restarting it runs the new one.
+  bool outdated = 4;
 }
+
+message ShutdownRequest {
+  bool if_idle = 1;
+}
+
+message ShutdownResponse {}
 
 // ---------------------------------------------------------------------------
 // Terminals

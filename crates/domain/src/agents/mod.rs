@@ -18,6 +18,5 @@ pub use ports::{AgentStore, ProgramLocator, StoredProvider};
 pub use presets::{AgentPreset, PRESETS};
 pub use provider::{AgentProvider, PromptStyle};
 pub use session::{
-    AgentContext, AgentEvent, AgentEventKind, AgentSession, AgentSessionId, AgentState,
-    ContextKind,
+    AgentContext, AgentEvent, AgentEventKind, AgentSession, AgentSessionId, AgentState, ContextKind,
 };

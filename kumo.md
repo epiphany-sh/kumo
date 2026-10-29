@@ -128,6 +128,7 @@ El daemon **ejecuta comandos**, así que tiene que estar cerrado:
 - **Una sola instancia**: al arrancar, si el archivo existe y el `Hello` responde, salir con "ya está corriendo".
 - **Handshake de versión**: el `Hello` devuelve `api_version`; la UI se niega a operar si no coincide y ofrece reiniciar el daemon.
 - La UI lanza el daemon como proceso hijo desacoplado (que sobreviva a la UI), espera al archivo, se conecta y reintenta con backoff si se cae.
+- **Actualizaciones**: un update reemplaza el bundle, pero el daemon que ya corría sigue con el programa viejo. El `Hello` responde `outdated` cuando el archivo del programa cambió desde que arrancó. Si no hay terminales corriendo, la UI lo reinicia sola (`Shutdown` con `if_idle`, que el daemon rechaza si en el medio se abrió una); si hay, espera a que termine la última, y la barra de estado ofrece reiniciar ya cerrándolas.
 
 ---
 

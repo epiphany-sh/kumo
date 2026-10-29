@@ -96,12 +96,14 @@ class HelloResponse extends $pb.GeneratedMessage {
     $core.int? serverApiVersion,
     $core.String? serverVersion,
     $fixnum.Int64? serverTimeUnixNanos,
+    $core.bool? outdated,
   }) {
     final result = HelloResponse._();
     if (serverApiVersion != null) result.serverApiVersion = serverApiVersion;
     if (serverVersion != null) result.serverVersion = serverVersion;
     if (serverTimeUnixNanos != null)
       result.serverTimeUnixNanos = serverTimeUnixNanos;
+    if (outdated != null) result.outdated = outdated;
     return result;
   }
 
@@ -124,6 +126,7 @@ class HelloResponse extends $pb.GeneratedMessage {
     ..a<$fixnum.Int64>(
         3, _omitFieldNames ? '' : 'serverTimeUnixNanos', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOB(4, _omitFieldNames ? '' : 'outdated')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -174,6 +177,115 @@ class HelloResponse extends $pb.GeneratedMessage {
   $core.bool hasServerTimeUnixNanos() => $_has(2);
   @$pb.TagNumber(3)
   void clearServerTimeUnixNanos() => $_clearField(3);
+
+  /// The daemon's program was replaced on disk (an update or a rebuild):
+  /// restarting it runs the new one.
+  @$pb.TagNumber(4)
+  $core.bool get outdated => $_getBF(3);
+  @$pb.TagNumber(4)
+  set outdated($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasOutdated() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearOutdated() => $_clearField(4);
+}
+
+class ShutdownRequest extends $pb.GeneratedMessage {
+  factory ShutdownRequest({
+    $core.bool? ifIdle,
+  }) {
+    final result = ShutdownRequest._();
+    if (ifIdle != null) result.ifIdle = ifIdle;
+    return result;
+  }
+
+  ShutdownRequest._();
+
+  factory ShutdownRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ShutdownRequest()..mergeFromBuffer(data, registry);
+  factory ShutdownRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ShutdownRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ShutdownRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ShutdownRequest.$_createMessage)
+    ..aOB(1, _omitFieldNames ? '' : 'ifIdle')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ShutdownRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ShutdownRequest copyWith(void Function(ShutdownRequest) updates) =>
+      super.copyWith((message) => updates(message as ShutdownRequest))
+          as ShutdownRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ShutdownRequest() / ShutdownRequest.new instead')
+  static ShutdownRequest create() => ShutdownRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ShutdownRequest._();
+  @$core.override
+  ShutdownRequest createEmptyInstance() => ShutdownRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ShutdownRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ShutdownRequest>(
+          ShutdownRequest.$_createMessage);
+  static ShutdownRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get ifIdle => $_getBF(0);
+  @$pb.TagNumber(1)
+  set ifIdle($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasIfIdle() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIfIdle() => $_clearField(1);
+}
+
+class ShutdownResponse extends $pb.GeneratedMessage {
+  factory ShutdownResponse() => ShutdownResponse._();
+
+  ShutdownResponse._();
+
+  factory ShutdownResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ShutdownResponse()..mergeFromBuffer(data, registry);
+  factory ShutdownResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ShutdownResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ShutdownResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ShutdownResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ShutdownResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ShutdownResponse copyWith(void Function(ShutdownResponse) updates) =>
+      super.copyWith((message) => updates(message as ShutdownResponse))
+          as ShutdownResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ShutdownResponse() / ShutdownResponse.new instead')
+  static ShutdownResponse create() => ShutdownResponse._();
+  static $pb.GeneratedMessage $_createMessage() => ShutdownResponse._();
+  @$core.override
+  ShutdownResponse createEmptyInstance() => ShutdownResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ShutdownResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ShutdownResponse>(
+          ShutdownResponse.$_createMessage);
+  static ShutdownResponse? _defaultInstance;
 }
 
 class OpenRequest extends $pb.GeneratedMessage {

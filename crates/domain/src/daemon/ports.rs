@@ -10,3 +10,10 @@ pub trait DiscoveryStore: Send + Sync {
     /// Removing a missing record is not an error.
     fn remove(&self) -> Result<(), DaemonError>;
 }
+
+/// The daemon's own program file.
+pub trait Executable: Send + Sync {
+    /// Whether the file changed since the daemon started (an update or a
+    /// rebuild): a restart would run another program.
+    fn replaced(&self) -> bool;
+}

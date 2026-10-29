@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use kumo_application::agents::AgentService;
 use kumo_application::changes::ChangesService;
-use kumo_application::daemon::HelloService;
+use kumo_application::daemon::{DaemonControl, HelloService};
 use kumo_application::docs::DocsService;
 use kumo_application::pipelines::PipelinesService;
 use kumo_application::pulls::PullRequestService;
@@ -40,6 +40,7 @@ use crate::services::{
 #[derive(Debug, Clone)]
 pub struct Services {
     pub hello: HelloService,
+    pub control: DaemonControl,
     pub terminals: Arc<TerminalService>,
     pub workspace: Arc<WorkspaceService>,
     pub changes: Arc<ChangesService>,
@@ -96,7 +97,7 @@ impl GrpcServer {
         let incoming = TcpIncoming::from(self.listener).with_nodelay(Some(true));
         Server::builder()
             .add_service(CoreServer::with_interceptor(
-                CoreGrpc::new(self.services.hello),
+                CoreGrpc::new(self.services.hello, self.services.control),
                 auth.clone(),
             ))
             .add_service(TerminalsServer::with_interceptor(

@@ -1339,10 +1339,46 @@ class _EngineStatus extends StatelessWidget {
     return ListenableBuilder(
       listenable: engine,
       builder: (context, _) => switch (engine.status) {
+        _ when engine.restarting => StatusText('kumod updating…', color: c.acc, dot: true),
+        EngineStatus.ready when engine.outdated => _UpdateReady(engine: engine),
         EngineStatus.ready => StatusText('kumod ${engine.current?.serverVersion ?? ''}', color: c.ok, dot: true),
         EngineStatus.connecting => StatusText('kumod starting…', color: c.text3, dot: true),
         EngineStatus.failed => Tooltip(message: engine.error ?? '', child: StatusText('kumod offline', color: c.err, dot: true)),
       },
+    );
+  }
+}
+
+/// The daemon runs an old program while terminals keep it busy: it restarts
+/// on its own when the last one ends, or now from here.
+class _UpdateReady extends StatelessWidget {
+  const _UpdateReady({required this.engine});
+  final KumoEngine engine;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final n = engine.runningInOutdated;
+    return KPressable(
+      semanticLabel: 'kumod update ready',
+      tooltip: 'kumod was updated. It restarts when no terminal is running.',
+      onTap: () => showKMenu(
+        context,
+        position: belowOf(context, right: false),
+        builder: (context, close) => KMenuPanel(width: 280, children: [
+          KMenuItem(
+            icon: KIcons.refresh,
+            label: 'Restart kumod now',
+            note: n == 0 ? 'No terminal is running.' : 'Closes $n running ${n == 1 ? 'terminal' : 'terminals'}. Otherwise it restarts when the last one ends.',
+            danger: n > 0,
+            onTap: () {
+              close();
+              engine.restartDaemon(force: true);
+            },
+          ),
+        ]),
+      ),
+      builder: (context, hover, focus) => StatusText('kumod update ready', color: hover || focus ? c.text : c.acc, dot: true),
     );
   }
 }

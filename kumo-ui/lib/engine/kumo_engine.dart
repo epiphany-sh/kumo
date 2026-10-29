@@ -14,7 +14,7 @@ enum EngineStatus { connecting, ready, failed }
 
 /// An authenticated connection to `kumod`.
 class EngineConnection {
-  EngineConnection._(this.channel, this.endpoint, this.serverVersion, CallOptions auth)
+  EngineConnection._(this.channel, this.endpoint, this.serverVersion, CallOptions auth, {this.outdated = false})
       : core = CoreClient(channel, options: auth),
         terminals = TerminalsClient(channel, options: auth),
         workspace = WorkspaceClient(channel, options: auth),
@@ -29,6 +29,10 @@ class EngineConnection {
   final ClientChannel channel;
   final DaemonEndpoint endpoint;
   final String serverVersion;
+
+  /// The daemon's program was replaced on disk (an update or a rebuild):
+  /// it runs the old one until restarted.
+  final bool outdated;
   final CoreClient core;
   final TerminalsClient terminals;
   final WorkspaceClient workspace;
@@ -57,6 +61,19 @@ class KumoEngine extends ChangeNotifier {
 
   EngineConnection? _connection;
   EngineConnection? get current => _connection;
+
+  /// The daemon runs an old program (see [EngineConnection.outdated]). It
+  /// restarts on its own once no terminal runs; [restartDaemon] does it now.
+  bool get outdated => _connection?.outdated ?? false;
+
+  /// Terminals running in an [outdated] daemon: they end with it.
+  int get runningInOutdated => _running;
+  int _running = 0;
+
+  /// The daemon is restarting: its streams end, and that's no error.
+  bool get restarting => _restarting;
+  bool _restarting = false;
+  Timer? _idleCheck;
 
   Future<EngineConnection>? _connecting;
 
@@ -93,6 +110,7 @@ class KumoEngine extends ChangeNotifier {
   EngineConnection _ready(EngineConnection connection, Stopwatch started, {required bool launched}) {
     _connection = connection;
     _error = null;
+    if (connection.outdated) _watchIdle();
     debugPrint('kumo: connected to kumod ${connection.serverVersion} at '
         '${connection.endpoint.host}:${connection.endpoint.port} '
         '(${launched ? 'launched' : 'already running'}, ${started.elapsedMilliseconds} ms)');
@@ -115,7 +133,7 @@ class KumoEngine extends ChangeNotifier {
       if (hello.serverApiVersion != kApiVersion) {
         throw StateError('kumod speaks API v${hello.serverApiVersion}, this UI needs v$kApiVersion. Restart the daemon.');
       }
-      return EngineConnection._(channel, endpoint, hello.serverVersion, auth);
+      return EngineConnection._(channel, endpoint, hello.serverVersion, auth, outdated: hello.outdated);
     } on Object {
       await channel.shutdown();
       rethrow;
@@ -129,6 +147,69 @@ class KumoEngine extends ChangeNotifier {
     return [for (final t in list.terminals) if (!t.exited) t];
   }
 
+  /// Checks every few seconds whether the outdated daemon is idle, and
+  /// restarts it then.
+  void _watchIdle() {
+    _idleCheck?.cancel();
+    _idleCheck = Timer.periodic(const Duration(seconds: 3), (_) => _restartIfIdle());
+    _restartIfIdle();
+  }
+
+  Future<void> _restartIfIdle() async {
+    final conn = _connection;
+    if (conn == null || !conn.outdated || _restarting) return;
+    try {
+      final running = (await runningTerminals()).length;
+      if (running != _running) {
+        _running = running;
+        notifyListeners();
+      }
+      if (running == 0) await restartDaemon();
+    } on Object catch (e) {
+      debugPrint('kumo: checking the outdated daemon failed: $e');
+    }
+  }
+
+  /// Stops the daemon and starts the new program in its place. [force]
+  /// ends its running terminals; without it the daemon refuses while one
+  /// runs. Calls for the connection meanwhile get the new daemon's.
+  Future<void> restartDaemon({bool force = false}) async {
+    final old = _connection;
+    if (old == null || _restarting) return;
+    _restarting = true;
+    _idleCheck?.cancel();
+    _connection = null;
+    _set(EngineStatus.connecting);
+    final restarted = _restart(old, force);
+    _connecting = restarted.whenComplete(() => _connecting = null);
+    try {
+      await _connecting;
+    } on Object {
+      // Reported through [status] and [error].
+    } finally {
+      _restarting = false;
+      notifyListeners();
+    }
+  }
+
+  Future<EngineConnection> _restart(EngineConnection old, bool force) async {
+    try {
+      await old.core.shutdown(ShutdownRequest(ifIdle: !force));
+    } on GrpcError catch (e) {
+      if (e.code != StatusCode.failedPrecondition) rethrow;
+      // A terminal started since we looked: keep the daemon, look again.
+      _connection = old;
+      _set(EngineStatus.ready);
+      _watchIdle();
+      return old;
+    }
+    debugPrint('kumo: restarting kumod ${old.serverVersion} (pid ${old.endpoint.pid}) to run its update');
+    await old.channel.shutdown();
+    await discovery.waitGone(old.endpoint.pid);
+    _running = 0;
+    return _connect();
+  }
+
   void _set(EngineStatus status) {
     _status = status;
     notifyListeners();
@@ -136,6 +217,7 @@ class KumoEngine extends ChangeNotifier {
 
   @override
   void dispose() {
+    _idleCheck?.cancel();
     _connection?.channel.shutdown();
     super.dispose();
   }

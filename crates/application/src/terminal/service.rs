@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use kumo_domain::terminal::{LaunchSpec, PtySystem, TerminalError, TerminalId, TerminalInfo};
+use kumo_domain::terminal::{
+    LaunchSpec, PtySystem, TerminalError, TerminalId, TerminalInfo, TerminalStatus,
+};
 
 use super::registry::SessionRegistry;
 use super::{SessionConfig, Subscription, TerminalSession};
@@ -67,6 +69,15 @@ impl TerminalService {
         let mut infos: Vec<_> = self.registry.all().iter().map(|s| s.info()).collect();
         infos.sort_by_key(|info| info.opened_at);
         infos
+    }
+
+    /// Sessions whose process is still alive.
+    pub fn running(&self) -> usize {
+        self.registry
+            .all()
+            .iter()
+            .filter(|s| matches!(s.info().status, TerminalStatus::Running))
+            .count()
     }
 
     /// Kills every session. Used when the daemon shuts down.

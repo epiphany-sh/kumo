@@ -15,6 +15,7 @@ pub mod agents;
 pub mod ci;
 pub mod discovery;
 pub mod docs;
+pub mod executable;
 pub mod fs;
 pub mod git;
 pub mod pty;

@@ -46,7 +46,8 @@ class EngineAgentsSource extends AgentsSource {
         }
       } on Object catch (e) {
         if (_disposed) return;
-        _fail(e);
+        // A restarting daemon ends every stream; the next one reconnects.
+        if (!_engine.restarting) _fail(e);
       }
       await Future<void>.delayed(const Duration(seconds: 2));
     }

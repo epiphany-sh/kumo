@@ -430,6 +430,7 @@ const HelloResponse$json = {
       '5': 4,
       '10': 'serverTimeUnixNanos'
     },
+    {'1': 'outdated', '3': 4, '4': 1, '5': 8, '10': 'outdated'},
   ],
 };
 
@@ -437,7 +438,29 @@ const HelloResponse$json = {
 final $typed_data.Uint8List helloResponseDescriptor = $convert.base64Decode(
     'Cg1IZWxsb1Jlc3BvbnNlEiwKEnNlcnZlcl9hcGlfdmVyc2lvbhgBIAEoDVIQc2VydmVyQXBpVm'
     'Vyc2lvbhIlCg5zZXJ2ZXJfdmVyc2lvbhgCIAEoCVINc2VydmVyVmVyc2lvbhIzChZzZXJ2ZXJf'
-    'dGltZV91bml4X25hbm9zGAMgASgEUhNzZXJ2ZXJUaW1lVW5peE5hbm9z');
+    'dGltZV91bml4X25hbm9zGAMgASgEUhNzZXJ2ZXJUaW1lVW5peE5hbm9zEhoKCG91dGRhdGVkGA'
+    'QgASgIUghvdXRkYXRlZA==');
+
+@$core.Deprecated('Use shutdownRequestDescriptor instead')
+const ShutdownRequest$json = {
+  '1': 'ShutdownRequest',
+  '2': [
+    {'1': 'if_idle', '3': 1, '4': 1, '5': 8, '10': 'ifIdle'},
+  ],
+};
+
+/// Descriptor for `ShutdownRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List shutdownRequestDescriptor = $convert
+    .base64Decode('Cg9TaHV0ZG93blJlcXVlc3QSFwoHaWZfaWRsZRgBIAEoCFIGaWZJZGxl');
+
+@$core.Deprecated('Use shutdownResponseDescriptor instead')
+const ShutdownResponse$json = {
+  '1': 'ShutdownResponse',
+};
+
+/// Descriptor for `ShutdownResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List shutdownResponseDescriptor =
+    $convert.base64Decode('ChBTaHV0ZG93blJlc3BvbnNl');
 
 @$core.Deprecated('Use openRequestDescriptor instead')
 const OpenRequest$json = {

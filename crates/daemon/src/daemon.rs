@@ -1,10 +1,11 @@
 use std::future::Future;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Context;
 use kumo_application::agents::{AgentPorts, AgentService};
 use kumo_application::changes::{ChangesPorts, ChangesService};
-use kumo_application::daemon::HelloService;
+use kumo_application::daemon::{DaemonControl, HelloService};
 use kumo_application::docs::{DocsPorts, DocsService};
 use kumo_application::pipelines::{PipelinesPorts, PipelinesService, PipelinesTiming};
 use kumo_application::pulls::{PullRequestPorts, PullRequestService};
@@ -25,6 +26,7 @@ use kumo_infrastructure::ci::{
 };
 use kumo_infrastructure::discovery::FileDiscoveryStore;
 use kumo_infrastructure::docs::{ConfluenceDocs, VaultDocs};
+use kumo_infrastructure::executable::ProgramFile;
 use kumo_infrastructure::fs::{LocalFileStore, LocalProjectReader};
 use kumo_infrastructure::git::{FsRepoFinder, GitCli};
 use kumo_infrastructure::pty::PortablePtySystem;
@@ -46,8 +48,12 @@ pub struct Daemon {
     endpoint: DaemonEndpoint,
     discovery: FileDiscoveryStore,
     terminals: Arc<TerminalService>,
+    control: DaemonControl,
     _lock: InstanceLock,
 }
+
+/// Once stopping, streams still open (a UI watching) get this long to end.
+const STOP_GRACE: Duration = Duration::from_secs(2);
 
 impl Daemon {
     /// Checks for another instance, binds on loopback and writes the
@@ -165,8 +171,10 @@ impl Daemon {
             std::time::Duration::from_secs(60),
         ));
 
+        let control = DaemonControl::new(Arc::clone(&terminals));
         let services = Services {
-            hello: HelloService::new(env!("CARGO_PKG_VERSION")),
+            hello: HelloService::new(env!("CARGO_PKG_VERSION"), Arc::new(ProgramFile::current())),
+            control: control.clone(),
             terminals: Arc::clone(&terminals),
             workspace: Arc::clone(&workspace),
             changes: Arc::new(ChangesService::new(
@@ -217,6 +225,7 @@ impl Daemon {
             endpoint,
             discovery,
             terminals,
+            control,
             _lock: instance,
         })
     }
@@ -225,10 +234,30 @@ impl Daemon {
         &self.endpoint
     }
 
-    /// Serves until `shutdown` resolves, then kills all terminals and
-    /// removes the discovery file.
+    /// Serves until `shutdown` resolves or a client asks it to stop, then
+    /// kills all terminals and removes the discovery file.
     pub async fn run(self, shutdown: impl Future<Output = ()>) -> anyhow::Result<()> {
-        let served = self.server.serve(shutdown).await;
+        let (stopping, stopped) = tokio::sync::oneshot::channel::<()>();
+        let control = self.control.clone();
+        let signal = async move {
+            tokio::select! {
+                () = shutdown => {}
+                () = control.stopped() => {}
+            }
+            let _ = stopping.send(());
+        };
+        let served = tokio::select! {
+            biased;
+            served = self.server.serve(signal) => served,
+            // A client watching keeps its connection open: don't wait forever.
+            () = async {
+                if stopped.await.is_ok() {
+                    tokio::time::sleep(STOP_GRACE).await;
+                } else {
+                    std::future::pending::<()>().await;
+                }
+            } => Ok(()),
+        };
         self.terminals.close_all();
         if let Err(error) = self.discovery.remove() {
             tracing::warn!(%error, "failed to remove discovery file");

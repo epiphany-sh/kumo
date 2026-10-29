@@ -41,12 +41,26 @@ class CoreClient extends $grpc.Client {
     return $createUnaryCall(_$hello, request, options: options);
   }
 
+  /// Stops the daemon; its terminals end with it. With `if_idle`, refused
+  /// (FAILED_PRECONDITION) while a terminal is running.
+  $grpc.ResponseFuture<$0.ShutdownResponse> shutdown(
+    $0.ShutdownRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$shutdown, request, options: options);
+  }
+
   // method descriptors
 
   static final _$hello = $grpc.ClientMethod<$0.HelloRequest, $0.HelloResponse>(
       '/kumo.v1.Core/Hello',
       ($0.HelloRequest value) => value.writeToBuffer(),
       $0.HelloResponse.fromBuffer);
+  static final _$shutdown =
+      $grpc.ClientMethod<$0.ShutdownRequest, $0.ShutdownResponse>(
+          '/kumo.v1.Core/Shutdown',
+          ($0.ShutdownRequest value) => value.writeToBuffer(),
+          $0.ShutdownResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Core')
@@ -61,6 +75,13 @@ abstract class CoreServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.HelloRequest.fromBuffer(value),
         ($0.HelloResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ShutdownRequest, $0.ShutdownResponse>(
+        'Shutdown',
+        shutdown_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.ShutdownRequest.fromBuffer(value),
+        ($0.ShutdownResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.HelloResponse> hello_Pre(
@@ -70,6 +91,14 @@ abstract class CoreServiceBase extends $grpc.Service {
 
   $async.Future<$0.HelloResponse> hello(
       $grpc.ServiceCall call, $0.HelloRequest request);
+
+  $async.Future<$0.ShutdownResponse> shutdown_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ShutdownRequest> $request) async {
+    return shutdown($call, await $request);
+  }
+
+  $async.Future<$0.ShutdownResponse> shutdown(
+      $grpc.ServiceCall call, $0.ShutdownRequest request);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Terminals')

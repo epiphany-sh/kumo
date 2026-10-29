@@ -13,4 +13,4 @@ pub use auth_token::AuthToken;
 pub use endpoint::DaemonEndpoint;
 pub use error::DaemonError;
 pub use listen_address::ListenAddress;
-pub use ports::DiscoveryStore;
+pub use ports::{DiscoveryStore, Executable};

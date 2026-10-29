@@ -988,6 +988,7 @@ dependencies = [
  "bytes",
  "futures",
  "kumo-domain",
+ "thiserror 2.0.21",
  "tokio",
  "tokio-stream",
  "tracing",
