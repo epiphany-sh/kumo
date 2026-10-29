@@ -52,6 +52,8 @@ async fn second_instance_refuses_to_start() {
     );
 }
 
+// Needs a running terminal (`/bin/sh`), like the other terminal tests.
+#[cfg(unix)]
 #[tokio::test(flavor = "multi_thread")]
 async fn shutdown_stops_an_idle_daemon_and_refuses_a_busy_one() {
     let data_dir = tempfile::tempdir().unwrap();
