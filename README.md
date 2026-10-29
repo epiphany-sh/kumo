@@ -4,6 +4,16 @@ App de escritorio para orquestar agentes de IA que programan. Este repo tiene
 el **engine** (daemon `kumod`, en Rust) y la UI (`kumo-ui/`, Flutter).
 El brief completo está en [`kumo.md`](kumo.md).
 
+## Instalar
+
+```bash
+curl -fsSL https://github.com/epiphany-sh/kumo/releases/latest/download/install.sh | sh
+```
+
+O con Homebrew: `brew install epiphany-sh/kumo/kumo`. Después Kumo se
+actualiza solo (Sparkle). Cómo se publica una versión:
+[`docs/releasing.md`](docs/releasing.md).
+
 ## Requisitos
 
 - Rust **1.99** (fijado en `rust-toolchain.toml`; `rustup` lo instala solo).
@@ -28,6 +38,7 @@ descubre el daemon por `daemon.json` o lo lanza desacoplado si no está corriend
 | `make test` / `make check` | Tests y lints de Rust y Flutter |
 | `make bench` | Benchmarks del daemon |
 | `make proto` | Regenera el cliente Dart desde `proto/` |
+| `make release VERSION=x.y.z` | Build de release en `dist/`: zip, appcast, `install.sh` y cask |
 
 Qué es real hoy y qué sigue siendo mock:
 

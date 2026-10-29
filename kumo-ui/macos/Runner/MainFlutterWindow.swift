@@ -19,6 +19,8 @@ class MainFlutterWindow: NSWindow {
     self.setFrameAutosaveName(MainFlutterWindow.frameName)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    (NSApp.delegate as? AppDelegate)?.updates.attach(
+      messenger: flutterViewController.engine.binaryMessenger)
 
     super.awakeFromNib()
   }

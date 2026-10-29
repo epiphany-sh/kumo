@@ -13,6 +13,7 @@ import 'engine/engine_tests_source.dart';
 import 'engine/engine_workspace_source.dart';
 import 'engine/engine_worktree_changes.dart';
 import 'engine/kumo_engine.dart';
+import 'platform/updates.dart';
 import 'platform/window_effects.dart';
 
 Future<void> main() async {
@@ -33,6 +34,7 @@ Future<void> main() async {
     ciHosts: EngineCiHostsSource(engine),
     pullRequests: EnginePullRequests(engine),
     docs: EngineDocs(engine),
+    updates: SparkleUpdates(),
   );
   runApp(KumoApp(state: state, engine: engine));
 }

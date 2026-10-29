@@ -14,6 +14,7 @@ import '../data/workspace_source.dart';
 import '../data/worktree_changes.dart';
 import '../data/models.dart';
 import '../editor/file_buffers.dart';
+import '../platform/updates.dart';
 import '../theme/palette.dart';
 import 'preferences.dart';
 
@@ -73,6 +74,7 @@ class AppState extends ChangeNotifier {
     CiHostsSource? ciHosts,
     PullRequestsSource? pullRequests,
     DocsSource? docs,
+    AppUpdates? updates,
   })  : prefs = prefs ?? Preferences.memory(),
         workspace = workspace ?? MockWorkspaceSource(),
         agents = agents ?? MockAgentsSource(),
@@ -83,6 +85,7 @@ class AppState extends ChangeNotifier {
         ciHosts = ciHosts ?? MockCiHostsSource(),
         pullRequests = pullRequests ?? MockPullRequests(),
         docs = docs ?? MockDocsSource(),
+        updates = updates ?? AppUpdates(),
         _mode = mode {
     _changes = changesFor == null ? MockWorktreeChanges() : NoWorktreeChanges();
     _changes.addListener(notifyListeners);
@@ -90,6 +93,7 @@ class AppState extends ChangeNotifier {
     _bindTests();
     this.workspace.addListener(_onWorkspaceChanged);
     this.agents.addListener(notifyListeners);
+    this.updates.addListener(notifyListeners);
     final p = this.prefs;
     final saved = p.get<String>('theme', '');
     for (final m in KumoThemeMode.values) {
@@ -99,6 +103,9 @@ class AppState extends ChangeNotifier {
     _sidePanelRight = p.get<bool>('sidePanel.right', false);
     _sidePanelOpen = p.get<bool>('sidePanel.onLaunch', true);
   }
+
+  /// New versions of Kumo, ready to install.
+  final AppUpdates updates;
 
   /// Persisted user settings. Settings screens read and write through
   /// [setting] / [setSetting]; typed ones also have fields here.
@@ -1218,6 +1225,9 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    updates
+      ..removeListener(notifyListeners)
+      ..dispose();
     agents
       ..removeListener(notifyListeners)
       ..dispose();

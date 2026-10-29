@@ -173,7 +173,11 @@ impl Daemon {
 
         let control = DaemonControl::new(Arc::clone(&terminals));
         let services = Services {
-            hello: HelloService::new(env!("CARGO_PKG_VERSION"), Arc::new(ProgramFile::current())),
+            hello: HelloService::new(
+                // Release builds say which (make release VERSION=…).
+                option_env!("KUMO_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")),
+                Arc::new(ProgramFile::current()),
+            ),
             control: control.clone(),
             terminals: Arc::clone(&terminals),
             workspace: Arc::clone(&workspace),

@@ -1,0 +1,73 @@
+name: release
+
+# A tag vX.Y.Z publishes Kumo X.Y.Z: the GitHub release (zip, appcast,
+# install.sh) and the Homebrew cask. One-time setup: docs/releasing.md.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the build number counts commits
+
+      - run: rustup show active-toolchain
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+
+      - name: Signing identity ("Kumo Development")
+        env:
+          P12: ${{ secrets.KUMO_SIGNING_P12 }}
+          P12_PASSWORD: ${{ secrets.KUMO_SIGNING_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p ci "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p ci "$keychain"
+          security import "$RUNNER_TEMP/signing.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k ci "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/signing.p12"
+
+      - name: Build, sign and package
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          echo "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle-key"
+          SPARKLE_KEY_FILE="$RUNNER_TEMP/sparkle-key" \
+            make release VERSION="${GITHUB_REF_NAME#v}" RELEASE_ORG="${{ github.repository_owner }}"
+          rm "$RUNNER_TEMP/sparkle-key"
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" --title "Kumo $version" --generate-notes \
+            "dist/Kumo-$version.zip" dist/Kumo.zip dist/appcast.xml dist/install.sh
+
+      - name: Homebrew cask
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          tap="${{ github.repository_owner }}/homebrew-kumo"
+          git clone "https://x-access-token:$TAP_TOKEN@github.com/$tap.git" "$RUNNER_TEMP/tap"
+          mkdir -p "$RUNNER_TEMP/tap/Casks"
+          cp dist/kumo.rb "$RUNNER_TEMP/tap/Casks/kumo.rb"
+          cd "$RUNNER_TEMP/tap"
+          git config user.name "kumo release"
+          git config user.email "release@users.noreply.github.com"
+          git add Casks/kumo.rb
+          git commit -m "kumo ${GITHUB_REF_NAME#v}"
+          git push

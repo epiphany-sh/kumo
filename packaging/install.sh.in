@@ -1,0 +1,39 @@
+#!/bin/sh
+# Installs Kumo:
+#
+#   curl -fsSL https://github.com/@RELEASE_REPO@/releases/latest/download/install.sh | sh
+#
+# What curl downloads isn't quarantined, so Kumo opens without Gatekeeper's
+# warning (it isn't notarized). After this, Kumo updates itself.
+set -eu
+
+repo=@RELEASE_REPO@
+app=Kumo.app
+
+if [ "$(uname -s)" != Darwin ]; then
+	echo "Kumo runs on macOS." >&2
+	exit 1
+fi
+
+dest=/Applications
+[ -w "$dest" ] || dest="$HOME/Applications"
+mkdir -p "$dest"
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+echo "Downloading Kumo…"
+curl -fsSL "https://github.com/$repo/releases/latest/download/Kumo.zip" -o "$tmp/Kumo.zip"
+ditto -x -k "$tmp/Kumo.zip" "$tmp"
+
+if pgrep -xq Kumo; then
+	echo "Closing Kumo to replace it (your terminals keep running)…"
+	osascript -e 'quit app "Kumo"' >/dev/null 2>&1 || true
+	sleep 2
+fi
+rm -rf "${dest:?}/$app"
+mv "$tmp/$app" "$dest/"
+xattr -dr com.apple.quarantine "$dest/$app" 2>/dev/null || true
+
+echo "✓ Kumo is in $dest"
+open "$dest/$app"

@@ -60,8 +60,16 @@ class ScreenToolbar extends StatelessWidget {
         Flexible(child: Capsule(child: breadcrumb)),
         const Spacer(),
         const SizedBox(width: 8),
-        SizedBox(width: 300, child: _SearchField(hint: searchHint, shortcut: searchKey)),
+        // An update waiting takes some of the search field's room.
+        SizedBox(width: s.updates.ready == null ? 300 : 220, child: _SearchField(hint: searchHint, shortcut: searchKey)),
         const SizedBox(width: 8),
+        if (s.updates.ready case final version?) ...[
+          Tooltip(
+            message: 'Kumo $version is downloaded. Restart to use it; otherwise it installs when Kumo quits.',
+            child: KButton(label: 'Restart to update', icon: KIcons.download, height: 36, fontSize: 12.5, onTap: s.updates.installAndRelaunch),
+          ),
+          const SizedBox(width: 8),
+        ],
         KIconButton(icon: themeIcon, label: 'Theme: $themeName — click to cycle (⇧⌘L)', onTap: s.cycleTheme, size: 36, filled: true, color: c.text),
         if (primary != null) ...[const SizedBox(width: 8), primary!],
       ]),
