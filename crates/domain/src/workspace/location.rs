@@ -67,9 +67,13 @@ mod tests {
             location.resolve("~/wt/x/y", "x", &branch("y")).unwrap(),
             PathBuf::from("/home/me/wt/x/y")
         );
+        // Absolute on every platform ("/tmp/w" has no drive on Windows).
+        let absolute = std::env::temp_dir().join("w");
         assert_eq!(
-            location.resolve("/tmp/w", "x", &branch("y")).unwrap(),
-            PathBuf::from("/tmp/w")
+            location
+                .resolve(absolute.to_str().unwrap(), "x", &branch("y"))
+                .unwrap(),
+            absolute
         );
         assert!(
             location
