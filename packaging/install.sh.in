@@ -10,8 +10,8 @@ set -eu
 repo=@RELEASE_REPO@
 app=Kumo.app
 
-if [ "$(uname -s)" != Darwin ]; then
-	echo "Kumo runs on macOS." >&2
+if [ "$(uname -s)" != Darwin ] || [ "$(uname -m)" != arm64 ]; then
+	echo "Kumo runs on Macs with Apple Silicon." >&2
 	exit 1
 fi
 

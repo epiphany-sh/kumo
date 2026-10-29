@@ -12,3 +12,7 @@ PRODUCT_BUNDLE_IDENTIFIER = dev.kumo.kumoUi
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 dev.kumo. All rights reserved.
+
+// Apple Silicon only: kumod is built for arm64 alone, and on an Intel Mac
+// macOS says "not supported" instead of opening an app without its daemon.
+ARCHS = arm64

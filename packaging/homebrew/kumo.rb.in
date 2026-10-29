@@ -9,6 +9,7 @@ cask "kumo" do
   homepage "https://github.com/@RELEASE_REPO@"
 
   auto_updates true
+  depends_on arch: :arm64
   depends_on macos: :monterey
 
   app "Kumo.app"

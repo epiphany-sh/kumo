@@ -6,6 +6,8 @@ El brief completo está en [`kumo.md`](kumo.md).
 
 ## Instalar
 
+En Macs con Apple Silicon y macOS 12 o más:
+
 ```bash
 curl -fsSL https://github.com/epiphany-sh/kumo/releases/latest/download/install.sh | sh
 ```
