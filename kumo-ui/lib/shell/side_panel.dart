@@ -18,6 +18,7 @@ import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/context_menu.dart';
 import '../widgets/controls.dart';
+import '../widgets/file_icon.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
 import 'screen_chrome.dart';
@@ -867,6 +868,7 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
             depth: depth,
             icon: KIcons.folder,
             iconColor: c.text3,
+            image: s.colorFileIcons ? FileIcon(d.key, dir: true, open: open) : null,
             name: name,
             color: tone ?? c.text,
             chevron: open ? KIcons.chevronDown : KIcons.chevronRight,
@@ -893,6 +895,7 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
           depth: depth,
           icon: KIcons.file,
           iconColor: col ?? c.text3,
+          image: s.colorFileIcons ? FileIcon(p) : null,
           name: p.split('/').last,
           color: col ?? c.text,
           kind: k,
@@ -1077,6 +1080,7 @@ class _TreeRow extends StatelessWidget {
     required this.semantic,
     required this.onTap,
     this.onMenu,
+    this.image,
     this.chevron,
     this.dot,
     this.kind,
@@ -1087,6 +1091,9 @@ class _TreeRow extends StatelessWidget {
   final int depth;
   final IconData icon;
   final Color iconColor;
+
+  /// Shown instead of [icon] (the colored file-type icons).
+  final Widget? image;
   final String name;
   final Color color;
   final String semantic;
@@ -1120,7 +1127,7 @@ class _TreeRow extends StatelessWidget {
           child: Row(children: [
             SizedBox(width: 14, child: chevron == null ? null : Icon(chevron, size: 14, color: c.text3)),
             const SizedBox(width: 4),
-            Icon(icon, size: 14, color: iconColor),
+            image ?? Icon(icon, size: 14, color: iconColor),
             const SizedBox(width: 6),
             Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: color))),
             if (dot != null) Dot(dot!, size: 6),

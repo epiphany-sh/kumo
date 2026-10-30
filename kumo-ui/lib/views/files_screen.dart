@@ -11,6 +11,7 @@ import '../shell/screen_chrome.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/controls.dart';
+import '../widgets/file_icon.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
 
@@ -296,6 +297,7 @@ class _FilesScreenState extends State<FilesScreen> {
 
   Widget _explorer(BuildContext context) {
     final c = context.c;
+    final colored = AppScope.of(context).colorFileIcons;
     final rows = <Widget>[];
     void walk(List<TreeNode> nodes, String prefix, int depth) {
       for (final n in nodes) {
@@ -306,9 +308,11 @@ class _FilesScreenState extends State<FilesScreen> {
           final open = _changedOnly || _expanded.contains(path);
           rows.add(_TreeRow(
             depth: depth,
+            path: path,
             name: n.name,
             isDir: true,
             open: open,
+            colored: colored,
             nameColor: agg == null ? c.text : (agg == GitStatus.conflict ? c.err : c.warn),
             dot: agg == null ? null : (agg == GitStatus.conflict ? c.err : c.warn),
             onTap: () => setState(() => open ? _expanded.remove(path) : _expanded.add(path)),
@@ -320,8 +324,10 @@ class _FilesScreenState extends State<FilesScreen> {
           final li = langOf(path);
           rows.add(_TreeRow(
             depth: depth,
+            path: path,
             name: n.name,
             isDir: false,
+            colored: colored,
             badge: li.badge,
             badgeColor: langColor(c, li.lang, li.badge),
             status: s,
@@ -484,7 +490,10 @@ class _FilesScreenState extends State<FilesScreen> {
             builder: (context, hover, focus) => Padding(
               padding: const EdgeInsets.fromLTRB(9, 0, 4, 0),
               child: Row(children: [
-                Text(li.badge, style: mono(8.5, weight: FontWeight.w700, color: langColor(c, li.lang, li.badge))),
+                if (AppScope.of(context).colorFileIcons)
+                  FileIcon(path, size: 14)
+                else
+                  Text(li.badge, style: mono(8.5, weight: FontWeight.w700, color: langColor(c, li.lang, li.badge))),
                 const SizedBox(width: 7),
                 Text(name, style: sans(12, weight: FontWeight.w500, color: sel ? c.text : c.text2).copyWith(decoration: s == GitStatus.deleted ? TextDecoration.lineThrough : null)),
                 if (s != null) ...[const SizedBox(width: 6), Text(s.letter, style: mono(10.5, weight: FontWeight.w700, color: gitColor(c, s)))],
@@ -733,7 +742,12 @@ class _FilesScreenState extends State<FilesScreen> {
               padding: const EdgeInsets.only(left: 6, right: 4),
               decoration: BoxDecoration(color: hover ? c.tile : null, borderRadius: BorderRadius.circular(8)),
               child: Row(children: [
-                SizedBox(width: 22, child: Text(li.badge, textAlign: TextAlign.center, style: mono(8.5, weight: FontWeight.w700, color: langColor(c, li.lang, li.badge)))),
+                SizedBox(
+                  width: 22,
+                  child: AppScope.of(context).colorFileIcons
+                      ? Center(child: FileIcon(path, size: 15))
+                      : Text(li.badge, textAlign: TextAlign.center, style: mono(8.5, weight: FontWeight.w700, color: langColor(c, li.lang, li.badge))),
+                ),
                 const SizedBox(width: 6),
                 Flexible(
                   flex: 2,
@@ -770,10 +784,12 @@ class _FilesScreenState extends State<FilesScreen> {
 class _TreeRow extends StatelessWidget {
   const _TreeRow({
     required this.depth,
+    required this.path,
     required this.name,
     required this.isDir,
     required this.nameColor,
     required this.onTap,
+    this.colored = false,
     this.open = false,
     this.badge,
     this.badgeColor,
@@ -783,8 +799,12 @@ class _TreeRow extends StatelessWidget {
   });
 
   final int depth;
+  final String path;
   final String name;
   final bool isDir;
+
+  /// Material Icon Theme icons instead of the gray folder and the badge.
+  final bool colored;
   final bool open;
   final String? badge;
   final Color? badgeColor;
@@ -804,7 +824,7 @@ class _TreeRow extends StatelessWidget {
       builder: (context, hover, focus) => Container(
         height: 26,
         margin: const EdgeInsets.only(bottom: 1),
-        padding: EdgeInsets.only(left: 6.0 + depth * 14 + (isDir ? 0 : 4), right: 8),
+        padding: EdgeInsets.only(left: 6.0 + depth * 14 + (isDir || colored ? 0 : 4), right: 8),
         decoration: selected
             ? chipDecoration(c, radius: 8, fill: c.navActive)
             : BoxDecoration(color: hover ? c.tile : null, borderRadius: BorderRadius.circular(8)),
@@ -812,7 +832,11 @@ class _TreeRow extends StatelessWidget {
           if (isDir) ...[
             Icon(open ? KIcons.chevronDown : KIcons.chevronRight, size: 14, color: c.text3),
             const SizedBox(width: 2),
-            Icon(open ? KIcons.folderOpen : KIcons.folder, size: 15, color: c.text3),
+            colored ? FileIcon(path, dir: true, open: open) : Icon(open ? KIcons.folderOpen : KIcons.folder, size: 15, color: c.text3),
+          ] else if (colored) ...[
+            // Lined up under the folder icons, past the chevron's slot.
+            const SizedBox(width: 16),
+            FileIcon(path),
           ] else
             SizedBox(width: 22, child: Text(badge ?? '', textAlign: TextAlign.center, style: mono(8.5, weight: FontWeight.w700, color: badgeColor ?? c.text3))),
           const SizedBox(width: 6),

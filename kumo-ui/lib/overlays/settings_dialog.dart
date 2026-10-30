@@ -215,6 +215,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
               onChanged: (_) => s.toggleDemoWallpaper(),
             ),
           ]),
+          ('Files', [
+            _SegRow(
+              label: 'File icons',
+              desc: 'Colored per file type (Material Icon Theme), or plain gray.',
+              options: const ['Colored', 'Simple'],
+              value: s.colorFileIcons ? 'Colored' : 'Simple',
+              onChanged: (v) => s.colorFileIcons = v == 'Colored',
+            ),
+          ]),
         ]);
       case SettingsTab.terminal:
         return _Page('Terminal', 'Shell, font and keyboard behaviour of every terminal pane.', sections: [

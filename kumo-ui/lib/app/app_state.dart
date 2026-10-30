@@ -475,6 +475,10 @@ class AppState extends ChangeNotifier {
   /// Whether the side panel starts open (it can always be toggled, ⌥⌘B).
   bool get sidePanelOnLaunch => prefs.get<bool>('sidePanel.onLaunch', true);
   set sidePanelOnLaunch(bool v) => setSetting('sidePanel.onLaunch', v);
+
+  /// Colored icons per file type in file trees; off keeps them plain gray.
+  bool get colorFileIcons => prefs.get<bool>('files.colorIcons', true);
+  set colorFileIcons(bool v) => setSetting('files.colorIcons', v);
   void toggleSidePanel() {
     _sidePanelOpen = !_sidePanelOpen;
     notifyListeners();
