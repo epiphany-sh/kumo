@@ -392,16 +392,11 @@ mod tests {
     fn quotes_paths_for_the_shell() {
         assert_eq!(sh_quote("/a b/c"), "'/a b/c'");
         assert_eq!(sh_quote("it's"), r"'it'\''s'");
-        let hook = hook_command(
-            Path::new("/Users/me/Application Support/kumo/agents/x"),
-            None,
-        );
-        assert!(
-            hook.contains(
-                "> '/Users/me/Application Support/kumo/agents/x/status.json.tmp' && mv -f"
-            ),
-            "{hook}"
-        );
+        let dir = Path::new("/Users/me/Application Support/kumo/agents/x");
+        let hook = hook_command(dir, None);
+        // Joined as the platform joins paths.
+        let tmp = dir.join("status.json.tmp").display().to_string();
+        assert!(hook.contains(&format!("> '{tmp}' && mv -f")), "{hook}");
     }
 
     /// Runs `command` in sh with `input` on stdin, as Claude Code does.
