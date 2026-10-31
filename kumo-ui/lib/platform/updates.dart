@@ -9,15 +9,23 @@ class AppUpdates extends ChangeNotifier {
 
   /// Quits, installs [ready] and opens it.
   Future<void> installAndRelaunch() async {}
+
+  /// Quits and opens Kumo again, with a fresh daemon.
+  Future<void> relaunch() async {}
 }
 
 /// Sparkle, in the macOS runner (`AppDelegate.swift`): release builds check
 /// and download in the background, and an update ready to install shows
 /// here. Nobody clicks? It installs when Kumo quits.
+///
+/// [stopDaemon] runs before Kumo quits: the daemon outlives the UI, so
+/// without it the relaunched Kumo would find the old `kumod` still running.
 class SparkleUpdates extends AppUpdates {
-  SparkleUpdates() {
+  SparkleUpdates({this.stopDaemon}) {
     _channel.setMethodCallHandler(_onCall);
   }
+
+  final Future<void> Function()? stopDaemon;
 
   static const _channel = MethodChannel('kumo/updates');
   String? _ready;
@@ -34,9 +42,15 @@ class SparkleUpdates extends AppUpdates {
   }
 
   @override
-  Future<void> installAndRelaunch() async {
+  Future<void> installAndRelaunch() => _quitFor('install');
+
+  @override
+  Future<void> relaunch() => _quitFor('relaunch');
+
+  Future<void> _quitFor(String method) async {
+    await stopDaemon?.call();
     try {
-      await _channel.invokeMethod<void>('install');
+      await _channel.invokeMethod<void>(method);
     } on MissingPluginException {
       // Not the macOS runner.
     }

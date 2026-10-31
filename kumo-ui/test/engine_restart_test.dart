@@ -92,4 +92,23 @@ void main() {
     expect(after.outdated, isFalse);
     expect(await second.runningTerminals(), isEmpty);
   }, skip: skip);
+
+  test('before Kumo quits for an update, the daemon stops for good: the next Kumo starts the new one', () async {
+    final first = engine();
+    final before = await first.connection();
+    await before.terminals.open(OpenRequest(program: '/bin/sh', args: ['-c', 'sleep 30']));
+
+    await first.stopForUpdate();
+    expect(await discovery.read(), isNull, reason: 'kumod is gone, its terminal too');
+    await expectLater(first.connection(), throwsStateError, reason: 'nothing launches the old program again');
+    expect(await discovery.read(), isNull);
+    first.dispose();
+
+    _replace(program);
+    final next = engine();
+    addTearDown(next.dispose);
+    final conn = await next.connection();
+    expect(conn.endpoint.pid, isNot(before.endpoint.pid));
+    expect(conn.outdated, isFalse, reason: 'no restart left to do');
+  }, skip: skip);
 }

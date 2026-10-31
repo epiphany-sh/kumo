@@ -63,7 +63,12 @@ final class Updates: NSObject, SPUUpdaterDelegate {
     channel.setMethodCallHandler { [weak self] call, result in
       switch call.method {
       case "install":
-        self?.installNow?()
+        // The Flutter side stopped kumod already: with no update waiting,
+        // still come back rather than stay without a daemon.
+        if let install = self?.installNow { install() } else { Updates.relaunch() }
+        result(nil)
+      case "relaunch":
+        Updates.relaunch()
         result(nil)
       case "check":
         self?.controller?.checkForUpdates(nil)
@@ -76,6 +81,24 @@ final class Updates: NSObject, SPUUpdaterDelegate {
     if let version = readyVersion {
       channel.invokeMethod("ready", arguments: version)
     }
+  }
+
+  /// Quits and opens this bundle again once this process is gone (two copies
+  /// of Kumo never run at once).
+  static func relaunch() {
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/bin/sh")
+    task.arguments = [
+      "-c", "while kill -0 \"$0\" 2>/dev/null; do sleep 0.1; done; /usr/bin/open \"$1\"",
+      String(ProcessInfo.processInfo.processIdentifier), Bundle.main.bundlePath,
+    ]
+    do {
+      try task.run()
+    } catch {
+      NSLog("Kumo: relaunch failed: %@", error.localizedDescription)
+      return
+    }
+    NSApp.terminate(nil)
   }
 
   func updater(

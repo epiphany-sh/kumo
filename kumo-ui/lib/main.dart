@@ -37,7 +37,7 @@ Future<void> main() async {
     ciHosts: EngineCiHostsSource(engine),
     pullRequests: EnginePullRequests(engine),
     docs: EngineDocs(engine),
-    updates: SparkleUpdates(),
+    updates: SparkleUpdates(stopDaemon: engine.stopForUpdate),
   );
   runApp(KumoApp(state: state, engine: engine));
 }
