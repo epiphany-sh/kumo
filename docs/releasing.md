@@ -70,6 +70,8 @@ El número lo calcula `packaging/next-version.sh`:
   `0.1.1` → `0.1.2`…
 - Para pasar a `0.2`, cambiá esa versión a `0.2.0` en un PR: el merge
   publica `0.2.0`.
+- Nunca baja: si hay un tag más alto que `Cargo.toml` (uno hecho a mano),
+  sigue desde ese. Con `v0.2.0` y `Cargo.toml` en `0.1.0`, sale `0.2.1`.
 
 Los releases van de a uno. Si entran varios merges mientras uno se publica,
 sale uno solo con todos. Si el build falla, no queda tag y el número se
@@ -81,6 +83,11 @@ vuelve a usar. Un commit que ya tiene tag no se publica de nuevo.
 git tag v0.2.0
 git push origin v0.2.0
 ```
+
+También se puede crear el release desde la web de GitHub: el workflow le
+sube los archivos (zip, appcast, `install.sh`) y actualiza el cask. Mientras
+corre (unos minutos), ese release queda como "Latest" sin appcast, y las apps
+instaladas no encuentran updates hasta que termina.
 
 El número de build (`CFBundleVersion`, lo que compara Sparkle) es la cantidad
 de commits: siempre crece.
