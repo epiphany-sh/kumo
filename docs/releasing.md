@@ -58,15 +58,32 @@ se reemplazan solos por la versión publicada.
 
 ## Publicar una versión
 
+**Sola, en cada merge a `main`.** Cuando el workflow `ci` termina en verde
+sobre `main`, el workflow `release` publica la versión siguiente: buildea,
+firma, arma el zip, el appcast y el `install.sh`, crea el release (y su tag)
+en GitHub y actualiza el cask del tap.
+
+El número lo calcula `packaging/next-version.sh`:
+
+- `MAJOR.MINOR` sale de `version` en `[workspace.package]` de `Cargo.toml`.
+- El patch es el siguiente al tag `vMAJOR.MINOR.*` más alto: `v0.1.0` →
+  `0.1.1` → `0.1.2`…
+- Para pasar a `0.2`, cambiá esa versión a `0.2.0` en un PR: el merge
+  publica `0.2.0`.
+
+Los releases van de a uno. Si entran varios merges mientras uno se publica,
+sale uno solo con todos. Si el build falla, no queda tag y el número se
+vuelve a usar. Un commit que ya tiene tag no se publica de nuevo.
+
+**A mano**, con el número que quieras:
+
 ```bash
 git tag v0.2.0
 git push origin v0.2.0
 ```
 
-El workflow `release` buildea, firma, arma el zip, el appcast y el
-`install.sh`, crea el release en GitHub y actualiza el cask del tap. El
-número de build (`CFBundleVersion`, lo que compara Sparkle) es la cantidad de
-commits: siempre crece.
+El número de build (`CFBundleVersion`, lo que compara Sparkle) es la cantidad
+de commits: siempre crece.
 
 Para probarlo local sin publicar: `make release VERSION=0.2.0` deja todo en
 `dist/` (firma el appcast con la clave de tu Keychain).
