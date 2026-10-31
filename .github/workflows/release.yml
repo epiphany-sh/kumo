@@ -1,21 +1,64 @@
 name: release
 
-# A tag vX.Y.Z publishes Kumo X.Y.Z: the GitHub release (zip, appcast,
-# install.sh) and the Homebrew cask. One-time setup: docs/releasing.md.
+# Publishes Kumo X.Y.Z: the GitHub release (zip, appcast, install.sh) and
+# the Homebrew cask. Every merge to main once `ci` passes on it, numbered by
+# packaging/next-version.sh; or a tag vX.Y.Z pushed by hand. One-time setup:
+# docs/releasing.md.
 
 on:
   push:
     tags: ["v*"]
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: write
 
+# One at a time, so two merges never get the same number. A merge that
+# lands while another waits replaces it: the newest one carries both.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  macos:
-    runs-on: macos-latest
+  version:
+    # A merge to main: only once its tests passed (not for pull requests).
+    if: >-
+      github.event_name == 'push' ||
+      (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      sha: ${{ steps.version.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0 # tags
+      - id: version
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version=$(packaging/next-version.sh HEAD) # empty: already released
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Kumo ${version:-: this commit is already released}"
+
+  macos:
+    needs: version
+    if: needs.version.outputs.version != ''
+    runs-on: macos-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      SHA: ${{ needs.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
           fetch-depth: 0 # the build number counts commits
 
       - run: rustup show active-toolchain
@@ -46,16 +89,18 @@ jobs:
         run: |
           echo "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle-key"
           SPARKLE_KEY_FILE="$RUNNER_TEMP/sparkle-key" \
-            make release VERSION="${GITHUB_REF_NAME#v}" RELEASE_ORG="${{ github.repository_owner }}"
+            make release VERSION="$VERSION" RELEASE_ORG="${{ github.repository_owner }}"
           rm "$RUNNER_TEMP/sparkle-key"
 
+      # Tags the commit (for a merge) only once it's built: a failed build
+      # leaves no tag, and its number is used again. A tag made with this
+      # token doesn't start another run.
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          gh release create "$GITHUB_REF_NAME" --title "Kumo $version" --generate-notes \
-            "dist/Kumo-$version.zip" dist/Kumo.zip dist/appcast.xml dist/install.sh
+          gh release create "v$VERSION" --target "$SHA" --title "Kumo $VERSION" --generate-notes \
+            "dist/Kumo-$VERSION.zip" dist/Kumo.zip dist/appcast.xml dist/install.sh
 
       - name: Homebrew cask
         env:
@@ -69,5 +114,5 @@ jobs:
           git config user.name "kumo release"
           git config user.email "release@users.noreply.github.com"
           git add Casks/kumo.rb
-          git commit -m "kumo ${GITHUB_REF_NAME#v}"
+          git commit -m "kumo $VERSION"
           git push origin HEAD:main
