@@ -6,7 +6,7 @@ use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
-use common::{TIMEOUT, TestDaemon, git_repo, save_namespace, test_config};
+use common::{TIMEOUT, TestDaemon, git, git_repo, save_namespace, test_config};
 use kumo_grpc::client::KumoClient;
 use kumo_proto::v1 as pb;
 
@@ -133,28 +133,39 @@ async fn worktrees_are_created_tracked_and_removed() {
         .unwrap();
     assert_eq!(worktree.status.as_ref().unwrap().changed_files, 1);
 
-    let remove = |force| pb::RemoveWorktreeRequest {
+    let remove = |force, delete_branch| pb::RemoveWorktreeRequest {
         repo_path: root.display().to_string(),
         worktree_path: created.path.clone(),
         force,
+        delete_branch,
     };
     let dirty = client
         .workspace
-        .remove_worktree(remove(false))
+        .remove_worktree(remove(false, true))
         .await
-        .unwrap_err();
+        .unwrap()
+        .into_inner();
     assert_eq!(
-        dirty.code(),
-        tonic::Code::FailedPrecondition,
-        "git refuses to drop changes: {}",
-        dirty.message()
+        (dirty.removed, dirty.changed_files),
+        (false, 1),
+        "git refuses to drop changes"
     );
-    client
+    assert!(expected.exists(), "left as it was");
+    assert!(git(&root, &["branch", "--list", "feat/PRC-1"]).contains("feat/PRC-1"));
+
+    // Forced, with its branch (merged: nothing was committed on it).
+    let removed = client
         .workspace
-        .remove_worktree(remove(true))
+        .remove_worktree(remove(true, true))
         .await
-        .unwrap();
+        .unwrap()
+        .into_inner();
+    assert!(
+        removed.removed && removed.branch_kept.is_empty(),
+        "{removed:?}"
+    );
     assert!(!expected.exists());
+    assert_eq!(git(&root, &["branch", "--list", "feat/PRC-1"]), "");
 
     let main = client
         .workspace
@@ -162,12 +173,56 @@ async fn worktrees_are_created_tracked_and_removed() {
             repo_path: root.display().to_string(),
             worktree_path: root.display().to_string(),
             force: true,
+            delete_branch: false,
         })
         .await
         .unwrap_err();
     assert_eq!(main.code(), tonic::Code::FailedPrecondition);
     let snapshot = snapshot_where(&mut client, |_| true).await;
     assert_eq!(repo(&snapshot, &root).worktrees.len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_unmerged_branch_stays_when_its_worktree_goes() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let root = git_repo(&daemon.home().join("dev/kumo"), None);
+    save_namespace(&mut client, "local", &[&root]).await;
+    let created = client
+        .workspace
+        .create_worktree(pb::CreateWorktreeRequest {
+            repo_path: root.display().to_string(),
+            branch: "feat/wip".into(),
+            create_branch: true,
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .worktree
+        .unwrap();
+    let path = Path::new(&created.path);
+    std::fs::write(path.join("work.txt"), "x").unwrap();
+    git(path, &["add", "."]);
+    git(path, &["commit", "-q", "-m", "work"]);
+
+    let removal = client
+        .workspace
+        .remove_worktree(pb::RemoveWorktreeRequest {
+            repo_path: root.display().to_string(),
+            worktree_path: created.path.clone(),
+            force: false,
+            delete_branch: true,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(removal.removed && !path.exists(), "{removal:?}");
+    assert_eq!(
+        removal.branch_kept,
+        "branch feat/wip has commits that aren't merged"
+    );
+    assert!(git(&root, &["branch", "--list", "feat/wip"]).contains("feat/wip"));
 }
 
 #[tokio::test(flavor = "multi_thread")]
