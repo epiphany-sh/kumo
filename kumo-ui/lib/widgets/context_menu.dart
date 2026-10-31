@@ -152,7 +152,7 @@ class KMenuDivider extends StatelessWidget {
 
 /// Inline "are you sure" step shown in place of the menu items.
 class KMenuConfirm extends StatelessWidget {
-  const KMenuConfirm({super.key, required this.title, required this.body, required this.confirmLabel, required this.onConfirm, required this.onCancel, this.detail});
+  const KMenuConfirm({super.key, required this.title, required this.body, required this.confirmLabel, required this.onConfirm, required this.onCancel, this.detail, this.extra});
 
   final String title;
   final String? detail;
@@ -160,6 +160,9 @@ class KMenuConfirm extends StatelessWidget {
   final String confirmLabel;
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
+
+  /// Below the body, e.g. an option of what's confirmed.
+  final Widget? extra;
 
   @override
   Widget build(BuildContext context) {
@@ -174,6 +177,7 @@ class KMenuConfirm extends StatelessWidget {
             if (detail != null) ...[const SizedBox(height: 4), Text(detail!, style: mono(11, color: c.text2))],
             const SizedBox(height: 4),
             Text(body, style: sans(11.5, color: c.text3, height: 1.4)),
+            if (extra != null) ...[const SizedBox(height: 8), extra!],
           ]),
         ),
         Padding(

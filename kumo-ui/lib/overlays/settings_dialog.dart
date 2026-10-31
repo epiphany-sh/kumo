@@ -8,6 +8,7 @@ import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
+import '../widgets/kumo_mark.dart';
 import 'agent_settings.dart';
 import 'docs_settings.dart';
 import 'host_settings.dart';
@@ -177,7 +178,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   _Page _page(BuildContext context, AppState s) {
     switch (_tab) {
       case SettingsTab.general:
-        return _Page('General', 'How Kumo starts, updates and where it keeps its data.', sections: [
+        return _Page('General', 'How Kumo starts, updates and where it keeps its data.', custom: const _About(), sections: [
           ('Layout', [
             _SegRow(
               label: 'Side panel position',
@@ -273,6 +274,20 @@ class _SettingsDialogState extends State<SettingsDialog> {
               _toggle(s, 'ai.ownWorktree', 'Give every agent its own worktree', 'Agents never share a checkout, so they can’t step on each other.', true),
               _toggle(s, 'ai.notify', 'Notify me when an agent needs input', null, true),
             ]),
+            ('Plan usage', [
+              _toggle(
+                s,
+                'usage.sidebar',
+                'Show what’s left in the sidebar',
+                s.usage.supported
+                    ? 'One row per agent with its tightest limit: Claude Code and Codex count 5-hour and weekly windows, Gemini CLI requests per day, Copilot premium requests per month.'
+                    : 'Not available yet: this version of Kumo can’t read the agents’ usage. The setting applies once it can.',
+                true,
+              ),
+              _seg(s, 'usage.as', 'Show', null, const ['Left', 'Used'], 'Left'),
+              _select(s, 'usage.rows', 'Rows in the sidebar', 'Agents in the order above, the default first. Past that, the last row becomes “+N more”, which still says when a folded one runs low.', const ['4', '6', 'All'], '4'),
+              _select(s, 'usage.warn', 'Highlight a limit when less than', 'It turns amber, then red when it’s nearly spent.', const ['25% is left', '10% is left', 'Never'], '25% is left'),
+            ]),
           ],
         );
       case SettingsTab.tickets:
@@ -324,6 +339,45 @@ class _SettingsDialogState extends State<SettingsDialog> {
         desc: desc,
         control: _TextSetting(key: ValueKey(key), value: s.setting<String>(key, fallback), mono: mono, onChanged: (v) => s.setSetting(key, v)),
       );
+}
+
+/// The app's mark and name at the top of General.
+class _About extends StatelessWidget {
+  const _About();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(16)),
+        child: Row(children: [
+          Container(
+            width: 52,
+            height: 52,
+            alignment: Alignment.center,
+            // The app icon's tile: the mark on near-black, in every theme.
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1F222A), Color(0xFF0A0B0E)]),
+              border: Border.all(color: const Color(0x14FFFFFF)),
+            ),
+            child: const KumoMark(size: 38, semanticLabel: null),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('kumo', style: sans(18, weight: FontWeight.w600, color: c.text, letterSpacing: -0.6)),
+              const SizedBox(height: 2),
+              Text('Terminals, coding agents, worktrees, tasks and docs in one window.', style: sans(12.5, color: c.text3, height: 1.4)),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
 }
 
 class _Page {

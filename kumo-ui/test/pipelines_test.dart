@@ -20,9 +20,9 @@ Future<void> _pumpWidgets(WidgetTester tester, MockPipelinesScenario scenario) a
 }
 
 void main() {
-  test('the widget is on the panel by default, right after the agent', () {
+  test('the widget is on the panel by default, right after the agent and its session', () {
     final s = AppState();
-    expect(s.widgets.take(2), [InspectorWidget.agent, InspectorWidget.pipelines]);
+    expect(s.widgets.take(3), [InspectorWidget.agent, InspectorWidget.session, InspectorWidget.pipelines]);
     expect(s.pipelines.provider, CiProvider.githubActions);
     expect(s.pipelines.branch, s.activeWorktree);
     s.dispose();

@@ -5,6 +5,7 @@ import 'app/kumo_app.dart';
 import 'app/preferences.dart';
 import 'data/pipelines_source.dart';
 import 'engine/engine_agents_source.dart';
+import 'engine/engine_ai_usage.dart';
 import 'engine/engine_pipelines_source.dart';
 import 'engine/engine_docs.dart';
 import 'engine/engine_pull_requests.dart';
@@ -21,12 +22,14 @@ Future<void> main() async {
   // Discover or launch kumod while the window comes up; nothing waits on it.
   final engine = KumoEngine()..connection().ignore();
   await WindowEffects.init();
+  final agents = EngineAgentsSource(engine);
   final state = AppState(
     demoWallpaper: !WindowEffects.nativeBackdrop,
     prefs: Preferences.load(),
     workspace: EngineWorkspaceSource(engine),
     changesFor: (worktree) => EngineWorktreeChanges(engine, worktree),
-    agents: EngineAgentsSource(engine),
+    agents: agents,
+    usage: EngineAiUsage(engine, agents),
     tasks: EngineTasksSource(engine),
     pipelinesFor: ({required repo, required worktree, required worktreePath}) =>
         EnginePipelinesSource(engine, worktreePath, provider: CiProvider.ofHost(repo.host), branch: worktree.branch),

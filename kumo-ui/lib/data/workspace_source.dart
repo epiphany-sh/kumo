@@ -38,8 +38,9 @@ abstract class WorkspaceSource extends ChangeNotifier {
   /// `git worktree add`: a new [branch] from [base], or an existing one.
   Future<void> createWorktree(Repo repo, {required String branch, required bool createBranch, String base = '', String path = ''});
 
-  /// `git worktree remove`; the branch stays.
-  Future<void> removeWorktree(Repo repo, Worktree worktree);
+  /// `git worktree remove`. One with changes stays untouched unless
+  /// [force]; with [deleteBranch], its branch goes too if it's merged.
+  Future<WorktreeRemoval> removeWorktree(Repo repo, Worktree worktree, {bool force = false, bool deleteBranch = false});
 
   /// Re-reads git state.
   void refresh();
@@ -118,11 +119,26 @@ class MockWorkspaceSource extends WorkspaceSource {
   Future<void> createWorktree(Repo repo, {required String branch, required bool createBranch, String base = '', String path = ''}) async {}
 
   @override
-  Future<void> removeWorktree(Repo repo, Worktree worktree) async {}
+  Future<WorktreeRemoval> removeWorktree(Repo repo, Worktree worktree, {bool force = false, bool deleteBranch = false}) async => const WorktreeRemoval();
 
   @override
   void refresh() {}
 
   @override
   Future<RepoBranches?> branches(Repo repo) async => null;
+}
+
+/// What removing a worktree did.
+@immutable
+class WorktreeRemoval {
+  const WorktreeRemoval({this.removed = true, this.changedFiles = 0, this.branchKept = ''});
+
+  /// False: it has changes and removing wasn't forced, so it's untouched.
+  final bool removed;
+
+  /// Files with changes, when that's why it wasn't removed.
+  final int changedFiles;
+
+  /// Its branch was to go too but stays: why. Empty otherwise.
+  final String branchKept;
 }

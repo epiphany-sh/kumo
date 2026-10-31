@@ -133,7 +133,11 @@ class EngineAgentsSource extends AgentsSource {
   }
 
   static pb.AgentContext _contextTo(AgentContextItem item) => pb.AgentContext(
-        kind: item.kind == AgentContextKind.doc ? pb.AgentContextKind.AGENT_CONTEXT_KIND_DOC : pb.AgentContextKind.AGENT_CONTEXT_KIND_TASK,
+        kind: switch (item.kind) {
+          AgentContextKind.task => pb.AgentContextKind.AGENT_CONTEXT_KIND_TASK,
+          AgentContextKind.doc => pb.AgentContextKind.AGENT_CONTEXT_KIND_DOC,
+          AgentContextKind.code => pb.AgentContextKind.AGENT_CONTEXT_KIND_CODE,
+        },
         title: item.title,
         detail: item.detail,
         url: item.url,
@@ -181,7 +185,11 @@ class EngineAgentsSource extends AgentsSource {
         context: [
           for (final item in s.context)
             AgentContextItem(
-              kind: item.kind == pb.AgentContextKind.AGENT_CONTEXT_KIND_DOC ? AgentContextKind.doc : AgentContextKind.task,
+              kind: switch (item.kind) {
+                pb.AgentContextKind.AGENT_CONTEXT_KIND_DOC => AgentContextKind.doc,
+                pb.AgentContextKind.AGENT_CONTEXT_KIND_CODE => AgentContextKind.code,
+                _ => AgentContextKind.task,
+              },
               title: item.title,
               detail: item.detail,
               url: item.url,

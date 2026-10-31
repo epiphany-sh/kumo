@@ -11,6 +11,7 @@ import '../theme/kumo_theme.dart';
 import '../widgets/change_scrollbar.dart';
 import '../widgets/controls.dart';
 import '../widgets/kicons.dart';
+import 'ask_agent.dart';
 import 'code_editor.dart';
 import 'diff_colors.dart';
 import 'syntax.dart';
@@ -81,11 +82,27 @@ class _FileViewState extends State<FileView> {
   final _hScroll = ScrollController();
   final _editScroll = ScrollController();
 
+  /// The "ask an agent about the selection" popup (⌘L).
+  final _ask = ValueNotifier(false);
+  final _editFocus = FocusNode(debugLabel: 'file editor');
+
+  /// Edit is showing (the layer that asks lives there).
+  bool _editing = false;
+
+  void _openAsk() {
+    if (!_editing) return;
+    final s = AppScope.read(context);
+    final ctrl = s.buffers.of(widget.path);
+    if (selectedLines(ctrl.text, ctrl.selection) != null) _ask.value = true;
+  }
+
   @override
   void dispose() {
     _scroll.dispose();
     _hScroll.dispose();
     _editScroll.dispose();
+    _ask.dispose();
+    _editFocus.dispose();
     super.dispose();
   }
 
@@ -133,6 +150,7 @@ class _FileViewState extends State<FileView> {
     final deleted = s.changes.statusOf(widget.path) == GitStatus.deleted || file?.kind == 'D';
     // Unchanged files only have the editor; deleted ones only the diff.
     final mode = file == null ? FileViewMode.edit : (deleted && _mode == FileViewMode.edit ? FileViewMode.diff : _mode);
+    _editing = mode == FileViewMode.edit && _diffLoaded;
     if (mode == FileViewMode.edit) _loadMarks(s.changes);
     final dirty = s.buffers.isDirty(widget.path);
     final asking = s.closeAsk?.$1 == widget.path;
@@ -149,6 +167,8 @@ class _FileViewState extends State<FileView> {
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyS, meta: true): _save,
         const SingleActivator(LogicalKeyboardKey.keyS, control: true): _save,
+        const SingleActivator(LogicalKeyboardKey.keyL, meta: true): _openAsk,
+        const SingleActivator(LogicalKeyboardKey.keyL, control: true): _openAsk,
       },
       child: Container(
         decoration: BoxDecoration(color: c.pane, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.paneBorder)),
@@ -299,17 +319,35 @@ class _FileViewState extends State<FileView> {
           child: Text(why, style: sans(12, color: c.text2)),
         ),
       Expanded(
-        child: CodeEditor(
-          key: ValueKey('edit:${widget.path}'),
-          controller: ctrl,
-          readOnly: why != null,
-          fontSize: _editFont,
-          scrollController: _editScroll,
-          decorate: (lines) => [
-            for (var i = 0; i < lines.length; i++)
-              LineDeco(bar: whole ? c.ok : switch (_marks[i + 1]) { true => c.ok, false => c.warn, null => null }),
-          ],
-        ),
+        child: Stack(children: [
+          Positioned.fill(
+            child: CodeEditor(
+              key: ValueKey('edit:${widget.path}'),
+              controller: ctrl,
+              readOnly: why != null,
+              fontSize: _editFont,
+              scrollController: _editScroll,
+              focusNode: _editFocus,
+              decorate: (lines) => [
+                for (var i = 0; i < lines.length; i++)
+                  LineDeco(bar: whole ? c.ok : switch (_marks[i + 1]) { true => c.ok, false => c.warn, null => null }),
+              ],
+            ),
+          ),
+          // Select code: ask an agent about it, with where it is.
+          Positioned.fill(
+            child: AskAgentLayer(
+              path: widget.path,
+              controller: ctrl,
+              scroll: _editScroll,
+              open: _ask,
+              fontSize: _editFont,
+              unsaved: buffers.isDirty(widget.path),
+              // Back to the code when the popup closes, so ⌘S and typing work.
+              onClosed: _editFocus.requestFocus,
+            ),
+          ),
+        ]),
       ),
     ]);
   }

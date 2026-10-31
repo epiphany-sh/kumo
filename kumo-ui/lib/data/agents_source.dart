@@ -46,9 +46,9 @@ class AgentProviderInfo {
   final bool hasLogin;
 }
 
-enum AgentContextKind { task, doc }
+enum AgentContextKind { task, doc, code }
 
-/// A ticket or page an agent was given.
+/// A ticket, page or piece of code an agent was given.
 @immutable
 class AgentContextItem {
   const AgentContextItem({required this.kind, required this.title, this.detail = '', this.url = ''});

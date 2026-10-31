@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
 import '../data/agents_source.dart';
+import '../data/ai_usage_source.dart';
 import '../data/changes.dart';
 import '../data/docs_source.dart';
 import '../data/models.dart';
@@ -21,6 +24,7 @@ import '../widgets/controls.dart';
 import '../widgets/file_icon.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
+import '../widgets/usage_meter.dart';
 import 'screen_chrome.dart';
 
 /// Panel beside the Terminal view's tabs, for the current worktree:
@@ -1273,6 +1277,7 @@ class _WidgetCardState extends State<_WidgetCard> {
 
 Widget _widgetBody(InspectorWidget w) => switch (w) {
       InspectorWidget.agent => const _AgentWidget(),
+      InspectorWidget.session => const _SessionWidget(),
       InspectorWidget.changes => const _ChangesWidget(),
       InspectorWidget.context => const _ContextWidget(),
       InspectorWidget.pipelines => const PipelinesCard(),
@@ -1333,6 +1338,7 @@ class _AddWidgetButton extends StatelessWidget {
 
 IconData _iconOf(InspectorWidget w) => switch (w) {
       InspectorWidget.agent => KIcons.agent,
+      InspectorWidget.session => KIcons.gauge,
       InspectorWidget.changes => KIcons.file,
       InspectorWidget.context => KIcons.docs,
       InspectorWidget.pipelines => KIcons.cluster,
@@ -1489,6 +1495,272 @@ class _AgentWidget extends StatelessWidget {
         ],
       ]),
     );
+  }
+}
+
+/// The worktree's agent session: how full its context window is and with
+/// what, and what's left on its plan. Two agents here: tabs pick one; more:
+/// a menu that says how full each one is. Without usage from the daemon it
+/// shows what the agent was given and says what it can't read yet.
+class _SessionWidget extends StatefulWidget {
+  const _SessionWidget();
+
+  @override
+  State<_SessionWidget> createState() => _SessionWidgetState();
+}
+
+class _SessionWidgetState extends State<_SessionWidget> {
+  String? _runId;
+
+  /// After "Compact context": what was typed, for [_statusRun].
+  String? _status;
+  String? _statusRun;
+
+  /// Runs being compacted right now.
+  final _compacting = <String>{};
+  Timer? _tick;
+  Timer? _clear;
+
+  @override
+  void initState() {
+    super.initState();
+    // "Resets in 1 h 48 min" stays true.
+    _tick = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    _clear?.cancel();
+    super.dispose();
+  }
+
+  void _pick(String id) => setState(() => _runId = id);
+
+  String _fullNote(AppState s, AgentRun r) {
+    final u = s.usage.sessionOf(r);
+    return u == null ? 'Started ${_clock(r.startedAt)}' : '${(u.fractionUsed * 100).round()}% of its context used';
+  }
+
+  void _menu(BuildContext context, List<AgentRun> runs, AgentRun current) {
+    final s = AppScope.read(context);
+    final c = context.c;
+    final box = context.findRenderObject() as RenderBox;
+    showKMenu(
+      context,
+      position: box.localToGlobal(box.size.bottomRight(Offset.zero)) - const Offset(240, 0),
+      builder: (context, close) => KMenuPanel(width: 240, children: [
+        Padding(padding: const EdgeInsets.fromLTRB(8, 4, 8, 6), child: Text('RUNNING IN THIS WORKTREE', style: microLabel(c))),
+        for (final r in runs)
+          KMenuItem(
+            icon: r.id == current.id ? KIcons.check : KIcons.agent,
+            label: r.providerName,
+            note: _fullNote(s, r),
+            onTap: () {
+              close();
+              _pick(r.id);
+            },
+          ),
+      ]),
+    );
+  }
+
+  Future<void> _compact(AppState s, AgentRun run, String command) async {
+    setState(() => _compacting.add(run.id));
+    final ok = await s.usage.compact(run);
+    if (!mounted) return;
+    setState(() {
+      _compacting.remove(run.id);
+      _statusRun = run.id;
+      _status = ok ? 'Typed $command into ${run.providerName}. Older turns are now a summary.' : 'Couldn’t reach ${run.providerName}’s terminal.';
+    });
+    _clear?.cancel();
+    _clear = Timer(const Duration(seconds: 8), () {
+      if (mounted) setState(() => _status = null);
+    });
+  }
+
+  Color _sliceColor(KumoPalette c, ContextSliceKind k) => switch (k) {
+        ContextSliceKind.total => c.acc,
+        ContextSliceKind.system => c.text3,
+        ContextSliceKind.files => c.text2,
+        ContextSliceKind.conversation => c.acc,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    final live = s.worktreeAgents.where((r) => r.status != AgentStatus.done).toList();
+    final runs = live.isNotEmpty ? live : s.worktreeAgents;
+    if (runs.isEmpty) {
+      return Section(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const PanelHeading('Session'),
+          const SizedBox(height: 4),
+          Text('When an agent runs in this worktree, how full its context is and what’s left on its plan show here.', style: sans(12, color: c.text3, height: 1.4)),
+        ]),
+      );
+    }
+    final run = runs.where((r) => r.id == _runId).firstOrNull ?? runs.first;
+    final session = s.usage.sessionOf(run);
+    final plan = s.usage.planOf(run.providerId);
+    final style = s.usageStyle;
+    final now = DateTime.now();
+    final meta = [
+      session?.model ?? run.providerName,
+      'started ${_clock(run.startedAt)}',
+      if (session != null && session.turns > 0) session.turns == 1 ? '1 turn' : '${session.turns} turns',
+    ].join(' · ');
+    // Two agents: tabs on their own row, full width. More: a menu.
+    final tabs = runs.length == 2
+        ? KSegmented<String>(
+            label: 'Agent in this worktree',
+            height: 26,
+            expand: true,
+            value: run.id,
+            onChanged: _pick,
+            items: [for (final r in runs) (r.id, r.providerName, null)],
+          )
+        : null;
+    final picker = runs.length > 2
+            ? Builder(
+                builder: (context) => KPressable(
+                  onTap: () => _menu(context, runs, run),
+                  semanticLabel: 'Agent: ${run.providerName}. ${runs.length} run in this worktree',
+                  tooltip: '${runs.length} agents run in this worktree',
+                  builder: (context, hover, focus) => Container(
+                    height: 26,
+                    padding: const EdgeInsets.only(left: 8, right: 4),
+                    decoration: BoxDecoration(color: hover || focus ? c.tile : c.chip, borderRadius: BorderRadius.circular(9), border: Border.all(color: c.chipBorder)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Flexible(child: Text(run.providerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, weight: FontWeight.w500, color: c.text))),
+                      Text(' · ${runs.length}', style: sans(11.5, color: c.text3)),
+                      Icon(KIcons.chevronDown, size: 15, color: c.text3),
+                    ]),
+                  ),
+                ),
+              )
+            : null;
+    // Tokens per item only when the agent reports them; else what it was given.
+    final items = session != null && session.items.isNotEmpty
+        ? session.items
+        : [for (final i in run.context) SessionContextItem(badge: _contextBadge(i), label: i.title, tokens: 0, detail: i.detail)];
+    final compactCmd = session?.compactCommand;
+    return Section(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Icon(KIcons.gauge, size: 15, color: c.text2),
+          const SizedBox(width: 8),
+          Expanded(child: Text('Session', style: sans(12.5, weight: FontWeight.w600, color: c.text))),
+          if (picker != null) Flexible(flex: 3, child: Align(alignment: Alignment.centerRight, child: picker)),
+        ]),
+        if (tabs != null) ...[const SizedBox(height: 10), tabs],
+        const SizedBox(height: 6),
+        Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, color: c.text3)),
+        const SizedBox(height: 12),
+        if (session != null && session.contextMax > 0) ..._window(c, session) else
+          Text(
+            s.usage.supported
+                ? '${run.providerName} doesn’t report its context window to Kumo.'
+                : 'Kumo can’t read ${run.providerName}’s context window or plan usage yet.',
+            style: sans(12, color: c.text3, height: 1.4),
+          ),
+        const SizedBox(height: 12),
+        Text('IN CONTEXT', style: microLabel(c)),
+        const SizedBox(height: 2),
+        if (items.isEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text('Nothing sent to it yet.', style: sans(12, color: c.text3))),
+        for (final it in items)
+          Tooltip(
+            message: it.tokens > 0 ? '${it.detail.isEmpty ? it.label : it.detail} · about ${tokensLabel(it.tokens)} tokens' : (it.detail.isEmpty ? it.label : it.detail),
+            child: SizedBox(
+              height: 26,
+              child: Row(children: [
+                SourceTile(it.badge, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text(it.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: c.text))),
+                if (it.tokens > 0) Text(tokensLabel(it.tokens), style: sans(11.5, color: c.text3).copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
+              ]),
+            ),
+          ),
+        if (plan != null) ...[
+          const SizedBox(height: 10),
+          Container(height: 1, color: c.divider),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: Text(style.showUsed ? 'PLAN USAGE USED' : 'PLAN USAGE LEFT', style: microLabel(c))),
+            Flexible(child: Text(plan.plan, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, color: c.text3))),
+          ]),
+          for (final w in plan.windows) ...[const SizedBox(height: 9), UsageWindowView(window: w, style: style, now: now)],
+          if (plan.problem != null) ...[const SizedBox(height: 8), Text(plan.problem!, style: sans(12, color: c.warn, height: 1.4))],
+        ],
+        if (compactCmd != null) ...[
+          const SizedBox(height: 12),
+          Row(children: [
+            Tooltip(
+              message: 'Types $compactCmd into ${run.providerName}’s terminal: older turns become a short summary and free the window.',
+              child: KButton(label: 'Compact context', height: 30, fontSize: 12, onTap: _compacting.contains(run.id) ? null : () => _compact(s, run, compactCmd)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(_statusRun == run.id ? _status ?? '' : '', maxLines: 2, overflow: TextOverflow.ellipsis, style: sans(11.5, color: c.text3, height: 1.35)),
+            ),
+          ]),
+        ],
+      ]),
+    );
+  }
+
+  List<Widget> _window(KumoPalette c, AgentSessionUsage u) {
+    final free = (u.contextMax - u.used).clamp(0, u.contextMax).toInt();
+    final full = u.fractionUsed >= 0.85;
+    int flex(int tokens) => tokens <= 0 ? 0 : (tokens * 1000 ~/ u.contextMax).clamp(1, 1000).toInt();
+    final slices = [for (final x in u.slices) if (x.tokens > 0) x];
+    return [
+      Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+        Expanded(child: Text('Context window', style: sans(12, color: c.text2))),
+        Text(tokensLabel(u.used), style: sans(12, weight: FontWeight.w600, color: full ? c.warn : c.text)),
+        Text(' / ${tokensLabel(u.contextMax)}', style: sans(12, color: c.text3)),
+      ]),
+      const SizedBox(height: 6),
+      Semantics(
+        label: 'Context window: ${tokensLabel(u.used)} of ${tokensLabel(u.contextMax)} tokens used. '
+            '${[for (final x in slices) '${x.label} ${tokensLabel(x.tokens)}'].join(', ')}',
+        excludeSemantics: true,
+        child: Container(
+          height: 8,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(4)),
+          child: Row(children: [
+            for (var i = 0; i < slices.length; i++) ...[
+              if (i > 0) const SizedBox(width: 2),
+              Expanded(flex: flex(slices[i].tokens), child: ColoredBox(color: _sliceColor(c, slices[i].kind))),
+            ],
+            if (flex(free) > 0) Expanded(flex: flex(free), child: const SizedBox()),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 6),
+      Wrap(spacing: 12, runSpacing: 4, children: [
+        for (final x in slices)
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 7, height: 7, decoration: BoxDecoration(color: _sliceColor(c, x.kind), borderRadius: BorderRadius.circular(2))),
+            const SizedBox(width: 5),
+            Text(x.label, style: sans(11.5, color: c.text2)),
+            const SizedBox(width: 4),
+            Text(tokensLabel(x.tokens), style: sans(11.5, color: c.text3)),
+          ]),
+      ]),
+      const SizedBox(height: 6),
+      Text(
+        full ? 'Almost full: compact it, or start a fresh session for the next task.' : '${tokensLabel(free)} free · ${((1 - u.fractionUsed) * 100).round()}% of the window',
+        style: sans(11.5, color: full ? c.warn : c.text3, height: 1.4),
+      ),
+    ];
   }
 }
 
@@ -1686,7 +1958,11 @@ String _contextBadge(AgentContextItem item) {
   for (final kind in DocKind.values) {
     if (kind.label == from) return kind.badge;
   }
-  return item.kind == AgentContextKind.doc ? 'DC' : 'TK';
+  return switch (item.kind) {
+    AgentContextKind.task => 'TK',
+    AgentContextKind.doc => 'DC',
+    AgentContextKind.code => 'CD',
+  };
 }
 
 /// CI runs of the selected worktree's branch, from its repository's host
