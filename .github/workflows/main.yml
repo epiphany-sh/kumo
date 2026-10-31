@@ -1,0 +1,28 @@
+name: main
+
+# Once merged: the release profile builds on both platforms, and on macOS
+# the bench runs on it. Not on pull requests (`ci.yml` checks those).
+on:
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --workspace
+      # On Windows the echo scenario never sees kumo-echo's READY through the
+      # terminal (ConPTY) and hangs; macOS only until that's fixed.
+      - if: runner.os == 'macOS'
+        run: cargo run --release -p kumo-bench -- all
