@@ -9,6 +9,8 @@ pub fn provider_to(view: ProviderView) -> pb::AgentProvider {
     pb::AgentProvider {
         takes_prompt_argument: provider.takes_prompt_argument(),
         has_login: provider.has_login(),
+        usage_readable: provider.usage_readable(),
+        read_usage: provider.read_usage,
         install_hint: provider
             .preset
             .map(|p| p.install_hint.to_owned())

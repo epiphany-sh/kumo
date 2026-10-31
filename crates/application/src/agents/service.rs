@@ -5,13 +5,15 @@ use std::time::Duration;
 use bytes::Bytes;
 use kumo_domain::agents::{
     AgentContext, AgentError, AgentEventKind, AgentPreset, AgentProvider, AgentSession,
-    AgentSessionId, AgentState, AgentStore, PRESETS, ProgramLocator, StoredProvider,
+    AgentSessionId, AgentState, AgentStore, PRESETS, PlanUsage, PlanUsageStore, ProgramLocator,
+    StoredProvider, UsageReport, UsageSource, UsageTarget,
 };
 use kumo_domain::terminal::{LaunchSpec, TerminalError, TerminalId, TerminalSize};
 use kumo_domain::time::Timestamp;
 use tokio::sync::watch;
 
 use super::monitor;
+use super::usage::{self, UsageState};
 use crate::terminal::TerminalService;
 use crate::workspace::WorkspaceService;
 
@@ -22,6 +24,9 @@ const QUIET_AFTER: Duration = Duration::from_millis(2500);
 pub struct AgentPorts {
     pub store: Arc<dyn AgentStore>,
     pub locator: Arc<dyn ProgramLocator>,
+    /// Where the CLIs that report their usage report it.
+    pub usage: Vec<Arc<dyn UsageSource>>,
+    pub plans: Arc<dyn PlanUsageStore>,
 }
 
 impl std::fmt::Debug for AgentPorts {
@@ -35,6 +40,18 @@ impl std::fmt::Debug for AgentPorts {
 pub struct ProviderView {
     pub provider: AgentProvider,
     pub resolved: Option<PathBuf>,
+}
+
+/// What the user sets for a provider in Settings › AI agents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderSettings {
+    pub name: String,
+    pub program: String,
+    pub args: String,
+    pub enabled: bool,
+    pub is_default: bool,
+    /// None: unchanged (on for a new provider).
+    pub read_usage: Option<bool>,
 }
 
 /// Every agent session, pushed whole on each change.
@@ -53,6 +70,7 @@ pub struct AgentService {
     workspace: Arc<WorkspaceService>,
     sessions: Mutex<AgentsSnapshot>,
     published: watch::Sender<Arc<AgentsSnapshot>>,
+    usage: Mutex<UsageState>,
     quiet_after: Duration,
 }
 
@@ -69,6 +87,7 @@ impl AgentService {
             workspace,
             sessions: Mutex::new(AgentsSnapshot::default()),
             published,
+            usage: Mutex::default(),
             quiet_after: QUIET_AFTER,
         }
     }
@@ -98,12 +117,16 @@ impl AgentService {
     pub async fn save_provider(
         &self,
         id: Option<String>,
-        name: &str,
-        program: &str,
-        args: &str,
-        enabled: bool,
-        is_default: bool,
+        settings: ProviderSettings,
     ) -> Result<ProviderView, AgentError> {
+        let ProviderSettings {
+            name,
+            program,
+            args,
+            enabled,
+            is_default,
+            read_usage,
+        } = settings;
         let current = match &id {
             Some(id) => Some(self.provider(id).await?),
             None => None,
@@ -116,7 +139,7 @@ impl AgentService {
                     current.name
                 },
                 short: if current.custom {
-                    AgentProvider::badge_for(name)
+                    AgentProvider::badge_for(&name)
                 } else {
                     current.short
                 },
@@ -124,17 +147,19 @@ impl AgentService {
                 args: args.trim().to_owned(),
                 enabled,
                 is_default: is_default && enabled,
+                read_usage: read_usage.unwrap_or(current.read_usage),
                 ..current
             },
             None => AgentProvider {
                 id: uuid_like(),
                 name: name.trim().to_owned(),
-                short: AgentProvider::badge_for(name),
+                short: AgentProvider::badge_for(&name),
                 program: program.trim().to_owned(),
                 args: args.trim().to_owned(),
                 custom: true,
                 enabled,
                 is_default: is_default && enabled,
+                read_usage: read_usage.unwrap_or(true),
                 preset: None,
             },
         };
@@ -147,6 +172,7 @@ impl AgentService {
             custom: provider.custom,
             enabled: provider.enabled,
             is_default: provider.is_default,
+            read_usage: provider.read_usage,
         };
         let store = Arc::clone(&self.ports.store);
         blocking(move || store.save(&stored)).await?;
@@ -221,7 +247,18 @@ impl AgentService {
             .await
             .ok_or_else(|| AgentError::UnknownWorktree(worktree.into()))?;
         let program = self.installed(&provider).await?;
-        let (args, prompt_passed) = provider.launch_args(prompt)?;
+        let (mut args, prompt_passed) = provider.launch_args(prompt)?;
+        let id = AgentSessionId::generate();
+        // Before it starts: a session's files are matched by start time.
+        let target = UsageTarget {
+            session_id: id.clone(),
+            worktree: worktree.clone(),
+            started_at: Timestamp::now(),
+        };
+        let source = self.usage_source(&provider);
+        if let Some(source) = &source {
+            args = usage::launch_args(source, &target, args).await;
+        }
         let spec = LaunchSpec::new(program.display().to_string())
             .map_err(launch_error)?
             .with_args(args)
@@ -236,7 +273,7 @@ impl AgentService {
 
         let now = Timestamp::now();
         let mut session = AgentSession {
-            id: AgentSessionId::generate(),
+            id,
             provider_id: provider.id.clone(),
             provider_name: provider.name.clone(),
             short: provider.short.clone(),
@@ -268,6 +305,10 @@ impl AgentService {
             typed,
             self.quiet_after,
         ));
+        if let Some(source) = source {
+            self.usage_lock().follow(target.clone());
+            tokio::spawn(usage::follow(Arc::clone(self), target, source));
+        }
         Ok(session)
     }
 
@@ -288,29 +329,7 @@ impl AgentService {
         }
         let text = text.trim();
         if !text.is_empty() {
-            let attachment = self
-                .terminals
-                .attach(&session.terminal, false)
-                .map_err(launch_error)?;
-            // Several lines go as one paste (agent TUIs read bracketed
-            // paste); then it's submitted on its own, as a person would.
-            let text = text.replace('\x1b', "");
-            let typed = if text.contains('\n') {
-                format!("\x1b[200~{text}\x1b[201~")
-            } else {
-                text
-            };
-            attachment
-                .session
-                .write(Bytes::from(typed))
-                .await
-                .map_err(launch_error)?;
-            tokio::time::sleep(Duration::from_millis(80)).await;
-            attachment
-                .session
-                .write(Bytes::from_static(b"\r"))
-                .await
-                .map_err(launch_error)?;
+            self.type_in(&session, text).await?;
         }
         self.update_session(id, |session| {
             session.record(
@@ -323,6 +342,68 @@ impl AgentService {
             }
         });
         self.session(id)
+    }
+
+    /// Types the agent's own compact command (`/compact`, `/compress`)
+    /// into its terminal and submits it.
+    pub async fn compact(&self, id: &AgentSessionId) -> Result<AgentSession, AgentError> {
+        let session = self.session(id)?;
+        if matches!(session.state, AgentState::Exited(_)) {
+            return Err(AgentError::Invalid(format!(
+                "{} already finished",
+                session.provider_name
+            )));
+        }
+        let command = self
+            .provider(&session.provider_id)
+            .await?
+            .compact_command()
+            .ok_or_else(|| {
+                AgentError::Invalid(format!(
+                    "{} has no command to compact its context",
+                    session.provider_name
+                ))
+            })?;
+        self.type_in(&session, command).await?;
+        self.session(id)
+    }
+
+    /// What's left on each connected agent's plan and how full each
+    /// session's context is, as last read. Empty when nothing is readable.
+    pub async fn usage(&self) -> Result<UsageReport, AgentError> {
+        self.load_plans().await;
+        let providers = self.providers().await?;
+        let sessions = self.sessions();
+        Ok(self
+            .usage_lock()
+            .report(&providers, &sessions, Timestamp::now()))
+    }
+
+    /// Types `text` into the agent's terminal and submits it. Several
+    /// lines go as one paste (agent TUIs read bracketed paste); then it's
+    /// submitted on its own, as a person would.
+    async fn type_in(&self, session: &AgentSession, text: &str) -> Result<(), AgentError> {
+        let attachment = self
+            .terminals
+            .attach(&session.terminal, false)
+            .map_err(launch_error)?;
+        let text = text.replace('\x1b', "");
+        let typed = if text.contains('\n') {
+            format!("\x1b[200~{text}\x1b[201~")
+        } else {
+            text
+        };
+        attachment
+            .session
+            .write(Bytes::from(typed))
+            .await
+            .map_err(launch_error)?;
+        tokio::time::sleep(Duration::from_millis(80)).await;
+        attachment
+            .session
+            .write(Bytes::from_static(b"\r"))
+            .await
+            .map_err(launch_error)
     }
 
     /// Kills the agent's process; its session ends as exited.
@@ -339,6 +420,16 @@ impl AgentService {
         let session = self.session(id)?;
         let _ = self.terminals.close(&session.terminal);
         self.update(|snapshot| snapshot.sessions.retain(|s| &s.id != id));
+        if let Some(target) = self.usage_lock().forget(id)
+            && let Some(source) = self
+                .ports
+                .usage
+                .iter()
+                .find(|s| s.provider_id() == session.provider_id)
+                .cloned()
+        {
+            tokio::task::spawn_blocking(move || source.forget(&target));
+        }
         Ok(())
     }
 
@@ -375,6 +466,51 @@ impl AgentService {
 
     fn lock(&self) -> std::sync::MutexGuard<'_, AgentsSnapshot> {
         self.sessions.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    pub(super) fn usage_lock(&self) -> std::sync::MutexGuard<'_, UsageState> {
+        self.usage.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// The session's state; None once dismissed.
+    pub(super) fn state_of(&self, id: &AgentSessionId) -> Option<AgentState> {
+        self.lock()
+            .sessions
+            .iter()
+            .find(|s| &s.id == id)
+            .map(|s| s.state)
+    }
+
+    /// Where `provider`'s usage is read, when it reports it and that's on.
+    fn usage_source(&self, provider: &AgentProvider) -> Option<Arc<dyn UsageSource>> {
+        if !provider.reads_usage() {
+            return None;
+        }
+        self.ports
+            .usage
+            .iter()
+            .find(|s| s.provider_id() == provider.id)
+            .cloned()
+    }
+
+    /// The plan readings kept from earlier runs, once.
+    async fn load_plans(&self) {
+        if self.usage_lock().plans_loaded() {
+            return;
+        }
+        let plans = Arc::clone(&self.ports.plans);
+        match blocking(move || plans.load_plans()).await {
+            Ok(saved) => self.usage_lock().restore(saved),
+            Err(e) => tracing::warn!(error = %e, "can't read the saved plan usage"),
+        }
+    }
+
+    /// Keeps a plan reading for its provider, here and across restarts.
+    pub(super) async fn save_plan(&self, plan: PlanUsage) {
+        let plans = Arc::clone(&self.ports.plans);
+        if let Err(e) = blocking(move || plans.save_plan(&plan)).await {
+            tracing::warn!(error = %e, "can't save the plan usage");
+        }
     }
 
     fn session(&self, id: &AgentSessionId) -> Result<AgentSession, AgentError> {
@@ -429,6 +565,7 @@ fn merge(stored: Vec<StoredProvider>) -> Vec<AgentProvider> {
             known.args = saved.args.clone();
             known.enabled = saved.enabled;
             known.is_default = saved.is_default && saved.enabled;
+            known.read_usage = saved.read_usage;
         }
     }
     providers.extend(
@@ -444,6 +581,7 @@ fn merge(stored: Vec<StoredProvider>) -> Vec<AgentProvider> {
                 custom: true,
                 enabled: s.enabled,
                 is_default: s.is_default && s.enabled,
+                read_usage: s.read_usage,
                 preset: None,
             }),
     );
@@ -484,6 +622,7 @@ mod tests {
             custom,
             enabled,
             is_default: default,
+            read_usage: true,
         }
     }
 

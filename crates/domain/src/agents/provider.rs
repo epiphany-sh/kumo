@@ -22,6 +22,9 @@ pub struct AgentProvider {
     pub custom: bool,
     pub enabled: bool,
     pub is_default: bool,
+    /// Read its plan limits and context window, where it reports them
+    /// (for Claude Code, through its status line). On by default.
+    pub read_usage: bool,
     pub preset: Option<&'static AgentPreset>,
 }
 
@@ -36,6 +39,7 @@ impl AgentProvider {
             custom: false,
             enabled: false,
             is_default: false,
+            read_usage: true,
             preset: Some(preset),
         }
     }
@@ -101,6 +105,21 @@ impl AgentProvider {
         self.preset.is_some()
     }
 
+    /// Kumo knows how to read its usage (whether or not it's turned on).
+    pub fn usage_readable(&self) -> bool {
+        self.preset.is_some_and(|p| p.reads_usage)
+    }
+
+    /// Its usage is read: readable and turned on.
+    pub fn reads_usage(&self) -> bool {
+        self.usage_readable() && self.read_usage
+    }
+
+    /// The command that compacts its context, if it has one.
+    pub fn compact_command(&self) -> Option<&'static str> {
+        self.preset.and_then(|p| p.compact_command)
+    }
+
     pub fn validate(&self) -> Result<(), AgentError> {
         if self.name.trim().is_empty() {
             return Err(AgentError::Invalid("the agent needs a name".into()));
@@ -151,6 +170,7 @@ mod tests {
             custom: true,
             enabled: true,
             is_default: false,
+            read_usage: true,
             preset: None,
         };
         assert_eq!(custom.short, "MA");

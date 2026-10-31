@@ -508,6 +508,11 @@ service Agents {
   rpc Dismiss(DismissAgentRequest) returns (DismissAgentResponse);
   // Every session now, then again whenever one changes (last wins).
   rpc Watch(WatchAgentsRequest) returns (stream AgentsSnapshot);
+  // What's left on each connected agent's plan and how full each running
+  // session's context is, as last read. Empty when nothing is readable.
+  rpc Usage(UsageRequest) returns (UsageReport);
+  // Types the agent's own compact command (/compact, /compress) and submits it.
+  rpc Compact(CompactAgentRequest) returns (AgentSession);
 }
 
 message AgentProvider {
@@ -529,6 +534,11 @@ message AgentProvider {
   // The prompt can be passed at start; otherwise Kumo types it in.
   bool takes_prompt_argument = 12;
   bool has_login = 13;
+  // Kumo can read its plan limits and context window (Claude Code, Codex).
+  bool usage_readable = 14;
+  // The setting: read them ("Read Claude Code's usage through its status
+  // line"). On by default.
+  bool read_usage = 15;
 }
 
 message ListProvidersRequest {}
@@ -545,6 +555,8 @@ message SaveProviderRequest {
   string args = 4;
   bool enabled = 5;
   bool is_default = 6;
+  // Unset: unchanged (on for a new provider).
+  optional bool read_usage = 7;
 }
 
 message DeleteProviderRequest {
@@ -674,6 +686,66 @@ message WatchAgentsRequest {}
 message AgentsSnapshot {
   uint64 version = 1;
   repeated AgentSession sessions = 2;
+}
+
+// Usage: only what an agent's CLI itself reports (Claude Code's status
+// line, Codex's session files). What can't be read is left out, never
+// estimated.
+
+enum UsageUnit {
+  USAGE_UNIT_PERCENT = 0;
+  USAGE_UNIT_REQUESTS = 1;
+  USAGE_UNIT_DOLLARS = 2;
+}
+
+message UsageWindow {
+  string label = 1;        // "5-hour session", "Weekly", "Spend limit · monthly"
+  string short = 2;        // "5h", "wk", "mo"
+  double left = 3;         // in `unit`s; percent: 0–100
+  double of = 4;           // 100 for percent
+  UsageUnit unit = 5;
+  int64 resets_at = 6;     // unix ms; 0 = unknown
+}
+
+message PlanUsage {
+  string provider_id = 1;
+  string plan = 2;         // "Claude Max", "ChatGPT Plus"; empty = unknown
+  repeated UsageWindow windows = 3;
+  string problem = 4;      // why it can't be read now; empty = fine
+  int64 read_at = 5;       // unix ms
+}
+
+enum ContextSliceKind {
+  CONTEXT_SLICE_TOTAL = 0;
+  CONTEXT_SLICE_SYSTEM = 1;
+  CONTEXT_SLICE_FILES = 2;
+  CONTEXT_SLICE_CONVERSATION = 3;
+}
+
+message ContextSlice {
+  ContextSliceKind kind = 1;
+  uint64 tokens = 2;
+}
+
+message SessionUsage {
+  string session_id = 1;
+  string model = 2;
+  uint64 context_max = 3;
+  repeated ContextSlice slices = 4;  // one TOTAL slice when there's no breakdown
+  uint32 turns = 5;                  // 0 = unknown
+  string compact_command = 6;        // empty = can't compact
+  int64 read_at = 7;                 // unix ms
+}
+
+message UsageRequest {}
+
+message UsageReport {
+  repeated PlanUsage plans = 1;
+  repeated SessionUsage sessions = 2;
+}
+
+message CompactAgentRequest {
+  string id = 1;
 }
 
 // ---------------------------------------------------------------------------

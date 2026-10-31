@@ -9,6 +9,7 @@ mod pulls;
 mod tasks;
 mod terminal;
 mod tests;
+mod usage;
 mod workspace;
 
 pub use agents::{agent_context_from, agent_session_to, agents_snapshot_to, provider_to};
@@ -26,4 +27,5 @@ pub use tasks::{
 };
 pub use terminal::{launch_spec_from, size_from, terminal_info_to, terminal_output_to};
 pub use tests::{test_run_to, tests_snapshot_to, tests_status_from};
+pub use usage::usage_report_to;
 pub use workspace::{candidate_to, snapshot_to, worktree_to};

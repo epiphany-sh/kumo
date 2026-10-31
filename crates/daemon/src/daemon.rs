@@ -19,7 +19,7 @@ use kumo_domain::pipelines::{HostTokens, TokenFallback};
 use kumo_domain::tasks::{SecretStore, TaskConnector};
 use kumo_domain::workspace::WorktreeLocation;
 use kumo_grpc::server::{GrpcServer, Services};
-use kumo_infrastructure::agents::ShellPathLocator;
+use kumo_infrastructure::agents::{ClaudeStatusLine, CodexRollouts, ShellPathLocator, codex_home};
 use kumo_infrastructure::ci::{
     BitbucketPipelines, BitbucketPulls, GhTokenFallback, GitHubActions, GitHubPulls, GitLabCi,
     GitLabPulls,
@@ -171,6 +171,7 @@ impl Daemon {
             std::time::Duration::from_secs(60),
         ));
 
+        let agent_store = Arc::new(SqliteAgentStore::open(&data_dir.join("kumo.db"))?);
         let control = DaemonControl::new(Arc::clone(&terminals));
         let services = Services {
             hello: HelloService::new(
@@ -191,8 +192,14 @@ impl Daemon {
             )),
             agents: Arc::new(AgentService::new(
                 AgentPorts {
-                    store: Arc::new(SqliteAgentStore::open(&data_dir.join("kumo.db"))?),
+                    store: agent_store.clone(),
                     locator: Arc::clone(&locator),
+                    // Plan limits and context windows, as the CLIs report them.
+                    usage: vec![
+                        Arc::new(ClaudeStatusLine::new(&data_dir.join("agents"), &home)),
+                        Arc::new(CodexRollouts::new(&codex_home(&home))),
+                    ],
+                    plans: agent_store,
                 },
                 Arc::clone(&terminals),
                 Arc::clone(&workspace),

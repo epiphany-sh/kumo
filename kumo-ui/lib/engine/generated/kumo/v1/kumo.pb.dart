@@ -4369,6 +4369,8 @@ class AgentProvider extends $pb.GeneratedMessage {
     $core.String? installHint,
     $core.bool? takesPromptArgument,
     $core.bool? hasLogin,
+    $core.bool? usageReadable,
+    $core.bool? readUsage,
   }) {
     final result = AgentProvider._();
     if (id != null) result.id = id;
@@ -4385,6 +4387,8 @@ class AgentProvider extends $pb.GeneratedMessage {
     if (takesPromptArgument != null)
       result.takesPromptArgument = takesPromptArgument;
     if (hasLogin != null) result.hasLogin = hasLogin;
+    if (usageReadable != null) result.usageReadable = usageReadable;
+    if (readUsage != null) result.readUsage = readUsage;
     return result;
   }
 
@@ -4414,6 +4418,8 @@ class AgentProvider extends $pb.GeneratedMessage {
     ..aOS(11, _omitFieldNames ? '' : 'installHint')
     ..aOB(12, _omitFieldNames ? '' : 'takesPromptArgument')
     ..aOB(13, _omitFieldNames ? '' : 'hasLogin')
+    ..aOB(14, _omitFieldNames ? '' : 'usageReadable')
+    ..aOB(15, _omitFieldNames ? '' : 'readUsage')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4559,6 +4565,27 @@ class AgentProvider extends $pb.GeneratedMessage {
   $core.bool hasHasLogin() => $_has(12);
   @$pb.TagNumber(13)
   void clearHasLogin() => $_clearField(13);
+
+  /// Kumo can read its plan limits and context window (Claude Code, Codex).
+  @$pb.TagNumber(14)
+  $core.bool get usageReadable => $_getBF(13);
+  @$pb.TagNumber(14)
+  set usageReadable($core.bool value) => $_setBool(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasUsageReadable() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearUsageReadable() => $_clearField(14);
+
+  /// The setting: read them ("Read Claude Code's usage through its status
+  /// line"). On by default.
+  @$pb.TagNumber(15)
+  $core.bool get readUsage => $_getBF(14);
+  @$pb.TagNumber(15)
+  set readUsage($core.bool value) => $_setBool(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasReadUsage() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearReadUsage() => $_clearField(15);
 }
 
 class ListProvidersRequest extends $pb.GeneratedMessage {
@@ -4665,6 +4692,7 @@ class SaveProviderRequest extends $pb.GeneratedMessage {
     $core.String? args,
     $core.bool? enabled,
     $core.bool? isDefault,
+    $core.bool? readUsage,
   }) {
     final result = SaveProviderRequest._();
     if (id != null) result.id = id;
@@ -4673,6 +4701,7 @@ class SaveProviderRequest extends $pb.GeneratedMessage {
     if (args != null) result.args = args;
     if (enabled != null) result.enabled = enabled;
     if (isDefault != null) result.isDefault = isDefault;
+    if (readUsage != null) result.readUsage = readUsage;
     return result;
   }
 
@@ -4695,6 +4724,7 @@ class SaveProviderRequest extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'args')
     ..aOB(5, _omitFieldNames ? '' : 'enabled')
     ..aOB(6, _omitFieldNames ? '' : 'isDefault')
+    ..aOB(7, _omitFieldNames ? '' : 'readUsage')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4774,6 +4804,16 @@ class SaveProviderRequest extends $pb.GeneratedMessage {
   $core.bool hasIsDefault() => $_has(5);
   @$pb.TagNumber(6)
   void clearIsDefault() => $_clearField(6);
+
+  /// Unset: unchanged (on for a new provider).
+  @$pb.TagNumber(7)
+  $core.bool get readUsage => $_getBF(6);
+  @$pb.TagNumber(7)
+  set readUsage($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasReadUsage() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearReadUsage() => $_clearField(7);
 }
 
 class DeleteProviderRequest extends $pb.GeneratedMessage {
@@ -6031,6 +6071,577 @@ class AgentsSnapshot extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(2)
   $pb.PbList<AgentSession> get sessions => $_getList(1);
+}
+
+class UsageWindow extends $pb.GeneratedMessage {
+  factory UsageWindow({
+    $core.String? label,
+    $core.String? short,
+    $core.double? left,
+    $core.double? of,
+    UsageUnit? unit,
+    $fixnum.Int64? resetsAt,
+  }) {
+    final result = UsageWindow._();
+    if (label != null) result.label = label;
+    if (short != null) result.short = short;
+    if (left != null) result.left = left;
+    if (of != null) result.of = of;
+    if (unit != null) result.unit = unit;
+    if (resetsAt != null) result.resetsAt = resetsAt;
+    return result;
+  }
+
+  UsageWindow._();
+
+  factory UsageWindow.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UsageWindow()..mergeFromBuffer(data, registry);
+  factory UsageWindow.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UsageWindow()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UsageWindow',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: UsageWindow.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'label')
+    ..aOS(2, _omitFieldNames ? '' : 'short')
+    ..aD(3, _omitFieldNames ? '' : 'left')
+    ..aD(4, _omitFieldNames ? '' : 'of')
+    ..aE<UsageUnit>(5, _omitFieldNames ? '' : 'unit',
+        enumValues: UsageUnit.values)
+    ..aInt64(6, _omitFieldNames ? '' : 'resetsAt')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UsageWindow clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UsageWindow copyWith(void Function(UsageWindow) updates) =>
+      super.copyWith((message) => updates(message as UsageWindow))
+          as UsageWindow;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use UsageWindow() / UsageWindow.new instead')
+  static UsageWindow create() => UsageWindow._();
+  static $pb.GeneratedMessage $_createMessage() => UsageWindow._();
+  @$core.override
+  UsageWindow createEmptyInstance() => UsageWindow._();
+  @$core.pragma('dart2js:noInline')
+  static UsageWindow getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<UsageWindow>(
+          UsageWindow.$_createMessage);
+  static UsageWindow? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get label => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set label($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLabel() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLabel() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get short => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set short($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasShort() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearShort() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get left => $_getN(2);
+  @$pb.TagNumber(3)
+  set left($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasLeft() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearLeft() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get of => $_getN(3);
+  @$pb.TagNumber(4)
+  set of($core.double value) => $_setDouble(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasOf() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearOf() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  UsageUnit get unit => $_getN(4);
+  @$pb.TagNumber(5)
+  set unit(UsageUnit value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasUnit() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearUnit() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get resetsAt => $_getI64(5);
+  @$pb.TagNumber(6)
+  set resetsAt($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasResetsAt() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearResetsAt() => $_clearField(6);
+}
+
+class PlanUsage extends $pb.GeneratedMessage {
+  factory PlanUsage({
+    $core.String? providerId,
+    $core.String? plan,
+    $core.Iterable<UsageWindow>? windows,
+    $core.String? problem,
+    $fixnum.Int64? readAt,
+  }) {
+    final result = PlanUsage._();
+    if (providerId != null) result.providerId = providerId;
+    if (plan != null) result.plan = plan;
+    if (windows != null) result.windows.addAll(windows);
+    if (problem != null) result.problem = problem;
+    if (readAt != null) result.readAt = readAt;
+    return result;
+  }
+
+  PlanUsage._();
+
+  factory PlanUsage.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PlanUsage()..mergeFromBuffer(data, registry);
+  factory PlanUsage.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PlanUsage()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PlanUsage',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: PlanUsage.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'providerId')
+    ..aOS(2, _omitFieldNames ? '' : 'plan')
+    ..pPM<UsageWindow>(3, _omitFieldNames ? '' : 'windows',
+        subBuilder: UsageWindow.$_createMessage)
+    ..aOS(4, _omitFieldNames ? '' : 'problem')
+    ..aInt64(5, _omitFieldNames ? '' : 'readAt')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PlanUsage clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PlanUsage copyWith(void Function(PlanUsage) updates) =>
+      super.copyWith((message) => updates(message as PlanUsage)) as PlanUsage;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PlanUsage() / PlanUsage.new instead')
+  static PlanUsage create() => PlanUsage._();
+  static $pb.GeneratedMessage $_createMessage() => PlanUsage._();
+  @$core.override
+  PlanUsage createEmptyInstance() => PlanUsage._();
+  @$core.pragma('dart2js:noInline')
+  static PlanUsage getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PlanUsage>(PlanUsage.$_createMessage);
+  static PlanUsage? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get providerId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set providerId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProviderId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProviderId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get plan => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set plan($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPlan() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPlan() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<UsageWindow> get windows => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $core.String get problem => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set problem($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasProblem() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearProblem() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get readAt => $_getI64(4);
+  @$pb.TagNumber(5)
+  set readAt($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasReadAt() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearReadAt() => $_clearField(5);
+}
+
+class ContextSlice extends $pb.GeneratedMessage {
+  factory ContextSlice({
+    ContextSliceKind? kind,
+    $fixnum.Int64? tokens,
+  }) {
+    final result = ContextSlice._();
+    if (kind != null) result.kind = kind;
+    if (tokens != null) result.tokens = tokens;
+    return result;
+  }
+
+  ContextSlice._();
+
+  factory ContextSlice.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ContextSlice()..mergeFromBuffer(data, registry);
+  factory ContextSlice.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ContextSlice()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ContextSlice',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ContextSlice.$_createMessage)
+    ..aE<ContextSliceKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: ContextSliceKind.values)
+    ..a<$fixnum.Int64>(2, _omitFieldNames ? '' : 'tokens', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ContextSlice clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ContextSlice copyWith(void Function(ContextSlice) updates) =>
+      super.copyWith((message) => updates(message as ContextSlice))
+          as ContextSlice;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ContextSlice() / ContextSlice.new instead')
+  static ContextSlice create() => ContextSlice._();
+  static $pb.GeneratedMessage $_createMessage() => ContextSlice._();
+  @$core.override
+  ContextSlice createEmptyInstance() => ContextSlice._();
+  @$core.pragma('dart2js:noInline')
+  static ContextSlice getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ContextSlice>(
+          ContextSlice.$_createMessage);
+  static ContextSlice? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ContextSliceKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(ContextSliceKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get tokens => $_getI64(1);
+  @$pb.TagNumber(2)
+  set tokens($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTokens() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTokens() => $_clearField(2);
+}
+
+class SessionUsage extends $pb.GeneratedMessage {
+  factory SessionUsage({
+    $core.String? sessionId,
+    $core.String? model,
+    $fixnum.Int64? contextMax,
+    $core.Iterable<ContextSlice>? slices,
+    $core.int? turns,
+    $core.String? compactCommand,
+    $fixnum.Int64? readAt,
+  }) {
+    final result = SessionUsage._();
+    if (sessionId != null) result.sessionId = sessionId;
+    if (model != null) result.model = model;
+    if (contextMax != null) result.contextMax = contextMax;
+    if (slices != null) result.slices.addAll(slices);
+    if (turns != null) result.turns = turns;
+    if (compactCommand != null) result.compactCommand = compactCommand;
+    if (readAt != null) result.readAt = readAt;
+    return result;
+  }
+
+  SessionUsage._();
+
+  factory SessionUsage.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SessionUsage()..mergeFromBuffer(data, registry);
+  factory SessionUsage.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SessionUsage()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SessionUsage',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SessionUsage.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(2, _omitFieldNames ? '' : 'model')
+    ..a<$fixnum.Int64>(
+        3, _omitFieldNames ? '' : 'contextMax', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..pPM<ContextSlice>(4, _omitFieldNames ? '' : 'slices',
+        subBuilder: ContextSlice.$_createMessage)
+    ..aI(5, _omitFieldNames ? '' : 'turns', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(6, _omitFieldNames ? '' : 'compactCommand')
+    ..aInt64(7, _omitFieldNames ? '' : 'readAt')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SessionUsage clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SessionUsage copyWith(void Function(SessionUsage) updates) =>
+      super.copyWith((message) => updates(message as SessionUsage))
+          as SessionUsage;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SessionUsage() / SessionUsage.new instead')
+  static SessionUsage create() => SessionUsage._();
+  static $pb.GeneratedMessage $_createMessage() => SessionUsage._();
+  @$core.override
+  SessionUsage createEmptyInstance() => SessionUsage._();
+  @$core.pragma('dart2js:noInline')
+  static SessionUsage getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SessionUsage>(
+          SessionUsage.$_createMessage);
+  static SessionUsage? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sessionId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sessionId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSessionId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSessionId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get model => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set model($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasModel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearModel() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get contextMax => $_getI64(2);
+  @$pb.TagNumber(3)
+  set contextMax($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasContextMax() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearContextMax() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $pb.PbList<ContextSlice> get slices => $_getList(3);
+
+  @$pb.TagNumber(5)
+  $core.int get turns => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set turns($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasTurns() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearTurns() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get compactCommand => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set compactCommand($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCompactCommand() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCompactCommand() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get readAt => $_getI64(6);
+  @$pb.TagNumber(7)
+  set readAt($fixnum.Int64 value) => $_setInt64(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasReadAt() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearReadAt() => $_clearField(7);
+}
+
+class UsageRequest extends $pb.GeneratedMessage {
+  factory UsageRequest() => UsageRequest._();
+
+  UsageRequest._();
+
+  factory UsageRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UsageRequest()..mergeFromBuffer(data, registry);
+  factory UsageRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UsageRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UsageRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: UsageRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UsageRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UsageRequest copyWith(void Function(UsageRequest) updates) =>
+      super.copyWith((message) => updates(message as UsageRequest))
+          as UsageRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use UsageRequest() / UsageRequest.new instead')
+  static UsageRequest create() => UsageRequest._();
+  static $pb.GeneratedMessage $_createMessage() => UsageRequest._();
+  @$core.override
+  UsageRequest createEmptyInstance() => UsageRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UsageRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<UsageRequest>(
+          UsageRequest.$_createMessage);
+  static UsageRequest? _defaultInstance;
+}
+
+class UsageReport extends $pb.GeneratedMessage {
+  factory UsageReport({
+    $core.Iterable<PlanUsage>? plans,
+    $core.Iterable<SessionUsage>? sessions,
+  }) {
+    final result = UsageReport._();
+    if (plans != null) result.plans.addAll(plans);
+    if (sessions != null) result.sessions.addAll(sessions);
+    return result;
+  }
+
+  UsageReport._();
+
+  factory UsageReport.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UsageReport()..mergeFromBuffer(data, registry);
+  factory UsageReport.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UsageReport()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UsageReport',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: UsageReport.$_createMessage)
+    ..pPM<PlanUsage>(1, _omitFieldNames ? '' : 'plans',
+        subBuilder: PlanUsage.$_createMessage)
+    ..pPM<SessionUsage>(2, _omitFieldNames ? '' : 'sessions',
+        subBuilder: SessionUsage.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UsageReport clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UsageReport copyWith(void Function(UsageReport) updates) =>
+      super.copyWith((message) => updates(message as UsageReport))
+          as UsageReport;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use UsageReport() / UsageReport.new instead')
+  static UsageReport create() => UsageReport._();
+  static $pb.GeneratedMessage $_createMessage() => UsageReport._();
+  @$core.override
+  UsageReport createEmptyInstance() => UsageReport._();
+  @$core.pragma('dart2js:noInline')
+  static UsageReport getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<UsageReport>(
+          UsageReport.$_createMessage);
+  static UsageReport? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<PlanUsage> get plans => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<SessionUsage> get sessions => $_getList(1);
+}
+
+class CompactAgentRequest extends $pb.GeneratedMessage {
+  factory CompactAgentRequest({
+    $core.String? id,
+  }) {
+    final result = CompactAgentRequest._();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  CompactAgentRequest._();
+
+  factory CompactAgentRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CompactAgentRequest()..mergeFromBuffer(data, registry);
+  factory CompactAgentRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CompactAgentRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CompactAgentRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: CompactAgentRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CompactAgentRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CompactAgentRequest copyWith(void Function(CompactAgentRequest) updates) =>
+      super.copyWith((message) => updates(message as CompactAgentRequest))
+          as CompactAgentRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use CompactAgentRequest() / CompactAgentRequest.new instead')
+  static CompactAgentRequest create() => CompactAgentRequest._();
+  static $pb.GeneratedMessage $_createMessage() => CompactAgentRequest._();
+  @$core.override
+  CompactAgentRequest createEmptyInstance() => CompactAgentRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CompactAgentRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CompactAgentRequest>(
+          CompactAgentRequest.$_createMessage);
+  static CompactAgentRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
 }
 
 class TaskSource extends $pb.GeneratedMessage {

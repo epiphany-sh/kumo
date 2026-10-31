@@ -84,6 +84,14 @@ const STEPS: &[&str] = &[
         fetched     INTEGER NOT NULL,
         PRIMARY KEY (source_id, external_id)
     );",
+    // 5: agents' usage: whether to read it, and the last plan reading
+    "ALTER TABLE agent_providers ADD COLUMN read_usage INTEGER NOT NULL DEFAULT 1;
+    CREATE TABLE agent_plan_usage (
+        provider_id TEXT PRIMARY KEY,
+        plan        TEXT NOT NULL,
+        windows     TEXT NOT NULL,
+        read_at     INTEGER NOT NULL
+    );",
 ];
 
 #[cfg(test)]

@@ -215,6 +215,53 @@ class AgentState extends $pb.ProtobufEnum {
   const AgentState._(super.value, super.name);
 }
 
+class UsageUnit extends $pb.ProtobufEnum {
+  static const UsageUnit USAGE_UNIT_PERCENT =
+      UsageUnit._(0, _omitEnumNames ? '' : 'USAGE_UNIT_PERCENT');
+  static const UsageUnit USAGE_UNIT_REQUESTS =
+      UsageUnit._(1, _omitEnumNames ? '' : 'USAGE_UNIT_REQUESTS');
+  static const UsageUnit USAGE_UNIT_DOLLARS =
+      UsageUnit._(2, _omitEnumNames ? '' : 'USAGE_UNIT_DOLLARS');
+
+  static const $core.List<UsageUnit> values = <UsageUnit>[
+    USAGE_UNIT_PERCENT,
+    USAGE_UNIT_REQUESTS,
+    USAGE_UNIT_DOLLARS,
+  ];
+
+  static final $core.List<UsageUnit?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static UsageUnit? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const UsageUnit._(super.value, super.name);
+}
+
+class ContextSliceKind extends $pb.ProtobufEnum {
+  static const ContextSliceKind CONTEXT_SLICE_TOTAL =
+      ContextSliceKind._(0, _omitEnumNames ? '' : 'CONTEXT_SLICE_TOTAL');
+  static const ContextSliceKind CONTEXT_SLICE_SYSTEM =
+      ContextSliceKind._(1, _omitEnumNames ? '' : 'CONTEXT_SLICE_SYSTEM');
+  static const ContextSliceKind CONTEXT_SLICE_FILES =
+      ContextSliceKind._(2, _omitEnumNames ? '' : 'CONTEXT_SLICE_FILES');
+  static const ContextSliceKind CONTEXT_SLICE_CONVERSATION =
+      ContextSliceKind._(3, _omitEnumNames ? '' : 'CONTEXT_SLICE_CONVERSATION');
+
+  static const $core.List<ContextSliceKind> values = <ContextSliceKind>[
+    CONTEXT_SLICE_TOTAL,
+    CONTEXT_SLICE_SYSTEM,
+    CONTEXT_SLICE_FILES,
+    CONTEXT_SLICE_CONVERSATION,
+  ];
+
+  static final $core.List<ContextSliceKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ContextSliceKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ContextSliceKind._(super.value, super.name);
+}
+
 class TaskSourceKind extends $pb.ProtobufEnum {
   static const TaskSourceKind TASK_SOURCE_KIND_UNSPECIFIED =
       TaskSourceKind._(0, _omitEnumNames ? '' : 'TASK_SOURCE_KIND_UNSPECIFIED');

@@ -137,6 +137,38 @@ final $typed_data.Uint8List agentStateDescriptor = $convert.base64Decode(
     'CgpBZ2VudFN0YXRlEhcKE0FHRU5UX1NUQVRFX1dPUktJTkcQABIbChdBR0VOVF9TVEFURV9ORU'
     'VEU19JTlBVVBABEhYKEkFHRU5UX1NUQVRFX0VYSVRFRBAC');
 
+@$core.Deprecated('Use usageUnitDescriptor instead')
+const UsageUnit$json = {
+  '1': 'UsageUnit',
+  '2': [
+    {'1': 'USAGE_UNIT_PERCENT', '2': 0},
+    {'1': 'USAGE_UNIT_REQUESTS', '2': 1},
+    {'1': 'USAGE_UNIT_DOLLARS', '2': 2},
+  ],
+};
+
+/// Descriptor for `UsageUnit`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List usageUnitDescriptor = $convert.base64Decode(
+    'CglVc2FnZVVuaXQSFgoSVVNBR0VfVU5JVF9QRVJDRU5UEAASFwoTVVNBR0VfVU5JVF9SRVFVRV'
+    'NUUxABEhYKElVTQUdFX1VOSVRfRE9MTEFSUxAC');
+
+@$core.Deprecated('Use contextSliceKindDescriptor instead')
+const ContextSliceKind$json = {
+  '1': 'ContextSliceKind',
+  '2': [
+    {'1': 'CONTEXT_SLICE_TOTAL', '2': 0},
+    {'1': 'CONTEXT_SLICE_SYSTEM', '2': 1},
+    {'1': 'CONTEXT_SLICE_FILES', '2': 2},
+    {'1': 'CONTEXT_SLICE_CONVERSATION', '2': 3},
+  ],
+};
+
+/// Descriptor for `ContextSliceKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List contextSliceKindDescriptor = $convert.base64Decode(
+    'ChBDb250ZXh0U2xpY2VLaW5kEhcKE0NPTlRFWFRfU0xJQ0VfVE9UQUwQABIYChRDT05URVhUX1'
+    'NMSUNFX1NZU1RFTRABEhcKE0NPTlRFWFRfU0xJQ0VfRklMRVMQAhIeChpDT05URVhUX1NMSUNF'
+    'X0NPTlZFUlNBVElPThAD');
+
 @$core.Deprecated('Use taskSourceKindDescriptor instead')
 const TaskSourceKind$json = {
   '1': 'TaskSourceKind',
@@ -1469,6 +1501,8 @@ const AgentProvider$json = {
       '10': 'takesPromptArgument'
     },
     {'1': 'has_login', '3': 13, '4': 1, '5': 8, '10': 'hasLogin'},
+    {'1': 'usage_readable', '3': 14, '4': 1, '5': 8, '10': 'usageReadable'},
+    {'1': 'read_usage', '3': 15, '4': 1, '5': 8, '10': 'readUsage'},
   ],
 };
 
@@ -1480,7 +1514,9 @@ final $typed_data.Uint8List agentProviderDescriptor = $convert.base64Decode(
     'xlZBIdCgppc19kZWZhdWx0GAggASgIUglpc0RlZmF1bHQSHAoJaW5zdGFsbGVkGAkgASgIUglp'
     'bnN0YWxsZWQSIwoNcmVzb2x2ZWRfcGF0aBgKIAEoCVIMcmVzb2x2ZWRQYXRoEiEKDGluc3RhbG'
     'xfaGludBgLIAEoCVILaW5zdGFsbEhpbnQSMgoVdGFrZXNfcHJvbXB0X2FyZ3VtZW50GAwgASgI'
-    'UhN0YWtlc1Byb21wdEFyZ3VtZW50EhsKCWhhc19sb2dpbhgNIAEoCFIIaGFzTG9naW4=');
+    'UhN0YWtlc1Byb21wdEFyZ3VtZW50EhsKCWhhc19sb2dpbhgNIAEoCFIIaGFzTG9naW4SJQoOdX'
+    'NhZ2VfcmVhZGFibGUYDiABKAhSDXVzYWdlUmVhZGFibGUSHQoKcmVhZF91c2FnZRgPIAEoCFIJ'
+    'cmVhZFVzYWdl');
 
 @$core.Deprecated('Use listProvidersRequestDescriptor instead')
 const ListProvidersRequest$json = {
@@ -1521,6 +1557,18 @@ const SaveProviderRequest$json = {
     {'1': 'args', '3': 4, '4': 1, '5': 9, '10': 'args'},
     {'1': 'enabled', '3': 5, '4': 1, '5': 8, '10': 'enabled'},
     {'1': 'is_default', '3': 6, '4': 1, '5': 8, '10': 'isDefault'},
+    {
+      '1': 'read_usage',
+      '3': 7,
+      '4': 1,
+      '5': 8,
+      '9': 0,
+      '10': 'readUsage',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_read_usage'},
   ],
 };
 
@@ -1528,7 +1576,8 @@ const SaveProviderRequest$json = {
 final $typed_data.Uint8List saveProviderRequestDescriptor = $convert.base64Decode(
     'ChNTYXZlUHJvdmlkZXJSZXF1ZXN0Eg4KAmlkGAEgASgJUgJpZBISCgRuYW1lGAIgASgJUgRuYW'
     '1lEhgKB3Byb2dyYW0YAyABKAlSB3Byb2dyYW0SEgoEYXJncxgEIAEoCVIEYXJncxIYCgdlbmFi'
-    'bGVkGAUgASgIUgdlbmFibGVkEh0KCmlzX2RlZmF1bHQYBiABKAhSCWlzRGVmYXVsdA==');
+    'bGVkGAUgASgIUgdlbmFibGVkEh0KCmlzX2RlZmF1bHQYBiABKAhSCWlzRGVmYXVsdBIiCgpyZW'
+    'FkX3VzYWdlGAcgASgISABSCXJlYWRVc2FnZYgBAUINCgtfcmVhZF91c2FnZQ==');
 
 @$core.Deprecated('Use deleteProviderRequestDescriptor instead')
 const DeleteProviderRequest$json = {
@@ -1831,6 +1880,156 @@ const AgentsSnapshot$json = {
 final $typed_data.Uint8List agentsSnapshotDescriptor = $convert.base64Decode(
     'Cg5BZ2VudHNTbmFwc2hvdBIYCgd2ZXJzaW9uGAEgASgEUgd2ZXJzaW9uEjEKCHNlc3Npb25zGA'
     'IgAygLMhUua3Vtby52MS5BZ2VudFNlc3Npb25SCHNlc3Npb25z');
+
+@$core.Deprecated('Use usageWindowDescriptor instead')
+const UsageWindow$json = {
+  '1': 'UsageWindow',
+  '2': [
+    {'1': 'label', '3': 1, '4': 1, '5': 9, '10': 'label'},
+    {'1': 'short', '3': 2, '4': 1, '5': 9, '10': 'short'},
+    {'1': 'left', '3': 3, '4': 1, '5': 1, '10': 'left'},
+    {'1': 'of', '3': 4, '4': 1, '5': 1, '10': 'of'},
+    {
+      '1': 'unit',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.UsageUnit',
+      '10': 'unit'
+    },
+    {'1': 'resets_at', '3': 6, '4': 1, '5': 3, '10': 'resetsAt'},
+  ],
+};
+
+/// Descriptor for `UsageWindow`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List usageWindowDescriptor = $convert.base64Decode(
+    'CgtVc2FnZVdpbmRvdxIUCgVsYWJlbBgBIAEoCVIFbGFiZWwSFAoFc2hvcnQYAiABKAlSBXNob3'
+    'J0EhIKBGxlZnQYAyABKAFSBGxlZnQSDgoCb2YYBCABKAFSAm9mEiYKBHVuaXQYBSABKA4yEi5r'
+    'dW1vLnYxLlVzYWdlVW5pdFIEdW5pdBIbCglyZXNldHNfYXQYBiABKANSCHJlc2V0c0F0');
+
+@$core.Deprecated('Use planUsageDescriptor instead')
+const PlanUsage$json = {
+  '1': 'PlanUsage',
+  '2': [
+    {'1': 'provider_id', '3': 1, '4': 1, '5': 9, '10': 'providerId'},
+    {'1': 'plan', '3': 2, '4': 1, '5': 9, '10': 'plan'},
+    {
+      '1': 'windows',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.UsageWindow',
+      '10': 'windows'
+    },
+    {'1': 'problem', '3': 4, '4': 1, '5': 9, '10': 'problem'},
+    {'1': 'read_at', '3': 5, '4': 1, '5': 3, '10': 'readAt'},
+  ],
+};
+
+/// Descriptor for `PlanUsage`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List planUsageDescriptor = $convert.base64Decode(
+    'CglQbGFuVXNhZ2USHwoLcHJvdmlkZXJfaWQYASABKAlSCnByb3ZpZGVySWQSEgoEcGxhbhgCIA'
+    'EoCVIEcGxhbhIuCgd3aW5kb3dzGAMgAygLMhQua3Vtby52MS5Vc2FnZVdpbmRvd1IHd2luZG93'
+    'cxIYCgdwcm9ibGVtGAQgASgJUgdwcm9ibGVtEhcKB3JlYWRfYXQYBSABKANSBnJlYWRBdA==');
+
+@$core.Deprecated('Use contextSliceDescriptor instead')
+const ContextSlice$json = {
+  '1': 'ContextSlice',
+  '2': [
+    {
+      '1': 'kind',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.ContextSliceKind',
+      '10': 'kind'
+    },
+    {'1': 'tokens', '3': 2, '4': 1, '5': 4, '10': 'tokens'},
+  ],
+};
+
+/// Descriptor for `ContextSlice`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List contextSliceDescriptor = $convert.base64Decode(
+    'CgxDb250ZXh0U2xpY2USLQoEa2luZBgBIAEoDjIZLmt1bW8udjEuQ29udGV4dFNsaWNlS2luZF'
+    'IEa2luZBIWCgZ0b2tlbnMYAiABKARSBnRva2Vucw==');
+
+@$core.Deprecated('Use sessionUsageDescriptor instead')
+const SessionUsage$json = {
+  '1': 'SessionUsage',
+  '2': [
+    {'1': 'session_id', '3': 1, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'model', '3': 2, '4': 1, '5': 9, '10': 'model'},
+    {'1': 'context_max', '3': 3, '4': 1, '5': 4, '10': 'contextMax'},
+    {
+      '1': 'slices',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.ContextSlice',
+      '10': 'slices'
+    },
+    {'1': 'turns', '3': 5, '4': 1, '5': 13, '10': 'turns'},
+    {'1': 'compact_command', '3': 6, '4': 1, '5': 9, '10': 'compactCommand'},
+    {'1': 'read_at', '3': 7, '4': 1, '5': 3, '10': 'readAt'},
+  ],
+};
+
+/// Descriptor for `SessionUsage`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sessionUsageDescriptor = $convert.base64Decode(
+    'CgxTZXNzaW9uVXNhZ2USHQoKc2Vzc2lvbl9pZBgBIAEoCVIJc2Vzc2lvbklkEhQKBW1vZGVsGA'
+    'IgASgJUgVtb2RlbBIfCgtjb250ZXh0X21heBgDIAEoBFIKY29udGV4dE1heBItCgZzbGljZXMY'
+    'BCADKAsyFS5rdW1vLnYxLkNvbnRleHRTbGljZVIGc2xpY2VzEhQKBXR1cm5zGAUgASgNUgV0dX'
+    'JucxInCg9jb21wYWN0X2NvbW1hbmQYBiABKAlSDmNvbXBhY3RDb21tYW5kEhcKB3JlYWRfYXQY'
+    'ByABKANSBnJlYWRBdA==');
+
+@$core.Deprecated('Use usageRequestDescriptor instead')
+const UsageRequest$json = {
+  '1': 'UsageRequest',
+};
+
+/// Descriptor for `UsageRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List usageRequestDescriptor =
+    $convert.base64Decode('CgxVc2FnZVJlcXVlc3Q=');
+
+@$core.Deprecated('Use usageReportDescriptor instead')
+const UsageReport$json = {
+  '1': 'UsageReport',
+  '2': [
+    {
+      '1': 'plans',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.PlanUsage',
+      '10': 'plans'
+    },
+    {
+      '1': 'sessions',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.SessionUsage',
+      '10': 'sessions'
+    },
+  ],
+};
+
+/// Descriptor for `UsageReport`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List usageReportDescriptor = $convert.base64Decode(
+    'CgtVc2FnZVJlcG9ydBIoCgVwbGFucxgBIAMoCzISLmt1bW8udjEuUGxhblVzYWdlUgVwbGFucx'
+    'IxCghzZXNzaW9ucxgCIAMoCzIVLmt1bW8udjEuU2Vzc2lvblVzYWdlUghzZXNzaW9ucw==');
+
+@$core.Deprecated('Use compactAgentRequestDescriptor instead')
+const CompactAgentRequest$json = {
+  '1': 'CompactAgentRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+  ],
+};
+
+/// Descriptor for `CompactAgentRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List compactAgentRequestDescriptor = $convert
+    .base64Decode('ChNDb21wYWN0QWdlbnRSZXF1ZXN0Eg4KAmlkGAEgASgJUgJpZA==');
 
 @$core.Deprecated('Use taskSourceDescriptor instead')
 const TaskSource$json = {

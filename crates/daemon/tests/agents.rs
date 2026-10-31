@@ -44,6 +44,7 @@ async fn connect(client: &mut KumoClient, id: &str, default: bool) -> pb::AgentP
             args: current.args,
             enabled: true,
             is_default: default,
+            read_usage: None,
         })
         .await
         .unwrap()
@@ -190,11 +191,11 @@ async fn agent_gets_its_prompt_works_then_waits_and_exits() {
     let daemon = TestDaemon::start().await;
     let mut client = daemon.client().await;
     let wt = worktree(&daemon, &mut client).await;
-    // Prints its arguments and cwd, rings the bell (needs input), echoes a reply.
+    // Prints its last argument and cwd, rings the bell (needs input), echoes a reply.
     fake_cli(
         &daemon.bin(),
         "claude",
-        "echo \"claude got: $* in $(pwd)\"; printf 'ready\\a'; read line; echo \"you said: $line\"",
+        "for last; do :; done; echo \"claude got: $last in $(pwd)\"; printf 'ready\\a'; read line; echo \"you said: $line\"",
     );
     connect(&mut client, "claude", true).await;
 
@@ -440,4 +441,314 @@ async fn refuses_to_start_without_an_agent_or_outside_the_workspace() {
         .await
         .unwrap_err();
     assert_eq!(outside.code(), tonic::Code::NotFound);
+}
+
+/// What the fake CLI was started with, one argument per line.
+fn args_of(bin: &Path, name: &str) -> Vec<String> {
+    let path = bin.join(format!("{name}.args"));
+    let deadline = std::time::Instant::now() + TIMEOUT;
+    loop {
+        if let Ok(args) = std::fs::read_to_string(&path)
+            && args.ends_with('\n')
+        {
+            return args.lines().map(str::to_owned).collect();
+        }
+        assert!(std::time::Instant::now() < deadline, "{name} never started");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+/// A fake CLI that saves its arguments, then echoes what's typed into it.
+fn recording_cli(bin: &Path, name: &str, before: &str) {
+    let args = bin.join(format!("{name}.args"));
+    fake_cli(
+        bin,
+        name,
+        &format!(
+            "printf '%s\\n' \"$@\" > '{}'; {before} printf 'ready\\a'; while read line; do echo \"typed: $line\"; done",
+            args.display()
+        ),
+    );
+}
+
+async fn usage(client: &mut KumoClient) -> pb::UsageReport {
+    client
+        .agents
+        .usage(pb::UsageRequest {})
+        .await
+        .unwrap()
+        .into_inner()
+}
+
+/// Polls `Usage` until `ready`.
+async fn usage_where(
+    client: &mut KumoClient,
+    ready: impl Fn(&pb::UsageReport) -> bool,
+) -> pb::UsageReport {
+    let deadline = tokio::time::Instant::now() + TIMEOUT;
+    loop {
+        let report = usage(client).await;
+        if ready(&report) {
+            return report;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "usage never got there: {report:?}"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn nothing_read_is_an_empty_usage_report() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    assert_eq!(usage(&mut client).await, pb::UsageReport::default());
+
+    // An agent that reports nothing (Gemini) adds nothing either.
+    let wt = worktree(&daemon, &mut client).await;
+    recording_cli(&daemon.bin(), "gemini", "");
+    connect(&mut client, "gemini", true).await;
+    client.agents.start(start(&wt, "", "")).await.unwrap();
+    assert!(
+        !args_of(&daemon.bin(), "gemini")
+            .iter()
+            .any(|a| a == "--settings"),
+        "only Claude Code gets a status line"
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert_eq!(usage(&mut client).await, pb::UsageReport::default());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn claude_code_usage_is_read_through_its_status_line() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    // The user's own status line is kept.
+    std::fs::create_dir_all(daemon.home().join(".claude")).unwrap();
+    std::fs::write(
+        daemon.home().join(".claude/settings.json"),
+        r#"{"statusLine":{"type":"command","command":"grep -o Opus"}}"#,
+    )
+    .unwrap();
+    recording_cli(&daemon.bin(), "claude", "");
+    let provider = connect(&mut client, "claude", true).await;
+    assert!(provider.usage_readable && provider.read_usage);
+
+    let session = client
+        .agents
+        .start(start(&wt, "", "fix it"))
+        .await
+        .unwrap()
+        .into_inner();
+    let args = args_of(&daemon.bin(), "claude");
+    assert_eq!(
+        (args[0].as_str(), args[2].as_str()),
+        ("--settings", "fix it")
+    );
+    let settings: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&args[1]).unwrap()).unwrap();
+    let hook = settings["statusLine"]["command"].as_str().unwrap();
+
+    // Claude Code runs the status line with the session's JSON.
+    let resets = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        + 3600;
+    let status = format!(
+        r#"{{"model":{{"display_name":"Opus"}},"context_window":{{"total_input_tokens":15500,"context_window_size":200000,"used_percentage":8,"remaining_percentage":92,"current_usage":{{"input_tokens":8500}}}},"rate_limits":{{"five_hour":{{"used_percentage":23.5,"resets_at":{resets}}},"seven_day":{{"used_percentage":41.2,"resets_at":{resets}}}}}}}"#
+    );
+    let mut line = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(hook)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    use std::io::Write;
+    line.stdin
+        .take()
+        .unwrap()
+        .write_all(status.as_bytes())
+        .unwrap();
+    let shown = line.wait_with_output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&shown.stdout), "Opus\n");
+
+    let report = usage_where(&mut client, |r| !r.sessions.is_empty()).await;
+    let plan = &report.plans[0];
+    assert_eq!(
+        (plan.provider_id.as_str(), plan.plan.as_str()),
+        ("claude", "")
+    );
+    let windows: Vec<_> = plan
+        .windows
+        .iter()
+        .map(|w| (w.short.as_str(), w.left, w.resets_at))
+        .collect();
+    let resets_ms = i64::try_from(resets).unwrap() * 1000;
+    assert_eq!(
+        windows,
+        [("5h", 76.5, resets_ms), ("wk", 100.0 - 41.2, resets_ms)]
+    );
+    let used = &report.sessions[0];
+    assert_eq!(used.session_id, session.id);
+    assert_eq!(
+        (
+            used.model.as_str(),
+            used.context_max,
+            used.compact_command.as_str()
+        ),
+        ("Opus", 200_000, "/compact")
+    );
+    assert_eq!(used.slices.len(), 1);
+    assert_eq!(
+        (used.slices[0].kind(), used.slices[0].tokens),
+        (pb::ContextSliceKind::ContextSliceTotal, 15_500)
+    );
+
+    // Compact types Claude Code's own command.
+    let mut terminal = Attached::new(&mut client, &session.terminal_id, true).await;
+    client
+        .agents
+        .compact(pb::CompactAgentRequest {
+            id: session.id.clone(),
+        })
+        .await
+        .unwrap();
+    terminal.read_until("typed: /compact").await;
+
+    // Dismissed: its folder goes; the plan reading stays (account-wide).
+    let dir = std::path::PathBuf::from(&args[1])
+        .parent()
+        .unwrap()
+        .to_owned();
+    client
+        .agents
+        .dismiss(pb::DismissAgentRequest { id: session.id })
+        .await
+        .unwrap();
+    let report = usage_where(&mut client, |r| r.sessions.is_empty()).await;
+    assert_eq!(report.plans.len(), 1);
+    let deadline = std::time::Instant::now() + TIMEOUT;
+    while dir.exists() {
+        assert!(std::time::Instant::now() < deadline, "folder kept");
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn turned_off_claude_code_gets_no_status_line() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    recording_cli(&daemon.bin(), "claude", "");
+    let current = connect(&mut client, "claude", true).await;
+    let off = client
+        .agents
+        .save_provider(pb::SaveProviderRequest {
+            id: "claude".into(),
+            name: current.name,
+            program: current.program,
+            args: current.args,
+            enabled: true,
+            is_default: true,
+            read_usage: Some(false),
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(off.usage_readable && !off.read_usage);
+    // Saving without the field leaves it as it was.
+    let again = connect(&mut client, "claude", true).await;
+    assert!(!again.read_usage);
+
+    client.agents.start(start(&wt, "", "x")).await.unwrap();
+    assert_eq!(args_of(&daemon.bin(), "claude"), ["x"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn codex_usage_is_read_from_its_rollout_file() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    let sessions = daemon.home().join(".codex/sessions");
+    // Writes its rollout as codex-cli does: session_meta, then a turn.
+    let token_count = r#"{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":23823,"cached_input_tokens":21248,"output_tokens":260,"total_tokens":24083},"model_context_window":258400},"rate_limits":{"limit_id":"codex","primary":{"used_percent":25.0,"window_minutes":300,"resets_at":4102444800},"secondary":{"used_percent":4.0,"window_minutes":10080,"resets_at":4102444800},"plan_type":"plus"}}}"#;
+    // (Agents get only the fake bin on their PATH.)
+    let before = format!(
+        "PATH=\"$PATH:/usr/bin:/bin\"; dir='{}'/$(date +%Y/%m/%d); mkdir -p \"$dir\"; f=\"$dir/rollout-test.jsonl\"; \
+         now=$(date -u +%Y-%m-%dT%H:%M:%SZ); \
+         printf '%s\\n' \"{{\\\"type\\\":\\\"session_meta\\\",\\\"payload\\\":{{\\\"timestamp\\\":\\\"$now\\\",\\\"cwd\\\":\\\"$(pwd)\\\"}}}}\" > \"$f\"; \
+         printf '%s\\n' '{{\"type\":\"turn_context\",\"payload\":{{\"model\":\"gpt-6-sol\"}}}}' '{token_count}' >> \"$f\";",
+        sessions.display()
+    );
+    recording_cli(&daemon.bin(), "codex", &before);
+    connect(&mut client, "codex", true).await;
+
+    let session = client
+        .agents
+        .start(start(&wt, "", "go"))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(args_of(&daemon.bin(), "codex"), ["go"]);
+    let report = usage_where(&mut client, |r| !r.sessions.is_empty()).await;
+    let plan = &report.plans[0];
+    assert_eq!(
+        (plan.provider_id.as_str(), plan.plan.as_str()),
+        ("codex", "ChatGPT Plus")
+    );
+    let labels: Vec<_> = plan
+        .windows
+        .iter()
+        .map(|w| (w.label.as_str(), w.left))
+        .collect();
+    assert_eq!(labels, [("5-hour session", 75.0), ("Weekly", 96.0)]);
+    let used = &report.sessions[0];
+    assert_eq!(
+        (used.model.as_str(), used.context_max, used.slices[0].tokens),
+        ("gpt-6-sol", 258_400, 24_083)
+    );
+
+    let mut terminal = Attached::new(&mut client, &session.terminal_id, true).await;
+    client
+        .agents
+        .compact(pb::CompactAgentRequest { id: session.id })
+        .await
+        .unwrap();
+    terminal.read_until("typed: /compact").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn compact_refuses_agents_without_a_compact_command() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    recording_cli(&daemon.bin(), "copilot", "");
+    connect(&mut client, "copilot", true).await;
+    let session = client
+        .agents
+        .start(start(&wt, "", ""))
+        .await
+        .unwrap()
+        .into_inner();
+    let refused = client
+        .agents
+        .compact(pb::CompactAgentRequest { id: session.id })
+        .await
+        .unwrap_err();
+    assert_eq!(
+        refused.code(),
+        tonic::Code::InvalidArgument,
+        "{}",
+        refused.message()
+    );
+    let unknown = client
+        .agents
+        .compact(pb::CompactAgentRequest { id: "nope".into() })
+        .await
+        .unwrap_err();
+    assert_eq!(unknown.code(), tonic::Code::NotFound);
 }
