@@ -608,9 +608,11 @@ message StartAgentRequest {
 enum AgentContextKind {
   AGENT_CONTEXT_KIND_TASK = 0;
   AGENT_CONTEXT_KIND_DOC = 1;
+  // Code selected in a file.
+  AGENT_CONTEXT_KIND_CODE = 2;
 }
 
-// A ticket or page an agent was given.
+// A ticket, page or piece of code an agent was given.
 message AgentContext {
   AgentContextKind kind = 1;
   // e.g. "PRC-412 · Bulk discounts by category".
@@ -1398,6 +1400,11 @@ service Docs {
   // matching a query. Answers are reused for a minute unless `refresh`.
   rpc List(ListDocsRequest) returns (DocList);
   rpc Read(ReadDocRequest) returns (Doc);
+  // One level of a knowledge base: with no `parent`, its top level (the
+  // Confluence spaces / the vault's root); else what is under `parent`.
+  // Folders and spaces first, then pages, each by title. Answers are reused
+  // for a minute unless `refresh`.
+  rpc Browse(BrowseDocsRequest) returns (DocLevel);
 }
 
 enum DocKind {
@@ -1465,6 +1472,37 @@ message Doc {
   repeated string path = 4;
   // The note's file, for a vault; empty otherwise.
   string file = 5;
+}
+
+message BrowseDocsRequest {
+  // DocSource.id.
+  string source_id = 1;
+  // A DocNode.key from the level above; empty for the top level.
+  string parent = 2;
+  // 0 = 200.
+  uint32 limit = 3;
+  bool refresh = 4;
+}
+
+// A space, a folder or a page within a level.
+message DocNode {
+  // Opaque; sent back as `parent` to list what is under it. Unique in its level.
+  string key = 1;
+  string title = 2;
+  // Set when it is a page that can be read (Docs.Read with doc.id); unset
+  // for a space or a folder.
+  DocSummary doc = 3;
+  // Entries under it; 0 = nothing to go into. When counting would cost a
+  // request per node, 1 stands for "has children" (Confluence pages).
+  uint32 children = 4;
+  // A short tag shown next to the title, e.g. "archived"; usually empty.
+  string note = 5;
+}
+
+message DocLevel {
+  repeated DocNode nodes = 1;
+  // More entries exist than `limit`.
+  bool truncated = 2;
 }
 
 // ---------------------------------------------------------------------------

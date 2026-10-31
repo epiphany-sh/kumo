@@ -5,5 +5,5 @@
 mod model;
 mod ports;
 
-pub use model::{Doc, DocId, DocKind, DocSummary};
+pub use model::{Doc, DocId, DocKind, DocNode, DocSummary};
 pub use ports::DocsConnector;

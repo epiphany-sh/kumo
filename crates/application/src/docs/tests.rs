@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use kumo_domain::docs::{Doc, DocId, DocKind, DocSummary, DocsConnector};
+use kumo_domain::docs::{Doc, DocId, DocKind, DocNode, DocSummary, DocsConnector};
 use kumo_domain::tasks::{
     SecretStore, SourceId, SourceOptions, Task, TaskDetail, TaskError, TaskId, TaskLink,
     TaskSource, TaskStore,
@@ -134,6 +134,24 @@ impl DocsConnector for Fake {
             file: None,
         })
     }
+    fn browse(
+        &self,
+        source: &TaskSource,
+        secret: Option<&str>,
+        parent: Option<&str>,
+        limit: usize,
+    ) -> Result<(Vec<DocNode>, bool), TaskError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.secrets.lock().unwrap().push(secret.map(str::to_owned));
+        let node = DocNode {
+            key: format!("{}>{}", parent.unwrap_or("top"), source.id),
+            title: "node".into(),
+            doc: None,
+            children: 1,
+            note: String::new(),
+        };
+        Ok((vec![node], limit < 2))
+    }
 }
 
 fn source(id: &str, options: SourceOptions, enabled: bool) -> TaskSource {
@@ -261,4 +279,65 @@ async fn reads_a_page_through_its_source() {
         docs.read(&DocId::parse("ob2/a.md").unwrap()).await,
         Err(TaskError::UnknownSource(_))
     ));
+}
+
+#[tokio::test]
+async fn browses_a_level_and_reuses_it_unless_refreshed() {
+    let (confluence, vault) = (Fake::new(DocKind::Confluence), Fake::new(DocKind::Obsidian));
+    let docs = service(&confluence, &vault);
+    let jira1 = SourceId::parse("jira1").unwrap();
+    let (source, nodes, truncated) = docs
+        .browse(&jira1, Some("space:1"), 200, false)
+        .await
+        .unwrap();
+    assert_eq!(source.name, "acme.atlassian.net");
+    assert_eq!(nodes[0].key, "space:1>jira1");
+    assert!(!truncated);
+    assert_eq!(
+        confluence.secrets.lock().unwrap().as_slice(),
+        [Some("tok".into())]
+    );
+    docs.browse(&jira1, Some("space:1"), 200, false)
+        .await
+        .unwrap();
+    assert_eq!(confluence.calls.load(Ordering::SeqCst), 1, "cached");
+    let (_, top, truncated) = docs.browse(&jira1, None, 1, false).await.unwrap();
+    assert_eq!(top[0].key, "top>jira1");
+    assert!(truncated);
+    assert_eq!(
+        confluence.calls.load(Ordering::SeqCst),
+        2,
+        "another parent or limit asks"
+    );
+    docs.browse(&jira1, Some("space:1"), 200, true)
+        .await
+        .unwrap();
+    assert_eq!(
+        confluence.calls.load(Ordering::SeqCst),
+        3,
+        "refresh asks again"
+    );
+}
+
+#[tokio::test]
+async fn browses_only_enabled_known_sources() {
+    let (confluence, vault) = (Fake::new(DocKind::Confluence), Fake::new(DocKind::Obsidian));
+    let docs = service(&confluence, &vault);
+    for id in ["nope1", "ob2", "todo1", "jira9"] {
+        assert!(
+            matches!(
+                docs.browse(&SourceId::parse(id).unwrap(), None, 200, false)
+                    .await,
+                Err(TaskError::UnknownSource(_))
+            ),
+            "{id}: unknown, disabled, without docs, or a site already read"
+        );
+    }
+    let (source, _, _) = docs
+        .browse(&SourceId::parse("ob1").unwrap(), None, 200, false)
+        .await
+        .unwrap();
+    assert_eq!(source.name, "work");
+    assert_eq!(vault.secrets.lock().unwrap().as_slice(), [None]);
+    assert_eq!(confluence.calls.load(Ordering::SeqCst), 0);
 }

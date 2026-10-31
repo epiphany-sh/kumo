@@ -1,10 +1,11 @@
 //! Confluence Cloud, signed in with a Jira source's Atlassian account
 //! (same site, email and API token). Lists through CQL search, reads pages
-//! as ADF through API v2 and turns them into Markdown.
+//! as ADF through API v2 and turns them into Markdown, browses spaces and
+//! page trees through API v2.
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use kumo_domain::docs::{Doc, DocId, DocKind, DocSummary, DocsConnector};
+use kumo_domain::docs::{Doc, DocId, DocKind, DocNode, DocSummary, DocsConnector};
 use kumo_domain::tasks::{SourceOptions, TaskError, TaskSource};
 use serde_json::Value;
 
@@ -17,6 +18,11 @@ use crate::tasks::http::Http;
 const MINE_CQL: &str = "type = page AND (contributor = currentUser() OR watcher = currentUser()) ORDER BY lastmodified DESC";
 /// When they have none: the site's latest.
 const LATEST_CQL: &str = "type = page ORDER BY lastmodified DESC";
+
+/// Most entries API v2 returns per request.
+const PAGE_MAX: usize = 250;
+/// Requests one level may take, following `_links.next`.
+const MAX_REQUESTS: usize = 20;
 
 #[derive(Debug)]
 pub struct ConfluenceDocs {
@@ -84,6 +90,185 @@ impl ConfluenceDocs {
             .take(limit)
             .collect())
     }
+
+    /// The items of a v2 list starting at `path` that `keep` keeps,
+    /// following `_links.next` until there are more than `limit`; whether
+    /// there were more; the site's base URL, as the answers give it.
+    fn collect(
+        &self,
+        account: &Account<'_>,
+        path: String,
+        limit: usize,
+        keep: impl Fn(&Value) -> bool,
+    ) -> Result<(Vec<Value>, bool, String), TaskError> {
+        let mut base = format!("{}/wiki", account.site);
+        let mut items = Vec::new();
+        let mut next = Some(path);
+        for _ in 0..MAX_REQUESTS {
+            let Some(path) = next.take() else { break };
+            let mut answer = self.get(account, &path)?;
+            if let Some(b) = answer.pointer("/_links/base").and_then(Value::as_str) {
+                b.clone_into(&mut base);
+            }
+            next = answer
+                .pointer("/_links/next")
+                .and_then(Value::as_str)
+                .and_then(relative);
+            if let Some(Value::Array(results)) = answer.get_mut("results").map(Value::take) {
+                items.extend(results.into_iter().filter(|item| keep(item)));
+            }
+            if items.len() > limit {
+                break;
+            }
+        }
+        let truncated = items.len() > limit || next.is_some();
+        items.truncate(limit);
+        Ok((items, truncated, base))
+    }
+
+    fn space(&self, account: &Account<'_>, id: &str) -> Result<Space, TaskError> {
+        let space = self.get(account, &format!("/wiki/api/v2/spaces/{}", enc(id)))?;
+        Ok(Space {
+            name: space["name"].as_str().unwrap_or_default().to_owned(),
+            key: space["key"].as_str().unwrap_or_default().to_owned(),
+            homepage: id_of(&space["homepageId"]),
+        })
+    }
+
+    /// The pages right under page `id`; other content types (folders,
+    /// whiteboards, databases, embeds) are skipped. `space` when known,
+    /// else the children's own.
+    fn children_of(
+        &self,
+        source: &TaskSource,
+        account: &Account<'_>,
+        id: &str,
+        space: Option<&Space>,
+        limit: usize,
+    ) -> Result<(Vec<DocNode>, bool), TaskError> {
+        let (pages, truncated, base) = self.collect(
+            account,
+            format!(
+                "/wiki/api/v2/pages/{id}/direct-children?sort=title&limit={}",
+                (limit + 1).clamp(1, PAGE_MAX)
+            ),
+            limit,
+            |item| item["type"].as_str() == Some("page"),
+        )?;
+        // Children don't carry their space's name or key: one request for
+        // the level, not one per page.
+        let fetched = match (space, pages.first().and_then(|p| id_of(&p["spaceId"]))) {
+            (None, Some(space_id)) => self.space(account, &space_id).ok(),
+            _ => None,
+        };
+        let space = space.or(fetched.as_ref());
+        let nodes = pages
+            .iter()
+            .filter_map(|page| page_node(source, &base, space, page))
+            .collect();
+        Ok((nodes, truncated))
+    }
+}
+
+/// What a page needs from its space.
+struct Space {
+    name: String,
+    key: String,
+    homepage: Option<String>,
+}
+
+/// What `Browse` may ask for, from a node key.
+enum Level<'a> {
+    Spaces,
+    Space(&'a str),
+    Page(&'a str),
+}
+
+impl<'a> Level<'a> {
+    /// `space:<id>` or `page:<id>`; ids are numeric, as they reach a URL.
+    fn parse(parent: Option<&'a str>) -> Result<Self, TaskError> {
+        let Some(key) = parent else {
+            return Ok(Self::Spaces);
+        };
+        let numeric = |id: &str| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit());
+        match key.split_once(':') {
+            Some(("space", id)) if numeric(id) => Ok(Self::Space(id)),
+            Some(("page", id)) if numeric(id) => Ok(Self::Page(id)),
+            _ => Err(TaskError::Invalid(format!(
+                "unknown Confluence level: {key}"
+            ))),
+        }
+    }
+}
+
+/// `_links.next`, relative to the site: with or without `/wiki`.
+fn relative(next: &str) -> Option<String> {
+    if !next.starts_with('/') || next.starts_with("//") {
+        return None;
+    }
+    Some(if next.starts_with("/wiki/") {
+        next.to_owned()
+    } else {
+        format!("/wiki{next}")
+    })
+}
+
+/// v2 ids are strings; tolerate numbers.
+fn id_of(raw: &Value) -> Option<String> {
+    raw.as_str()
+        .map(str::to_owned)
+        .or_else(|| raw.as_u64().map(|id| id.to_string()))
+        .filter(|id| !id.is_empty())
+}
+
+/// A page of a v2 list (a space's pages or a page's children). Its
+/// `doc` is built like [`summary_of_hit`]'s, without the body.
+fn page_node(
+    source: &TaskSource,
+    base: &str,
+    space: Option<&Space>,
+    page: &Value,
+) -> Option<DocNode> {
+    let id = id_of(&page["id"])?;
+    let title = page["title"].as_str().unwrap_or("Untitled").to_owned();
+    // Only a space's page list links to the page; children get the
+    // space's page URL.
+    let webui = page
+        .pointer("/_links/webui")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .or_else(|| {
+            space
+                .filter(|s| !s.key.is_empty())
+                .map(|s| format!("/spaces/{}/pages/{id}", enc(&s.key)))
+        })
+        .unwrap_or_else(|| format!("/pages/viewpage.action?pageId={id}"));
+    Some(DocNode {
+        key: format!("page:{id}"),
+        title: title.clone(),
+        doc: Some(DocSummary {
+            id: DocId::new(&source.id, &id),
+            title,
+            place: space.map(|s| s.name.clone()).unwrap_or_default(),
+            updated_at: page
+                .pointer("/version/createdAt")
+                .and_then(Value::as_str)
+                .and_then(unix_ms),
+            // v2 lists only give the author's account id.
+            author: None,
+            url: format!("{base}{webui}"),
+            excerpt: String::new(),
+        }),
+        // v2 lists don't say whether a page has children, and asking per
+        // page would cost a request each: every page may be opened, and
+        // an empty level reads "Nothing under this page".
+        children: 1,
+        note: if page["status"].as_str() == Some("archived") {
+            "archived".into()
+        } else {
+            String::new()
+        },
+    })
 }
 
 impl DocsConnector for ConfluenceDocs {
@@ -197,6 +382,78 @@ impl DocsConnector for ConfluenceDocs {
             file: None,
         })
     }
+
+    /// Keys: `space:<id>` for a space, `page:<id>` for a page. Pages only:
+    /// folders, whiteboards, databases and embeds are left out.
+    fn browse(
+        &self,
+        source: &TaskSource,
+        secret: Option<&str>,
+        parent: Option<&str>,
+        limit: usize,
+    ) -> Result<(Vec<DocNode>, bool), TaskError> {
+        let level = Level::parse(parent)?;
+        let account = Self::account(source, secret)?;
+        let per_request = (limit + 1).clamp(1, PAGE_MAX);
+        let (mut nodes, truncated) = match level {
+            Level::Spaces => {
+                let (spaces, truncated, _) = self.collect(
+                    &account,
+                    format!("/wiki/api/v2/spaces?status=current&sort=name&limit={per_request}"),
+                    limit,
+                    |space| space["type"].as_str() != Some("personal"),
+                )?;
+                let nodes = spaces
+                    .iter()
+                    .filter_map(|space| {
+                        Some(DocNode {
+                            key: format!("space:{}", id_of(&space["id"])?),
+                            title: space["name"].as_str().unwrap_or_default().to_owned(),
+                            doc: None,
+                            // Never counted: one more request per space.
+                            children: 1,
+                            note: String::new(),
+                        })
+                    })
+                    .collect();
+                (nodes, truncated)
+            }
+            Level::Space(id) => {
+                let space = self.space(&account, id)?;
+                let (pages, mut truncated, base) = self.collect(
+                    &account,
+                    format!(
+                        "/wiki/api/v2/spaces/{id}/pages?depth=root&sort=title&limit={per_request}"
+                    ),
+                    limit,
+                    |_| true,
+                )?;
+                let mut nodes: Vec<DocNode> = Vec::new();
+                for page in &pages {
+                    // The home page holds most of a space: its children
+                    // stand in for it, so it takes one click less.
+                    if let Some(home) =
+                        id_of(&page["id"]).filter(|p| space.homepage.as_ref() == Some(p))
+                    {
+                        let (children, more) =
+                            self.children_of(source, &account, &home, Some(&space), limit)?;
+                        truncated |= more;
+                        nodes.extend(children);
+                    } else {
+                        nodes.extend(page_node(source, &base, Some(&space), page));
+                    }
+                }
+                (nodes, truncated)
+            }
+            Level::Page(id) => self.children_of(source, &account, id, None, limit)?,
+        };
+        // Confluence's own tree order isn't available across content types
+        // (CONFCLOUD-79631): by title.
+        DocNode::sort(&mut nodes);
+        let truncated = truncated || nodes.len() > limit;
+        nodes.truncate(limit);
+        Ok((nodes, truncated))
+    }
 }
 
 fn unix_ms(raw: &str) -> Option<i64> {
@@ -299,6 +556,9 @@ mod tests {
                 ),
             );
         }
+        if let Some(answer) = browse_route(path) {
+            return answer;
+        }
         match path {
             "/wiki/api/v2/pages/98311?body-format=atlas_doc_format" => {
                 let adf = r#"{"type":"doc","version":1,"content":[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"Scope"}]},{"type":"paragraph","content":[{"type":"text","text":"List prices only."}]}]}"#;
@@ -310,7 +570,10 @@ mod tests {
                 });
                 (200, page.to_string())
             }
-            "/wiki/api/v2/spaces/65538" => (200, r#"{"id":"65538","name":"Pricing"}"#.into()),
+            "/wiki/api/v2/spaces/65538" => (
+                200,
+                r#"{"id":"65538","key":"PRC","name":"Pricing","homepageId":"100"}"#.into(),
+            ),
             "/wiki/rest/api/user?accountId=acc-1" => (200, r#"{"displayName":"Lucía"}"#.into()),
             _ => (404, r#"{"message":"not found"}"#.into()),
         }
@@ -372,6 +635,150 @@ mod tests {
         ));
         assert!(matches!(
             ConfluenceDocs::default().recent(&source(&server.url), None, 5),
+            Err(TaskError::Auth(_))
+        ));
+    }
+
+    /// Spaces (two answers, one personal space), Pricing's root pages (its
+    /// home page and an archived one), and children mixing content types.
+    fn browse_route(path: &str) -> Option<(u16, String)> {
+        let (route, query) = path.split_once('?').unwrap_or((path, ""));
+        let base = r#""base":"https://acme.atlassian.net/wiki""#;
+        let body = match route {
+            "/wiki/api/v2/spaces" if query.contains("cursor=2") => format!(
+                r#"{{"results":[{{"id":"7","key":"ENG","name":"engineering","type":"collaboration","status":"current"}}],"_links":{{{base}}}}}"#
+            ),
+            "/wiki/api/v2/spaces" => format!(
+                r#"{{"results":[{{"id":"65538","key":"PRC","name":"Pricing","type":"global","status":"current"}},
+                {{"id":"9","key":"~ana","name":"Ana","type":"personal","status":"current"}}],
+                "_links":{{"next":"/wiki/api/v2/spaces?cursor=2&limit=201",{base}}}}}"#
+            ),
+            "/wiki/api/v2/spaces/65538/pages" => format!(
+                r#"{{"results":[{{"id":"300","title":"Zz old","status":"archived","spaceId":"65538",
+                "_links":{{"webui":"/spaces/PRC/pages/300/Zz+old"}}}},
+                {{"id":"100","title":"Pricing Home","status":"current","spaceId":"65538",
+                "version":{{"createdAt":"2026-10-25T12:00:00.000Z"}},"_links":{{"webui":"/spaces/PRC/overview"}}}}],
+                "_links":{{{base}}}}}"#
+            ),
+            "/wiki/api/v2/pages/100/direct-children" => format!(
+                r#"{{"results":[{{"id":"98311","title":"Discount rules v3","type":"page","status":"current","spaceId":"65538"}},
+                {{"id":"5","title":"Assets","type":"folder","status":"current","spaceId":"65538"}},
+                {{"id":"6","title":"Board","type":"whiteboard","status":"current","spaceId":"65538"}},
+                {{"id":"200","title":"appendix","type":"page","status":"current","spaceId":"65538"}}],
+                "_links":{{{base}}}}}"#
+            ),
+            "/wiki/api/v2/pages/98311/direct-children" => format!(
+                r#"{{"results":[{{"id":"401","title":"Examples","type":"page","status":"current","spaceId":"65538"}},
+                {{"id":"402","title":"Diagram","type":"whiteboard","status":"current","spaceId":"65538"}}],
+                "_links":{{"next":"/wiki/api/v2/pages/98311/direct-children?cursor=2",{base}}}}}"#
+            ),
+            _ => return None,
+        };
+        Some((200, body))
+    }
+
+    fn level(nodes: &[DocNode]) -> Vec<(&str, &str, Option<&str>, &str)> {
+        nodes
+            .iter()
+            .map(|n| {
+                (
+                    n.key.as_str(),
+                    n.title.as_str(),
+                    n.doc.as_ref().map(|d| d.id.as_str()),
+                    n.note.as_str(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn browse_lists_the_spaces_but_personal_ones() {
+        let server = TestServer::start(route);
+        let (spaces, truncated) = ConfluenceDocs::default()
+            .browse(&source(&server.url), Some("tok"), None, 200)
+            .unwrap();
+        assert_eq!(
+            level(&spaces),
+            [
+                ("space:7", "engineering", None, ""),
+                ("space:65538", "Pricing", None, "")
+            ],
+            "every answer, by title"
+        );
+        assert!(spaces.iter().all(|s| s.children == 1));
+        assert!(!truncated);
+        let sent: Vec<_> = server.requests().iter().map(|r| r.path.clone()).collect();
+        assert_eq!(
+            sent,
+            [
+                "/wiki/api/v2/spaces?status=current&sort=name&limit=201",
+                "/wiki/api/v2/spaces?cursor=2&limit=201"
+            ]
+        );
+    }
+
+    #[test]
+    fn browse_opens_a_space_at_its_home_pages_children() {
+        let server = TestServer::start(route);
+        let (pages, truncated) = ConfluenceDocs::default()
+            .browse(&source(&server.url), Some("tok"), Some("space:65538"), 200)
+            .unwrap();
+        assert_eq!(
+            level(&pages),
+            [
+                ("page:200", "appendix", Some("jira1/200"), ""),
+                ("page:98311", "Discount rules v3", Some("jira1/98311"), ""),
+                ("page:300", "Zz old", Some("jira1/300"), "archived")
+            ],
+            "no folders or whiteboards, the home page stands aside"
+        );
+        assert!(!truncated);
+        let doc = pages[1].doc.as_ref().unwrap();
+        assert_eq!(doc.place, "Pricing");
+        assert_eq!(
+            doc.url,
+            "https://acme.atlassian.net/wiki/spaces/PRC/pages/98311"
+        );
+        assert_eq!(pages[1].children, 1);
+        assert_eq!(
+            pages[2].doc.as_ref().unwrap().url,
+            "https://acme.atlassian.net/wiki/spaces/PRC/pages/300/Zz+old"
+        );
+        // The node's doc reads like any page.
+        let read = ConfluenceDocs::default()
+            .read(&source(&server.url), Some("tok"), doc.id.external())
+            .unwrap();
+        assert_eq!(read.summary.title, "Discount rules v3");
+    }
+
+    #[test]
+    fn browse_lists_a_pages_children_and_says_when_there_are_more() {
+        let server = TestServer::start(route);
+        let docs = ConfluenceDocs::default();
+        let src = source(&server.url);
+        let (children, truncated) = docs
+            .browse(&src, Some("tok"), Some("page:98311"), 1)
+            .unwrap();
+        assert_eq!(
+            level(&children),
+            [("page:401", "Examples", Some("jira1/401"), "")]
+        );
+        assert!(truncated, "a next page is left");
+        assert_eq!(children[0].doc.as_ref().unwrap().place, "Pricing");
+        let (spaces, truncated) = docs.browse(&src, Some("tok"), None, 1).unwrap();
+        assert_eq!(level(&spaces), [("space:65538", "Pricing", None, "")]);
+        assert!(truncated);
+        for bad in ["page:../x", "space:", "folder:1", "98311"] {
+            assert!(
+                matches!(
+                    docs.browse(&src, Some("tok"), Some(bad), 10),
+                    Err(TaskError::Invalid(_))
+                ),
+                "{bad}"
+            );
+        }
+        assert!(matches!(
+            docs.browse(&src, None, None, 10),
             Err(TaskError::Auth(_))
         ));
     }

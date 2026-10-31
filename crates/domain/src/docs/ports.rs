@@ -3,7 +3,7 @@
 
 use crate::tasks::{TaskError, TaskSource};
 
-use super::{Doc, DocKind, DocSummary};
+use super::{Doc, DocKind, DocNode, DocSummary};
 
 /// Reads one kind of knowledge base through a task source's account or
 /// folder. `secret` is that source's API token, when its kind needs one.
@@ -32,4 +32,15 @@ pub trait DocsConnector: Send + Sync + 'static {
         secret: Option<&str>,
         external: &str,
     ) -> Result<Doc, TaskError>;
+    /// One level: the top one when `parent` is None, else what is under
+    /// the node whose key is `parent`. Folders/spaces first, then pages,
+    /// each by title (case-insensitive). At most `limit` entries; the bool
+    /// says whether there were more.
+    fn browse(
+        &self,
+        source: &TaskSource,
+        secret: Option<&str>,
+        parent: Option<&str>,
+        limit: usize,
+    ) -> Result<(Vec<DocNode>, bool), TaskError>;
 }
