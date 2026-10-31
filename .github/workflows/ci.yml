@@ -1,11 +1,63 @@
 name: ci
 
+# Pull requests, and main once merged (what `release` waits for). Not every
+# push to a branch: with a pull request open, that ran everything twice.
 on:
   push:
+    branches: [main]
   pull_request:
 
+# A new push to a pull request cancels the run it replaces; on main every
+# merge runs to the end (each one may be released).
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show active-toolchain
+      - run: cargo fmt --all --check
+
+  clippy:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show active-toolchain
+      # Builds from main are reused by pull requests; theirs aren't kept.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
   test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo test --workspace --no-fail-fast
+
+  # The release profile builds, and on macOS the bench runs on it.
+  release-build:
     strategy:
       fail-fast: false
       matrix:
@@ -15,11 +67,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup show active-toolchain
-      - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace --no-fail-fast
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo build --release --workspace
       # On Windows the echo scenario never sees kumo-echo's READY through the
       # terminal (ConPTY) and hangs; macOS only until that's fixed.
       - if: runner.os == 'macOS'
         run: cargo run --release -p kumo-bench -- all
+
+  # The Flutter app, on the platform it ships for.
+  ui:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: kumo-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5 # as in release.yml
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
