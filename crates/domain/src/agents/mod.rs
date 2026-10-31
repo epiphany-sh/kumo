@@ -9,6 +9,7 @@ mod ports;
 mod presets;
 mod provider;
 mod session;
+mod usage;
 
 pub use actions::{ActionReader, action_of};
 pub use activity::{ActivityTracker, LastLine};
@@ -19,4 +20,8 @@ pub use presets::{AgentPreset, PRESETS};
 pub use provider::{AgentProvider, PromptStyle};
 pub use session::{
     AgentContext, AgentEvent, AgentEventKind, AgentSession, AgentSessionId, AgentState, ContextKind,
+};
+pub use usage::{
+    ContextReading, ContextSlice, ContextSliceKind, PlanReading, PlanUsage, PlanUsageStore,
+    SessionUsage, UsageReading, UsageReport, UsageSource, UsageTarget, UsageUnit, UsageWindow,
 };

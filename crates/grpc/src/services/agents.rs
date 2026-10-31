@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use futures::{Stream, StreamExt};
-use kumo_application::agents::AgentService;
+use kumo_application::agents::{AgentService, ProviderSettings};
 use kumo_domain::agents::AgentSessionId;
 use kumo_proto::v1 as pb;
 use tokio_stream::wrappers::WatchStream;
@@ -11,7 +11,7 @@ use tonic::{Request, Response, Status};
 
 use crate::mapping::{
     agent_context_from, agent_session_to, agents_snapshot_to, agents_status_from, provider_to,
-    size_from, status_from,
+    size_from, status_from, usage_report_to,
 };
 
 type SnapshotStream = Pin<Box<dyn Stream<Item = Result<pb::AgentsSnapshot, Status>> + Send>>;
@@ -57,11 +57,14 @@ impl pb::agents_server::Agents for AgentsGrpc {
             .service
             .save_provider(
                 non_empty(r.id),
-                &r.name,
-                &r.program,
-                &r.args,
-                r.enabled,
-                r.is_default,
+                ProviderSettings {
+                    name: r.name,
+                    program: r.program,
+                    args: r.args,
+                    enabled: r.enabled,
+                    is_default: r.is_default,
+                    read_usage: r.read_usage,
+                },
             )
             .await
             .map_err(agents_status_from)?;
@@ -161,6 +164,26 @@ impl pb::agents_server::Agents for AgentsGrpc {
             .dismiss(&session_id(&request.into_inner().id)?)
             .map_err(agents_status_from)?;
         Ok(Response::new(pb::DismissAgentResponse {}))
+    }
+
+    async fn usage(
+        &self,
+        _request: Request<pb::UsageRequest>,
+    ) -> Result<Response<pb::UsageReport>, Status> {
+        let report = self.service.usage().await.map_err(agents_status_from)?;
+        Ok(Response::new(usage_report_to(report)))
+    }
+
+    async fn compact(
+        &self,
+        request: Request<pb::CompactAgentRequest>,
+    ) -> Result<Response<pb::AgentSession>, Status> {
+        let session = self
+            .service
+            .compact(&session_id(&request.into_inner().id)?)
+            .await
+            .map_err(agents_status_from)?;
+        Ok(Response::new(agent_session_to(session)))
     }
 
     type WatchStream = SnapshotStream;

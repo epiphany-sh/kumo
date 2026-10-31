@@ -1061,6 +1061,23 @@ class AgentsClient extends $grpc.Client {
         options: options);
   }
 
+  /// What's left on each connected agent's plan and how full each running
+  /// session's context is, as last read. Empty when nothing is readable.
+  $grpc.ResponseFuture<$0.UsageReport> usage(
+    $0.UsageRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$usage, request, options: options);
+  }
+
+  /// Types the agent's own compact command (/compact, /compress) and submits it.
+  $grpc.ResponseFuture<$0.AgentSession> compact(
+    $0.CompactAgentRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$compact, request, options: options);
+  }
+
   // method descriptors
 
   static final _$listProviders =
@@ -1113,6 +1130,15 @@ class AgentsClient extends $grpc.Client {
           '/kumo.v1.Agents/Watch',
           ($0.WatchAgentsRequest value) => value.writeToBuffer(),
           $0.AgentsSnapshot.fromBuffer);
+  static final _$usage = $grpc.ClientMethod<$0.UsageRequest, $0.UsageReport>(
+      '/kumo.v1.Agents/Usage',
+      ($0.UsageRequest value) => value.writeToBuffer(),
+      $0.UsageReport.fromBuffer);
+  static final _$compact =
+      $grpc.ClientMethod<$0.CompactAgentRequest, $0.AgentSession>(
+          '/kumo.v1.Agents/Compact',
+          ($0.CompactAgentRequest value) => value.writeToBuffer(),
+          $0.AgentSession.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Agents')
@@ -1203,6 +1229,21 @@ abstract class AgentsServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.WatchAgentsRequest.fromBuffer(value),
         ($0.AgentsSnapshot value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.UsageRequest, $0.UsageReport>(
+        'Usage',
+        usage_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.UsageRequest.fromBuffer(value),
+        ($0.UsageReport value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.CompactAgentRequest, $0.AgentSession>(
+        'Compact',
+        compact_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.CompactAgentRequest.fromBuffer(value),
+        ($0.AgentSession value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.ListProvidersResponse> listProviders_Pre(
@@ -1288,6 +1329,22 @@ abstract class AgentsServiceBase extends $grpc.Service {
 
   $async.Stream<$0.AgentsSnapshot> watch(
       $grpc.ServiceCall call, $0.WatchAgentsRequest request);
+
+  $async.Future<$0.UsageReport> usage_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.UsageRequest> $request) async {
+    return usage($call, await $request);
+  }
+
+  $async.Future<$0.UsageReport> usage(
+      $grpc.ServiceCall call, $0.UsageRequest request);
+
+  $async.Future<$0.AgentSession> compact_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.CompactAgentRequest> $request) async {
+    return compact($call, await $request);
+  }
+
+  $async.Future<$0.AgentSession> compact(
+      $grpc.ServiceCall call, $0.CompactAgentRequest request);
 }
 
 /// Tasks from the tools the user already works with. The board is served

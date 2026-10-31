@@ -1086,6 +1086,7 @@ dependencies = [
  "kumo-grpc",
  "kumo-infrastructure",
  "kumo-proto",
+ "serde_json",
  "tempfile",
  "tokio",
  "tokio-stream",

@@ -15,6 +15,7 @@ pub struct StoredProvider {
     pub custom: bool,
     pub enabled: bool,
     pub is_default: bool,
+    pub read_usage: bool,
 }
 
 pub trait AgentStore: Send + Sync + 'static {

@@ -13,6 +13,11 @@ pub struct AgentPreset {
     /// (it asks to sign in on first use).
     pub login: Option<&'static [&'static str]>,
     pub install_hint: &'static str,
+    /// The CLI's own command to compact its context, typed in.
+    pub compact_command: Option<&'static str>,
+    /// Kumo can read its plan limits and context window (a
+    /// [`UsageSource`](super::UsageSource) reads it).
+    pub reads_usage: bool,
 }
 
 /// Known CLIs. Prompts go as arguments only where the CLI documents it
@@ -27,6 +32,8 @@ pub const PRESETS: &[AgentPreset] = &[
         prompt: PromptStyle::Argument(&["{prompt}"]),
         login: None,
         install_hint: "npm install -g @anthropic-ai/claude-code",
+        compact_command: Some("/compact"),
+        reads_usage: true,
     },
     AgentPreset {
         id: "codex",
@@ -36,6 +43,8 @@ pub const PRESETS: &[AgentPreset] = &[
         prompt: PromptStyle::Argument(&["{prompt}"]),
         login: Some(&["login"]),
         install_hint: "npm install -g @openai/codex",
+        compact_command: Some("/compact"),
+        reads_usage: true,
     },
     AgentPreset {
         id: "gemini",
@@ -45,6 +54,8 @@ pub const PRESETS: &[AgentPreset] = &[
         prompt: PromptStyle::Argument(&["-i", "{prompt}"]),
         login: None,
         install_hint: "npm install -g @google/gemini-cli",
+        compact_command: Some("/compress"),
+        reads_usage: false,
     },
     AgentPreset {
         id: "copilot",
@@ -54,6 +65,8 @@ pub const PRESETS: &[AgentPreset] = &[
         prompt: PromptStyle::TypeIn,
         login: None,
         install_hint: "npm install -g @github/copilot",
+        compact_command: None,
+        reads_usage: false,
     },
     AgentPreset {
         id: "grok",
@@ -63,6 +76,8 @@ pub const PRESETS: &[AgentPreset] = &[
         prompt: PromptStyle::TypeIn,
         login: None,
         install_hint: "Install a Grok coding CLI (xAI's Grok Build or a community grok-cli) so `grok` is on your PATH",
+        compact_command: None,
+        reads_usage: false,
     },
     AgentPreset {
         id: "opencode",
@@ -72,6 +87,8 @@ pub const PRESETS: &[AgentPreset] = &[
         prompt: PromptStyle::TypeIn,
         login: Some(&["auth", "login"]),
         install_hint: "npm install -g opencode-ai",
+        compact_command: None,
+        reads_usage: false,
     },
     AgentPreset {
         id: "cursor",
@@ -81,6 +98,8 @@ pub const PRESETS: &[AgentPreset] = &[
         prompt: PromptStyle::TypeIn,
         login: Some(&["login"]),
         install_hint: "curl https://cursor.com/install -fsS | bash",
+        compact_command: None,
+        reads_usage: false,
     },
     AgentPreset {
         id: "aider",
@@ -90,6 +109,8 @@ pub const PRESETS: &[AgentPreset] = &[
         prompt: PromptStyle::TypeIn,
         login: None,
         install_hint: "brew install aider",
+        compact_command: None,
+        reads_usage: false,
     },
     AgentPreset {
         id: "qwen",
@@ -99,6 +120,8 @@ pub const PRESETS: &[AgentPreset] = &[
         prompt: PromptStyle::TypeIn,
         login: None,
         install_hint: "npm install -g @qwen-code/qwen-code",
+        compact_command: None,
+        reads_usage: false,
     },
     AgentPreset {
         id: "amp",
@@ -108,6 +131,8 @@ pub const PRESETS: &[AgentPreset] = &[
         prompt: PromptStyle::TypeIn,
         login: None,
         install_hint: "npm install -g @sourcegraph/amp",
+        compact_command: None,
+        reads_usage: false,
     },
 ];
 

@@ -34,6 +34,7 @@ futures.workspace = true
 bytes.workspace = true
 tempfile.workspace = true
 tonic.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

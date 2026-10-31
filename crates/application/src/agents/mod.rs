@@ -3,5 +3,6 @@
 
 mod monitor;
 mod service;
+mod usage;
 
-pub use service::{AgentPorts, AgentService, AgentsSnapshot, ProviderView};
+pub use service::{AgentPorts, AgentService, AgentsSnapshot, ProviderSettings, ProviderView};
