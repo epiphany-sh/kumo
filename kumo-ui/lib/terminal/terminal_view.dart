@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart'
     show GestureBinding, PointerPanZoomEndEvent, PointerPanZoomStartEvent, PointerPanZoomUpdateEvent, PointerScrollEvent, PointerSignalEvent, kPrimaryButton, kSecondaryButton;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter/services.dart';
 
 import '../engine/grpc_terminal_surface.dart';
@@ -50,7 +51,12 @@ int visibleStart(TermBuffer b, int fit, {int? top, int reflows = 0}) {
   return (top - b.dropped).clamp(0, bottom);
 }
 
-class _TerminalCanvasState extends State<TerminalCanvas> {
+/// Fraction of a line the view sits past [visibleStart]'s line: [frac] while
+/// in the history, none once that line is the bottom.
+double visibleOffset(TermBuffer b, int fit, {int? top, int reflows = 0, double frac = 0}) =>
+    visibleStart(b, fit, top: top, reflows: reflows) < visibleStart(b, fit) ? frac : 0;
+
+class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProviderStateMixin {
   int _cols = 0;
   int _rows = 0;
   final _focus = FocusNode(debugLabel: 'terminal');
@@ -68,9 +74,12 @@ class _TerminalCanvasState extends State<TerminalCanvas> {
   Duration _lastDown = Duration.zero;
   Offset _lastPos = Offset.zero;
 
-  // ---- Scrollback: where the view is, the wheel's leftover fraction of a
-  // line, the scrollbar and the autoscroll of a selection drag.
+  // ---- Scrollback: where the view is (a line and the fraction of it
+  // scrolled past, so the wheel and trackpad move by pixels), the wheel's
+  // leftover fraction of a line for full-screen programs, the scrollbar and
+  // the autoscroll of a selection drag.
   int? _top;
+  double _frac = 0;
   int _seenReflows = 0;
   double _wheelRest = 0;
   bool _barDrag = false;
@@ -81,7 +90,11 @@ class _TerminalCanvasState extends State<TerminalCanvas> {
   Offset _dragAt = Offset.zero;
   double _flingVelocity = 0; // lines per second, trackpad
   Duration _lastPan = Duration.zero;
-  Timer? _fling;
+  // The coast runs on the display's frames, not a timer that beats against
+  // them.
+  late final Ticker _fling;
+  Duration _lastCoast = Duration.zero;
+  Offset _coastAt = Offset.zero;
 
   /// Geometry of the last layout, to map the pointer to cells.
   Size _cell = const Size(7, 15);
@@ -99,6 +112,9 @@ class _TerminalCanvasState extends State<TerminalCanvas> {
   int _firstLine(TermBuffer b) => visibleStart(b, _fit, top: _top, reflows: _seenReflows);
 
   int _bottomLine(TermBuffer b) => visibleStart(b, _fit);
+
+  /// Fraction of a line the view sits past [_firstLine].
+  double _offset(TermBuffer b) => visibleOffset(b, _fit, top: _top, reflows: _seenReflows, frac: _frac);
 
   /// Lines were re-wrapped (a width change): positions in them are gone.
   void _syncReflows(TermBuffer b) {
@@ -125,7 +141,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> {
     final b = _buffer;
     if (b.lines.isEmpty) return const TermPoint(0, 0);
     final first = _firstLine(b);
-    final row = ((local.dy - widget.padding.top) / _cell.height).floor();
+    final row = ((local.dy - widget.padding.top) / _cell.height + _offset(b)).floor();
     final line = first + row;
     if (line >= b.lines.length) return TermPoint(b.lines.length - 1, lineWidth(b.lines.last));
     if (line < first) return TermPoint(first, 0);
@@ -137,24 +153,32 @@ class _TerminalCanvasState extends State<TerminalCanvas> {
 
   // ---- Scrolling
 
-  /// Moves the view [delta] lines (negative: back in history).
-  void _scrollBy(int delta) {
+  /// Moves the view [delta] lines, fractions too (negative: back in
+  /// history). False when it was already at that end.
+  bool _scrollBy(num delta) {
     final b = _buffer;
-    if (b.altScreen || delta == 0) return;
+    if (b.altScreen || delta == 0) return false;
     _syncReflows(b);
-    final bottom = _bottomLine(b);
-    final next = (_firstLine(b) + delta).clamp(0, bottom);
-    setState(() => _top = next >= bottom ? null : b.dropped + next);
-    _flashBar();
+    return _scrollTo(_firstLine(b) + _offset(b) + delta);
   }
 
-  void _scrollTo(int line) {
+  /// Puts [line] (and the [line]'s fraction scrolled past) at the top; at
+  /// the bottom the view follows the output again.
+  bool _scrollTo(num line) {
     final b = _buffer;
     _syncReflows(b);
     final bottom = _bottomLine(b);
-    final next = line.clamp(0, bottom);
-    setState(() => _top = next >= bottom ? null : b.dropped + next);
+    final next = line.clamp(0, bottom).toDouble();
+    final whole = next.floor();
+    final top = whole >= bottom ? null : b.dropped + whole;
+    final frac = top == null ? 0.0 : next - whole;
+    final moved = top != _top || frac != _frac;
+    setState(() {
+      _top = top;
+      _frac = frac;
+    });
     _flashBar();
+    return moved;
   }
 
   void _toBottom() {
@@ -172,16 +196,18 @@ class _TerminalCanvasState extends State<TerminalCanvas> {
 
   /// Wheel or trackpad: [pixels] down (positive: toward newer output). In
   /// history on the main screen; a full-screen program gets arrows, or
-  /// wheel reports when it asked for the mouse.
-  void _wheel(double pixels, Offset local) {
-    _wheelRest += pixels / _cell.height;
-    final lines = _wheelRest.truncate();
-    if (lines == 0) return;
-    _wheelRest -= lines;
+  /// wheel reports when it asked for the mouse. False once the history
+  /// can't go farther that way.
+  bool _wheel(double pixels, Offset local) {
     final surface = widget.surface;
     final grpc = surface is GrpcTerminalSurface ? surface : null;
     final b = _buffer;
     if (grpc != null && (grpc.mouseTracking || b.altScreen)) {
+      // The program moves by whole lines: keep the rest for the next event.
+      _wheelRest += pixels / _cell.height;
+      final lines = _wheelRest.truncate();
+      if (lines == 0) return true;
+      _wheelRest -= lines;
       final up = lines < 0;
       final col = ((local.dx - widget.padding.left) / _cell.width).floor().clamp(0, _cols - 1);
       final row = ((local.dy - widget.padding.top) / _cell.height).floor().clamp(0, _rows - 1);
@@ -190,9 +216,9 @@ class _TerminalCanvasState extends State<TerminalCanvas> {
           : utf8.encode(grpc.applicationCursorKeys ? '\x1bO${up ? 'A' : 'B'}' : '\x1b[${up ? 'A' : 'B'}');
       final bytes = <int>[for (var i = 0; i < math.min(lines.abs(), 12); i++) ...once];
       grpc.sendBytes(bytes);
-      return;
+      return true;
     }
-    _scrollBy(lines);
+    return _scrollBy(pixels / _cell.height);
   }
 
   void _signal(PointerSignalEvent e) {
@@ -222,20 +248,24 @@ class _TerminalCanvasState extends State<TerminalCanvas> {
   /// Trackpad lift: the scroll coasts and slows down, like any macOS view.
   void _panEnd(PointerPanZoomEndEvent e) {
     if (_flingVelocity.abs() < 8 || _buffer.altScreen) return;
-    final at = e.localPosition;
-    _fling = Timer.periodic(const Duration(milliseconds: 16), (t) {
-      _flingVelocity *= 0.93;
-      if (!mounted || _flingVelocity.abs() < 2) {
-        _stopFling();
-        return;
-      }
-      _wheel(_flingVelocity * 0.016 * _cell.height, at);
-    });
+    _coastAt = e.localPosition;
+    _lastCoast = Duration.zero;
+    _stopFling();
+    _fling.start();
+  }
+
+  /// One frame of the coast: as far as the velocity carries it since the
+  /// last frame, slowing down the same per second at 60 or 120 Hz.
+  void _coast(Duration elapsed) {
+    final dt = (elapsed - _lastCoast).inMicroseconds / 1e6;
+    _lastCoast = elapsed;
+    if (dt <= 0) return;
+    _flingVelocity *= math.pow(0.93, dt / 0.016);
+    if (_flingVelocity.abs() < 2 || !_wheel(_flingVelocity * dt * _cell.height, _coastAt)) _stopFling();
   }
 
   void _stopFling() {
-    _fling?.cancel();
-    _fling = null;
+    if (_fling.isActive) _fling.stop();
   }
 
   bool _onBar(Offset local) => local.dx >= _size.width - _barWidth && _buffer.lines.length > _fit && !_buffer.altScreen;
@@ -248,7 +278,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> {
     final track = _size.height - 8;
     final thumb = scrollThumbExtent(track, _fit, b.lines.length);
     final t = ((local.dy - 4 - thumb / 2) / math.max(1, track - thumb)).clamp(0.0, 1.0);
-    _scrollTo((t * bottom).round());
+    _scrollTo(t * bottom);
   }
 
   // ---- Selection and pointer
@@ -420,6 +450,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> {
   @override
   void initState() {
     super.initState();
+    _fling = createTicker(_coast);
     _focus.addListener(() => setState(() => _hasFocus = _focus.hasFocus));
     if (widget.active) _grabKeyboard();
   }
@@ -438,7 +469,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> {
   void dispose() {
     _barTimer?.cancel();
     _stopAutoScroll();
-    _stopFling();
+    _fling.dispose();
     _focus.dispose();
     _renderer.dispose();
     super.dispose();
@@ -562,6 +593,8 @@ class _TerminalCanvasState extends State<TerminalCanvas> {
             cellWidth: cell.width,
             focused: _hasFocus,
             top: _top,
+            frac: _frac,
+            devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
             reflows: _seenReflows,
             selection: _sel,
             selectionDropped: _selDropped,
@@ -683,6 +716,8 @@ class _TerminalPainter extends CustomPainter {
     required this.cellWidth,
     required this.focused,
     this.top,
+    this.frac = 0,
+    this.devicePixelRatio = 1,
     this.reflows = 0,
     this.selection,
     this.selectionDropped = 0,
@@ -701,6 +736,8 @@ class _TerminalPainter extends CustomPainter {
   final double cellWidth;
   final bool focused;
   final int? top;
+  final double frac;
+  final double devicePixelRatio;
   final int reflows;
   final TermSelection? selection;
   final int selectionDropped;
@@ -718,11 +755,17 @@ class _TerminalPainter extends CustomPainter {
     // Line-oriented surfaces (mocks) get +1 row for the prompt/cursor line.
     final maxLines = cursor != null ? fit : math.max(1, fit - 1);
     final start = visibleStart(b, fit, top: top, reflows: reflows);
-    final end = math.min(b.lines.length, start + maxLines);
-    final atBottom = end >= b.lines.length;
+    final offset = visibleOffset(b, fit, top: top, reflows: reflows, frac: frac);
+    // Part of a line scrolled off the top shows part of one more below.
+    final end = math.min(b.lines.length, start + maxLines + (offset > 0 ? 1 : 0));
+    final atBottom = start + maxLines >= b.lines.length;
 
     canvas.save();
     canvas.clipRect(Offset.zero & size);
+    // Shifted on whole device pixels, so text stays crisp mid-scroll.
+    canvas
+      ..save()
+      ..translate(0, -(offset * lineExtent * devicePixelRatio).round() / devicePixelRatio);
     var y = padding.top;
     for (var i = start; i < end; i++) {
       final line = b.lines[i];
@@ -754,12 +797,13 @@ class _TerminalPainter extends CustomPainter {
     } else if (b.cursorVisible && atBottom) {
       _paintPromptCursor(canvas, y);
     }
-    if (showBar && !b.altScreen && b.lines.length > maxLines) _paintBar(canvas, size, start, b.lines.length - maxLines, maxLines, b.lines.length);
+    canvas.restore();
+    if (showBar && !b.altScreen && b.lines.length > maxLines) _paintBar(canvas, size, start + offset, b.lines.length - maxLines, maxLines, b.lines.length);
     canvas.restore();
   }
 
   /// A thin thumb on the right edge: where the view is in the history.
-  void _paintBar(Canvas canvas, Size size, int start, int bottom, int fit, int total) {
+  void _paintBar(Canvas canvas, Size size, double start, int bottom, int fit, int total) {
     final track = size.height - 8;
     final thumb = scrollThumbExtent(track, fit, total);
     final y = 4.0 + (bottom <= 0 ? 0.0 : (track - thumb) * start / bottom);
@@ -813,6 +857,8 @@ class _TerminalPainter extends CustomPainter {
       old.cellWidth != cellWidth ||
       old.lineExtent != lineExtent ||
       old.top != top ||
+      old.frac != frac ||
+      old.devicePixelRatio != devicePixelRatio ||
       old.reflows != reflows ||
       old.selection != selection ||
       old.selectionDropped != selectionDropped ||
