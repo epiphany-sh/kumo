@@ -6,6 +6,7 @@ use kumo_domain::changes::ChangeWatcher;
 use kumo_domain::workspace::{
     BranchName, Branches, Git, Namespace, NamespaceId, NewWorktree, Remote, Repo, RepoFinder,
     RepoState, WorkspaceError, WorkspaceSnapshot, WorkspaceStore, Worktree, WorktreeLocation,
+    WorktreeRemoval,
 };
 use tokio::sync::{Mutex, watch};
 
@@ -211,13 +212,16 @@ impl WorkspaceService {
         Ok(created)
     }
 
-    /// `git worktree remove`; the branch stays.
+    /// `git worktree remove`. Without `force`, one with changes stays as
+    /// it is (not an error: the caller can ask to force it). With
+    /// `delete_branch`, its branch goes too if it's merged.
     pub async fn remove_worktree(
         &self,
         repo_path: &Path,
         worktree: &Path,
         force: bool,
-    ) -> Result<(), WorkspaceError> {
+        delete_branch: bool,
+    ) -> Result<WorktreeRemoval, WorkspaceError> {
         let mut state = self.state.lock().await;
         let repo_state = state
             .repos
@@ -232,14 +236,44 @@ impl WorkspaceService {
             return Err(WorkspaceError::CannotRemoveMainCheckout);
         }
         let repo = repo_state.repo.clone();
+        let branch = target.branch.clone().filter(|_| delete_branch);
         let git = Arc::clone(&self.ports.git);
         let (repo_path, worktree_path) = (repo.path.clone(), target.path.clone());
-        blocking(move || git.remove_worktree(&repo_path, &worktree_path, force)).await?;
+        let removal = blocking(move || {
+            match git.remove_worktree(&repo_path, &worktree_path, force) {
+                Ok(()) => {}
+                Err(WorkspaceError::HasChanges(_)) => {
+                    let changed_files = git
+                        .status(&worktree_path)
+                        .map_or(0, |status| status.changed_files);
+                    return Ok(WorktreeRemoval {
+                        removed: false,
+                        changed_files,
+                        branch_kept: None,
+                    });
+                }
+                Err(e) => return Err(e),
+            }
+            let branch_kept = branch.and_then(|branch| {
+                git.delete_branch(&repo_path, &branch)
+                    .err()
+                    .map(|e| e.to_string())
+            });
+            Ok(WorktreeRemoval {
+                removed: true,
+                changed_files: 0,
+                branch_kept,
+            })
+        })
+        .await?;
+        if !removal.removed {
+            return Ok(removal);
+        }
         tracing::info!(repo = %repo.path.display(), worktree = %worktree.display(), "worktree removed");
 
         self.reread(&mut state, repo).await;
         self.publish(&mut state);
-        Ok(())
+        Ok(removal)
     }
 
     /// Branches of a repository in the workspace.

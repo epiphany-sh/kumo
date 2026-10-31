@@ -150,7 +150,25 @@ impl Git for GitCli {
             args.push(OsStr::new("--force"));
         }
         args.push(worktree.as_os_str());
-        self.run(repo, args).map(drop)
+        self.exec(repo, args).map(drop).map_err(|e| {
+            if e.contains("contains modified or untracked files") {
+                WorkspaceError::HasChanges(worktree.into())
+            } else {
+                WorkspaceError::Git(e)
+            }
+        })
+    }
+
+    fn delete_branch(&self, repo: &Path, branch: &str) -> Result<(), WorkspaceError> {
+        self.exec(repo, ["branch", "-d", "--", branch])
+            .map(drop)
+            .map_err(|e| {
+                if e.contains("not fully merged") {
+                    WorkspaceError::BranchNotMerged(branch.to_owned())
+                } else {
+                    WorkspaceError::Git(e)
+                }
+            })
     }
 
     fn branches(&self, repo: &Path) -> Result<Branches, WorkspaceError> {

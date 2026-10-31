@@ -32,9 +32,10 @@ pub fn workspace_status_from(error: WorkspaceError) -> Status {
         WorkspaceError::RepoNotFound(_)
         | WorkspaceError::WorktreeNotFound(_)
         | WorkspaceError::NamespaceNotFound(_) => Status::not_found(message),
-        WorkspaceError::CannotRemoveMainCheckout | WorkspaceError::Git(_) => {
-            Status::failed_precondition(message)
-        }
+        WorkspaceError::CannotRemoveMainCheckout
+        | WorkspaceError::HasChanges(_)
+        | WorkspaceError::BranchNotMerged(_)
+        | WorkspaceError::Git(_) => Status::failed_precondition(message),
         WorkspaceError::Store(_) => Status::internal(message),
     }
 }

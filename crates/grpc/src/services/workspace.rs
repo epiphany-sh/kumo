@@ -127,15 +127,21 @@ impl pb::workspace_server::Workspace for WorkspaceGrpc {
         request: Request<pb::RemoveWorktreeRequest>,
     ) -> Result<Response<pb::RemoveWorktreeResponse>, Status> {
         let request = request.into_inner();
-        self.service
+        let removal = self
+            .service
             .remove_worktree(
                 PathBuf::from(request.repo_path).as_path(),
                 PathBuf::from(request.worktree_path).as_path(),
                 request.force,
+                request.delete_branch,
             )
             .await
             .map_err(workspace_status_from)?;
-        Ok(Response::new(pb::RemoveWorktreeResponse {}))
+        Ok(Response::new(pb::RemoveWorktreeResponse {
+            removed: removal.removed,
+            changed_files: removal.changed_files,
+            branch_kept: removal.branch_kept.unwrap_or_default(),
+        }))
     }
 
     async fn list_branches(

@@ -18,12 +18,17 @@ pub trait Git: Send + Sync + 'static {
     fn worktrees(&self, repo: &Path) -> Result<Vec<Worktree>, WorkspaceError>;
     fn status(&self, worktree: &Path) -> Result<WorktreeStatus, WorkspaceError>;
     fn add_worktree(&self, repo: &Path, worktree: &NewWorktree) -> Result<(), WorkspaceError>;
+    /// Without `force`, a worktree with changes (ignored files aside) is
+    /// left as is: [`WorkspaceError::HasChanges`].
     fn remove_worktree(
         &self,
         repo: &Path,
         worktree: &Path,
         force: bool,
     ) -> Result<(), WorkspaceError>;
+    /// `git branch -d`: only a merged branch ([`WorkspaceError::BranchNotMerged`]
+    /// otherwise).
+    fn delete_branch(&self, repo: &Path, branch: &str) -> Result<(), WorkspaceError>;
     fn branches(&self, repo: &Path) -> Result<Branches, WorkspaceError>;
 }
 

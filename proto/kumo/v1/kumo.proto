@@ -154,7 +154,8 @@ service Workspace {
   // Only the group: repositories and worktrees stay on disk.
   rpc DeleteNamespace(DeleteNamespaceRequest) returns (DeleteNamespaceResponse);
   rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse);
-  // `git worktree remove`; the branch stays. The main checkout can't be removed.
+  // `git worktree remove`; the branch stays unless `delete_branch`. The main
+  // checkout can't be removed. One with changes is left as is unless `force`.
   rpc RemoveWorktree(RemoveWorktreeRequest) returns (RemoveWorktreeResponse);
   // Branches to start a worktree from or check out.
   rpc ListBranches(ListBranchesRequest) returns (ListBranchesResponse);
@@ -280,9 +281,18 @@ message RemoveWorktreeRequest {
   string worktree_path = 2;
   // Also remove it with uncommitted changes.
   bool force = 3;
+  // Also delete its branch, if merged (`git branch -d`).
+  bool delete_branch = 4;
 }
 
-message RemoveWorktreeResponse {}
+message RemoveWorktreeResponse {
+  // False when it has changes and `force` wasn't set: nothing was touched.
+  bool removed = 1;
+  // Files with changes, when that's why it wasn't removed.
+  uint32 changed_files = 2;
+  // `delete_branch` was set but the branch stays: why (e.g. not merged).
+  string branch_kept = 3;
+}
 
 message ListBranchesRequest {
   string repo_path = 1;
