@@ -269,8 +269,6 @@ fn io_error(error: std::io::Error) -> AgentError {
 
 #[cfg(test)]
 mod tests {
-    use std::process::{Command, Stdio};
-
     use super::*;
     use kumo_domain::agents::UsageUnit;
 
@@ -400,8 +398,11 @@ mod tests {
     }
 
     /// Runs `command` in sh with `input` on stdin, as Claude Code does.
+    #[cfg(unix)]
     fn run(command: &str, input: &str) -> String {
         use std::io::Write;
+        use std::process::{Command, Stdio};
+
         let mut child = Command::new("sh")
             .arg("-c")
             .arg(command)
