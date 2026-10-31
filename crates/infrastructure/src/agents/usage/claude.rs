@@ -12,7 +12,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use kumo_domain::agents::{
     AgentError, AgentSessionId, ContextReading, PlanReading, UsageReading, UsageSource,
@@ -23,6 +23,8 @@ use serde_json::{Map, Value, json};
 
 const SETTINGS: &str = "settings.json";
 const STATUS: &str = "status.json";
+/// A session folder untouched this long belongs to no session anymore.
+const KEEP_FOR: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 
 /// [`UsageSource`] for Claude Code. One folder per session under `root`.
 #[derive(Debug)]
@@ -34,10 +36,10 @@ pub struct ClaudeStatusLine {
 }
 
 impl ClaudeStatusLine {
-    /// `root`: e.g. `<data_dir>/agents`. Folders left by an earlier run
-    /// (its sessions ended with it) are removed.
+    /// `root`: e.g. `<data_dir>/agents`. Folders nothing wrote to for
+    /// [`KEEP_FOR`] are removed; recent ones stay, whatever ran them.
     pub fn new(root: &Path, home: &Path) -> Self {
-        let _ = std::fs::remove_dir_all(root);
+        prune(root, SystemTime::now());
         Self {
             root: root.to_owned(),
             home: home.to_owned(),
@@ -90,6 +92,27 @@ impl UsageSource for ClaudeStatusLine {
             .unwrap_or_else(PoisonError::into_inner)
             .remove(&target.session_id);
         let _ = std::fs::remove_dir_all(self.dir(&target.session_id));
+    }
+}
+
+/// Removes the session folders under `root` last written before
+/// `now - KEEP_FOR`. Every status update renames a file in its folder,
+/// which touches the folder.
+fn prune(root: &Path, now: SystemTime) {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return;
+    };
+    let Some(cutoff) = now.checked_sub(KEEP_FOR) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let old = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .is_ok_and(|modified| modified < cutoff);
+        if old && entry.file_type().is_ok_and(|t| t.is_dir()) {
+            let _ = std::fs::remove_dir_all(entry.path());
+        }
     }
 }
 
@@ -500,6 +523,32 @@ mod tests {
                 .unwrap()
                 .contains("sed -n")
         );
+    }
+
+    #[test]
+    fn only_folders_untouched_for_a_week_are_pruned() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir(root.path().join("s1")).unwrap();
+        std::fs::write(root.path().join("s1").join(STATUS), "{}").unwrap();
+        std::fs::write(root.path().join("stray-file"), "").unwrap();
+
+        // Starting again now (a quick restart): everything stays.
+        let home = tempfile::tempdir().unwrap();
+        ClaudeStatusLine::new(root.path(), home.path());
+        prune(
+            root.path(),
+            SystemTime::now() + Duration::from_secs(6 * 24 * 60 * 60),
+        );
+        assert!(root.path().join("s1").join(STATUS).exists());
+
+        // Eight days later: the folder goes, anything else stays.
+        prune(
+            root.path(),
+            SystemTime::now() + Duration::from_secs(8 * 24 * 60 * 60),
+        );
+        assert!(!root.path().join("s1").exists());
+        assert!(root.path().join("stray-file").exists());
+        prune(&root.path().join("missing"), SystemTime::now());
     }
 
     #[cfg(unix)]
