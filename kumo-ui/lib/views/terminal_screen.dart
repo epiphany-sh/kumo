@@ -1372,12 +1372,14 @@ class _UpdateReady extends StatelessWidget {
         builder: (context, close) => KMenuPanel(width: 280, children: [
           KMenuItem(
             icon: KIcons.refresh,
-            label: 'Restart kumod now',
+            // Kumo, not just kumod: the open terminals and streams start over
+            // with the new daemon.
+            label: 'Restart Kumo now',
             note: n == 0 ? 'No terminal is running.' : 'Closes $n running ${n == 1 ? 'terminal' : 'terminals'}. Otherwise it restarts when the last one ends.',
             danger: n > 0,
             onTap: () {
               close();
-              engine.restartDaemon(force: true);
+              AppScope.of(context).updates.relaunch();
             },
           ),
         ]),

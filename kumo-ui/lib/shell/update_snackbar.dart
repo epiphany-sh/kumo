@@ -64,7 +64,7 @@ class _UpdateSnackbarState extends State<UpdateSnackbar> {
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                               Text('Kumo $version is ready', style: sans(13, weight: FontWeight.w600, color: c.text)),
                               const SizedBox(height: 2),
-                              Text('Restart to use it, or it installs when Kumo quits.', style: sans(12, color: c.text3)),
+                              Text('Restarting closes terminals, or it installs on quit.', style: sans(12, color: c.text3)),
                             ]),
                           ),
                           const SizedBox(width: 10),

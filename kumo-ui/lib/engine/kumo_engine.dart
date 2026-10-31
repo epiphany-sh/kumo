@@ -75,14 +75,41 @@ class KumoEngine extends ChangeNotifier {
   bool _restarting = false;
   Timer? _idleCheck;
 
+  /// Kumo quits to install an update or relaunch (see [stopForUpdate]).
+  bool _stopped = false;
+
   Future<EngineConnection>? _connecting;
 
   /// The live connection, connecting (and launching `kumod`) if needed.
   /// After a failure, the next call tries again.
   Future<EngineConnection> connection() {
+    if (_stopped) return Future.error(StateError('kumod stopped: Kumo is restarting'));
     final ready = _connection;
     if (ready != null) return Future.value(ready);
     return _connecting ??= _connect().whenComplete(() => _connecting = null);
+  }
+
+  /// Stops the daemon, and its terminals with it, right before Kumo quits to
+  /// install an update or relaunch: the next Kumo starts the new program
+  /// instead of finding the old one running. Nothing reconnects afterwards,
+  /// which would launch the old program again.
+  Future<void> stopForUpdate() async {
+    if (_stopped) return;
+    _stopped = true;
+    _restarting = true;
+    _idleCheck?.cancel();
+    final conn = _connection ?? await _connecting?.then<EngineConnection?>((c) => c, onError: (Object _) => null);
+    _connection = null;
+    notifyListeners();
+    if (conn == null) return;
+    try {
+      await conn.core.shutdown(ShutdownRequest(ifIdle: false), options: CallOptions(timeout: const Duration(seconds: 3)));
+      await conn.channel.shutdown();
+      await discovery.waitGone(conn.endpoint.pid);
+    } on Object catch (e) {
+      // Kumo quits anyway; the next one restarts an outdated daemon itself.
+      debugPrint('kumo: stopping kumod before the restart failed: $e');
+    }
   }
 
   Future<EngineConnection> _connect() async {

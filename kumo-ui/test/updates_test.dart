@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/app/kumo_app.dart';
@@ -33,7 +33,7 @@ void main() {
 
     updates.download('0.2.0');
     await tester.pump();
-    expect(find.byTooltip('Kumo 0.2.0 is downloaded. Restart to use it; otherwise it installs when Kumo quits.'), findsOneWidget);
+    expect(find.byTooltip('Kumo 0.2.0 is downloaded. Restart to use it (open terminals close); otherwise it installs when Kumo quits.'), findsOneWidget);
     await tester.tap(find.text('Restart to update'));
     expect(updates.installs, 1);
     expect(tester.takeException(), isNull);
@@ -65,5 +65,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Kumo 0.2.1 is ready'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  test('Sparkle installs only once the daemon has stopped', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final calls = <String>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('kumo/updates'),
+      (call) async {
+        calls.add(call.method);
+        return null;
+      },
+    );
+    final updates = SparkleUpdates(stopDaemon: () async => calls.add('stop kumod'));
+    await updates.installAndRelaunch();
+    expect(calls, ['stop kumod', 'install']);
+    await updates.relaunch();
+    expect(calls, ['stop kumod', 'install', 'stop kumod', 'relaunch']);
   });
 }
