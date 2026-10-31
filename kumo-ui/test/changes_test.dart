@@ -85,14 +85,15 @@ void main() {
 
   test('widgets reorder like ReorderableListView', () {
     final s = AppState();
+    expect(s.widgets, [InspectorWidget.agent, InspectorWidget.session, InspectorWidget.pipelines, InspectorWidget.changes]);
     s.reorderWidget(0, 4); // agent to the end
-    expect(s.widgets, [InspectorWidget.pipelines, InspectorWidget.changes, InspectorWidget.context, InspectorWidget.agent]);
+    expect(s.widgets, [InspectorWidget.session, InspectorWidget.pipelines, InspectorWidget.changes, InspectorWidget.agent]);
     s.moveWidget(InspectorWidget.agent, -1);
-    expect(s.widgets.last, InspectorWidget.context);
+    expect(s.widgets.last, InspectorWidget.changes);
     s.addWidget(InspectorWidget.tests);
     s.removeWidget(InspectorWidget.changes);
-    expect(s.widgets, [InspectorWidget.pipelines, InspectorWidget.agent, InspectorWidget.context, InspectorWidget.tests]);
-    expect(s.availableWidgets, containsAll([InspectorWidget.changes, InspectorWidget.pullRequest, InspectorWidget.activity]));
+    expect(s.widgets, [InspectorWidget.session, InspectorWidget.pipelines, InspectorWidget.agent, InspectorWidget.tests]);
+    expect(s.availableWidgets, containsAll([InspectorWidget.changes, InspectorWidget.context, InspectorWidget.pullRequest, InspectorWidget.activity]));
     s.dispose();
   });
 }

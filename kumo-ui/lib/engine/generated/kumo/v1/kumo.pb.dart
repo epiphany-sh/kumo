@@ -5336,7 +5336,7 @@ class StartAgentRequest extends $pb.GeneratedMessage {
   $pb.PbList<AgentContext> get context => $_getList(6);
 }
 
-/// A ticket or page an agent was given.
+/// A ticket, page or piece of code an agent was given.
 class AgentContext extends $pb.GeneratedMessage {
   factory AgentContext({
     AgentContextKind? kind,
@@ -12039,6 +12039,278 @@ class Doc extends $pb.GeneratedMessage {
   $core.bool hasFile() => $_has(4);
   @$pb.TagNumber(5)
   void clearFile() => $_clearField(5);
+}
+
+class BrowseDocsRequest extends $pb.GeneratedMessage {
+  factory BrowseDocsRequest({
+    $core.String? sourceId,
+    $core.String? parent,
+    $core.int? limit,
+    $core.bool? refresh,
+  }) {
+    final result = BrowseDocsRequest._();
+    if (sourceId != null) result.sourceId = sourceId;
+    if (parent != null) result.parent = parent;
+    if (limit != null) result.limit = limit;
+    if (refresh != null) result.refresh = refresh;
+    return result;
+  }
+
+  BrowseDocsRequest._();
+
+  factory BrowseDocsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BrowseDocsRequest()..mergeFromBuffer(data, registry);
+  factory BrowseDocsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BrowseDocsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BrowseDocsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: BrowseDocsRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'sourceId')
+    ..aOS(2, _omitFieldNames ? '' : 'parent')
+    ..aI(3, _omitFieldNames ? '' : 'limit', fieldType: $pb.PbFieldType.OU3)
+    ..aOB(4, _omitFieldNames ? '' : 'refresh')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BrowseDocsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BrowseDocsRequest copyWith(void Function(BrowseDocsRequest) updates) =>
+      super.copyWith((message) => updates(message as BrowseDocsRequest))
+          as BrowseDocsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use BrowseDocsRequest() / BrowseDocsRequest.new instead')
+  static BrowseDocsRequest create() => BrowseDocsRequest._();
+  static $pb.GeneratedMessage $_createMessage() => BrowseDocsRequest._();
+  @$core.override
+  BrowseDocsRequest createEmptyInstance() => BrowseDocsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static BrowseDocsRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<BrowseDocsRequest>(
+          BrowseDocsRequest.$_createMessage);
+  static BrowseDocsRequest? _defaultInstance;
+
+  /// DocSource.id.
+  @$pb.TagNumber(1)
+  $core.String get sourceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sourceId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSourceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSourceId() => $_clearField(1);
+
+  /// A DocNode.key from the level above; empty for the top level.
+  @$pb.TagNumber(2)
+  $core.String get parent => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set parent($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasParent() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearParent() => $_clearField(2);
+
+  /// 0 = 200.
+  @$pb.TagNumber(3)
+  $core.int get limit => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set limit($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasLimit() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearLimit() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get refresh => $_getBF(3);
+  @$pb.TagNumber(4)
+  set refresh($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRefresh() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRefresh() => $_clearField(4);
+}
+
+/// A space, a folder or a page within a level.
+class DocNode extends $pb.GeneratedMessage {
+  factory DocNode({
+    $core.String? key,
+    $core.String? title,
+    DocSummary? doc,
+    $core.int? children,
+    $core.String? note,
+  }) {
+    final result = DocNode._();
+    if (key != null) result.key = key;
+    if (title != null) result.title = title;
+    if (doc != null) result.doc = doc;
+    if (children != null) result.children = children;
+    if (note != null) result.note = note;
+    return result;
+  }
+
+  DocNode._();
+
+  factory DocNode.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DocNode()..mergeFromBuffer(data, registry);
+  factory DocNode.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DocNode()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DocNode',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DocNode.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'key')
+    ..aOS(2, _omitFieldNames ? '' : 'title')
+    ..aOM<DocSummary>(3, _omitFieldNames ? '' : 'doc',
+        subBuilder: DocSummary.$_createMessage)
+    ..aI(4, _omitFieldNames ? '' : 'children', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(5, _omitFieldNames ? '' : 'note')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DocNode clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DocNode copyWith(void Function(DocNode) updates) =>
+      super.copyWith((message) => updates(message as DocNode)) as DocNode;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use DocNode() / DocNode.new instead')
+  static DocNode create() => DocNode._();
+  static $pb.GeneratedMessage $_createMessage() => DocNode._();
+  @$core.override
+  DocNode createEmptyInstance() => DocNode._();
+  @$core.pragma('dart2js:noInline')
+  static DocNode getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DocNode>(DocNode.$_createMessage);
+  static DocNode? _defaultInstance;
+
+  /// Opaque; sent back as `parent` to list what is under it. Unique in its level.
+  @$pb.TagNumber(1)
+  $core.String get key => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set key($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get title => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set title($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTitle() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTitle() => $_clearField(2);
+
+  /// Set when it is a page that can be read (Docs.Read with doc.id); unset
+  /// for a space or a folder.
+  @$pb.TagNumber(3)
+  DocSummary get doc => $_getN(2);
+  @$pb.TagNumber(3)
+  set doc(DocSummary value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDoc() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDoc() => $_clearField(3);
+  @$pb.TagNumber(3)
+  DocSummary ensureDoc() => $_ensure(2);
+
+  /// Entries under it; 0 = nothing to go into. When counting would cost a
+  /// request per node, 1 stands for "has children" (Confluence pages).
+  @$pb.TagNumber(4)
+  $core.int get children => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set children($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasChildren() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearChildren() => $_clearField(4);
+
+  /// A short tag shown next to the title, e.g. "archived"; usually empty.
+  @$pb.TagNumber(5)
+  $core.String get note => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set note($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasNote() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearNote() => $_clearField(5);
+}
+
+class DocLevel extends $pb.GeneratedMessage {
+  factory DocLevel({
+    $core.Iterable<DocNode>? nodes,
+    $core.bool? truncated,
+  }) {
+    final result = DocLevel._();
+    if (nodes != null) result.nodes.addAll(nodes);
+    if (truncated != null) result.truncated = truncated;
+    return result;
+  }
+
+  DocLevel._();
+
+  factory DocLevel.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DocLevel()..mergeFromBuffer(data, registry);
+  factory DocLevel.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DocLevel()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DocLevel',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DocLevel.$_createMessage)
+    ..pPM<DocNode>(1, _omitFieldNames ? '' : 'nodes',
+        subBuilder: DocNode.$_createMessage)
+    ..aOB(2, _omitFieldNames ? '' : 'truncated')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DocLevel clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DocLevel copyWith(void Function(DocLevel) updates) =>
+      super.copyWith((message) => updates(message as DocLevel)) as DocLevel;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use DocLevel() / DocLevel.new instead')
+  static DocLevel create() => DocLevel._();
+  static $pb.GeneratedMessage $_createMessage() => DocLevel._();
+  @$core.override
+  DocLevel createEmptyInstance() => DocLevel._();
+  @$core.pragma('dart2js:noInline')
+  static DocLevel getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DocLevel>(DocLevel.$_createMessage);
+  static DocLevel? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<DocNode> get nodes => $_getList(0);
+
+  /// More entries exist than `limit`.
+  @$pb.TagNumber(2)
+  $core.bool get truncated => $_getBF(1);
+  @$pb.TagNumber(2)
+  set truncated($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTruncated() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTruncated() => $_clearField(2);
 }
 
 class WatchTestsRequest extends $pb.GeneratedMessage {

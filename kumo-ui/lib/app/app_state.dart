@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../data/agents_source.dart';
+import '../data/ai_usage_source.dart';
 import '../data/ci_hosts_source.dart';
 import '../data/pipelines_source.dart';
 import '../data/docs_source.dart';
@@ -16,6 +17,7 @@ import '../data/models.dart';
 import '../editor/file_buffers.dart';
 import '../platform/updates.dart';
 import '../theme/palette.dart';
+import '../widgets/usage_meter.dart';
 import 'preferences.dart';
 
 enum KumoView {
@@ -79,6 +81,7 @@ class AppState extends ChangeNotifier {
     WorkspaceSource? workspace,
     WorktreeChanges Function(String worktreePath)? changesFor,
     AgentsSource? agents,
+    AiUsageSource? usage,
     TasksSource? tasks,
     PipelinesFactory? pipelinesFor,
     TestsSource Function(String worktreePath)? testsFor,
@@ -89,6 +92,7 @@ class AppState extends ChangeNotifier {
   })  : prefs = prefs ?? Preferences.memory(),
         workspace = workspace ?? MockWorkspaceSource(),
         agents = agents ?? MockAgentsSource(),
+        usage = usage ?? MockAiUsageSource(),
         tasks = tasks ?? MockTasksSource(),
         _changesFor = changesFor,
         _pipelinesFor = pipelinesFor ?? mockPipelinesFor,
@@ -104,6 +108,7 @@ class AppState extends ChangeNotifier {
     _bindTests();
     this.workspace.addListener(_onWorkspaceChanged);
     this.agents.addListener(notifyListeners);
+    this.usage.addListener(notifyListeners);
     this.updates.addListener(notifyListeners);
     final p = this.prefs;
     final saved = p.get<String>('theme', '');
@@ -113,6 +118,7 @@ class AppState extends ChangeNotifier {
     _translucency = p.get<double>('translucency', _translucency).clamp(0.25, 0.9).toDouble();
     _sidePanelRight = p.get<bool>('sidePanel.right', false);
     _sidePanelOpen = p.get<bool>('sidePanel.onLaunch', true);
+    _sidebarWidth = p.get<num>('sidebar.width', defaultSidebarWidth).toDouble().clamp(minSidebarWidth, maxSidebarWidth).toDouble();
     _sidePanelTab = SidePanelTab.values.where((t) => t.name == p.get<String>('sidePanel.tab', 'widgets')).firstOrNull ?? SidePanelTab.widgets;
   }
 
@@ -167,6 +173,23 @@ class AppState extends ChangeNotifier {
 
   bool _sidebarVisible = true;
   bool get sidebarVisible => _sidebarVisible;
+
+  /// Width of the sidebar: its right edge drags between [minSidebarWidth]
+  /// and [maxSidebarWidth]; double-click goes back to the default.
+  static const minSidebarWidth = 220.0;
+  static const maxSidebarWidth = 420.0;
+  static const defaultSidebarWidth = 252.0;
+  double _sidebarWidth = defaultSidebarWidth;
+  double get sidebarWidth => _sidebarWidth;
+  set sidebarWidth(double v) {
+    final w = v.clamp(minSidebarWidth, maxSidebarWidth).toDouble();
+    if (w == _sidebarWidth) return;
+    _sidebarWidth = w;
+    notifyListeners();
+  }
+
+  /// Keeps the width for the next launch (once a drag ends, not per frame).
+  void saveSidebarWidth() => prefs.set('sidebar.width', _sidebarWidth);
   void toggleSidebar() {
     _sidebarVisible = !_sidebarVisible;
     notifyListeners();
@@ -361,9 +384,11 @@ class AppState extends ChangeNotifier {
   /// Visible worktrees of [repo] (deleted ones filtered out).
   List<Worktree> worktreesOf(Repo repo) => [for (final w in repo.worktrees) if (!isWorktreeRemoved(repo, w)) w];
 
-  /// `git worktree remove` (the branch stays), once the undo window closes.
-  /// The principal checkout is not a worktree and can't be removed.
-  void deleteWorktree(String repoId, String branch) {
+  /// `git worktree remove`, once the undo window closes. With changes in
+  /// it, git keeps it and Kumo offers to [force] it (dropping them). With
+  /// [deleteBranch], its branch goes too if it's merged. The principal
+  /// checkout is not a worktree and can't be removed.
+  void deleteWorktree(String repoId, String branch, {bool force = false, bool deleteBranch = false}) {
     final repo = workspace.repo(repoId);
     final w = repo?.worktrees.where((w) => w.branch == branch).firstOrNull;
     if (repo == null || w == null || w.isMain) return;
@@ -378,10 +403,22 @@ class AppState extends ChangeNotifier {
     _offerUndo(
       'Deleted worktree “$branch”',
       () => _removedWorktrees.remove(key),
-      commit: () => workspace.removeWorktree(repo, w).then(
-            (_) {
+      commit: () => workspace.removeWorktree(repo, w, force: force, deleteBranch: deleteBranch).then(
+            (r) {
               _removedWorktrees.remove(key);
+              if (!r.removed) {
+                final files = r.changedFiles == 1 ? '1 changed file' : '${r.changedFiles} changed files';
+                _offerUndo(
+                  '“$branch” has $files',
+                  () => deleteWorktree(repoId, branch, force: true, deleteBranch: deleteBranch),
+                  action: 'Delete anyway',
+                );
+                return;
+              }
               _closeWorktreeTerminals(directory);
+              if (r.branchKept.isNotEmpty) {
+                _offerUndo('${r.branchKept[0].toUpperCase()}${r.branchKept.substring(1)}: kept', () {}, action: null);
+              }
             },
             // Git refused (e.g. uncommitted changes): show it again.
             onError: (Object _) {
@@ -424,10 +461,11 @@ class AppState extends ChangeNotifier {
   /// Shows an undo toast. [commit] runs when the window closes without an
   /// undo (destructive work happens only then), or when another undoable
   /// action replaces this one.
-  void _offerUndo(String message, VoidCallback restore, {VoidCallback? commit}) {
+  /// [action] labels the button that runs [restore] (null: no button).
+  void _offerUndo(String message, VoidCallback restore, {VoidCallback? commit, String? action = 'Undo'}) {
     _undoTimer?.cancel();
     _runPendingCommit();
-    _undo = UndoNotice(message, restore);
+    _undo = UndoNotice(message, restore, action: action);
     _pendingCommit = commit;
     _undoTimer = Timer(const Duration(seconds: 8), dismissUndo);
     notifyListeners();
@@ -785,7 +823,7 @@ class AppState extends ChangeNotifier {
 
   // ---- Inspector widgets (the Widgets tab) ----
 
-  List<InspectorWidget> _widgets = const [InspectorWidget.agent, InspectorWidget.pipelines, InspectorWidget.changes, InspectorWidget.context];
+  List<InspectorWidget> _widgets = const [InspectorWidget.agent, InspectorWidget.session, InspectorWidget.pipelines, InspectorWidget.changes];
   List<InspectorWidget> get widgets => List.unmodifiable(_widgets);
   List<InspectorWidget> get availableWidgets => [for (final w in InspectorWidget.values) if (!_widgets.contains(w)) w];
 
@@ -1110,6 +1148,23 @@ class AppState extends ChangeNotifier {
   /// Coding agents (optional): connected providers and running sessions.
   final AgentsSource agents;
 
+  /// What's left on each agent's plan, and what fills a session's context
+  /// window. Optional: nothing shows when it isn't reported.
+  final AiUsageSource usage;
+
+  /// How usage reads, from Settings › AI agents › Plan usage.
+  UsageStyle get usageStyle => UsageStyle(
+        showUsed: setting<String>('usage.as', 'Left') == 'Used',
+        warnAt: switch (setting<String>('usage.warn', '25% is left')) { 'Never' => null, '10% is left' => 0.10, _ => 0.25 },
+      );
+
+  /// Show "AI usage" in the sidebar.
+  bool get usageInSidebar => setting<bool>('usage.sidebar', true);
+
+  /// Agents listed in the sidebar before the rest fold into "+N more"
+  /// (null: all).
+  int? get usageRows => switch (setting<String>('usage.rows', '4')) { 'All' => null, '6' => 6, _ => 4 };
+
   /// The Terminal view registers itself here to open daemon terminals
   /// (agents, sign-in flows) in a pane.
   void Function(String terminalId, String title, {bool agent, String? directory})? terminalOpener;
@@ -1267,6 +1322,9 @@ class AppState extends ChangeNotifier {
       ..removeListener(notifyListeners)
       ..dispose();
     tasks.dispose();
+    usage
+      ..removeListener(notifyListeners)
+      ..dispose();
     _buffers
       ?..removeListener(notifyListeners)
       ..dispose();
@@ -1293,6 +1351,7 @@ enum TerminalCommand { splitRight, splitDown, closePane, newTerminal }
 
 enum InspectorWidget {
   agent('Agent', 'What this worktree’s agent is doing, its diff and terminal'),
+  session('Session', 'Context window, what the agent has in it, and plan usage left'),
   changes('Changes', 'Uncommitted files; click one to open its diff'),
   context('Context', 'Tickets and pages the agent works from'),
   pipelines('Pipelines', 'CI runs of this branch on GitHub, GitLab or Bitbucket'),
@@ -1318,9 +1377,12 @@ class _WorktreeTabs {
 }
 
 class UndoNotice {
-  const UndoNotice(this.message, this.restore);
+  const UndoNotice(this.message, this.restore, {this.action = 'Undo'});
   final String message;
   final VoidCallback restore;
+
+  /// The button's label; null when it only informs.
+  final String? action;
 }
 
 class AppScope extends InheritedNotifier<AppState> {

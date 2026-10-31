@@ -59,6 +59,7 @@ pub fn agent_context_to(context: AgentContext) -> pb::AgentContext {
     let kind = match context.kind {
         ContextKind::Task => pb::AgentContextKind::Task,
         ContextKind::Doc => pb::AgentContextKind::Doc,
+        ContextKind::Code => pb::AgentContextKind::Code,
     };
     pb::AgentContext {
         kind: kind.into(),
@@ -73,6 +74,7 @@ pub fn agent_context_from(context: pb::AgentContext) -> AgentContext {
         kind: match context.kind() {
             pb::AgentContextKind::Task => ContextKind::Task,
             pb::AgentContextKind::Doc => ContextKind::Doc,
+            pb::AgentContextKind::Code => ContextKind::Code,
         },
         title: context.title,
         detail: context.detail,
@@ -108,5 +110,27 @@ pub fn agents_snapshot_to(snapshot: &AgentsSnapshot) -> pb::AgentsSnapshot {
             .cloned()
             .map(agent_session_to)
             .collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn context_kinds_come_back_as_sent() {
+        for kind in [
+            pb::AgentContextKind::Task,
+            pb::AgentContextKind::Doc,
+            pb::AgentContextKind::Code,
+        ] {
+            let sent = pb::AgentContext {
+                kind: kind.into(),
+                title: "parse_key · lib.rs:12-30".into(),
+                detail: "src/lib.rs".into(),
+                url: String::new(),
+            };
+            assert_eq!(agent_context_to(agent_context_from(sent.clone())), sent);
+        }
     }
 }

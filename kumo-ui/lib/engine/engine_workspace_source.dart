@@ -181,10 +181,19 @@ class EngineWorkspaceSource extends WorkspaceSource {
   }
 
   @override
-  Future<void> removeWorktree(ui.Repo repo, ui.Worktree worktree) => _call((conn) => conn.workspace.removeWorktree(RemoveWorktreeRequest(
+  Future<WorktreeRemoval> removeWorktree(ui.Repo repo, ui.Worktree worktree, {bool force = false, bool deleteBranch = false}) async {
+    var removal = const WorktreeRemoval();
+    await _call((conn) async {
+      final r = await conn.workspace.removeWorktree(RemoveWorktreeRequest(
         repoPath: repo.id,
         worktreePath: _absolute[worktree.path] ?? worktree.path,
-      )));
+        force: force,
+        deleteBranch: deleteBranch,
+      ));
+      removal = WorktreeRemoval(removed: r.removed, changedFiles: r.changedFiles, branchKept: r.branchKept);
+    });
+    return removal;
+  }
 
   @override
   void refresh() {

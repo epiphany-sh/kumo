@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -5,7 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
-import '../data/ci_hosts_source.dart';
+import '../data/agents_source.dart';
+import '../data/ai_usage_source.dart';
 import '../data/models.dart';
 import '../overlays/namespace_dialog.dart';
 import '../overlays/new_worktree_popover.dart';
@@ -18,6 +20,7 @@ import '../widgets/context_menu.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
+import '../widgets/usage_meter.dart';
 
 Color toneColor(BuildContext context, WorktreeTone t) {
   final c = context.c;
@@ -64,7 +67,7 @@ class Sidebar extends StatelessWidget {
     final signal = _signalTarget(s);
 
     return SizedBox(
-      width: 252,
+      width: s.sidebarWidth,
       child: GlassPanel(
         padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
         child: Column(
@@ -110,7 +113,12 @@ class Sidebar extends StatelessWidget {
               ),
             ),
             Container(height: 1, color: c.divider, margin: const EdgeInsets.only(bottom: 12)),
-            const _Integrations(),
+            // Never more than 40% of the window: past that it scrolls, so
+            // the namespaces keep their room.
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.4),
+              child: const SingleChildScrollView(child: _AiUsage()),
+            ),
             const SizedBox(height: 10),
             Row(children: [
               const SizedBox(width: 4),
@@ -211,89 +219,204 @@ class _WorkspaceSwitcher extends StatelessWidget {
 
 String _initial(String name) => name.trim().isEmpty ? '?' : name.trim().characters.first.toUpperCase();
 
-/// What's connected: task sources and repository hosts (a token or gh).
-/// A tile opens its Settings page; failing ones show in warning colors.
-class _Integrations extends StatefulWidget {
-  const _Integrations();
+/// What's left on the connected agents' plans, one row per agent with the
+/// limit closest to its end; a click shows every window and when it
+/// resets. Past [AppState.usageRows] agents, the last row folds the rest
+/// into "+N more", which still says when a folded one runs low. Hidden when
+/// nothing is reported, or turned off in Settings › AI agents.
+class _AiUsage extends StatefulWidget {
+  const _AiUsage();
 
   @override
-  State<_Integrations> createState() => _IntegrationsState();
+  State<_AiUsage> createState() => _AiUsageState();
 }
 
-class _IntegrationsState extends State<_Integrations> {
-  Future<List<CiHostInfo>>? _hosts;
-
-  void _loadHosts() => _hosts = AppScope.read(context).ciHosts.list().catchError((Object _) => <CiHostInfo>[]);
+class _AiUsageState extends State<_AiUsage> {
+  String? _open;
+  bool _all = false;
+  Timer? _tick;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_hosts == null) _loadHosts();
+  void initState() {
+    super.initState();
+    // "Resets in 1 h 48 min" and "Updated 2 min ago" stay true.
+    _tick = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
-  Future<void> _open(SettingsTab tab) async {
-    await showSettingsDialog(context, initial: tab);
-    if (mounted) setState(_loadHosts);
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
     final s = AppScope.of(context);
-    return ListenableBuilder(
-      listenable: s.tasks,
-      builder: (context, _) => FutureBuilder<List<CiHostInfo>>(
-        future: _hosts,
-        builder: (context, hosts) {
-          // (badge, name, failing, settings page), one tile per badge.
-          final tiles = <String, (String, bool, SettingsTab)>{};
-          for (final src in s.tasks.sources.where((x) => x.enabled)) {
-            final prev = tiles[src.kind.badge];
-            tiles[src.kind.badge] = (prev == null ? src.name : '${prev.$1}, ${src.name}', (prev?.$2 ?? false) || src.error.isNotEmpty, SettingsTab.tickets);
-          }
-          for (final h in hosts.data ?? const <CiHostInfo>[]) {
-            if (!h.hasToken && !h.usesGh) continue;
-            final prev = tiles[h.provider.host];
-            tiles[h.provider.host] = (prev == null ? h.host : '${prev.$1}, ${h.host}', prev?.$2 ?? false, prev?.$3 ?? SettingsTab.repos);
-          }
-          final failing = tiles.values.where((t) => t.$2).length;
-          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: SectionTitle(
-                'Integrations',
-                trailing: tiles.isEmpty
-                    ? null
-                    : Text(failing > 0 ? '$failing failing' : '${tiles.length} connected', style: sans(11, color: failing > 0 ? c.warn : c.ok)),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: tiles.isEmpty
-                  ? Align(
-                      alignment: Alignment.centerLeft,
-                      child: KButton(label: 'Connect your tools', height: 28, fontSize: 12, onTap: () => _open(SettingsTab.tickets)),
-                    )
-                  : Wrap(spacing: 4, runSpacing: 4, children: [
-                      for (final MapEntry(key: badge, value: (name, failing, tab)) in tiles.entries)
-                        KPressable(
-                          onTap: () => _open(tab),
-                          semanticLabel: failing ? '$name, failing' : name,
-                          builder: (context, hover, focus) => Opacity(
-                            opacity: hover ? 0.8 : 1,
-                            child: Container(
-                              decoration: failing ? BoxDecoration(borderRadius: BorderRadius.circular(7), border: Border.all(color: c.warn)) : null,
-                              child: SourceTile(badge, tooltip: failing ? '$name · failing' : name),
-                            ),
-                          ),
-                        ),
-                    ]),
-            ),
-          ]);
-        },
+    final c = context.c;
+    if (!s.usageInSidebar || !s.usage.supported) return const SizedBox.shrink();
+    final rows = [
+      for (final p in s.agents.connected)
+        if (s.usage.planOf(p.id) case final plan?) (p, plan),
+    ];
+    if (rows.isEmpty) return const SizedBox.shrink();
+    final style = s.usageStyle;
+    final now = DateTime.now();
+    final limit = s.usageRows ?? rows.length;
+    final fold = rows.length > limit;
+    final shown = fold && !_all ? rows.take(limit - 1).toList() : rows;
+    final hidden = fold && !_all ? rows.skip(limit - 1).toList() : const <(AgentProviderInfo, AgentPlanUsage)>[];
+    final low = [
+      for (final (p, plan) in hidden)
+        if (plan.tightest case final w? when style.tone(c, w.fractionLeft) != null) (p, w),
+    ];
+    final out = low.any((x) => style.tone(c, x.$2.fractionLeft) == c.err);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(
+        padding: const EdgeInsets.only(left: 4, right: 4, bottom: 3),
+        child: SectionTitle(
+          'AI usage',
+          trailing: KPressable(
+            onTap: s.usage.refresh,
+            semanticLabel: 'Refresh AI usage',
+            tooltip: 'Read from each agent’s own CLI or account · click to refresh',
+            builder: (context, hover, focus) => Text(_updated(s.usage.updatedAt, now), style: sans(11, color: hover || focus ? c.text2 : c.text3)),
+          ),
+        ),
       ),
-    );
+      for (final (p, plan) in shown)
+        _UsageRow(
+          key: ValueKey('usage-${p.id}'),
+          agent: p,
+          plan: plan,
+          style: style,
+          now: now,
+          open: _open == p.id,
+          onTap: () => setState(() => _open = _open == p.id ? null : p.id),
+        ),
+      if (fold)
+        KPressable(
+          key: const ValueKey('usage-more'),
+          onTap: () => setState(() => _all = !_all),
+          semanticLabel: _all ? 'Show fewer agents' : 'Show ${hidden.length} more agents${low.isEmpty ? '' : ', ${low.length} running low'}',
+          tooltip: _all
+              ? null
+              : [for (final (p, plan) in hidden) '${p.name}: ${plan.tightest == null ? 'can’t read its usage' : style.value(plan.tightest!)}'].join('\n'),
+          builder: (context, hover, focus) => Container(
+            height: 26,
+            padding: const EdgeInsets.only(left: 32, right: 4),
+            decoration: BoxDecoration(color: hover || focus ? c.tile : null, borderRadius: BorderRadius.circular(8)),
+            child: Row(children: [
+              Expanded(child: Text(_all ? 'Show less' : '+${hidden.length} more', maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: c.text2))),
+              if (low.isNotEmpty) ...[
+                Dot(out ? c.err : c.warn, size: 6),
+                const SizedBox(width: 5),
+                Flexible(
+                  flex: 3,
+                  child: Text(
+                    low.length == 1 ? '${low.first.$1.name} ${out ? 'almost out' : 'low'}' : '${low.length} running low',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(11.5, color: out ? c.err : c.warn),
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Icon(_all ? KIcons.chevronUp : KIcons.chevronDown, size: 14, color: c.text3),
+            ]),
+          ),
+        ),
+    ]);
+  }
+}
+
+String _updated(DateTime? at, DateTime now) {
+  if (at == null) return '';
+  final m = now.difference(at).inMinutes;
+  return m < 1 ? 'Updated just now' : (m < 60 ? 'Updated $m min ago' : 'Updated ${m ~/ 60} h ago');
+}
+
+/// One agent in "AI usage": its tightest window as a bar and a share, and
+/// every window with its reset when open.
+class _UsageRow extends StatelessWidget {
+  const _UsageRow({super.key, required this.agent, required this.plan, required this.style, required this.now, required this.open, required this.onTap});
+  final AgentProviderInfo agent;
+  final AgentPlanUsage plan;
+  final UsageStyle style;
+  final DateTime now;
+  final bool open;
+  final VoidCallback onTap;
+
+  String _lower(String text) => text.isEmpty ? text : text[0].toLowerCase() + text.substring(1);
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final w = plan.tightest;
+    final tone = w == null ? null : style.tone(c, w.fractionLeft);
+    final summary = plan.problem ?? [for (final x in plan.windows) '${x.label}: ${style.value(x)} · ${_lower(resetLabel(x.resets, now))}'].join('\n');
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      KPressable(
+        onTap: onTap,
+        selected: open,
+        semanticLabel: '${agent.name}, ${plan.problem ?? (w == null ? 'usage not reported' : '${style.value(w)} of the ${_lower(w.label)}')}${open ? ', expanded' : ''}',
+        tooltip: '${agent.name} · ${plan.plan}\n$summary\nClick for details',
+        builder: (context, hover, focus) => Container(
+          height: 28,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(color: open ? c.navActive : (hover || focus ? c.tile : null), borderRadius: BorderRadius.circular(8)),
+          child: Row(children: [
+            SourceTile(agent.short, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(agent.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: c.text))),
+            if (w == null) ...[
+              Dot(c.warn, size: 6),
+              const SizedBox(width: 5),
+              Text('Can’t read', style: sans(11.5, color: c.warn)),
+            ] else ...[
+              const SizedBox(width: 6),
+              UsageBar(width: 40, fill: style.fill(w), color: tone ?? c.acc),
+              SizedBox(
+                width: 34,
+                child: Text(
+                  style.percent(w),
+                  textAlign: TextAlign.right,
+                  style: sans(11.5, weight: FontWeight.w600, color: tone ?? c.text2).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+                ),
+              ),
+              const SizedBox(width: 5),
+              SizedBox(width: 22, child: Text(w.short, maxLines: 1, style: sans(10.5, color: c.text3))),
+            ],
+          ]),
+        ),
+      ),
+      if (open)
+        Container(
+          margin: const EdgeInsets.fromLTRB(32, 2, 0, 6),
+          padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+          decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(10)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(plan.plan, style: sans(11.5, color: c.text3)),
+            for (final x in plan.windows) ...[const SizedBox(height: 9), UsageWindowView(window: x, style: style, now: now, track: c.divider)],
+            if (plan.problem != null) ...[
+              const SizedBox(height: 6),
+              Text(plan.problem!, style: sans(11.5, color: c.text2, height: 1.4)),
+              if (plan.fix != null) ...[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: KPressable(
+                    onTap: () => showSettingsDialog(context, initial: SettingsTab.ai),
+                    semanticLabel: plan.fix,
+                    builder: (context, hover, focus) => Text(plan.fix!, style: sans(12, weight: FontWeight.w600, color: c.acc)),
+                  ),
+                ),
+              ],
+            ],
+          ]),
+        ),
+    ]);
   }
 }
 
@@ -481,7 +604,8 @@ class _NamespaceGroupState extends State<_NamespaceGroup> {
                     child: KPressable(
                       onTap: () => s.toggleNamespaceCollapsed(ns.id),
                       semanticLabel: '${ns.collapsed ? 'Expand' : 'Collapse'} ${ns.name}',
-                      tooltip: ns.collapsed ? 'Expand' : 'Collapse',
+                      // The whole name, however narrow the sidebar.
+                      tooltip: '${ns.name} · click to ${ns.collapsed ? 'expand' : 'collapse'}',
                       builder: (context, hover, focus) => SizedBox(
                         height: 30,
                         child: Row(children: [
@@ -658,15 +782,18 @@ class _UndoToast extends StatelessWidget {
         decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(10)),
         child: Row(children: [
           Expanded(child: Text(notice.message, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: c.text2))),
-          KPressable(
-            onTap: s.undoLast,
-            semanticLabel: 'Undo',
-            builder: (context, hover, focus) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              decoration: BoxDecoration(color: hover || focus ? c.accSoft : null, borderRadius: BorderRadius.circular(6)),
-              child: Text('Undo', style: sans(12, weight: FontWeight.w600, color: c.acc)),
-            ),
-          ),
+          if (notice.action case final action?)
+            KPressable(
+              onTap: s.undoLast,
+              semanticLabel: action,
+              builder: (context, hover, focus) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(color: hover || focus ? c.accSoft : null, borderRadius: BorderRadius.circular(6)),
+                child: Text(action, style: sans(12, weight: FontWeight.w600, color: c.acc)),
+              ),
+            )
+          else
+            KIconButton(icon: KIcons.close, label: 'Dismiss', size: 22, iconSize: 12, color: c.text3, onTap: s.dismissUndo),
         ]),
       ),
     );
@@ -711,6 +838,24 @@ class _RepoGroupState extends State<_RepoGroup> {
   bool _open = true;
   String? _menuFor;
 
+  /// (worktree path, what) just copied: its status line says so briefly.
+  (String, String)? _copied;
+  Timer? _copiedTimer;
+
+  void _flashCopied(Worktree w, String what) {
+    _copiedTimer?.cancel();
+    setState(() => _copied = (w.path, what));
+    _copiedTimer = Timer(const Duration(milliseconds: 1600), () {
+      if (mounted) setState(() => _copied = null);
+    });
+  }
+
+  @override
+  void dispose() {
+    _copiedTimer?.cancel();
+    super.dispose();
+  }
+
   void _openMenu(Worktree w, Offset at) {
     setState(() => _menuFor = w.branch);
     showKMenu(
@@ -719,7 +864,7 @@ class _RepoGroupState extends State<_RepoGroup> {
       onClosed: () {
         if (mounted) setState(() => _menuFor = null);
       },
-      builder: (context, close) => _WorktreeMenu(repo: widget.repo, wt: w, close: close),
+      builder: (context, close) => _WorktreeMenu(repo: widget.repo, wt: w, close: close, onCopied: (what) => _flashCopied(w, what)),
     );
   }
 
@@ -729,7 +874,8 @@ class _RepoGroupState extends State<_RepoGroup> {
     final c = context.c;
     final r = widget.repo;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6, left: 4),
+      // Projects breathe apart; their worktrees stay close together.
+      padding: const EdgeInsets.only(bottom: 14, left: 4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         KPressable(
           onTap: () => setState(() => _open = !_open),
@@ -743,7 +889,12 @@ class _RepoGroupState extends State<_RepoGroup> {
               const SizedBox(width: 6),
               Icon(KIcons.repo, size: 15, color: c.text2),
               const SizedBox(width: 8),
-              Expanded(child: Text(r.name, overflow: TextOverflow.ellipsis, style: sans(12.5, weight: FontWeight.w600, color: c.text))),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Tooltip(message: r.name, child: Text(r.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, weight: FontWeight.w600, color: c.text))),
+                ),
+              ),
               TagChip(r.host, color: c.text2),
               const SizedBox(width: 2),
               AnchoredPopover(
@@ -772,7 +923,8 @@ class _RepoGroupState extends State<_RepoGroup> {
                 // terminals; in the Terminal view it switches the context.
                 onTap: () => s.view == KumoView.terminal ? s.selectWorktree(w.branch, path: w.path) : s.openWorktree(w),
                 semanticLabel: '${w.branch}, ${w.note}${w.isMain ? ', principal checkout' : ''}',
-                tooltip: w.isMain ? 'Principal checkout · right-click for actions' : null,
+                // Long branch names are cut: the whole name and where it lives.
+                tooltip: '${w.branch}${w.isMain ? ' · principal checkout' : ''}\n${s.workspace.absolutePathOf(w)}\nRight-click for actions',
                 selected: s.isActiveWorktree(w) && !s.inHome,
                 builder: (context, hover, focus) {
                   // The worktree you're standing on: a soft accent background.
@@ -809,7 +961,10 @@ class _RepoGroupState extends State<_RepoGroup> {
                               ),
                             ],
                           ]),
-                          Text(w.note, style: sans(11, color: w.tone == WorktreeTone.warn ? c.warn : c.text3)),
+                          if (_copied?.$1 == w.path)
+                            Text('Copied ${_copied!.$2}', style: sans(11, color: c.ok))
+                          else
+                            Text(w.note, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11, color: w.tone == WorktreeTone.warn ? c.warn : c.text3)),
                         ]),
                       ),
                     ]),
@@ -823,10 +978,13 @@ class _RepoGroupState extends State<_RepoGroup> {
 }
 
 class _WorktreeMenu extends StatefulWidget {
-  const _WorktreeMenu({required this.repo, required this.wt, required this.close});
+  const _WorktreeMenu({required this.repo, required this.wt, required this.close, required this.onCopied});
   final Repo repo;
   final Worktree wt;
   final VoidCallback close;
+
+  /// After a copy: what was copied ("full path", "branch name").
+  final ValueChanged<String> onCopied;
 
   @override
   State<_WorktreeMenu> createState() => _WorktreeMenuState();
@@ -834,6 +992,7 @@ class _WorktreeMenu extends StatefulWidget {
 
 class _WorktreeMenuState extends State<_WorktreeMenu> {
   bool _confirm = false;
+  bool _deleteBranch = false;
 
   void _do(VoidCallback f) {
     widget.close();
@@ -852,10 +1011,16 @@ class _WorktreeMenuState extends State<_WorktreeMenu> {
             KMenuConfirm(
               title: 'Delete this worktree?',
               detail: w.path,
-              body: '${running ? '$agent is running here and will be stopped. ' : ''}Runs git worktree remove. The branch stays in the repo.',
+              body: '${running ? '$agent is running here and will be stopped. ' : ''}Runs git worktree remove. '
+                  'If it has uncommitted changes, Kumo asks before dropping them.',
+              extra: KCheck(
+                value: _deleteBranch,
+                onChanged: (v) => setState(() => _deleteBranch = v),
+                label: 'Also delete branch ${w.branch} (if it’s merged)',
+              ),
               confirmLabel: 'Delete',
               onCancel: () => setState(() => _confirm = false),
-              onConfirm: () => _do(() => s.deleteWorktree(widget.repo.id, w.branch)),
+              onConfirm: () => _do(() => s.deleteWorktree(widget.repo.id, w.branch, deleteBranch: _deleteBranch)),
             ),
           ]
         : [
@@ -868,7 +1033,22 @@ class _WorktreeMenuState extends State<_WorktreeMenu> {
               }),
             ),
             KMenuItem(icon: KIcons.reveal, label: 'Reveal in Finder', onTap: () => _do(() {})),
-            KMenuItem(icon: KIcons.copy, label: 'Copy path', onTap: () => _do(() => Clipboard.setData(ClipboardData(text: w.path)))),
+            KMenuItem(
+              icon: KIcons.copy,
+              label: 'Copy full path',
+              onTap: () => _do(() {
+                Clipboard.setData(ClipboardData(text: s.workspace.absolutePathOf(w)));
+                widget.onCopied('full path');
+              }),
+            ),
+            KMenuItem(
+              icon: KIcons.branch,
+              label: 'Copy branch name',
+              onTap: () => _do(() {
+                Clipboard.setData(ClipboardData(text: w.branch));
+                widget.onCopied('branch name');
+              }),
+            ),
             const KMenuDivider(),
             if (isMain)
               const KMenuItem(icon: KIcons.trash, label: 'Delete worktree', note: 'This is the principal checkout, not a worktree.')

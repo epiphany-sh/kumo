@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
-use kumo_domain::docs::{Doc, DocId, DocKind, DocSummary, DocsConnector};
+use kumo_domain::docs::{Doc, DocId, DocKind, DocNode, DocSummary, DocsConnector};
 use kumo_domain::tasks::{SecretStore, SourceId, SourceOptions, TaskError, TaskSource, TaskStore};
 
 pub struct DocsPorts {
@@ -45,7 +45,12 @@ pub struct DocsService {
     /// How long a list is reused.
     fresh: Duration,
     lists: Mutex<HashMap<String, (Instant, Vec<DocGroup>)>>,
+    /// Levels, by source, parent and limit.
+    levels: Mutex<HashMap<LevelKey, (Instant, Level)>>,
 }
+
+type LevelKey = (SourceId, Option<String>, usize);
+type Level = (DocSource, Vec<DocNode>, bool);
 
 impl std::fmt::Debug for DocsService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -59,6 +64,7 @@ impl DocsService {
             ports,
             fresh,
             lists: Mutex::new(HashMap::new()),
+            levels: Mutex::new(HashMap::new()),
         }
     }
 
@@ -116,13 +122,7 @@ impl DocsService {
 
     /// The whole page `id`, with the knowledge base it's in.
     pub async fn read(&self, id: &DocId) -> Result<(DocSource, Doc), TaskError> {
-        let wanted = id.source();
-        let (source, doc_source, connector) = self
-            .sources()
-            .await?
-            .into_iter()
-            .find(|(s, _, _)| s.id == wanted)
-            .ok_or_else(|| TaskError::UnknownSource(wanted.to_string()))?;
+        let (source, doc_source, connector) = self.source(&id.source()).await?;
         let secrets = Arc::clone(&self.ports.secrets);
         let external = id.external().to_owned();
         let doc = blocking(move || {
@@ -133,8 +133,56 @@ impl DocsService {
         Ok((doc_source, doc))
     }
 
+    /// One level of knowledge base `source`: its top one without `parent`,
+    /// else what is under that node. Whether there were more than `limit`.
+    /// [refresh] asks again even if the last answer is recent.
+    pub async fn browse(
+        &self,
+        source: &SourceId,
+        parent: Option<&str>,
+        limit: usize,
+        refresh: bool,
+    ) -> Result<(DocSource, Vec<DocNode>, bool), TaskError> {
+        let key = (source.clone(), parent.map(str::to_owned), limit);
+        if !refresh
+            && let Some((at, level)) = self.levels().get(&key)
+            && at.elapsed() < self.fresh
+        {
+            return Ok(level.clone());
+        }
+        let (task_source, doc_source, connector) = self.source(source).await?;
+        let secrets = Arc::clone(&self.ports.secrets);
+        let parent = key.1.clone();
+        let (nodes, truncated) = blocking(move || {
+            let secret = secret_of(&*secrets, &task_source)?;
+            connector.browse(&task_source, secret.as_deref(), parent.as_deref(), limit)
+        })
+        .await?;
+        let level = (doc_source, nodes, truncated);
+        let mut levels = self.levels();
+        levels.retain(|_, (at, _)| at.elapsed() < self.fresh);
+        levels.insert(key, (Instant::now(), level.clone()));
+        Ok(level)
+    }
+
+    fn levels(&self) -> std::sync::MutexGuard<'_, HashMap<LevelKey, (Instant, Level)>> {
+        self.levels.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
     fn lists(&self) -> std::sync::MutexGuard<'_, HashMap<String, (Instant, Vec<DocGroup>)>> {
         self.lists.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// The knowledge base `id` reads through, if it's one of [sources].
+    async fn source(
+        &self,
+        id: &SourceId,
+    ) -> Result<(TaskSource, DocSource, Arc<dyn DocsConnector>), TaskError> {
+        self.sources()
+            .await?
+            .into_iter()
+            .find(|(s, _, _)| s.id == *id)
+            .ok_or_else(|| TaskError::UnknownSource(id.to_string()))
     }
 
     /// Enabled task sources that lead to docs, one per Atlassian site.

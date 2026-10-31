@@ -2046,6 +2046,17 @@ class DocsClient extends $grpc.Client {
     return $createUnaryCall(_$read, request, options: options);
   }
 
+  /// One level of a knowledge base: with no `parent`, its top level (the
+  /// Confluence spaces / the vault's root); else what is under `parent`.
+  /// Folders and spaces first, then pages, each by title. Answers are reused
+  /// for a minute unless `refresh`.
+  $grpc.ResponseFuture<$0.DocLevel> browse(
+    $0.BrowseDocsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$browse, request, options: options);
+  }
+
   // method descriptors
 
   static final _$list = $grpc.ClientMethod<$0.ListDocsRequest, $0.DocList>(
@@ -2056,6 +2067,10 @@ class DocsClient extends $grpc.Client {
       '/kumo.v1.Docs/Read',
       ($0.ReadDocRequest value) => value.writeToBuffer(),
       $0.Doc.fromBuffer);
+  static final _$browse = $grpc.ClientMethod<$0.BrowseDocsRequest, $0.DocLevel>(
+      '/kumo.v1.Docs/Browse',
+      ($0.BrowseDocsRequest value) => value.writeToBuffer(),
+      $0.DocLevel.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Docs')
@@ -2077,6 +2092,13 @@ abstract class DocsServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.ReadDocRequest.fromBuffer(value),
         ($0.Doc value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.BrowseDocsRequest, $0.DocLevel>(
+        'Browse',
+        browse_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.BrowseDocsRequest.fromBuffer(value),
+        ($0.DocLevel value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.DocList> list_Pre($grpc.ServiceCall $call,
@@ -2093,6 +2115,14 @@ abstract class DocsServiceBase extends $grpc.Service {
   }
 
   $async.Future<$0.Doc> read($grpc.ServiceCall call, $0.ReadDocRequest request);
+
+  $async.Future<$0.DocLevel> browse_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.BrowseDocsRequest> $request) async {
+    return browse($call, await $request);
+  }
+
+  $async.Future<$0.DocLevel> browse(
+      $grpc.ServiceCall call, $0.BrowseDocsRequest request);
 }
 
 /// A worktree's tests: its own command (a Makefile `test` target, else the

@@ -129,13 +129,18 @@ class AgentContextKind extends $pb.ProtobufEnum {
   static const AgentContextKind AGENT_CONTEXT_KIND_DOC =
       AgentContextKind._(1, _omitEnumNames ? '' : 'AGENT_CONTEXT_KIND_DOC');
 
+  /// Code selected in a file.
+  static const AgentContextKind AGENT_CONTEXT_KIND_CODE =
+      AgentContextKind._(2, _omitEnumNames ? '' : 'AGENT_CONTEXT_KIND_CODE');
+
   static const $core.List<AgentContextKind> values = <AgentContextKind>[
     AGENT_CONTEXT_KIND_TASK,
     AGENT_CONTEXT_KIND_DOC,
+    AGENT_CONTEXT_KIND_CODE,
   ];
 
   static final $core.List<AgentContextKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 1);
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
   static AgentContextKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

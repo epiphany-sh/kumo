@@ -1,5 +1,5 @@
 use kumo_application::docs::{DocGroup, DocSource};
-use kumo_domain::docs::{Doc, DocKind, DocSummary};
+use kumo_domain::docs::{Doc, DocKind, DocNode, DocSummary};
 use kumo_domain::tasks::TaskError;
 use kumo_proto::v1 as pb;
 
@@ -57,5 +57,21 @@ pub fn doc_to(source: &DocSource, doc: &Doc) -> pb::Doc {
             .as_ref()
             .map(|f| f.display().to_string())
             .unwrap_or_default(),
+    }
+}
+
+pub fn doc_level_to(nodes: &[DocNode], truncated: bool) -> pb::DocLevel {
+    pb::DocLevel {
+        nodes: nodes
+            .iter()
+            .map(|n| pb::DocNode {
+                key: n.key.clone(),
+                title: n.title.clone(),
+                doc: n.doc.as_ref().map(doc_summary_to),
+                children: n.children,
+                note: n.note.clone(),
+            })
+            .collect(),
+        truncated,
     }
 }
