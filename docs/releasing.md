@@ -58,25 +58,27 @@ se reemplazan solos por la versión publicada.
 
 ## Publicar una versión
 
-**Sola, en cada merge a `main`.** El PR ya pasó `ci` (fmt, clippy, tests,
-Flutter), así que con el merge el workflow `release` publica la versión
-siguiente: buildea, firma, arma el zip, el appcast y el `install.sh`, crea el
-release (y su tag) en GitHub y actualiza el cask del tap. Mergeá solo PRs
-con `ci` en verde: nada más lo frena.
+Las ramas siguen un camino fijo, y lo hace cumplir el check `branch-policy` de
+`ci` (`packaging/branch-policy.sh`), obligatorio para mergear:
 
-El número lo calcula `packaging/next-version.sh`:
+```
+feature/…  ─┐
+fix/…      ─┴─▶  release/X.Y.Z  ──▶  main  ──▶  vX.Y.Z publicada
+```
 
-- `MAJOR.MINOR` sale de `version` en `[workspace.package]` de `Cargo.toml`.
-- El patch es el siguiente al tag `vMAJOR.MINOR.*` más alto: `v0.1.0` →
-  `0.1.1` → `0.1.2`…
-- Para pasar a `0.2`, cambiá esa versión a `0.2.0` en un PR: el merge
-  publica `0.2.0`.
-- Nunca baja: si hay un tag más alto que `Cargo.toml` (uno hecho a mano),
-  sigue desde ese. Con `v0.2.0` y `Cargo.toml` en `0.1.0`, sale `0.2.1`.
+1. **Abrí la release** desde `main`, con el número que va a tener:
+   `git switch -c release/0.3.0 origin/main && git push -u origin release/0.3.0`.
+   El número tiene que ser mayor que el último tag.
+2. **Los cambios entran por PR** a esa rama, desde `feature/…` o `fix/…`.
+   Nada se pushea directo a una `release/*`: pasan por PR y `ci`, igual que
+   `main`.
+3. **Mergeá la release a `main`** con un PR (`release/0.3.0` → `main`). Es lo
+   único que entra a `main`. Con el merge, el workflow `release` publica
+   `0.3.0`: buildea, firma, arma el zip, el appcast y el `install.sh`, crea el
+   release (y su tag) en GitHub y actualiza el cask del tap.
 
-Los releases van de a uno. Si entran varios merges mientras uno se publica,
-sale uno solo con todos. Si el build falla, no queda tag y el número se
-vuelve a usar. Un commit que ya tiene tag no se publica de nuevo.
+Los releases van de a uno. Si el build falla, no queda tag: re-correlo desde
+Actions.
 
 **A mano**, con el número que quieras:
 
