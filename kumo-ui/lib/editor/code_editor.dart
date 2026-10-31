@@ -62,7 +62,10 @@ class LineDeco {
 
 /// Gutter + highlighted, editable code with vertical and horizontal scroll.
 class CodeEditor extends StatefulWidget {
-  const CodeEditor({super.key, required this.controller, required this.decorate, this.readOnly = false, this.fontSize = 12.5, this.scrollController});
+  const CodeEditor({super.key, required this.controller, required this.decorate, this.readOnly = false, this.fontSize = 12.5, this.scrollController, this.focusNode});
+
+  /// The text's focus, to give it back from outside (optional).
+  final FocusNode? focusNode;
 
   /// Height of a line, and the space above the first one.
   static double lineExtentFor(double fontSize) => fontSize * _CodeEditorState._lh;
@@ -168,6 +171,7 @@ class _CodeEditorState extends State<CodeEditor> {
                           ]),
                           TextField(
                             controller: widget.controller,
+                            focusNode: widget.focusNode,
                             readOnly: widget.readOnly,
                             maxLines: null,
                             keyboardType: TextInputType.multiline,

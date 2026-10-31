@@ -75,7 +75,7 @@ class AppShell extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (s.sidebarVisible) ...[const Sidebar(), const SizedBox(width: 10)],
+                    if (s.sidebarVisible) ...[const Sidebar(), const SidebarResizer()],
                     Expanded(
                       child: IndexedStack(
                         index: s.view.index,
@@ -99,4 +99,103 @@ class AppShell extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The 10 px gap right of the sidebar, which drags its width (220–420 px).
+/// A grip shows on hover, focus and while dragging; double-click resets it;
+/// with the keyboard, ← → change it (⇧ for bigger steps).
+class SidebarResizer extends StatefulWidget {
+  const SidebarResizer({super.key});
+
+  @override
+  State<SidebarResizer> createState() => _SidebarResizerState();
+}
+
+class _SidebarResizerState extends State<SidebarResizer> {
+  bool _hover = false;
+  bool _focus = false;
+  bool _dragging = false;
+  double _startWidth = 0;
+  double _startX = 0;
+
+  void _by(AppState s, double dx) {
+    s.sidebarWidth = s.sidebarWidth + dx;
+    s.saveSidebarWidth();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    final on = _hover || _focus || _dragging;
+    final w = s.sidebarWidth.round();
+    return Semantics(
+      label: 'Resize sidebar',
+      value: '$w pixels',
+      increasedValue: '${(w + 16).clamp(220, 420)} pixels',
+      decreasedValue: '${(w - 16).clamp(220, 420)} pixels',
+      onIncrease: () => _by(s, 16),
+      onDecrease: () => _by(s, -16),
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.resizeColumn,
+        onShowHoverHighlight: (v) => setState(() => _hover = v),
+        onShowFocusHighlight: (v) => setState(() => _focus = v),
+        shortcuts: const {
+          SingleActivator(LogicalKeyboardKey.arrowLeft): _Resize(-16),
+          SingleActivator(LogicalKeyboardKey.arrowRight): _Resize(16),
+          SingleActivator(LogicalKeyboardKey.arrowLeft, shift: true): _Resize(-40),
+          SingleActivator(LogicalKeyboardKey.arrowRight, shift: true): _Resize(40),
+        },
+        actions: {
+          _Resize: CallbackAction<_Resize>(onInvoke: (i) {
+            _by(s, i.dx);
+            return null;
+          }),
+        },
+        child: Tooltip(
+          message: 'Drag to resize · double-click to reset',
+          waitDuration: const Duration(milliseconds: 600),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            // From where the drag started, so the edge stays under the
+            // pointer even after hitting a limit.
+            onHorizontalDragStart: (d) => setState(() {
+              _dragging = true;
+              _startWidth = s.sidebarWidth;
+              _startX = d.globalPosition.dx;
+            }),
+            onHorizontalDragUpdate: (d) => s.sidebarWidth = _startWidth + d.globalPosition.dx - _startX,
+            onHorizontalDragEnd: (_) {
+              setState(() => _dragging = false);
+              s.saveSidebarWidth();
+            },
+            onHorizontalDragCancel: () => setState(() => _dragging = false),
+            onDoubleTap: () {
+              s.sidebarWidth = AppState.defaultSidebarWidth;
+              s.saveSidebarWidth();
+            },
+            child: SizedBox(
+              width: 10,
+              child: Center(
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 150),
+                  opacity: on ? 1 : 0,
+                  child: Container(
+                    width: 4,
+                    height: 40,
+                    decoration: BoxDecoration(color: _dragging ? c.acc : c.text3, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Resize extends Intent {
+  const _Resize(this.dx);
+  final double dx;
 }

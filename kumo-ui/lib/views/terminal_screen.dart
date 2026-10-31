@@ -462,12 +462,16 @@ class _TerminalScreenState extends State<TerminalScreen> {
         ]);
       }),
       status: [
-        if (s.inHome)
-          const StatusText('~ · Home', icon: KIcons.home, monospace: true)
-        else
-          Flexible(child: StatusText('${s.changes.branch} ↑${s.commitsAhead} ↓${s.changes.behind}', icon: KIcons.branch, monospace: true, flexible: true)),
-        ..._agentStatus(context, s),
-        const Spacer(),
+        // The left side ellipsizes; the right side stays whole at the edge.
+        Expanded(
+          child: Row(children: [
+            if (s.inHome)
+              const StatusText('~ · Home', icon: KIcons.home, monospace: true)
+            else
+              Flexible(child: StatusText('${s.changes.branch} ↑${s.commitsAhead} ↓${s.changes.behind}', icon: KIcons.branch, monospace: true, flexible: true)),
+            for (final item in _agentStatus(context, s)) ...[const SizedBox(width: 16), Flexible(child: item)],
+          ]),
+        ),
         StatusText('${_tabs.length} ${_tabs.length == 1 ? 'tab' : 'tabs'} · ${_layout.panes.length} ${_layout.panes.length == 1 ? 'pane' : 'panes'}'),
         const StatusText('zsh · UTF-8'),
         if (_engine != null) _EngineStatus(engine: _engine!),
@@ -480,16 +484,16 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final c = context.c;
     if (!s.agents.live) {
       return [
-        StatusText('1 agent needs you', color: c.warn, dot: true),
-        const StatusText('2 agents running'),
-        const StatusText('gke-staging · pricing', icon: KIcons.cluster),
+        StatusText('1 agent needs you', color: c.warn, dot: true, flexible: true),
+        const StatusText('2 agents running', flexible: true),
+        const StatusText('gke-staging · pricing', icon: KIcons.cluster, flexible: true),
       ];
     }
     final waiting = s.agents.runs.where((r) => r.status == AgentStatus.needsYou).length;
     final running = s.agents.runs.where((r) => r.status == AgentStatus.running).length;
     return [
-      if (waiting > 0) StatusText('$waiting ${waiting == 1 ? 'agent needs' : 'agents need'} you', color: c.warn, dot: true),
-      if (running > 0) StatusText('$running ${running == 1 ? 'agent' : 'agents'} running'),
+      if (waiting > 0) StatusText('$waiting ${waiting == 1 ? 'agent needs' : 'agents need'} you', color: c.warn, dot: true, flexible: true),
+      if (running > 0) StatusText('$running ${running == 1 ? 'agent' : 'agents'} running', flexible: true),
     ];
   }
 

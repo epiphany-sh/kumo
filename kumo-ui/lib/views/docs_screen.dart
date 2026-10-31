@@ -49,6 +49,91 @@ class _DocsScreenState extends State<DocsScreen> {
   bool _sent = false;
   String? _sendError;
 
+  /// For you (pinned, recent, updated lately) or Browse (one level of a
+  /// knowledge base at a time, with a breadcrumb).
+  bool _browse = false;
+  DocSourceInfo? _browseSource;
+  /// The path to the level shown: node keys, and their titles for the
+  /// breadcrumb.
+  List<(String, String)> _browsePath = const [];
+  List<DocNode>? _nodes;
+  bool _browseLoading = false;
+  String? _browseError;
+  int _browseSeq = 0;
+
+  // ---- Pinned and recent pages, kept across launches ----
+
+  static const _pinKey = 'docs.pinned';
+  static const _recentKey = 'docs.recent';
+  static const _maxRecent = 6;
+
+  /// Saved rows: id, title, source badge, place.
+  List<_SavedDoc> _saved(String key) => [
+        for (final m in AppScope.read(context).prefs.get<List<dynamic>>(key, const []))
+          if (m is Map && m['id'] is String) _SavedDoc(m['id'] as String, '${m['title'] ?? ''}', '${m['badge'] ?? ''}', '${m['place'] ?? ''}'),
+      ];
+
+  void _save(String key, List<_SavedDoc> docs) {
+    AppScope.read(context).prefs.set(key, [for (final d in docs) {'id': d.id, 'title': d.title, 'badge': d.badge, 'place': d.place}]);
+  }
+
+  static _SavedDoc _savedOf(DocPage page) => _SavedDoc(page.summary.id, page.summary.title, page.source.kind.badge, page.summary.place);
+
+  bool _isPinned(String id) => _saved(_pinKey).any((d) => d.id == id);
+
+  void _togglePin(DocPage page) {
+    final pins = _saved(_pinKey);
+    final at = pins.indexWhere((d) => d.id == page.summary.id);
+    setState(() {
+      if (at >= 0) {
+        pins.removeAt(at);
+      } else {
+        pins.insert(0, _savedOf(page));
+      }
+      _save(_pinKey, pins);
+    });
+  }
+
+  void _remember(DocPage page) {
+    final recent = [_savedOf(page), for (final d in _saved(_recentKey)) if (d.id != page.summary.id) d];
+    _save(_recentKey, recent.take(_maxRecent).toList());
+  }
+
+  // ---- Browse ----
+
+  Future<void> _goTo(DocSourceInfo source, List<(String, String)> path) async {
+    final s = AppScope.read(context);
+    final seq = ++_browseSeq;
+    setState(() {
+      _browseSource = source;
+      _browsePath = path;
+      // The old level goes: its rows would lead somewhere else now.
+      _nodes = null;
+      _browseLoading = true;
+      _browseError = null;
+    });
+    try {
+      final nodes = await s.docs.browse(source, [for (final p in path) p.$1]);
+      if (!mounted || seq != _browseSeq) return;
+      setState(() {
+        _nodes = nodes;
+        _browseLoading = false;
+      });
+    } catch (e) {
+      if (!mounted || seq != _browseSeq) return;
+      setState(() {
+        _browseError = '$e';
+        _browseLoading = false;
+      });
+    }
+  }
+
+  void _startBrowse() {
+    setState(() => _browse = true);
+    final sources = [for (final g in _groups ?? const <DocGroup>[]) if (g.problem.isEmpty) g.source];
+    if (_browseSource == null && sources.isNotEmpty) _goTo(sources.first, const []);
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
@@ -95,7 +180,7 @@ class _DocsScreenState extends State<DocsScreen> {
     _debounce = Timer(const Duration(milliseconds: 300), _list);
   }
 
-  Future<void> _open(String id) async {
+  Future<void> _open(String id, {bool remember = false}) async {
     final s = AppScope.read(context);
     final seq = ++_readSeq;
     setState(() {
@@ -109,6 +194,8 @@ class _DocsScreenState extends State<DocsScreen> {
     try {
       final page = await s.docs.read(id);
       if (!mounted || seq != _readSeq) return;
+      // Pages you open (not the one shown to start with) go to Recent.
+      if (remember) _remember(page);
       setState(() {
         _page = page;
         _pageLoading = false;
@@ -202,7 +289,18 @@ class _DocsScreenState extends State<DocsScreen> {
               KIconButton(icon: Icons.refresh_rounded, label: 'Refresh', size: 22, iconSize: 14, onTap: () => _list(refresh: true)),
           ]),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
+        if (!searching && groups != null && groups.isNotEmpty) ...[
+          KSegmented<bool>(
+            label: 'Docs',
+            height: 28,
+            expand: true,
+            value: _browse,
+            onChanged: (v) => v ? _startBrowse() : setState(() => _browse = false),
+            items: const [(false, 'For you', null), (true, 'Browse', null)],
+          ),
+          const SizedBox(height: 10),
+        ],
         Expanded(
           child: ListView(padding: EdgeInsets.zero, children: [
             if (_error case final error?)
@@ -211,21 +309,157 @@ class _DocsScreenState extends State<DocsScreen> {
               _Note(text: _loading ? 'Reading your docs…' : '')
             else if (groups.isEmpty)
               const _NoSources()
+            else if (searching)
+              // Search covers every source and every level.
+              ..._sourceGroups(groups, searching: true)
+            else if (_browse)
+              ..._browseLevel(context, groups)
             else
-              for (final g in groups) ...[
-                _GroupHeader(group: g),
-                if (g.problem.isNotEmpty)
-                  _Problem(group: g)
-                else if (g.docs.isEmpty)
-                  _Note(text: searching ? 'Nothing matches' : 'No pages yet', indent: true)
-                else
-                  for (final d in g.docs) _DocRow(doc: d, selected: d.id == _selected, onTap: () => _open(d.id)),
-                const SizedBox(height: 10),
-              ],
+              ..._forYou(context, groups),
           ]),
         ),
       ]),
     );
+  }
+
+  /// Each source's pages (search results, or "Updated lately").
+  List<Widget> _sourceGroups(List<DocGroup> groups, {required bool searching}) => [
+        for (final g in groups) ...[
+          _GroupHeader(group: g),
+          if (g.problem.isNotEmpty)
+            _Problem(group: g)
+          else if (g.docs.isEmpty)
+            _Note(text: searching ? 'Nothing matches' : 'No pages yet', indent: true)
+          else
+            for (final d in g.docs) _DocRow(doc: d, selected: d.id == _selected, onTap: () => _open(d.id, remember: true)),
+          const SizedBox(height: 10),
+        ],
+      ];
+
+  /// For you: what you pinned and read, then what changed lately.
+  List<Widget> _forYou(BuildContext context, List<DocGroup> groups) {
+    final pins = _saved(_pinKey);
+    final recent = [for (final d in _saved(_recentKey)) if (!pins.any((p) => p.id == d.id)) d];
+    return [
+      const _SectionLabel(icon: KIcons.pin, text: 'Pinned'),
+      if (pins.isEmpty)
+        const _Note(text: 'Pin a page from its header to keep it here.', indent: true)
+      else
+        for (final d in pins) _SavedRow(doc: d, selected: d.id == _selected, onTap: () => _open(d.id, remember: true)),
+      if (recent.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        const _SectionLabel(icon: KIcons.clock, text: 'Recent'),
+        for (final d in recent) _SavedRow(doc: d, selected: d.id == _selected, onTap: () => _open(d.id, remember: true)),
+      ],
+      const SizedBox(height: 10),
+      const _SectionLabel(icon: KIcons.activity, text: 'Updated lately'),
+      ..._sourceGroups(groups, searching: false),
+    ];
+  }
+
+  /// Browse: a source, where you are in it, and that level.
+  List<Widget> _browseLevel(BuildContext context, List<DocGroup> groups) {
+    final c = context.c;
+    final sources = [for (final g in groups) if (g.problem.isEmpty) g.source];
+    final source = _browseSource;
+    if (sources.isEmpty || source == null) return [const _Note(text: 'No knowledge base can be read right now.')];
+    final s = AppScope.read(context);
+    // Long trails fold the middle: Confluence › … › Engineering › Discounts.
+    final crumbs = <(String, List<(String, String)>)>[
+      (source.kind.label, const []),
+      for (var k = 0; k < _browsePath.length; k++) (_browsePath[k].$2, _browsePath.sublist(0, k + 1)),
+    ];
+    final shown = crumbs.length > 4 ? [crumbs.first, ('…', crumbs[crumbs.length - 3].$2), ...crumbs.sublist(crumbs.length - 2)] : crumbs;
+    final hidden = crumbs.length > 4 ? crumbs.sublist(1, crumbs.length - 2).map((c) => c.$1).join(' › ') : '';
+    final nodes = _nodes ?? const <DocNode>[];
+    return [
+      Wrap(spacing: 4, runSpacing: 4, children: [
+        for (final src in sources)
+          KPressable(
+            onTap: () => _goTo(src, const []),
+            semanticLabel: '${src.kind.label} · ${src.name}',
+            tooltip: '${src.kind.label} · ${src.name}',
+            selected: src.id == source.id,
+            builder: (context, hover, focus) {
+              final on = src.id == source.id;
+              return Container(
+                height: 26,
+                padding: const EdgeInsets.only(left: 4, right: 8),
+                decoration: BoxDecoration(
+                  color: on ? c.accSoft : (hover || focus ? c.tile : null),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: on ? c.acc : c.chipBorder),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  SourceTile(src.kind.badge, size: 16),
+                  const SizedBox(width: 5),
+                  Text(src.kind.label, style: sans(11.5, weight: FontWeight.w500, color: on ? c.text : c.text2)),
+                ]),
+              );
+            },
+          ),
+      ]),
+      const SizedBox(height: 8),
+      SizedBox(
+        height: 26,
+        child: Row(children: [
+          if (_browsePath.isNotEmpty) ...[
+            KIconButton(icon: KIcons.back, label: 'Up one level', size: 24, iconSize: 14, onTap: () => _goTo(source, _browsePath.sublist(0, _browsePath.length - 1))),
+            const SizedBox(width: 2),
+          ],
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Row(children: [
+                for (var k = 0; k < shown.length; k++) ...[
+                  if (k > 0) Padding(padding: const EdgeInsets.symmetric(horizontal: 2), child: Text('›', style: sans(11.5, color: c.text3))),
+                  KPressable(
+                    onTap: () => _goTo(source, shown[k].$2),
+                    semanticLabel: k == shown.length - 1 ? '${shown[k].$1}, where you are' : 'Go to ${shown[k].$1}',
+                    tooltip: shown[k].$1 == '…' ? hidden : shown[k].$1,
+                    builder: (context, hover, focus) => Container(
+                      constraints: const BoxConstraints(maxWidth: 120),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                      decoration: BoxDecoration(color: hover || focus ? c.tile : null, borderRadius: BorderRadius.circular(6)),
+                      child: Text(
+                        shown[k].$1,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(11.5, weight: k == shown.length - 1 ? FontWeight.w600 : FontWeight.w400, color: k == shown.length - 1 ? c.text : c.text3),
+                      ),
+                    ),
+                  ),
+                ],
+              ]),
+            ),
+          ),
+          if (_browseLoading) SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.5, color: c.text3)),
+        ]),
+      ),
+      const SizedBox(height: 6),
+      if (_browseError case final error?)
+        _Note(text: error, warn: true)
+      else if (nodes.isEmpty && !_browseLoading)
+        const _Note(text: 'Nothing here yet.')
+      else
+        for (final n in nodes)
+          _NodeRow(
+            node: n,
+            selected: n.doc != null && n.doc!.id == _selected,
+            // A folder opens its level; a page opens itself, › its child pages.
+            onTap: () => n.isFolder ? _goTo(source, [..._browsePath, (n.key, n.title)]) : _open(n.doc!.id, remember: true),
+            onDrill: !n.isFolder && n.children > 0 ? () => _goTo(source, [..._browsePath, (n.key, n.title)]) : null,
+          ),
+      const SizedBox(height: 10),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Text(
+          s.docs.browsesEverything ? 'Every space and folder, one level at a time. Search covers all of it.' : 'Spaces and their recently edited pages. Search covers all of it.',
+          style: sans(11, color: c.text3, height: 1.4),
+        ),
+      ),
+    ];
   }
 
   Widget _reader(BuildContext context) {
@@ -246,7 +480,16 @@ class _DocsScreenState extends State<DocsScreen> {
         if (page.summary.author.isNotEmpty) 'by ${page.summary.author}',
       ].join(' · ');
       body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(page.summary.title, style: sans(28, weight: FontWeight.w600, color: c.text, letterSpacing: -0.7, height: 1.15)),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: Text(page.summary.title, style: sans(28, weight: FontWeight.w600, color: c.text, letterSpacing: -0.7, height: 1.15))),
+          const SizedBox(width: 8),
+          KIconButton(
+            icon: _isPinned(page.summary.id) ? KIcons.pinned : KIcons.pin,
+            label: _isPinned(page.summary.id) ? 'Unpin from For you' : 'Pin to For you',
+            color: _isPinned(page.summary.id) ? c.acc : null,
+            onTap: () => _togglePin(page),
+          ),
+        ]),
         if (meta.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(meta, style: sans(12, color: c.text3)),
@@ -454,6 +697,126 @@ class _DocRow extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+/// A page kept in For you (pinned, recent).
+@immutable
+class _SavedDoc {
+  const _SavedDoc(this.id, this.title, this.badge, this.place);
+  final String id;
+  final String title;
+  final String badge;
+  final String place;
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 2, 8, 4),
+      child: Row(children: [
+        Icon(icon, size: 12, color: c.text3),
+        const SizedBox(width: 6),
+        Text(text.toUpperCase(), style: microLabel(c)),
+      ]),
+    );
+  }
+}
+
+class _SavedRow extends StatelessWidget {
+  const _SavedRow({required this.doc, required this.selected, required this.onTap});
+  final _SavedDoc doc;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return KPressable(
+      onTap: onTap,
+      selected: selected,
+      semanticLabel: doc.title,
+      tooltip: doc.place.isEmpty ? doc.title : '${doc.title}\n${doc.place}',
+      builder: (context, hover, focus) => Container(
+        margin: const EdgeInsets.only(bottom: 1),
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+        decoration: selected ? chipDecoration(c, radius: 9, fill: c.navActive) : BoxDecoration(color: hover || focus ? c.tile : null, borderRadius: BorderRadius.circular(9)),
+        child: Row(children: [
+          SourceTile(doc.badge, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(doc.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, weight: selected ? FontWeight.w600 : FontWeight.w400, color: selected ? c.text : c.text2)),
+              if (doc.place.isNotEmpty) Text(doc.place, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(10.5, color: c.text3)),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// A Browse entry: a folder (with how many entries), or a page, whose ›
+/// goes into its child pages.
+class _NodeRow extends StatelessWidget {
+  const _NodeRow({required this.node, required this.selected, required this.onTap, this.onDrill});
+  final DocNode node;
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback? onDrill;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Row(children: [
+      Expanded(
+        child: KPressable(
+          onTap: onTap,
+          selected: selected,
+          semanticLabel: node.isFolder ? '${node.title}, ${node.children} inside' : node.title,
+          tooltip: node.title,
+          builder: (context, hover, focus) => Container(
+            margin: const EdgeInsets.only(bottom: 1),
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+            decoration: selected ? chipDecoration(c, radius: 9, fill: c.navActive) : BoxDecoration(color: hover || focus ? c.tile : null, borderRadius: BorderRadius.circular(9)),
+            child: Row(children: [
+              Icon(node.isFolder ? KIcons.folder : KIcons.page, size: 14, color: node.isFolder ? c.text2 : c.text3),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(
+                    node.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(12.5, weight: selected ? FontWeight.w600 : FontWeight.w400, color: node.note.isNotEmpty ? c.text3 : (selected ? c.text : c.text2)),
+                  ),
+                  if (node.note.isNotEmpty) Text(node.note, style: sans(10.5, color: c.text3)),
+                ]),
+              ),
+              if (node.isFolder) ...[
+                Text('${node.children}', style: sans(11, color: c.text3)),
+                const SizedBox(width: 4),
+                Icon(KIcons.chevronRight, size: 14, color: c.text3),
+              ],
+            ]),
+          ),
+        ),
+      ),
+      if (onDrill != null)
+        KIconButton(
+          icon: KIcons.chevronRight,
+          label: '${node.children} ${node.children == 1 ? 'page' : 'pages'} under ${node.title}',
+          size: 26,
+          iconSize: 15,
+          onTap: onDrill,
+        ),
+    ]);
   }
 }
 

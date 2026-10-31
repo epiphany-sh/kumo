@@ -59,6 +59,8 @@ pub struct AgentSession {
 pub enum ContextKind {
     Task,
     Doc,
+    /// Code selected in a file.
+    Code,
 }
 
 /// A ticket or page an agent was given.

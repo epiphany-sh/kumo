@@ -5,7 +5,7 @@ import '../data/docs_source.dart';
 import 'generated/kumo/v1/kumo.pbgrpc.dart' as pb;
 import 'kumo_engine.dart';
 
-/// Docs over `Docs` (List / Read).
+/// Docs over `Docs` (List / Browse / Read).
 class EngineDocs implements DocsSource {
   EngineDocs(this._engine);
   final KumoEngine _engine;
@@ -31,6 +31,29 @@ class EngineDocs implements DocsSource {
         ),
     ];
   }
+
+  /// [path] holds keys from the top; the engine's are self-contained, so
+  /// only the last one is sent.
+  @override
+  Future<List<DocNode>> browse(DocSourceInfo source, List<String> path) async {
+    final level = await _call((c) => c.browse(pb.BrowseDocsRequest(
+          sourceId: source.id,
+          parent: path.isEmpty ? '' : path.last,
+        )));
+    return [
+      for (final n in level.nodes)
+        DocNode(
+          key: n.key,
+          title: n.title,
+          doc: n.hasDoc() ? docSummaryFrom(n.doc) : null,
+          children: n.children,
+          note: n.note,
+        ),
+    ];
+  }
+
+  @override
+  bool get browsesEverything => true;
 
   @override
   Future<DocPage> read(String id) async {

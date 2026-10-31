@@ -90,13 +90,14 @@ const AgentContextKind$json = {
   '2': [
     {'1': 'AGENT_CONTEXT_KIND_TASK', '2': 0},
     {'1': 'AGENT_CONTEXT_KIND_DOC', '2': 1},
+    {'1': 'AGENT_CONTEXT_KIND_CODE', '2': 2},
   ],
 };
 
 /// Descriptor for `AgentContextKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List agentContextKindDescriptor = $convert.base64Decode(
     'ChBBZ2VudENvbnRleHRLaW5kEhsKF0FHRU5UX0NPTlRFWFRfS0lORF9UQVNLEAASGgoWQUdFTl'
-    'RfQ09OVEVYVF9LSU5EX0RPQxAB');
+    'RfQ09OVEVYVF9LSU5EX0RPQxABEhsKF0FHRU5UX0NPTlRFWFRfS0lORF9DT0RFEAI=');
 
 @$core.Deprecated('Use agentEventKindDescriptor instead')
 const AgentEventKind$json = {
@@ -3564,6 +3565,69 @@ final $typed_data.Uint8List docDescriptor = $convert.base64Decode(
     'CgNEb2MSLQoHc3VtbWFyeRgBIAEoCzITLmt1bW8udjEuRG9jU3VtbWFyeVIHc3VtbWFyeRIqCg'
     'Zzb3VyY2UYAiABKAsyEi5rdW1vLnYxLkRvY1NvdXJjZVIGc291cmNlEhoKCG1hcmtkb3duGAMg'
     'ASgJUghtYXJrZG93bhISCgRwYXRoGAQgAygJUgRwYXRoEhIKBGZpbGUYBSABKAlSBGZpbGU=');
+
+@$core.Deprecated('Use browseDocsRequestDescriptor instead')
+const BrowseDocsRequest$json = {
+  '1': 'BrowseDocsRequest',
+  '2': [
+    {'1': 'source_id', '3': 1, '4': 1, '5': 9, '10': 'sourceId'},
+    {'1': 'parent', '3': 2, '4': 1, '5': 9, '10': 'parent'},
+    {'1': 'limit', '3': 3, '4': 1, '5': 13, '10': 'limit'},
+    {'1': 'refresh', '3': 4, '4': 1, '5': 8, '10': 'refresh'},
+  ],
+};
+
+/// Descriptor for `BrowseDocsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List browseDocsRequestDescriptor = $convert.base64Decode(
+    'ChFCcm93c2VEb2NzUmVxdWVzdBIbCglzb3VyY2VfaWQYASABKAlSCHNvdXJjZUlkEhYKBnBhcm'
+    'VudBgCIAEoCVIGcGFyZW50EhQKBWxpbWl0GAMgASgNUgVsaW1pdBIYCgdyZWZyZXNoGAQgASgI'
+    'UgdyZWZyZXNo');
+
+@$core.Deprecated('Use docNodeDescriptor instead')
+const DocNode$json = {
+  '1': 'DocNode',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'title', '3': 2, '4': 1, '5': 9, '10': 'title'},
+    {
+      '1': 'doc',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.DocSummary',
+      '10': 'doc'
+    },
+    {'1': 'children', '3': 4, '4': 1, '5': 13, '10': 'children'},
+    {'1': 'note', '3': 5, '4': 1, '5': 9, '10': 'note'},
+  ],
+};
+
+/// Descriptor for `DocNode`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List docNodeDescriptor = $convert.base64Decode(
+    'CgdEb2NOb2RlEhAKA2tleRgBIAEoCVIDa2V5EhQKBXRpdGxlGAIgASgJUgV0aXRsZRIlCgNkb2'
+    'MYAyABKAsyEy5rdW1vLnYxLkRvY1N1bW1hcnlSA2RvYxIaCghjaGlsZHJlbhgEIAEoDVIIY2hp'
+    'bGRyZW4SEgoEbm90ZRgFIAEoCVIEbm90ZQ==');
+
+@$core.Deprecated('Use docLevelDescriptor instead')
+const DocLevel$json = {
+  '1': 'DocLevel',
+  '2': [
+    {
+      '1': 'nodes',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.DocNode',
+      '10': 'nodes'
+    },
+    {'1': 'truncated', '3': 2, '4': 1, '5': 8, '10': 'truncated'},
+  ],
+};
+
+/// Descriptor for `DocLevel`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List docLevelDescriptor = $convert.base64Decode(
+    'CghEb2NMZXZlbBImCgVub2RlcxgBIAMoCzIQLmt1bW8udjEuRG9jTm9kZVIFbm9kZXMSHAoJdH'
+    'J1bmNhdGVkGAIgASgIUgl0cnVuY2F0ZWQ=');
 
 @$core.Deprecated('Use watchTestsRequestDescriptor instead')
 const WatchTestsRequest$json = {

@@ -51,6 +51,11 @@ abstract final class KIcons {
   static const rename = Icons.edit_outlined;
   static const trash = Icons.delete_outline_rounded;
   static const copy = Icons.content_copy_rounded;
+  static const pin = Icons.push_pin_outlined;
+  static const pinned = Icons.push_pin_rounded;
+  static const page = Icons.article_outlined;
+  static const back = Icons.arrow_back_rounded;
+  static const link = Icons.link_rounded;
   static const paste = Icons.content_paste_rounded;
   static const selectAll = Icons.select_all_rounded;
   static const reveal = Icons.folder_open_outlined;
@@ -65,6 +70,7 @@ abstract final class KIcons {
   static const dragHandle = Icons.drag_handle_rounded;
   static const flask = Icons.science_outlined;
   static const activity = Icons.timeline_rounded;
+  static const gauge = Icons.speed_rounded;
   static const sidePanel = Icons.view_sidebar_outlined;
   static const home = Icons.home_outlined;
   static const refresh = Icons.refresh_rounded;

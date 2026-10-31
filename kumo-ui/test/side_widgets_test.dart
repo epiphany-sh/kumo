@@ -87,6 +87,10 @@ Future<(AppState, String)> _pump(WidgetTester tester, {required _Agents agents, 
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final state = AppState(agents: agents, testsFor: tests == null ? null : (_) => tests);
+  // The panel these tests were written for: Agent, Pipelines, Changes,
+  // Context (the Session widget has its own tests in ai_usage_test.dart).
+  state.removeWidget(InspectorWidget.session);
+  state.addWidget(InspectorWidget.context);
   for (final w in show) {
     state.addWidget(w);
   }

@@ -99,6 +99,30 @@ pub struct DocSummary {
     pub excerpt: String,
 }
 
+/// An entry of one level of a knowledge base: a space, a folder or a page.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocNode {
+    /// Opaque to clients, sent back as the parent of the level below.
+    /// Unique in its level.
+    pub key: String,
+    pub title: String,
+    /// The page, when it can be read; None for a space or a folder.
+    pub doc: Option<DocSummary>,
+    /// Entries under it; 0 when there's nothing to go into. 1 stands for
+    /// "has children" when counting would cost a request per node.
+    pub children: u32,
+    /// A short tag next to the title ("archived"); usually empty.
+    pub note: String,
+}
+
+impl DocNode {
+    /// Folders and spaces first, then pages, each by title
+    /// (case-insensitive).
+    pub fn sort(nodes: &mut [DocNode]) {
+        nodes.sort_by_cached_key(|n| (n.doc.is_some(), n.title.to_lowercase(), n.key.clone()));
+    }
+}
+
 /// A whole page, as Markdown.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Doc {

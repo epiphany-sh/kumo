@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use kumo_domain::docs::{Doc, DocId, DocKind, DocSummary, DocsConnector};
+use kumo_domain::docs::{Doc, DocId, DocKind, DocNode, DocSummary, DocsConnector};
 use kumo_domain::tasks::{SourceOptions, TaskError, TaskSource};
 
 use crate::tasks::obsidian::{MAX_NOTE_BYTES, collect_notes, encode, safe_note};
@@ -48,11 +48,7 @@ fn notes(vault: &Path) -> Vec<Note> {
         .filter_map(|relative| {
             let meta = fs::metadata(vault.join(&relative)).ok()?;
             (meta.len() <= MAX_NOTE_BYTES).then(|| Note {
-                modified: meta
-                    .modified()
-                    .ok()
-                    .and_then(|m| m.duration_since(UNIX_EPOCH).ok())
-                    .and_then(|d| i64::try_from(d.as_millis()).ok()),
+                modified: modified_ms(&meta),
                 relative,
             })
         })
@@ -63,6 +59,76 @@ fn notes(vault: &Path) -> Vec<Note> {
             .then(a.relative.cmp(&b.relative))
     });
     notes
+}
+
+fn modified_ms(meta: &fs::Metadata) -> Option<i64> {
+    meta.modified()
+        .ok()
+        .and_then(|m| m.duration_since(UNIX_EPOCH).ok())
+        .and_then(|d| i64::try_from(d.as_millis()).ok())
+}
+
+/// A folder inside the vault, from a client: plain names only, none hidden,
+/// and no symlink on the way (the same notes `collect_notes` would see).
+fn safe_folder<'a>(vault: &Path, folder: &'a str) -> Result<&'a Path, TaskError> {
+    let path = Path::new(folder);
+    if path.as_os_str().is_empty() {
+        return Err(TaskError::Invalid("not a vault folder".into()));
+    }
+    let mut at = vault.to_owned();
+    for part in path.components() {
+        let std::path::Component::Normal(name) = part else {
+            return Err(TaskError::Invalid(format!("not a vault folder: {folder}")));
+        };
+        if name.to_string_lossy().starts_with('.') {
+            return Err(TaskError::Invalid(format!("not a vault folder: {folder}")));
+        }
+        at.push(name);
+        if !fs::symlink_metadata(&at).is_ok_and(|m| m.is_dir()) {
+            return Err(TaskError::Invalid(format!("not a vault folder: {folder}")));
+        }
+    }
+    Ok(path)
+}
+
+/// What one folder shows: its visible subfolders that hold notes somewhere
+/// below, and its readable notes, unsorted.
+fn level(vault: &Path, dir: &Path) -> (Vec<PathBuf>, Vec<(PathBuf, fs::Metadata)>) {
+    let (mut folders, mut notes) = (Vec::new(), Vec::new());
+    let Ok(entries) = fs::read_dir(dir) else {
+        return (folders, notes);
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        if name.to_string_lossy().starts_with('.') {
+            continue;
+        }
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        let path = entry.path();
+        let Ok(relative) = path.strip_prefix(vault) else {
+            continue;
+        };
+        if kind.is_dir() {
+            let mut below = Vec::new();
+            if name != "node_modules" {
+                collect_notes(vault, &path, &mut below);
+            }
+            if !below.is_empty() {
+                folders.push(relative.to_owned());
+            }
+        } else if kind.is_file()
+            && path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("md"))
+            && let Ok(meta) = entry.metadata()
+            && meta.len() <= MAX_NOTE_BYTES
+        {
+            notes.push((relative.to_owned(), meta));
+        }
+    }
+    (folders, notes)
 }
 
 fn summary(source: &TaskSource, vault: &Path, note: &Note, excerpt: String) -> DocSummary {
@@ -209,11 +275,7 @@ impl DocsConnector for VaultDocs {
             .map_err(|e| TaskError::Unavailable(format!("can't read {external}: {e}")))?;
         let note = Note {
             relative: relative.to_owned(),
-            modified: meta
-                .modified()
-                .ok()
-                .and_then(|m| m.duration_since(UNIX_EPOCH).ok())
-                .and_then(|d| i64::try_from(d.as_millis()).ok()),
+            modified: modified_ms(&meta),
         };
         let mut path = vec![vault_name(vault)];
         if let Some(folder) = relative.parent() {
@@ -229,6 +291,57 @@ impl DocsConnector for VaultDocs {
             path,
             file: Some(file),
         })
+    }
+
+    /// Keys are paths relative to the vault: a folder's for folders, the
+    /// note's for notes.
+    fn browse(
+        &self,
+        source: &TaskSource,
+        _secret: Option<&str>,
+        parent: Option<&str>,
+        limit: usize,
+    ) -> Result<(Vec<DocNode>, bool), TaskError> {
+        let vault = vault(source)?;
+        let dir = match parent {
+            None => vault.to_owned(),
+            Some(folder) => vault.join(safe_folder(vault, folder)?),
+        };
+        let (folders, notes) = level(vault, &dir);
+        let mut nodes: Vec<DocNode> = folders
+            .into_iter()
+            .map(|folder| {
+                let (below, notes) = level(vault, &vault.join(&folder));
+                DocNode {
+                    key: folder.to_string_lossy().replace('\\', "/"),
+                    title: folder
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default(),
+                    doc: None,
+                    children: u32::try_from(below.len() + notes.len()).unwrap_or(u32::MAX),
+                    note: String::new(),
+                }
+            })
+            .collect();
+        nodes.extend(notes.into_iter().map(|(relative, meta)| {
+            let note = Note {
+                modified: modified_ms(&meta),
+                relative,
+            };
+            let doc = summary(source, vault, &note, String::new());
+            DocNode {
+                key: note.relative.to_string_lossy().replace('\\', "/"),
+                title: doc.title.clone(),
+                doc: Some(doc),
+                children: 0,
+                note: String::new(),
+            }
+        }));
+        DocNode::sort(&mut nodes);
+        let truncated = nodes.len() > limit;
+        nodes.truncate(limit);
+        Ok((nodes, truncated))
     }
 }
 
@@ -274,8 +387,14 @@ mod tests {
             "Use CopyFrom for bulk inserts.\n",
             100,
         );
+        write(
+            &v.join("eng/runbooks/Deploy.md"),
+            "Roll out one region at a time.\n",
+            1000,
+        );
         write(&v.join(".obsidian/workspace.md"), "hidden", 1);
         write(&v.join("eng/old.txt"), "not a note", 1);
+        fs::create_dir_all(v.join("drafts")).unwrap();
         dir
     }
 
@@ -292,7 +411,8 @@ mod tests {
             titles,
             [
                 ("PRC-412 scratchpad", name.as_str()),
-                ("pgx CopyFrom notes", "eng")
+                ("pgx CopyFrom notes", "eng"),
+                ("Deploy", "eng/runbooks")
             ]
         );
         assert_eq!(docs[1].id.as_str(), "ob1/eng/pgx CopyFrom notes.md");
@@ -336,5 +456,95 @@ mod tests {
         assert_eq!(nested.path, [vault_name(dir.path()), "eng".into()]);
         assert!(VaultDocs.read(&src, None, "../secret.md").is_err());
         assert!(VaultDocs.read(&src, None, "eng/old.txt").is_err());
+    }
+
+    fn titles(nodes: &[DocNode]) -> Vec<(&str, &str, u32, bool)> {
+        nodes
+            .iter()
+            .map(|n| {
+                (
+                    n.key.as_str(),
+                    n.title.as_str(),
+                    n.children,
+                    n.doc.is_some(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn browses_folders_first_then_notes() {
+        let dir = vault_dir();
+        let src = source(dir.path());
+        let (root, truncated) = VaultDocs.browse(&src, None, None, 200).unwrap();
+        assert_eq!(
+            titles(&root),
+            [
+                ("eng", "eng", 2, false),
+                ("PRC-412 scratchpad.md", "PRC-412 scratchpad", 0, true)
+            ],
+            "no .obsidian, no folder without notes"
+        );
+        assert!(!truncated);
+        let (eng, _) = VaultDocs.browse(&src, None, Some("eng"), 200).unwrap();
+        assert_eq!(
+            titles(&eng),
+            [
+                ("eng/runbooks", "runbooks", 1, false),
+                ("eng/pgx CopyFrom notes.md", "pgx CopyFrom notes", 0, true)
+            ]
+        );
+        let doc = eng[1].doc.as_ref().unwrap();
+        assert_eq!(doc.id.as_str(), "ob1/eng/pgx CopyFrom notes.md");
+        assert_eq!(doc.place, "eng");
+        let read = VaultDocs.read(&src, None, doc.id.external()).unwrap();
+        assert_eq!(read.markdown, "Use CopyFrom for bulk inserts.");
+        let (deep, _) = VaultDocs
+            .browse(&src, None, Some("eng/runbooks"), 200)
+            .unwrap();
+        assert_eq!(
+            titles(&deep),
+            [("eng/runbooks/Deploy.md", "Deploy", 0, true)]
+        );
+    }
+
+    #[test]
+    fn browse_stays_in_the_vault_and_caps_the_level() {
+        let dir = vault_dir();
+        let src = source(dir.path());
+        for parent in [
+            "../",
+            "..",
+            "eng/../..",
+            "/etc",
+            ".obsidian",
+            "eng/old.txt",
+            "nope",
+            "",
+        ] {
+            assert!(
+                matches!(
+                    VaultDocs.browse(&src, None, Some(parent), 200),
+                    Err(TaskError::Invalid(_))
+                ),
+                "{parent:?}"
+            );
+        }
+        let (one, truncated) = VaultDocs.browse(&src, None, None, 1).unwrap();
+        assert_eq!(titles(&one), [("eng", "eng", 2, false)]);
+        assert!(truncated);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn browse_skips_symlinks_out_of_the_vault() {
+        let dir = vault_dir();
+        let outside = tempfile::tempdir().unwrap();
+        write(&outside.path().join("secret.md"), "s", 1);
+        std::os::unix::fs::symlink(outside.path(), dir.path().join("linked")).unwrap();
+        let src = source(dir.path());
+        let (root, _) = VaultDocs.browse(&src, None, None, 200).unwrap();
+        assert!(root.iter().all(|n| n.key != "linked"));
+        assert!(VaultDocs.browse(&src, None, Some("linked"), 200).is_err());
     }
 }

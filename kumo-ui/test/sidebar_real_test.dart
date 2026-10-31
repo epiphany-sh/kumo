@@ -32,13 +32,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('integrations come from the connected task sources and hosts; badges count real things', (tester) async {
+  testWidgets('badges count real things; integrations live in Settings, not the sidebar', (tester) async {
     final s = await _app(tester, hosts: MockCiHostsSource(hosts: const [CiHostInfo(host: 'gitlab.acme.dev', provider: CiProvider.gitlabCi, hasToken: true)]));
-    for (final src in s.tasks.sources) {
-      expect(find.byTooltip(src.name), findsOneWidget, reason: src.name);
-    }
-    expect(find.byTooltip('gitlab.acme.dev'), findsOneWidget);
-    expect(find.text('${s.tasks.sources.map((x) => x.kind.badge).toSet().length + 1} connected'), findsOneWidget);
+    expect(find.byTooltip('gitlab.acme.dev'), findsNothing);
+    expect(find.text('AI USAGE'), findsOneWidget, reason: 'its place in the footer');
     final open = s.tasks.tasks.where((t) => t.mine && t.column.name != 'done').length;
     expect(find.text('$open'), findsWidgets, reason: 'the Tasks badge is your open tasks');
   });

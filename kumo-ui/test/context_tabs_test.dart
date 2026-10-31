@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/app/kumo_app.dart';
 import 'package:kumo_ui/shell/side_panel.dart';
+import 'package:kumo_ui/shell/sidebar.dart';
 
 Future<AppState> _pump(WidgetTester tester) async {
   tester.view.physicalSize = const Size(1440, 960);
@@ -108,7 +109,11 @@ void main() {
     expect(find.byType(SidePanel), findsNothing);
     expect(find.byTooltip(ContextTab.files.tooltip), findsNothing);
     expect(find.byTooltip('Close tab zsh'), findsOneWidget, reason: 'Home starts with one shell');
-    expect(find.text('Claude Code'), findsNothing, reason: 'the worktree’s terminals stay in its space');
+    expect(
+      find.text('Claude Code').evaluate().length,
+      find.descendant(of: find.byType(Sidebar), matching: find.text('Claude Code')).evaluate().length,
+      reason: 'the worktree’s terminals stay in its space (the sidebar’s AI usage still lists the agent)',
+    );
 
     // A worktree in the sidebar takes you back to its context.
     await tester.tap(find.text('feat/PRC-412-bulk-discounts').first);
