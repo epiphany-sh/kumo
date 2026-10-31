@@ -1,8 +1,8 @@
 name: release
 
 # Publishes Kumo X.Y.Z: the GitHub release (zip, appcast, install.sh) and
-# the Homebrew cask. Every merge to main (its pull request passed `ci`),
-# numbered by packaging/next-version.sh; or a tag vX.Y.Z pushed by hand.
+# the Homebrew cask. A release/X.Y.Z branch merged into main (the only kind
+# `ci` lets in) publishes X.Y.Z; so does a tag vX.Y.Z pushed by hand.
 # One-time setup: docs/releasing.md.
 
 on:
@@ -12,9 +12,9 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read # which branch a merge came from
 
-# One at a time, so two merges never get the same number. A merge that
-# lands while another waits replaces it: the newest one carries both.
+# One at a time.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -28,6 +28,7 @@ jobs:
     env:
       # What's released: the merge, or the tag's commit.
       SHA: ${{ github.sha }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,11 +38,20 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = tag ]; then
             version="${GITHUB_REF_NAME#v}"
           else
-            version=$(packaging/next-version.sh "$SHA") # empty: already released
+            # The pull request this merge closed, and its branch.
+            branch=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/pulls" \
+              --jq '[.[] | select(.base.ref == "main" and .merged_at != null)][0].head.ref // ""')
+            # Or from git's merge message: "Merge pull request #N from owner/release/X.Y.Z".
+            [ -n "$branch" ] || branch=$(git log -1 --format=%s "$SHA" | sed -n 's|^Merge pull request #[0-9]* from [^/]*/||p')
+            version=$(packaging/release-version.sh "$branch" || true)
+            if [ -n "$version" ] && git tag -l "v$version" | grep -q .; then
+              echo "v$version is already released"
+              version=
+            fi
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-          echo "Kumo ${version:-: this commit is already released}"
+          echo "Kumo ${version:-: nothing to release}"
 
   macos:
     needs: version
