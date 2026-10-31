@@ -4,6 +4,7 @@ import '../engine/engine_scope.dart';
 import '../engine/kumo_engine.dart';
 import '../platform/window_effects.dart';
 import '../shell/app_shell.dart';
+import '../shell/update_snackbar.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import 'app_state.dart';
@@ -59,7 +60,8 @@ class _KumoAppState extends State<KumoApp> {
               debugShowCheckedModeBanner: false,
               color: Colors.transparent,
               theme: materialThemeFor(palette),
-              home: const AppShell(),
+              // The snackbar inside the navigator: its tooltips need an overlay.
+              home: const Stack(fit: StackFit.expand, children: [AppShell(), UpdateSnackbar()]),
             ),
           ),
         );
