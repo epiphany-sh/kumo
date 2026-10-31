@@ -1,7 +1,7 @@
 import Cocoa
 import FlutterMacOS
 
-class MainFlutterWindow: NSWindow {
+class MainFlutterWindow: NSWindow, NSWindowDelegate {
   /// Key under which macOS remembers the window's last size and position.
   private static let frameName = "KumoMainWindow"
 
@@ -17,12 +17,22 @@ class MainFlutterWindow: NSWindow {
       self.setFrame(MainFlutterWindow.defaultFrame(for: self.screen ?? NSScreen.main), display: true)
     }
     self.setFrameAutosaveName(MainFlutterWindow.frameName)
+    self.delegate = self
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     (NSApp.delegate as? AppDelegate)?.updates.attach(
       messenger: flutterViewController.engine.binaryMessenger)
 
     super.awakeFromNib()
+  }
+
+  /// Full screen: the toolbar (where the traffic lights sit) hides with the
+  /// menu bar. Kept, macOS draws it opaque over the top of our content.
+  func window(
+    _ window: NSWindow,
+    willUseFullScreenPresentationOptions proposedOptions: NSApplication.PresentationOptions = []
+  ) -> NSApplication.PresentationOptions {
+    return proposedOptions.union([.fullScreen, .autoHideMenuBar, .autoHideToolbar])
   }
 
   /// 1440×920 (the size the UI is designed at), shrunk to 92% of the
