@@ -65,7 +65,7 @@ class ScreenToolbar extends StatelessWidget {
         const SizedBox(width: 8),
         if (s.updates.ready case final version?) ...[
           Tooltip(
-            message: 'Kumo $version is downloaded. Restart to use it; otherwise it installs when Kumo quits.',
+            message: 'Kumo $version is downloaded. Restart to use it (open terminals close); otherwise it installs when Kumo quits.',
             child: KButton(label: 'Restart to update', icon: KIcons.download, height: 36, fontSize: 12.5, onTap: s.updates.installAndRelaunch),
           ),
           const SizedBox(width: 8),
