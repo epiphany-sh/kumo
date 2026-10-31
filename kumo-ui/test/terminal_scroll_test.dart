@@ -58,6 +58,55 @@ void main() {
     expect(visibleStart(_buffer(100, reflows: 1), 10, top: 40), 90, reason: 're-wrapped: back to the bottom');
   });
 
+  test('in the history the view can sit part of a line down; at the bottom it can’t', () {
+    expect(visibleOffset(_buffer(100), 10, top: 40, frac: 0.25), 0.25);
+    expect(visibleOffset(_buffer(100), 10, frac: 0.25), 0, reason: 'follows the output');
+    expect(visibleOffset(_buffer(100), 10, top: 95, frac: 0.25), 0, reason: 'clamped to the bottom');
+    expect(visibleOffset(_buffer(100, alt: true), 10, top: 40, frac: 0.25), 0);
+  });
+
+  testWidgets('the wheel moves by pixels: half a line shows half a line, clicks hit the line under them', (tester) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') copied = (call.arguments as Map)['text'] as String?;
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+    final shell = _Shell();
+    await tester.pumpWidget(KumoTheme(
+      mode: KumoThemeMode.dark,
+      palette: KumoPalette.dark,
+      terminalPalette: KumoPalette.dark,
+      child: MaterialApp(home: Scaffold(body: SizedBox(width: 600, height: 200, child: TerminalCanvas(surface: shell, active: true)))),
+    ));
+    await tester.pump();
+    final box = tester.getTopLeft(find.byType(TerminalCanvas));
+    final tp = TextPainter(text: TextSpan(text: 'M', style: mono(12, height: 1.25)), textDirection: TextDirection.ltr)..layout();
+    final cw = tp.width;
+    final lh = tp.height;
+    tp.dispose();
+    final fit = ((200 - 24) / lh).floor();
+
+    final mouse = TestPointer(1, PointerDeviceKind.mouse);
+    mouse.hover(box + const Offset(100, 100));
+    await tester.sendEventToBinding(mouse.scroll(Offset(0, -lh * 20.5)));
+    await tester.pump();
+    // Line 200 - fit + 1 - 21 is on top, half of it scrolled off: a click
+    // three quarters of a line below the padding is on the next one.
+    final g = await tester.startGesture(box + Offset(14, 12 + lh * 0.75), buttons: kPrimaryButton);
+    await g.moveTo(box + Offset(14 + 12 * cw, 12 + lh * 0.75));
+    await g.up();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    expect(copied, 'line ${200 - fit + 1 - 21 + 1}');
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.takeException(), isNull);
+  });
+
   test('wheel reports follow xterm', () {
     expect(utf8.decode(wheelReport(up: true, col: 4, row: 2, sgr: true)), '\x1b[<64;5;3M');
     expect(wheelReport(up: false, col: 0, row: 0), [0x1b, 0x5b, 0x4d, 32 + 65, 33, 33]);
