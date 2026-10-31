@@ -32,20 +32,24 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       sha: ${{ steps.version.outputs.sha }}
+    env:
+      # What's released: the commit `ci` passed on, or the tag's.
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
+      # The workflow's own commit (main's newest, or the tag's): the
+      # script is there even when the released commit predates it.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-          fetch-depth: 0 # tags
+          fetch-depth: 0 # tags, and the released commit
       - id: version
         run: |
           if [ "$GITHUB_EVENT_NAME" = push ]; then
             version="${GITHUB_REF_NAME#v}"
           else
-            version=$(packaging/next-version.sh HEAD) # empty: already released
+            version=$(packaging/next-version.sh "$SHA") # empty: already released
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "Kumo ${version:-: this commit is already released}"
 
   macos:
@@ -94,13 +98,18 @@ jobs:
 
       # Tags the commit (for a merge) only once it's built: a failed build
       # leaves no tag, and its number is used again. A tag made with this
-      # token doesn't start another run.
+      # token doesn't start another run. A release made by hand on GitHub
+      # (which tags it) gets the files instead.
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v$VERSION" --target "$SHA" --title "Kumo $VERSION" --generate-notes \
-            "dist/Kumo-$VERSION.zip" dist/Kumo.zip dist/appcast.xml dist/install.sh
+          files=("dist/Kumo-$VERSION.zip" dist/Kumo.zip dist/appcast.xml dist/install.sh)
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            gh release upload "v$VERSION" "${files[@]}" --clobber
+          else
+            gh release create "v$VERSION" --target "$SHA" --title "Kumo $VERSION" --generate-notes "${files[@]}"
+          fi
 
       - name: Homebrew cask
         env:
