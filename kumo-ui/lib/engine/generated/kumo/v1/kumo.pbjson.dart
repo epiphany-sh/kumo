@@ -1067,22 +1067,31 @@ const RemoveWorktreeRequest$json = {
     {'1': 'repo_path', '3': 1, '4': 1, '5': 9, '10': 'repoPath'},
     {'1': 'worktree_path', '3': 2, '4': 1, '5': 9, '10': 'worktreePath'},
     {'1': 'force', '3': 3, '4': 1, '5': 8, '10': 'force'},
+    {'1': 'delete_branch', '3': 4, '4': 1, '5': 8, '10': 'deleteBranch'},
   ],
 };
 
 /// Descriptor for `RemoveWorktreeRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List removeWorktreeRequestDescriptor = $convert.base64Decode(
     'ChVSZW1vdmVXb3JrdHJlZVJlcXVlc3QSGwoJcmVwb19wYXRoGAEgASgJUghyZXBvUGF0aBIjCg'
-    '13b3JrdHJlZV9wYXRoGAIgASgJUgx3b3JrdHJlZVBhdGgSFAoFZm9yY2UYAyABKAhSBWZvcmNl');
+    '13b3JrdHJlZV9wYXRoGAIgASgJUgx3b3JrdHJlZVBhdGgSFAoFZm9yY2UYAyABKAhSBWZvcmNl'
+    'EiMKDWRlbGV0ZV9icmFuY2gYBCABKAhSDGRlbGV0ZUJyYW5jaA==');
 
 @$core.Deprecated('Use removeWorktreeResponseDescriptor instead')
 const RemoveWorktreeResponse$json = {
   '1': 'RemoveWorktreeResponse',
+  '2': [
+    {'1': 'removed', '3': 1, '4': 1, '5': 8, '10': 'removed'},
+    {'1': 'changed_files', '3': 2, '4': 1, '5': 13, '10': 'changedFiles'},
+    {'1': 'branch_kept', '3': 3, '4': 1, '5': 9, '10': 'branchKept'},
+  ],
 };
 
 /// Descriptor for `RemoveWorktreeResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List removeWorktreeResponseDescriptor =
-    $convert.base64Decode('ChZSZW1vdmVXb3JrdHJlZVJlc3BvbnNl');
+final $typed_data.Uint8List removeWorktreeResponseDescriptor = $convert.base64Decode(
+    'ChZSZW1vdmVXb3JrdHJlZVJlc3BvbnNlEhgKB3JlbW92ZWQYASABKAhSB3JlbW92ZWQSIwoNY2'
+    'hhbmdlZF9maWxlcxgCIAEoDVIMY2hhbmdlZEZpbGVzEh8KC2JyYW5jaF9rZXB0GAMgASgJUgpi'
+    'cmFuY2hLZXB0');
 
 @$core.Deprecated('Use listBranchesRequestDescriptor instead')
 const ListBranchesRequest$json = {

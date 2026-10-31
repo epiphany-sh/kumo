@@ -289,7 +289,8 @@ class WorkspaceClient extends $grpc.Client {
     return $createUnaryCall(_$createWorktree, request, options: options);
   }
 
-  /// `git worktree remove`; the branch stays. The main checkout can't be removed.
+  /// `git worktree remove`; the branch stays unless `delete_branch`. The main
+  /// checkout can't be removed. One with changes is left as is unless `force`.
   $grpc.ResponseFuture<$0.RemoveWorktreeResponse> removeWorktree(
     $0.RemoveWorktreeRequest request, {
     $grpc.CallOptions? options,

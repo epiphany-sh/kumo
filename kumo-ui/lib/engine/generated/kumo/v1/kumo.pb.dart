@@ -2528,11 +2528,13 @@ class RemoveWorktreeRequest extends $pb.GeneratedMessage {
     $core.String? repoPath,
     $core.String? worktreePath,
     $core.bool? force,
+    $core.bool? deleteBranch,
   }) {
     final result = RemoveWorktreeRequest._();
     if (repoPath != null) result.repoPath = repoPath;
     if (worktreePath != null) result.worktreePath = worktreePath;
     if (force != null) result.force = force;
+    if (deleteBranch != null) result.deleteBranch = deleteBranch;
     return result;
   }
 
@@ -2552,6 +2554,7 @@ class RemoveWorktreeRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'repoPath')
     ..aOS(2, _omitFieldNames ? '' : 'worktreePath')
     ..aOB(3, _omitFieldNames ? '' : 'force')
+    ..aOB(4, _omitFieldNames ? '' : 'deleteBranch')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2605,10 +2608,30 @@ class RemoveWorktreeRequest extends $pb.GeneratedMessage {
   $core.bool hasForce() => $_has(2);
   @$pb.TagNumber(3)
   void clearForce() => $_clearField(3);
+
+  /// Also delete its branch, if merged (`git branch -d`).
+  @$pb.TagNumber(4)
+  $core.bool get deleteBranch => $_getBF(3);
+  @$pb.TagNumber(4)
+  set deleteBranch($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDeleteBranch() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDeleteBranch() => $_clearField(4);
 }
 
 class RemoveWorktreeResponse extends $pb.GeneratedMessage {
-  factory RemoveWorktreeResponse() => RemoveWorktreeResponse._();
+  factory RemoveWorktreeResponse({
+    $core.bool? removed,
+    $core.int? changedFiles,
+    $core.String? branchKept,
+  }) {
+    final result = RemoveWorktreeResponse._();
+    if (removed != null) result.removed = removed;
+    if (changedFiles != null) result.changedFiles = changedFiles;
+    if (branchKept != null) result.branchKept = branchKept;
+    return result;
+  }
 
   RemoveWorktreeResponse._();
 
@@ -2623,6 +2646,10 @@ class RemoveWorktreeResponse extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'RemoveWorktreeResponse',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
       createEmptyInstance: RemoveWorktreeResponse.$_createMessage)
+    ..aOB(1, _omitFieldNames ? '' : 'removed')
+    ..aI(2, _omitFieldNames ? '' : 'changedFiles',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(3, _omitFieldNames ? '' : 'branchKept')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2648,6 +2675,36 @@ class RemoveWorktreeResponse extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<RemoveWorktreeResponse>(
           RemoveWorktreeResponse.$_createMessage);
   static RemoveWorktreeResponse? _defaultInstance;
+
+  /// False when it has changes and `force` wasn't set: nothing was touched.
+  @$pb.TagNumber(1)
+  $core.bool get removed => $_getBF(0);
+  @$pb.TagNumber(1)
+  set removed($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRemoved() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRemoved() => $_clearField(1);
+
+  /// Files with changes, when that's why it wasn't removed.
+  @$pb.TagNumber(2)
+  $core.int get changedFiles => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set changedFiles($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasChangedFiles() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearChangedFiles() => $_clearField(2);
+
+  /// `delete_branch` was set but the branch stays: why (e.g. not merged).
+  @$pb.TagNumber(3)
+  $core.String get branchKept => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set branchKept($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBranchKept() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBranchKept() => $_clearField(3);
 }
 
 class ListBranchesRequest extends $pb.GeneratedMessage {

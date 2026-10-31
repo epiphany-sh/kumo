@@ -23,4 +23,4 @@ pub use ports::{Git, RepoFinder, StoredWorkspace, WorkspaceStore};
 pub use remote::{GitHost, Remote};
 pub use repo::Repo;
 pub use snapshot::{RepoState, WorkspaceSnapshot};
-pub use worktree::{Branches, NewWorktree, Worktree, WorktreeStatus};
+pub use worktree::{Branches, NewWorktree, Worktree, WorktreeRemoval, WorktreeStatus};

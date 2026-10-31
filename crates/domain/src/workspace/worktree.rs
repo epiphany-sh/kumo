@@ -14,6 +14,17 @@ pub struct Worktree {
     pub status: WorktreeStatus,
 }
 
+/// What removing a worktree did.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct WorktreeRemoval {
+    /// False when it has changes and removing wasn't forced: it's untouched.
+    pub removed: bool,
+    /// Files with changes, when that's why it wasn't removed.
+    pub changed_files: u32,
+    /// Its branch was to go too but stays: why.
+    pub branch_kept: Option<String>,
+}
+
 /// Working-copy state, from `git status`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WorktreeStatus {
