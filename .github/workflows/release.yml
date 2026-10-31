@@ -1,17 +1,14 @@
 name: release
 
 # Publishes Kumo X.Y.Z: the GitHub release (zip, appcast, install.sh) and
-# the Homebrew cask. Every merge to main once `ci` passes on it, numbered by
-# packaging/next-version.sh; or a tag vX.Y.Z pushed by hand. One-time setup:
-# docs/releasing.md.
+# the Homebrew cask. Every merge to main (its pull request passed `ci`),
+# numbered by packaging/next-version.sh; or a tag vX.Y.Z pushed by hand.
+# One-time setup: docs/releasing.md.
 
 on:
   push:
-    tags: ["v*"]
-  workflow_run:
-    workflows: [ci]
-    types: [completed]
     branches: [main]
+    tags: ["v*"]
 
 permissions:
   contents: write
@@ -24,26 +21,20 @@ concurrency:
 
 jobs:
   version:
-    # A merge to main: only once its tests passed (not for pull requests).
-    if: >-
-      github.event_name == 'push' ||
-      (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
       sha: ${{ steps.version.outputs.sha }}
     env:
-      # What's released: the commit `ci` passed on, or the tag's.
-      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      # What's released: the merge, or the tag's commit.
+      SHA: ${{ github.sha }}
     steps:
-      # The workflow's own commit (main's newest, or the tag's): the
-      # script is there even when the released commit predates it.
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # tags, and the released commit
+          fetch-depth: 0 # tags
       - id: version
         run: |
-          if [ "$GITHUB_EVENT_NAME" = push ]; then
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
             version="${GITHUB_REF_NAME#v}"
           else
             version=$(packaging/next-version.sh "$SHA") # empty: already released

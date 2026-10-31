@@ -1,17 +1,14 @@
 name: ci
 
-# Pull requests, and main once merged (what `release` waits for). Not every
-# push to a branch: with a pull request open, that ran everything twice.
+# Checks a change: pull requests only, so what reaches main went through
+# one. What runs once it's merged is in `main.yml` and `release.yml`.
 on:
-  push:
-    branches: [main]
   pull_request:
 
-# A new push to a pull request cancels the run it replaces; on main every
-# merge runs to the end (each one may be released).
+# A new push to a pull request cancels the run it replaces.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -35,10 +32,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup show active-toolchain
-      # Builds from main are reused by pull requests; theirs aren't kept.
+      # Kept per pull request: its next pushes build only what changed.
       - uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
@@ -52,29 +47,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: rustup show active-toolchain
       - uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo test --workspace --no-fail-fast
-
-  # The release profile builds, and on macOS the bench runs on it.
-  release-build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - run: rustup show active-toolchain
-      - uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: cargo build --release --workspace
-      # On Windows the echo scenario never sees kumo-echo's READY through the
-      # terminal (ConPTY) and hangs; macOS only until that's fixed.
-      - if: runner.os == 'macOS'
-        run: cargo run --release -p kumo-bench -- all
 
   # The Flutter app, on the platform it ships for.
   ui:

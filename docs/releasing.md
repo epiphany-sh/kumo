@@ -58,10 +58,11 @@ se reemplazan solos por la versión publicada.
 
 ## Publicar una versión
 
-**Sola, en cada merge a `main`.** Cuando el workflow `ci` termina en verde
-sobre `main`, el workflow `release` publica la versión siguiente: buildea,
-firma, arma el zip, el appcast y el `install.sh`, crea el release (y su tag)
-en GitHub y actualiza el cask del tap.
+**Sola, en cada merge a `main`.** El PR ya pasó `ci` (fmt, clippy, tests,
+Flutter), así que con el merge el workflow `release` publica la versión
+siguiente: buildea, firma, arma el zip, el appcast y el `install.sh`, crea el
+release (y su tag) en GitHub y actualiza el cask del tap. Mergeá solo PRs
+con `ci` en verde: nada más lo frena.
 
 El número lo calcula `packaging/next-version.sh`:
 
