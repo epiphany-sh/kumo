@@ -1,6 +1,7 @@
 use kumo_domain::agents::AgentError;
 use kumo_domain::changes::ChangesError;
 use kumo_domain::pipelines::PipelinesError;
+use kumo_domain::profiles::ProfileError;
 use kumo_domain::tasks::TaskError;
 use kumo_domain::terminal::TerminalError;
 use kumo_domain::workspace::WorkspaceError;
@@ -95,5 +96,20 @@ pub fn pipelines_status_from(error: PipelinesError) -> Status {
         PipelinesError::Secret(_) => Status::internal(message),
         PipelinesError::Ci(problem) if problem.keeps_last_run() => Status::unavailable(message),
         PipelinesError::Ci(_) => Status::failed_precondition(message),
+    }
+}
+
+/// Maps a profile error; an unknown profile is "unknown workspace".
+pub fn profile_status_from(error: ProfileError) -> Status {
+    let message = error.to_string();
+    match error {
+        ProfileError::NotFound(_) => Status::not_found(message),
+        ProfileError::InvalidId(_) | ProfileError::EmptyName | ProfileError::InvalidColor(_) => {
+            Status::invalid_argument(message)
+        }
+        ProfileError::DefaultProfile | ProfileError::LastProfile | ProfileError::InUse(_) => {
+            Status::failed_precondition(message)
+        }
+        ProfileError::Storage(_) | ProfileError::Open { .. } => Status::internal(message),
     }
 }

@@ -14,18 +14,26 @@ use crate::mapping::{
     detected_to, source_options_from, source_to, task_detail_to, task_link_to, task_status_from,
     task_to, tasks_status_from, tasks_update_to,
 };
+use crate::profile::{Profiles, services_of};
 
 type UpdateStream = Pin<Box<dyn Stream<Item = Result<pb::TasksUpdate, Status>> + Send>>;
 
 /// `kumo.v1.Tasks`.
 #[derive(Debug, Clone)]
 pub struct TasksGrpc {
-    service: Arc<TaskService>,
+    profiles: Arc<Profiles>,
 }
 
 impl TasksGrpc {
-    pub fn new(service: Arc<TaskService>) -> Self {
-        Self { service }
+    pub fn new(profiles: Arc<Profiles>) -> Self {
+        Self { profiles }
+    }
+
+    /// The tasks service of the profile the call names.
+    async fn service<T>(&self, request: &Request<T>) -> Result<Arc<TaskService>, Status> {
+        Ok(Arc::clone(
+            &services_of(&self.profiles, request).await?.tasks,
+        ))
     }
 }
 
@@ -44,9 +52,10 @@ impl pb::tasks_server::Tasks for TasksGrpc {
 
     async fn watch(
         &self,
-        _request: Request<pb::WatchTasksRequest>,
+        request: Request<pb::WatchTasksRequest>,
     ) -> Result<Response<Self::WatchStream>, Status> {
-        let updates = WatchStream::new(self.service.watch()).scan(HashMap::new(), |sent, board| {
+        let service = self.service(&request).await?;
+        let updates = WatchStream::new(service.watch()).scan(HashMap::new(), |sent, board| {
             future::ready(Some(Ok(tasks_update_to(&board, sent))))
         });
         Ok(Response::new(Box::pin(updates)))
@@ -54,9 +63,10 @@ impl pb::tasks_server::Tasks for TasksGrpc {
 
     async fn detect(
         &self,
-        _request: Request<pb::DetectSourcesRequest>,
+        request: Request<pb::DetectSourcesRequest>,
     ) -> Result<Response<pb::DetectSourcesResponse>, Status> {
-        let detected = self.service.detect().await.map_err(tasks_status_from)?;
+        let service = self.service(&request).await?;
+        let detected = service.detect().await.map_err(tasks_status_from)?;
         Ok(Response::new(pb::DetectSourcesResponse {
             sources: detected.into_iter().map(detected_to).collect(),
         }))
@@ -66,11 +76,11 @@ impl pb::tasks_server::Tasks for TasksGrpc {
         &self,
         request: Request<pb::TestSourceRequest>,
     ) -> Result<Response<pb::TestSourceResponse>, Status> {
+        let service = self.service(&request).await?;
         let r = request.into_inner();
         let id = optional(r.id).map(|id| source_id(&id)).transpose()?;
         let options = source_options_from(r.kind, r.options).map_err(tasks_status_from)?;
-        let message = self
-            .service
+        let message = service
             .test_source(id, options, optional(r.secret))
             .await
             .map_err(tasks_status_from)?;
@@ -81,11 +91,11 @@ impl pb::tasks_server::Tasks for TasksGrpc {
         &self,
         request: Request<pb::SaveSourceRequest>,
     ) -> Result<Response<pb::TaskSource>, Status> {
+        let service = self.service(&request).await?;
         let r = request.into_inner();
         let id = optional(r.id).map(|id| source_id(&id)).transpose()?;
         let options = source_options_from(r.kind, r.options).map_err(tasks_status_from)?;
-        let view = self
-            .service
+        let view = service
             .save_source(id, &r.name, options, r.enabled, optional(r.secret))
             .await
             .map_err(tasks_status_from)?;
@@ -96,8 +106,9 @@ impl pb::tasks_server::Tasks for TasksGrpc {
         &self,
         request: Request<pb::DeleteSourceRequest>,
     ) -> Result<Response<pb::DeleteSourceResponse>, Status> {
+        let service = self.service(&request).await?;
         let id = source_id(&request.into_inner().id)?;
-        self.service
+        service
             .delete_source(&id)
             .await
             .map_err(tasks_status_from)?;
@@ -108,10 +119,11 @@ impl pb::tasks_server::Tasks for TasksGrpc {
         &self,
         request: Request<pb::SyncTasksRequest>,
     ) -> Result<Response<pb::SyncTasksResponse>, Status> {
+        let service = self.service(&request).await?;
         let id = optional(request.into_inner().source_id)
             .map(|id| source_id(&id))
             .transpose()?;
-        self.service.sync(id.as_ref()).map_err(tasks_status_from)?;
+        service.sync(id.as_ref()).map_err(tasks_status_from)?;
         Ok(Response::new(pb::SyncTasksResponse {}))
     }
 
@@ -119,11 +131,11 @@ impl pb::tasks_server::Tasks for TasksGrpc {
         &self,
         request: Request<pb::SetTaskStatusRequest>,
     ) -> Result<Response<pb::Task>, Status> {
+        let service = self.service(&request).await?;
         let r = request.into_inner();
         let id = TaskId::parse(&r.task_id).map_err(tasks_status_from)?;
         let status = task_status_from(r.status)?;
-        let task = self
-            .service
+        let task = service
             .set_status(&id, status)
             .await
             .map_err(tasks_status_from)?;
@@ -134,13 +146,13 @@ impl pb::tasks_server::Tasks for TasksGrpc {
         &self,
         request: Request<pb::LinkTaskRequest>,
     ) -> Result<Response<pb::TaskLink>, Status> {
+        let service = self.service(&request).await?;
         let r = request.into_inner();
         let id = TaskId::parse(&r.task_id).map_err(tasks_status_from)?;
         if r.worktree_path.trim().is_empty() {
             return Err(Status::invalid_argument("worktree path is empty"));
         }
-        let link = self
-            .service
+        let link = service
             .link(id, PathBuf::from(r.worktree_path), r.branch)
             .await
             .map_err(tasks_status_from)?;
@@ -151,10 +163,10 @@ impl pb::tasks_server::Tasks for TasksGrpc {
         &self,
         request: Request<pb::GetTaskRequest>,
     ) -> Result<Response<pb::TaskDetail>, Status> {
+        let service = self.service(&request).await?;
         let r = request.into_inner();
         let id = TaskId::parse(&r.id).map_err(tasks_status_from)?;
-        let detail = self
-            .service
+        let detail = service
             .get_task(&id, r.refresh)
             .await
             .map_err(tasks_status_from)?;
@@ -165,9 +177,10 @@ impl pb::tasks_server::Tasks for TasksGrpc {
         &self,
         request: Request<pb::UnlinkTaskRequest>,
     ) -> Result<Response<pb::UnlinkTaskResponse>, Status> {
+        let service = self.service(&request).await?;
         let r = request.into_inner();
         let id = TaskId::parse(&r.task_id).map_err(tasks_status_from)?;
-        self.service
+        service
             .unlink(&id, &PathBuf::from(r.worktree_path))
             .await
             .map_err(tasks_status_from)?;
