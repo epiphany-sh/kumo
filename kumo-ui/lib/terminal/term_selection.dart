@@ -136,3 +136,37 @@ TermSelection lineAt(List<TermLine> lines, int line) {
   if (line < 0 || line >= lines.length) return TermSelection(TermPoint(line, 0), TermPoint(line, 0));
   return TermSelection(TermPoint(line, 0), TermPoint(line, lineWidth(lines[line])));
 }
+
+final _url = RegExp(r'''(?:https?|obsidian|bear|todoist)://[^\s<>"'`│]+''');
+
+/// Shift/⌘-click: the URL under [p] (`http://localhost:3000/` from a dev
+/// server and the like) with the cells it covers; null off a link.
+(TermSelection, String)? linkAt(List<TermLine> lines, TermPoint p) {
+  if (p.line < 0 || p.line >= lines.length) return null;
+  final cells = _cells(lines[p.line]);
+  final text = String.fromCharCodes(cells.map((c) => c.$1));
+  // Code units of [text] → cells; runes past the BMP take two units.
+  final at = <int>[];
+  for (final (rune, col) in cells) {
+    at.add(col);
+    if (rune > 0xffff) at.add(col);
+  }
+  for (final m in _url.allMatches(text)) {
+    var url = m.group(0)!;
+    // Sentence punctuation and an unbalanced closing bracket at the end
+    // aren't part of it: "(see http://x/a)." opens http://x/a.
+    while (url.isNotEmpty) {
+      final last = url[url.length - 1];
+      final unbalanced = (last == ')' && '('.allMatches(url).length < ')'.allMatches(url).length) ||
+          (last == ']' && '['.allMatches(url).length < ']'.allMatches(url).length);
+      if (!'.,:;!?'.contains(last) && !unbalanced) break;
+      url = url.substring(0, url.length - 1);
+    }
+    final end = m.start + url.length;
+    if (!url.contains(RegExp(r'://.')) || at[m.start] > p.col) continue;
+    final to = at[end - 1] + termCellWidth(url.runes.last).clamp(1, 2);
+    if (p.col >= to) continue;
+    return (TermSelection(TermPoint(p.line, at[m.start]), TermPoint(p.line, to)), url);
+  }
+  return null;
+}

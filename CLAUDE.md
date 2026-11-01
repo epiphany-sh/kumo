@@ -8,11 +8,13 @@ Las ramas siguen un camino fijo y el check `branch-policy` de `ci`
 
 ```
 feature/…  ─┐
+feat/…     ─┤
 fix/…      ─┴─▶  release/X.Y.Z  ──▶  main  ──▶  vX.Y.Z publicada
 ```
 
-- **El trabajo va en `feature/<tema>` o `fix/<tema>`.** Ningún otro nombre
-  pasa el check (tampoco `claude/…`). Si la sesión arrancó en otra rama,
+- **El trabajo va en `feature/<tema>`, `feat/<tema>` o `fix/<tema>`.**
+  Ningún otro nombre pasa el check (tampoco `claude/…`). Si la sesión
+  arrancó en otra rama,
   pusheá el commit con el nombre correcto:
   `git push origin HEAD:refs/heads/fix/<tema>`.
 - **El PR va contra la `release/X.Y.Z` abierta, nunca contra `main`.** A
