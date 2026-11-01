@@ -15,7 +15,7 @@ env:
 
 jobs:
   # main takes only release/X.Y.Z branches (each merge releases one), and
-  # release branches take feature/… or fix/…: packaging/branch-policy.sh.
+  # release branches take feature/…, feat/… or fix/…: packaging/branch-policy.sh.
   branch-policy:
     runs-on: ubuntu-latest
     timeout-minutes: 5
