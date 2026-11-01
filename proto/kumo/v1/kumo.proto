@@ -2,6 +2,9 @@
 //
 // Transport: gRPC over HTTP/2 on TCP loopback. Every call carries
 // `authorization: Bearer <token>` (token from the discovery file).
+// Calls to every service except Core and Profiles may carry
+// `kumo-profile: <id>`: the workspace (profile) they act on. Without it
+// they act on the default profile; an unknown id fails with NOT_FOUND.
 // Keep this file backwards compatible once the UI consumes it:
 // never reuse or renumber fields, only add.
 syntax = "proto3";
@@ -40,6 +43,81 @@ message ShutdownRequest {
 }
 
 message ShutdownResponse {}
+
+// ---------------------------------------------------------------------------
+// Profiles
+// ---------------------------------------------------------------------------
+
+// Workspaces in the UI: separate accounts, tokens, namespaces and agents.
+// The engine calls them profiles (Workspace is the namespaces service).
+// A window sends its profile's id in `kumo-profile` on every other call.
+service Profiles {
+  rpc List(ListProfilesRequest) returns (ProfileList);
+  // Last in the switcher. Its id is a slug of the name, and never changes.
+  rpc Create(CreateProfileRequest) returns (Profile);
+  rpc Update(UpdateProfileRequest) returns (Profile);
+  // Stops its agents and deletes its data; repositories and worktrees on
+  // disk stay. Refused (FAILED_PRECONDITION) for the default profile, the
+  // last one, and one a window is showing.
+  rpc Delete(DeleteProfileRequest) returns (DeleteProfileResponse);
+  // Every profile with what runs in it, then again on each change. A
+  // window keeps this open with its `kumo-profile`: that profile counts as
+  // in use while the stream lives.
+  rpc Watch(WatchProfilesRequest) returns (stream ProfileList);
+}
+
+message ListProfilesRequest {}
+
+message WatchProfilesRequest {}
+
+message ProfileList {
+  // In switcher order.
+  repeated Profile profiles = 1;
+}
+
+message Profile {
+  string id = 1;
+  // Empty for the default profile until the user names it.
+  string name = 2;
+  string color = 3;            // "#8C9BFF"
+  uint32 position = 4;
+  // Where new worktrees go: <dir>/<repo>/<branch>. `~/` is the home.
+  string worktrees_dir = 5;
+  string git_name = 6;         // empty: the user's git config
+  string git_email = 7;
+  // Kumo's data from before profiles. Can't be deleted.
+  bool is_default = 8;
+  // What it has and runs right now (for the switcher).
+  uint32 agents_running = 9;
+  uint32 agents_waiting = 10;  // agents whose turn ended (needs you)
+  uint32 terminals_open = 11;
+  uint32 namespaces = 12;
+  uint32 repos = 13;
+}
+
+message CreateProfileRequest {
+  string name = 1;
+  string color = 2;            // empty: the default color
+  // Copies that profile's agent commands (never sign-ins). Empty: none.
+  string copy_agents_from = 3;
+}
+
+// Unset fields stay as they are.
+message UpdateProfileRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string color = 3;
+  optional uint32 position = 4;
+  optional string worktrees_dir = 5;  // empty: unchanged
+  optional string git_name = 6;       // empty: back to the user's git config
+  optional string git_email = 7;
+}
+
+message DeleteProfileRequest {
+  string id = 1;
+}
+
+message DeleteProfileResponse {}
 
 // ---------------------------------------------------------------------------
 // Terminals

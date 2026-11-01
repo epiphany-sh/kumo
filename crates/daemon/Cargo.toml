@@ -22,6 +22,7 @@ kumo-infrastructure.workspace = true
 kumo-grpc.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "time", "sync"] }
 anyhow.workspace = true
+futures.workspace = true
 clap.workspace = true
 dirs.workspace = true
 tracing.workspace = true

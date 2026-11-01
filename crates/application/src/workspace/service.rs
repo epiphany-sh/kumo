@@ -44,6 +44,8 @@ struct State {
 #[derive(Debug)]
 pub struct WorkspaceService {
     ports: WorkspacePorts,
+    /// Starts as `ports.location`; a profile's settings can move it.
+    location: std::sync::Mutex<WorktreeLocation>,
     state: Mutex<State>,
     published: watch::Sender<Arc<WorkspaceSnapshot>>,
 }
@@ -75,10 +77,19 @@ impl WorkspaceService {
         };
         let (published, _) = watch::channel(Arc::new(snapshot_of(&state)));
         Ok(Self {
+            location: std::sync::Mutex::new(ports.location.clone()),
             ports,
             state: Mutex::new(state),
             published,
         })
+    }
+
+    /// Where new worktrees go from now on.
+    pub fn set_location(&self, location: WorktreeLocation) {
+        *self
+            .location
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = location;
     }
 
     /// The current snapshot, and every later one (intermediate ones may be
@@ -186,8 +197,9 @@ impl WorkspaceService {
             .clone();
         let branch = BranchName::parse(branch)?;
         let path = self
-            .ports
             .location
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .resolve(requested_path, &repo.name, &branch)?;
         let new = NewWorktree {
             branch,

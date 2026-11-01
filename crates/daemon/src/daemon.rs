@@ -3,41 +3,23 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Context;
-use kumo_application::agents::{AgentPorts, AgentService};
-use kumo_application::changes::{ChangesPorts, ChangesService};
 use kumo_application::daemon::{DaemonControl, HelloService};
-use kumo_application::docs::{DocsPorts, DocsService};
-use kumo_application::pipelines::{PipelinesPorts, PipelinesService, PipelinesTiming};
-use kumo_application::pulls::{PullRequestPorts, PullRequestService};
-use kumo_application::tasks::{TaskPorts, TaskService, TaskTiming};
+use kumo_application::profiles::ProfileService;
 use kumo_application::terminal::TerminalService;
-use kumo_application::test_runs::{TestPorts, TestService};
-use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
 use kumo_domain::agents::ProgramLocator;
 use kumo_domain::daemon::{ApiVersion, DaemonEndpoint, DiscoveryStore};
-use kumo_domain::pipelines::{HostTokens, TokenFallback};
-use kumo_domain::tasks::{SecretStore, TaskConnector};
-use kumo_domain::workspace::WorktreeLocation;
+use kumo_domain::pipelines::HostTokens;
+use kumo_domain::tasks::SecretStore;
 use kumo_grpc::server::{GrpcServer, Services};
-use kumo_infrastructure::agents::{ClaudeStatusLine, CodexRollouts, ShellPathLocator, codex_home};
-use kumo_infrastructure::ci::{
-    BitbucketPipelines, BitbucketPulls, GhTokenFallback, GitHubActions, GitHubPulls, GitLabCi,
-    GitLabPulls,
-};
+use kumo_infrastructure::agents::ShellPathLocator;
 use kumo_infrastructure::discovery::FileDiscoveryStore;
-use kumo_infrastructure::docs::{ConfluenceDocs, VaultDocs};
 use kumo_infrastructure::executable::ProgramFile;
-use kumo_infrastructure::fs::{LocalFileStore, LocalProjectReader};
-use kumo_infrastructure::git::{FsRepoFinder, GitCli};
+use kumo_infrastructure::profiles::FileProfileStore;
 use kumo_infrastructure::pty::PortablePtySystem;
 use kumo_infrastructure::secrets::{KeychainSecretStore, MemorySecretStore};
 use kumo_infrastructure::security::generate_auth_token;
-use kumo_infrastructure::storage::{SqliteAgentStore, SqliteTaskStore, SqliteWorkspaceStore};
-use kumo_infrastructure::tasks::{
-    BearConnector, GitHubConnector, JiraConnector, ObsidianConnector, TodoistConnector,
-};
-use kumo_infrastructure::watch::NotifyWatcher;
 
+use crate::profiles::ProfileOpener;
 use crate::single_instance::{InstanceLock, ensure_not_running, lock};
 use crate::{DaemonConfig, SecretsBackend};
 
@@ -73,22 +55,6 @@ impl Daemon {
         ensure_not_running(&discovery).await?;
         let instance = lock(&data_dir).await?;
 
-        let workspace = Arc::new(
-            WorkspaceService::load(WorkspacePorts {
-                git: Arc::new(GitCli::default()),
-                store: Arc::new(SqliteWorkspaceStore::open(&data_dir.join("kumo.db"))?),
-                finder: Arc::new(FsRepoFinder::new(&home)),
-                watcher: Arc::new(NotifyWatcher),
-                location: WorktreeLocation::new(&home),
-            })
-            .await?,
-        );
-        // Git state is read in the background: the daemon answers right away.
-        let initial = Arc::clone(&workspace);
-        tokio::spawn(async move { initial.refresh().await });
-        // Worktrees and changes made from a terminal show without a refresh.
-        workspace.sync();
-
         let token = generate_auth_token().context("generating auth token")?;
         let terminals = Arc::new(TerminalService::new(
             Arc::new(PortablePtySystem),
@@ -110,68 +76,24 @@ impl Daemon {
                     (memory.clone(), memory)
                 }
             };
-        let connectors: Vec<Arc<dyn TaskConnector>> = vec![
-            Arc::new(ObsidianConnector::new(&home)),
-            Arc::new(BearConnector::new(&home)),
-            Arc::new(GitHubConnector::new(Arc::clone(&locator))),
-            Arc::new(JiraConnector::default()),
-            Arc::new(TodoistConnector::default()),
-        ];
-        let task_store = Arc::new(SqliteTaskStore::open(&data_dir.join("kumo.db"))?);
-        // Docs read through the task sources' accounts and vaults.
-        let docs = Arc::new(DocsService::new(
-            DocsPorts {
-                sources: task_store.clone(),
-                secrets: Arc::clone(&secrets),
-                connectors: vec![Arc::new(ConfluenceDocs::default()), Arc::new(VaultDocs)],
-            },
-            std::time::Duration::from_secs(60),
-        ));
-        let tasks = TaskService::load(
-            TaskPorts {
-                store: task_store,
-                secrets,
-                connectors,
-                watcher: Arc::new(NotifyWatcher),
-            },
-            TaskTiming::default(),
-        )
-        .await?;
 
-        // gh's sign-in, shared: one cached token for pipelines and pull requests.
-        let gh: Arc<dyn TokenFallback> = Arc::new(GhTokenFallback::new(Arc::clone(&locator)));
-        let pipelines = Arc::new(PipelinesService::new(
-            PipelinesPorts {
-                clients: vec![
-                    Arc::new(GitHubActions::default()),
-                    Arc::new(GitLabCi::default()),
-                    Arc::new(BitbucketPipelines::default()),
-                ],
-                tokens: Arc::clone(&host_tokens),
-                fallback: Arc::clone(&gh),
-                branches: Arc::new(GitCli::default()),
-                terminals: Arc::clone(&terminals) as _,
-            },
-            PipelinesTiming::default(),
-            workspace.watch(),
-        ));
+        // Every other service is per profile, built the first time a call
+        // names it. The default one (Kumo's data from before profiles) is
+        // opened now, so its repositories are read at start as before.
+        let opener = ProfileOpener {
+            data_dir: data_dir.clone(),
+            home: home.clone(),
+            locator,
+            secrets,
+            host_tokens,
+            terminals: Arc::clone(&terminals),
+        };
+        let profiles = Arc::new(ProfileService::load(
+            Arc::new(FileProfileStore::in_dir(&data_dir)),
+            Arc::new(opener),
+        )?);
+        profiles.resolve(None).await?;
 
-        let pulls = Arc::new(PullRequestService::new(
-            PullRequestPorts {
-                clients: vec![
-                    Arc::new(GitHubPulls::default()),
-                    Arc::new(GitLabPulls::default()),
-                    Arc::new(BitbucketPulls::default()),
-                ],
-                tokens: host_tokens,
-                fallback: gh,
-                branches: Arc::new(GitCli::default()),
-            },
-            workspace.watch(),
-            std::time::Duration::from_secs(60),
-        ));
-
-        let agent_store = Arc::new(SqliteAgentStore::open(&data_dir.join("kumo.db"))?);
         let control = DaemonControl::new(Arc::clone(&terminals));
         let services = Services {
             hello: HelloService::new(
@@ -181,41 +103,7 @@ impl Daemon {
             ),
             control: control.clone(),
             terminals: Arc::clone(&terminals),
-            workspace: Arc::clone(&workspace),
-            changes: Arc::new(ChangesService::new(
-                ChangesPorts {
-                    git: Arc::new(GitCli::default()),
-                    files: Arc::new(LocalFileStore),
-                    watcher: Arc::new(NotifyWatcher),
-                },
-                Arc::clone(&workspace),
-            )),
-            agents: Arc::new(AgentService::new(
-                AgentPorts {
-                    store: agent_store.clone(),
-                    locator: Arc::clone(&locator),
-                    // Plan limits and context windows, as the CLIs report them.
-                    usage: vec![
-                        Arc::new(ClaudeStatusLine::new(&data_dir.join("agents"), &home)),
-                        Arc::new(CodexRollouts::new(&codex_home(&home))),
-                    ],
-                    plans: agent_store,
-                },
-                Arc::clone(&terminals),
-                Arc::clone(&workspace),
-            )),
-            tests: Arc::new(TestService::new(
-                TestPorts {
-                    files: Arc::new(LocalProjectReader),
-                    locator,
-                },
-                Arc::clone(&terminals),
-                workspace,
-            )),
-            tasks,
-            pipelines,
-            pulls,
-            docs,
+            profiles,
         };
         let server = GrpcServer::bind(config.listen, token.clone(), services).await?;
 

@@ -288,6 +288,665 @@ class ShutdownResponse extends $pb.GeneratedMessage {
   static ShutdownResponse? _defaultInstance;
 }
 
+class ListProfilesRequest extends $pb.GeneratedMessage {
+  factory ListProfilesRequest() => ListProfilesRequest._();
+
+  ListProfilesRequest._();
+
+  factory ListProfilesRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListProfilesRequest()..mergeFromBuffer(data, registry);
+  factory ListProfilesRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListProfilesRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListProfilesRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ListProfilesRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListProfilesRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListProfilesRequest copyWith(void Function(ListProfilesRequest) updates) =>
+      super.copyWith((message) => updates(message as ListProfilesRequest))
+          as ListProfilesRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use ListProfilesRequest() / ListProfilesRequest.new instead')
+  static ListProfilesRequest create() => ListProfilesRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListProfilesRequest._();
+  @$core.override
+  ListProfilesRequest createEmptyInstance() => ListProfilesRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListProfilesRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListProfilesRequest>(
+          ListProfilesRequest.$_createMessage);
+  static ListProfilesRequest? _defaultInstance;
+}
+
+class WatchProfilesRequest extends $pb.GeneratedMessage {
+  factory WatchProfilesRequest() => WatchProfilesRequest._();
+
+  WatchProfilesRequest._();
+
+  factory WatchProfilesRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WatchProfilesRequest()..mergeFromBuffer(data, registry);
+  factory WatchProfilesRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WatchProfilesRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WatchProfilesRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: WatchProfilesRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchProfilesRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchProfilesRequest copyWith(void Function(WatchProfilesRequest) updates) =>
+      super.copyWith((message) => updates(message as WatchProfilesRequest))
+          as WatchProfilesRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use WatchProfilesRequest() / WatchProfilesRequest.new instead')
+  static WatchProfilesRequest create() => WatchProfilesRequest._();
+  static $pb.GeneratedMessage $_createMessage() => WatchProfilesRequest._();
+  @$core.override
+  WatchProfilesRequest createEmptyInstance() => WatchProfilesRequest._();
+  @$core.pragma('dart2js:noInline')
+  static WatchProfilesRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<WatchProfilesRequest>(
+          WatchProfilesRequest.$_createMessage);
+  static WatchProfilesRequest? _defaultInstance;
+}
+
+class ProfileList extends $pb.GeneratedMessage {
+  factory ProfileList({
+    $core.Iterable<Profile>? profiles,
+  }) {
+    final result = ProfileList._();
+    if (profiles != null) result.profiles.addAll(profiles);
+    return result;
+  }
+
+  ProfileList._();
+
+  factory ProfileList.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ProfileList()..mergeFromBuffer(data, registry);
+  factory ProfileList.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ProfileList()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ProfileList',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ProfileList.$_createMessage)
+    ..pPM<Profile>(1, _omitFieldNames ? '' : 'profiles',
+        subBuilder: Profile.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ProfileList clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ProfileList copyWith(void Function(ProfileList) updates) =>
+      super.copyWith((message) => updates(message as ProfileList))
+          as ProfileList;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ProfileList() / ProfileList.new instead')
+  static ProfileList create() => ProfileList._();
+  static $pb.GeneratedMessage $_createMessage() => ProfileList._();
+  @$core.override
+  ProfileList createEmptyInstance() => ProfileList._();
+  @$core.pragma('dart2js:noInline')
+  static ProfileList getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ProfileList>(
+          ProfileList.$_createMessage);
+  static ProfileList? _defaultInstance;
+
+  /// In switcher order.
+  @$pb.TagNumber(1)
+  $pb.PbList<Profile> get profiles => $_getList(0);
+}
+
+class Profile extends $pb.GeneratedMessage {
+  factory Profile({
+    $core.String? id,
+    $core.String? name,
+    $core.String? color,
+    $core.int? position,
+    $core.String? worktreesDir,
+    $core.String? gitName,
+    $core.String? gitEmail,
+    $core.bool? isDefault,
+    $core.int? agentsRunning,
+    $core.int? agentsWaiting,
+    $core.int? terminalsOpen,
+    $core.int? namespaces,
+    $core.int? repos,
+  }) {
+    final result = Profile._();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (color != null) result.color = color;
+    if (position != null) result.position = position;
+    if (worktreesDir != null) result.worktreesDir = worktreesDir;
+    if (gitName != null) result.gitName = gitName;
+    if (gitEmail != null) result.gitEmail = gitEmail;
+    if (isDefault != null) result.isDefault = isDefault;
+    if (agentsRunning != null) result.agentsRunning = agentsRunning;
+    if (agentsWaiting != null) result.agentsWaiting = agentsWaiting;
+    if (terminalsOpen != null) result.terminalsOpen = terminalsOpen;
+    if (namespaces != null) result.namespaces = namespaces;
+    if (repos != null) result.repos = repos;
+    return result;
+  }
+
+  Profile._();
+
+  factory Profile.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Profile()..mergeFromBuffer(data, registry);
+  factory Profile.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Profile()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Profile',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: Profile.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aOS(3, _omitFieldNames ? '' : 'color')
+    ..aI(4, _omitFieldNames ? '' : 'position', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(5, _omitFieldNames ? '' : 'worktreesDir')
+    ..aOS(6, _omitFieldNames ? '' : 'gitName')
+    ..aOS(7, _omitFieldNames ? '' : 'gitEmail')
+    ..aOB(8, _omitFieldNames ? '' : 'isDefault')
+    ..aI(9, _omitFieldNames ? '' : 'agentsRunning',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(10, _omitFieldNames ? '' : 'agentsWaiting',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(11, _omitFieldNames ? '' : 'terminalsOpen',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(12, _omitFieldNames ? '' : 'namespaces',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(13, _omitFieldNames ? '' : 'repos', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Profile clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Profile copyWith(void Function(Profile) updates) =>
+      super.copyWith((message) => updates(message as Profile)) as Profile;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Profile() / Profile.new instead')
+  static Profile create() => Profile._();
+  static $pb.GeneratedMessage $_createMessage() => Profile._();
+  @$core.override
+  Profile createEmptyInstance() => Profile._();
+  @$core.pragma('dart2js:noInline')
+  static Profile getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Profile>(Profile.$_createMessage);
+  static Profile? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  /// Empty for the default profile until the user names it.
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get color => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set color($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasColor() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearColor() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get position => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set position($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPosition() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPosition() => $_clearField(4);
+
+  /// Where new worktrees go: <dir>/<repo>/<branch>. `~/` is the home.
+  @$pb.TagNumber(5)
+  $core.String get worktreesDir => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set worktreesDir($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasWorktreesDir() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearWorktreesDir() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get gitName => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set gitName($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasGitName() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearGitName() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get gitEmail => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set gitEmail($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasGitEmail() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearGitEmail() => $_clearField(7);
+
+  /// Kumo's data from before profiles. Can't be deleted.
+  @$pb.TagNumber(8)
+  $core.bool get isDefault => $_getBF(7);
+  @$pb.TagNumber(8)
+  set isDefault($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasIsDefault() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearIsDefault() => $_clearField(8);
+
+  /// What it has and runs right now (for the switcher).
+  @$pb.TagNumber(9)
+  $core.int get agentsRunning => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set agentsRunning($core.int value) => $_setUnsignedInt32(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasAgentsRunning() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearAgentsRunning() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get agentsWaiting => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set agentsWaiting($core.int value) => $_setUnsignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasAgentsWaiting() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearAgentsWaiting() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.int get terminalsOpen => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set terminalsOpen($core.int value) => $_setUnsignedInt32(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasTerminalsOpen() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearTerminalsOpen() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.int get namespaces => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set namespaces($core.int value) => $_setUnsignedInt32(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasNamespaces() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearNamespaces() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.int get repos => $_getIZ(12);
+  @$pb.TagNumber(13)
+  set repos($core.int value) => $_setUnsignedInt32(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasRepos() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearRepos() => $_clearField(13);
+}
+
+class CreateProfileRequest extends $pb.GeneratedMessage {
+  factory CreateProfileRequest({
+    $core.String? name,
+    $core.String? color,
+    $core.String? copyAgentsFrom,
+  }) {
+    final result = CreateProfileRequest._();
+    if (name != null) result.name = name;
+    if (color != null) result.color = color;
+    if (copyAgentsFrom != null) result.copyAgentsFrom = copyAgentsFrom;
+    return result;
+  }
+
+  CreateProfileRequest._();
+
+  factory CreateProfileRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateProfileRequest()..mergeFromBuffer(data, registry);
+  factory CreateProfileRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      CreateProfileRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CreateProfileRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: CreateProfileRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aOS(2, _omitFieldNames ? '' : 'color')
+    ..aOS(3, _omitFieldNames ? '' : 'copyAgentsFrom')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateProfileRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CreateProfileRequest copyWith(void Function(CreateProfileRequest) updates) =>
+      super.copyWith((message) => updates(message as CreateProfileRequest))
+          as CreateProfileRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use CreateProfileRequest() / CreateProfileRequest.new instead')
+  static CreateProfileRequest create() => CreateProfileRequest._();
+  static $pb.GeneratedMessage $_createMessage() => CreateProfileRequest._();
+  @$core.override
+  CreateProfileRequest createEmptyInstance() => CreateProfileRequest._();
+  @$core.pragma('dart2js:noInline')
+  static CreateProfileRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CreateProfileRequest>(
+          CreateProfileRequest.$_createMessage);
+  static CreateProfileRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get color => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set color($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasColor() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearColor() => $_clearField(2);
+
+  /// Copies that profile's agent commands (never sign-ins). Empty: none.
+  @$pb.TagNumber(3)
+  $core.String get copyAgentsFrom => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set copyAgentsFrom($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCopyAgentsFrom() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCopyAgentsFrom() => $_clearField(3);
+}
+
+/// Unset fields stay as they are.
+class UpdateProfileRequest extends $pb.GeneratedMessage {
+  factory UpdateProfileRequest({
+    $core.String? id,
+    $core.String? name,
+    $core.String? color,
+    $core.int? position,
+    $core.String? worktreesDir,
+    $core.String? gitName,
+    $core.String? gitEmail,
+  }) {
+    final result = UpdateProfileRequest._();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (color != null) result.color = color;
+    if (position != null) result.position = position;
+    if (worktreesDir != null) result.worktreesDir = worktreesDir;
+    if (gitName != null) result.gitName = gitName;
+    if (gitEmail != null) result.gitEmail = gitEmail;
+    return result;
+  }
+
+  UpdateProfileRequest._();
+
+  factory UpdateProfileRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateProfileRequest()..mergeFromBuffer(data, registry);
+  factory UpdateProfileRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateProfileRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateProfileRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: UpdateProfileRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aOS(3, _omitFieldNames ? '' : 'color')
+    ..aI(4, _omitFieldNames ? '' : 'position', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(5, _omitFieldNames ? '' : 'worktreesDir')
+    ..aOS(6, _omitFieldNames ? '' : 'gitName')
+    ..aOS(7, _omitFieldNames ? '' : 'gitEmail')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateProfileRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateProfileRequest copyWith(void Function(UpdateProfileRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateProfileRequest))
+          as UpdateProfileRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use UpdateProfileRequest() / UpdateProfileRequest.new instead')
+  static UpdateProfileRequest create() => UpdateProfileRequest._();
+  static $pb.GeneratedMessage $_createMessage() => UpdateProfileRequest._();
+  @$core.override
+  UpdateProfileRequest createEmptyInstance() => UpdateProfileRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UpdateProfileRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UpdateProfileRequest>(
+          UpdateProfileRequest.$_createMessage);
+  static UpdateProfileRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get color => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set color($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasColor() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearColor() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get position => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set position($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPosition() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPosition() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get worktreesDir => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set worktreesDir($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasWorktreesDir() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearWorktreesDir() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get gitName => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set gitName($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasGitName() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearGitName() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get gitEmail => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set gitEmail($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasGitEmail() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearGitEmail() => $_clearField(7);
+}
+
+class DeleteProfileRequest extends $pb.GeneratedMessage {
+  factory DeleteProfileRequest({
+    $core.String? id,
+  }) {
+    final result = DeleteProfileRequest._();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  DeleteProfileRequest._();
+
+  factory DeleteProfileRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteProfileRequest()..mergeFromBuffer(data, registry);
+  factory DeleteProfileRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteProfileRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteProfileRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DeleteProfileRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteProfileRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteProfileRequest copyWith(void Function(DeleteProfileRequest) updates) =>
+      super.copyWith((message) => updates(message as DeleteProfileRequest))
+          as DeleteProfileRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DeleteProfileRequest() / DeleteProfileRequest.new instead')
+  static DeleteProfileRequest create() => DeleteProfileRequest._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteProfileRequest._();
+  @$core.override
+  DeleteProfileRequest createEmptyInstance() => DeleteProfileRequest._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteProfileRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteProfileRequest>(
+          DeleteProfileRequest.$_createMessage);
+  static DeleteProfileRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+}
+
+class DeleteProfileResponse extends $pb.GeneratedMessage {
+  factory DeleteProfileResponse() => DeleteProfileResponse._();
+
+  DeleteProfileResponse._();
+
+  factory DeleteProfileResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteProfileResponse()..mergeFromBuffer(data, registry);
+  factory DeleteProfileResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteProfileResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteProfileResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DeleteProfileResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteProfileResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteProfileResponse copyWith(
+          void Function(DeleteProfileResponse) updates) =>
+      super.copyWith((message) => updates(message as DeleteProfileResponse))
+          as DeleteProfileResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use DeleteProfileResponse() / DeleteProfileResponse.new instead')
+  static DeleteProfileResponse create() => DeleteProfileResponse._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteProfileResponse._();
+  @$core.override
+  DeleteProfileResponse createEmptyInstance() => DeleteProfileResponse._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteProfileResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteProfileResponse>(
+          DeleteProfileResponse.$_createMessage);
+  static DeleteProfileResponse? _defaultInstance;
+}
+
 class OpenRequest extends $pb.GeneratedMessage {
   factory OpenRequest({
     $core.String? program,

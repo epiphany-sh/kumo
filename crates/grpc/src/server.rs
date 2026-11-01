@@ -1,26 +1,20 @@
 //! The gRPC server: all services behind the bearer-token check, on a
-//! loopback listener with `TCP_NODELAY`.
+//! loopback listener with `TCP_NODELAY`. Per-profile services pick their
+//! profile from each call's `kumo-profile` header.
 
 use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use kumo_application::agents::AgentService;
-use kumo_application::changes::ChangesService;
 use kumo_application::daemon::{DaemonControl, HelloService};
-use kumo_application::docs::DocsService;
-use kumo_application::pipelines::PipelinesService;
-use kumo_application::pulls::PullRequestService;
-use kumo_application::tasks::TaskService;
 use kumo_application::terminal::TerminalService;
-use kumo_application::test_runs::TestService;
-use kumo_application::workspace::WorkspaceService;
 use kumo_domain::daemon::{AuthToken, DaemonError, ListenAddress};
 use kumo_proto::v1::agents_server::AgentsServer;
 use kumo_proto::v1::core_server::CoreServer;
 use kumo_proto::v1::docs_server::DocsServer;
 use kumo_proto::v1::git_server::GitServer;
 use kumo_proto::v1::pipelines_server::PipelinesServer;
+use kumo_proto::v1::profiles_server::ProfilesServer;
 use kumo_proto::v1::pull_requests_server::PullRequestsServer;
 use kumo_proto::v1::tasks_server::TasksServer;
 use kumo_proto::v1::terminals_server::TerminalsServer;
@@ -31,9 +25,10 @@ use tonic::transport::Server;
 use tonic::transport::server::TcpIncoming;
 
 use crate::auth::RequireBearer;
+use crate::profile::Profiles;
 use crate::services::{
-    AgentsGrpc, CoreGrpc, DocsGrpc, GitGrpc, PipelinesGrpc, PullRequestsGrpc, TasksGrpc,
-    TerminalsGrpc, TestsGrpc, WorkspaceGrpc,
+    AgentsGrpc, CoreGrpc, DocsGrpc, GitGrpc, PipelinesGrpc, ProfilesGrpc, PullRequestsGrpc,
+    TasksGrpc, TerminalsGrpc, TestsGrpc, WorkspaceGrpc,
 };
 
 /// Use cases the server exposes.
@@ -42,14 +37,8 @@ pub struct Services {
     pub hello: HelloService,
     pub control: DaemonControl,
     pub terminals: Arc<TerminalService>,
-    pub workspace: Arc<WorkspaceService>,
-    pub changes: Arc<ChangesService>,
-    pub agents: Arc<AgentService>,
-    pub tasks: Arc<TaskService>,
-    pub pipelines: Arc<PipelinesService>,
-    pub pulls: Arc<PullRequestService>,
-    pub docs: Arc<DocsService>,
-    pub tests: Arc<TestService>,
+    /// Every other service, per profile (the `kumo-profile` header).
+    pub profiles: Arc<Profiles>,
 }
 
 /// A bound, not yet serving, gRPC server.
@@ -100,40 +89,44 @@ impl GrpcServer {
                 CoreGrpc::new(self.services.hello, self.services.control),
                 auth.clone(),
             ))
+            .add_service(ProfilesServer::with_interceptor(
+                ProfilesGrpc::new(Arc::clone(&self.services.profiles)),
+                auth.clone(),
+            ))
             .add_service(TerminalsServer::with_interceptor(
                 TerminalsGrpc::new(self.services.terminals),
                 auth.clone(),
             ))
             .add_service(WorkspaceServer::with_interceptor(
-                WorkspaceGrpc::new(self.services.workspace),
+                WorkspaceGrpc::new(Arc::clone(&self.services.profiles)),
                 auth.clone(),
             ))
             .add_service(GitServer::with_interceptor(
-                GitGrpc::new(self.services.changes),
+                GitGrpc::new(Arc::clone(&self.services.profiles)),
                 auth.clone(),
             ))
             .add_service(AgentsServer::with_interceptor(
-                AgentsGrpc::new(self.services.agents),
+                AgentsGrpc::new(Arc::clone(&self.services.profiles)),
                 auth.clone(),
             ))
             .add_service(TasksServer::with_interceptor(
-                TasksGrpc::new(self.services.tasks),
+                TasksGrpc::new(Arc::clone(&self.services.profiles)),
                 auth.clone(),
             ))
             .add_service(PipelinesServer::with_interceptor(
-                PipelinesGrpc::new(self.services.pipelines),
+                PipelinesGrpc::new(Arc::clone(&self.services.profiles)),
                 auth.clone(),
             ))
             .add_service(PullRequestsServer::with_interceptor(
-                PullRequestsGrpc::new(self.services.pulls),
+                PullRequestsGrpc::new(Arc::clone(&self.services.profiles)),
                 auth.clone(),
             ))
             .add_service(DocsServer::with_interceptor(
-                DocsGrpc::new(self.services.docs),
+                DocsGrpc::new(Arc::clone(&self.services.profiles)),
                 auth.clone(),
             ))
             .add_service(TestsServer::with_interceptor(
-                TestsGrpc::new(self.services.tests),
+                TestsGrpc::new(Arc::clone(&self.services.profiles)),
                 auth,
             ))
             .serve_with_incoming_shutdown(incoming, shutdown)

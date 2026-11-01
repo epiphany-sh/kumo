@@ -113,6 +113,17 @@ impl AgentService {
         .await
     }
 
+    /// Copies `source`'s provider rows (program, args, settings) into this
+    /// service's store, replacing rows with the same id. Nothing else is
+    /// copied: sign-ins and sessions stay where they are.
+    pub async fn copy_providers_from(&self, source: &AgentService) -> Result<(), AgentError> {
+        let (from, to) = (
+            Arc::clone(&source.ports.store),
+            Arc::clone(&self.ports.store),
+        );
+        blocking(move || from.load()?.iter().try_for_each(|p| to.save(p))).await
+    }
+
     /// Creates (`id` None: a custom agent) or updates a provider.
     pub async fn save_provider(
         &self,
