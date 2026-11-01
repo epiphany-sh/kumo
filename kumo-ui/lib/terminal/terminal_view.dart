@@ -10,6 +10,7 @@ import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter/services.dart';
 
 import '../engine/grpc_terminal_surface.dart';
+import '../platform/open_url.dart';
 
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
@@ -84,6 +85,8 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   double _wheelRest = 0;
   bool _barDrag = false;
   bool _barHover = false;
+  bool _linkHover = false;
+  Offset? _hoverAt;
   bool _barFlash = false;
   Timer? _barTimer;
   Timer? _autoScroll;
@@ -281,6 +284,38 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     _scrollTo(t * bottom);
   }
 
+  // ---- Links: Shift-click (or ⌘-click on macOS, Ctrl-click elsewhere)
+  // opens the URL under the pointer.
+
+  static bool get _linkModifier {
+    final keys = HardwareKeyboard.instance;
+    return keys.isShiftPressed || (_mac ? keys.isMetaPressed : keys.isControlPressed);
+  }
+
+  String? _linkAt(Offset local) {
+    if (!_linkModifier || _onBar(local)) return null;
+    return linkAt(_buffer.lines, _pointAt(local, cell: true))?.$2;
+  }
+
+  /// Pressing or letting go of the modifier over a link swaps the cursor
+  /// without the mouse moving.
+  bool _modifierChanged(KeyEvent _) {
+    final at = _hoverAt;
+    if (at != null && mounted) _hover(at);
+    return false;
+  }
+
+  void _hover(Offset local) {
+    final bar = _onBar(local);
+    final link = _linkAt(local) != null;
+    if (bar != _barHover || link != _linkHover) {
+      setState(() {
+        _barHover = bar;
+        _linkHover = link;
+      });
+    }
+  }
+
   // ---- Selection and pointer
 
   void _down(PointerDownEvent e) {
@@ -291,6 +326,11 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
       return;
     }
     if (e.buttons != kPrimaryButton) return;
+    final url = _linkAt(e.localPosition);
+    if (url != null) {
+      openUrl(url);
+      return;
+    }
     if (_onBar(e.localPosition)) {
       setState(() => _barDrag = true);
       _dragBar(e.localPosition);
@@ -451,6 +491,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   void initState() {
     super.initState();
     _fling = createTicker(_coast);
+    HardwareKeyboard.instance.addHandler(_modifierChanged);
     _focus.addListener(() => setState(() => _hasFocus = _focus.hasFocus));
     if (widget.active) _grabKeyboard();
   }
@@ -467,6 +508,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_modifierChanged);
     _barTimer?.cancel();
     _stopAutoScroll();
     _fling.dispose();
@@ -619,13 +661,23 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
           onPointerPanZoomUpdate: _panUpdate,
           onPointerPanZoomEnd: _panEnd,
           child: MouseRegion(
-            cursor: _barHover || _barDrag ? SystemMouseCursors.basic : SystemMouseCursors.text,
+            cursor: _linkHover
+                ? SystemMouseCursors.click
+                : _barHover || _barDrag
+                    ? SystemMouseCursors.basic
+                    : SystemMouseCursors.text,
             onHover: (e) {
-              final over = _onBar(e.localPosition);
-              if (over != _barHover) setState(() => _barHover = over);
+              _hoverAt = e.localPosition;
+              _hover(e.localPosition);
             },
             onExit: (_) {
-              if (_barHover) setState(() => _barHover = false);
+              _hoverAt = null;
+              if (_barHover || _linkHover) {
+                setState(() {
+                  _barHover = false;
+                  _linkHover = false;
+                });
+              }
             },
             child: Stack(children: [
               Positioned.fill(child: canvas),

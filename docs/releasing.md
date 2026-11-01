@@ -63,13 +63,14 @@ Las ramas siguen un camino fijo, y lo hace cumplir el check `branch-policy` de
 
 ```
 feature/…  ─┐
+feat/…     ─┤
 fix/…      ─┴─▶  release/X.Y.Z  ──▶  main  ──▶  vX.Y.Z publicada
 ```
 
 1. **Abrí la release** desde `main`, con el número que va a tener:
    `git switch -c release/0.3.0 origin/main && git push -u origin release/0.3.0`.
    El número tiene que ser mayor que el último tag.
-2. **Los cambios entran por PR** a esa rama, desde `feature/…` o `fix/…`.
+2. **Los cambios entran por PR** a esa rama, desde `feature/…`, `feat/…` o `fix/…`.
    Nada se pushea directo a una `release/*`: pasan por PR y `ci`, igual que
    `main`.
 3. **Mergeá la release a `main`** con un PR (`release/0.3.0` → `main`). Es lo
