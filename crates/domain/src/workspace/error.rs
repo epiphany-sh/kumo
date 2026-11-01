@@ -16,6 +16,8 @@ pub enum WorkspaceError {
     InvalidBranch { name: String, reason: &'static str },
     #[error("invalid worktree path {0:?}: use an absolute path or one starting with ~")]
     InvalidPath(String),
+    #[error("{0} already exists: choose a new folder for the worktree")]
+    PathTaken(PathBuf),
     #[error("{0} has uncommitted changes or untracked files")]
     HasChanges(PathBuf),
     #[error("branch {0} has commits that aren't merged")]
