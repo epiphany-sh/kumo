@@ -7,6 +7,7 @@
 //! - [`changes`]: changes, files and history of one worktree.
 //! - [`terminal`]: PTY-backed terminal sessions, their output and lifecycle.
 //! - [`daemon`]: daemon identity, security and discovery rules.
+//! - [`profiles`]: the UI's workspaces: isolated accounts, data and agents.
 //! - [`pipelines`]: CI runs of a worktree's branch on its repository's host.
 //! - [`pulls`]: pull requests of the workspace's repositories.
 //! - [`tasks`]: tasks from the user's tools, cached locally.
@@ -18,6 +19,7 @@ pub mod changes;
 pub mod daemon;
 pub mod docs;
 pub mod pipelines;
+pub mod profiles;
 pub mod pulls;
 pub mod tasks;
 pub mod terminal;

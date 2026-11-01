@@ -7,6 +7,7 @@
 //! - [`changes`]: changes, files and history of one worktree.
 //! - [`terminal`]: open, attach to, drive and close terminal sessions.
 //! - [`daemon`]: daemon-level use cases (handshake).
+//! - [`profiles`]: the UI's workspaces and one bundle of services per profile.
 //! - [`tasks`]: tasks from the user's tools, synced in the background.
 //! - [`test_runs`]: a worktree's tests, run in a terminal and read.
 //! - [`workspace`]: namespaces, repositories and worktrees.
@@ -16,6 +17,7 @@ pub mod changes;
 pub mod daemon;
 pub mod docs;
 pub mod pipelines;
+pub mod profiles;
 pub mod pulls;
 pub mod tasks;
 pub mod terminal;

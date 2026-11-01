@@ -101,6 +101,182 @@ abstract class CoreServiceBase extends $grpc.Service {
       $grpc.ServiceCall call, $0.ShutdownRequest request);
 }
 
+/// Workspaces in the UI: separate accounts, tokens, namespaces and agents.
+/// The engine calls them profiles (Workspace is the namespaces service).
+/// A window sends its profile's id in `kumo-profile` on every other call.
+@$pb.GrpcServiceName('kumo.v1.Profiles')
+class ProfilesClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  ProfilesClient(super.channel, {super.options, super.interceptors});
+
+  $grpc.ResponseFuture<$0.ProfileList> list(
+    $0.ListProfilesRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$list, request, options: options);
+  }
+
+  /// Last in the switcher. Its id is a slug of the name, and never changes.
+  $grpc.ResponseFuture<$0.Profile> create(
+    $0.CreateProfileRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$create, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.Profile> update(
+    $0.UpdateProfileRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$update, request, options: options);
+  }
+
+  /// Stops its agents and deletes its data; repositories and worktrees on
+  /// disk stay. Refused (FAILED_PRECONDITION) for the default profile, the
+  /// last one, and one a window is showing.
+  $grpc.ResponseFuture<$0.DeleteProfileResponse> delete(
+    $0.DeleteProfileRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$delete, request, options: options);
+  }
+
+  /// Every profile with what runs in it, then again on each change. A
+  /// window keeps this open with its `kumo-profile`: that profile counts as
+  /// in use while the stream lives.
+  $grpc.ResponseStream<$0.ProfileList> watch(
+    $0.WatchProfilesRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createStreamingCall(_$watch, $async.Stream.fromIterable([request]),
+        options: options);
+  }
+
+  // method descriptors
+
+  static final _$list =
+      $grpc.ClientMethod<$0.ListProfilesRequest, $0.ProfileList>(
+          '/kumo.v1.Profiles/List',
+          ($0.ListProfilesRequest value) => value.writeToBuffer(),
+          $0.ProfileList.fromBuffer);
+  static final _$create =
+      $grpc.ClientMethod<$0.CreateProfileRequest, $0.Profile>(
+          '/kumo.v1.Profiles/Create',
+          ($0.CreateProfileRequest value) => value.writeToBuffer(),
+          $0.Profile.fromBuffer);
+  static final _$update =
+      $grpc.ClientMethod<$0.UpdateProfileRequest, $0.Profile>(
+          '/kumo.v1.Profiles/Update',
+          ($0.UpdateProfileRequest value) => value.writeToBuffer(),
+          $0.Profile.fromBuffer);
+  static final _$delete =
+      $grpc.ClientMethod<$0.DeleteProfileRequest, $0.DeleteProfileResponse>(
+          '/kumo.v1.Profiles/Delete',
+          ($0.DeleteProfileRequest value) => value.writeToBuffer(),
+          $0.DeleteProfileResponse.fromBuffer);
+  static final _$watch =
+      $grpc.ClientMethod<$0.WatchProfilesRequest, $0.ProfileList>(
+          '/kumo.v1.Profiles/Watch',
+          ($0.WatchProfilesRequest value) => value.writeToBuffer(),
+          $0.ProfileList.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Profiles')
+abstract class ProfilesServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.Profiles';
+
+  ProfilesServiceBase() {
+    $addMethod($grpc.ServiceMethod<$0.ListProfilesRequest, $0.ProfileList>(
+        'List',
+        list_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ListProfilesRequest.fromBuffer(value),
+        ($0.ProfileList value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.CreateProfileRequest, $0.Profile>(
+        'Create',
+        create_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.CreateProfileRequest.fromBuffer(value),
+        ($0.Profile value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.UpdateProfileRequest, $0.Profile>(
+        'Update',
+        update_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.UpdateProfileRequest.fromBuffer(value),
+        ($0.Profile value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.DeleteProfileRequest, $0.DeleteProfileResponse>(
+            'Delete',
+            delete_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.DeleteProfileRequest.fromBuffer(value),
+            ($0.DeleteProfileResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.WatchProfilesRequest, $0.ProfileList>(
+        'Watch',
+        watch_Pre,
+        false,
+        true,
+        ($core.List<$core.int> value) =>
+            $0.WatchProfilesRequest.fromBuffer(value),
+        ($0.ProfileList value) => value.writeToBuffer()));
+  }
+
+  $async.Future<$0.ProfileList> list_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ListProfilesRequest> $request) async {
+    return list($call, await $request);
+  }
+
+  $async.Future<$0.ProfileList> list(
+      $grpc.ServiceCall call, $0.ListProfilesRequest request);
+
+  $async.Future<$0.Profile> create_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.CreateProfileRequest> $request) async {
+    return create($call, await $request);
+  }
+
+  $async.Future<$0.Profile> create(
+      $grpc.ServiceCall call, $0.CreateProfileRequest request);
+
+  $async.Future<$0.Profile> update_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.UpdateProfileRequest> $request) async {
+    return update($call, await $request);
+  }
+
+  $async.Future<$0.Profile> update(
+      $grpc.ServiceCall call, $0.UpdateProfileRequest request);
+
+  $async.Future<$0.DeleteProfileResponse> delete_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.DeleteProfileRequest> $request) async {
+    return delete($call, await $request);
+  }
+
+  $async.Future<$0.DeleteProfileResponse> delete(
+      $grpc.ServiceCall call, $0.DeleteProfileRequest request);
+
+  $async.Stream<$0.ProfileList> watch_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WatchProfilesRequest> $request) async* {
+    yield* watch($call, await $request);
+  }
+
+  $async.Stream<$0.ProfileList> watch(
+      $grpc.ServiceCall call, $0.WatchProfilesRequest request);
+}
+
 @$pb.GrpcServiceName('kumo.v1.Terminals')
 class TerminalsClient extends $grpc.Client {
   /// The hostname for this service.

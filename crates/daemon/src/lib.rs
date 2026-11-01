@@ -6,6 +6,7 @@
 
 mod config;
 mod daemon;
+mod profiles;
 mod single_instance;
 
 pub use config::{DaemonConfig, SecretsBackend};
