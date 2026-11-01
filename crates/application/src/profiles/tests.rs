@@ -64,6 +64,7 @@ impl ProfileBundle for FakeBundle {
 #[derive(Default)]
 struct FakeOpener {
     opened: AtomicU32,
+    forgotten: Mutex<Vec<String>>,
 }
 
 impl OpenProfile<FakeBundle> for FakeOpener {
@@ -84,6 +85,10 @@ impl OpenProfile<FakeBundle> for FakeOpener {
             namespaces: 7,
             ..ProfileActivity::default()
         }
+    }
+    fn forget(&self, profile: &Profile) -> Result<(), ProfileError> {
+        self.forgotten.lock().unwrap().push(profile.id.to_string());
+        Ok(())
     }
 }
 
@@ -272,6 +277,7 @@ async fn delete_closes_the_open_bundle_and_forgets_it() {
     let bundle = s.service.resolve(Some("workspace-1")).await.unwrap();
     s.service.delete("workspace-1").await.unwrap();
     assert_eq!(bundle.closed.load(Ordering::SeqCst), 1);
+    assert_eq!(*s.opener.forgotten.lock().unwrap(), ["workspace-1"]);
     assert_eq!(
         s.service.resolve(Some("workspace-1")).await.err(),
         Some(ProfileError::NotFound("workspace-1".into()))

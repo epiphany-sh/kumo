@@ -8,8 +8,6 @@ use kumo_application::profiles::ProfileService;
 use kumo_application::terminal::TerminalService;
 use kumo_domain::agents::ProgramLocator;
 use kumo_domain::daemon::{ApiVersion, DaemonEndpoint, DiscoveryStore};
-use kumo_domain::pipelines::HostTokens;
-use kumo_domain::tasks::SecretStore;
 use kumo_grpc::server::{GrpcServer, Services};
 use kumo_infrastructure::agents::ShellPathLocator;
 use kumo_infrastructure::discovery::FileDiscoveryStore;
@@ -19,7 +17,7 @@ use kumo_infrastructure::pty::PortablePtySystem;
 use kumo_infrastructure::secrets::{KeychainSecretStore, MemorySecretStore};
 use kumo_infrastructure::security::generate_auth_token;
 
-use crate::profiles::ProfileOpener;
+use crate::profiles::{ProfileOpener, Secrets};
 use crate::single_instance::{InstanceLock, ensure_not_running, lock};
 use crate::{DaemonConfig, SecretsBackend};
 
@@ -64,18 +62,12 @@ impl Daemon {
             Some(path) => ShellPathLocator::with_path(&home, path),
             None => ShellPathLocator::new(&home),
         });
-        // One keychain for task sources and repository hosts.
-        let (secrets, host_tokens): (Arc<dyn SecretStore>, Arc<dyn HostTokens>) =
-            match config.secrets {
-                SecretsBackend::Keychain => {
-                    let keychain = Arc::new(KeychainSecretStore::new());
-                    (keychain.clone(), keychain)
-                }
-                SecretsBackend::Memory => {
-                    let memory = Arc::new(MemorySecretStore::default());
-                    (memory.clone(), memory)
-                }
-            };
+        // One keychain for task sources and repository hosts; each profile
+        // reads it under its own names.
+        let secrets = match config.secrets {
+            SecretsBackend::Keychain => Secrets::Keychain(KeychainSecretStore::new()),
+            SecretsBackend::Memory => Secrets::Memory(MemorySecretStore::default()),
+        };
 
         // Every other service is per profile, built the first time a call
         // names it. The default one (Kumo's data from before profiles) is
@@ -85,7 +77,6 @@ impl Daemon {
             home: home.clone(),
             locator,
             secrets,
-            host_tokens,
             terminals: Arc::clone(&terminals),
         };
         let profiles = Arc::new(ProfileService::load(
@@ -102,7 +93,6 @@ impl Daemon {
                 Arc::new(ProgramFile::current()),
             ),
             control: control.clone(),
-            terminals: Arc::clone(&terminals),
             profiles,
         };
         let server = GrpcServer::bind(config.listen, token.clone(), services).await?;

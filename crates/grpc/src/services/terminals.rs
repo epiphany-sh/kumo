@@ -10,18 +10,29 @@ use tonic::{Request, Response, Status, Streaming};
 use crate::mapping::{
     launch_spec_from, size_from, status_from, terminal_info_to, terminal_output_to,
 };
+use crate::profile::{Profiles, services_of};
 
 type OutputStream = Pin<Box<dyn Stream<Item = Result<pb::TerminalOutput, Status>> + Send>>;
 
 /// `kumo.v1.Terminals`.
+///
+/// Each call sees the terminals of the profile it names: `List` shows only
+/// those, and attaching to or closing another profile's is not found.
 #[derive(Debug, Clone)]
 pub struct TerminalsGrpc {
-    service: Arc<TerminalService>,
+    profiles: Arc<Profiles>,
 }
 
 impl TerminalsGrpc {
-    pub fn new(service: Arc<TerminalService>) -> Self {
-        Self { service }
+    pub fn new(profiles: Arc<Profiles>) -> Self {
+        Self { profiles }
+    }
+
+    /// The terminals of the profile the call names.
+    async fn service<T>(&self, request: &Request<T>) -> Result<Arc<TerminalService>, Status> {
+        Ok(Arc::clone(
+            &services_of(&self.profiles, request).await?.terminals,
+        ))
     }
 }
 
@@ -31,8 +42,9 @@ impl pb::terminals_server::Terminals for TerminalsGrpc {
         &self,
         request: Request<pb::OpenRequest>,
     ) -> Result<Response<pb::OpenResponse>, Status> {
+        let service = self.service(&request).await?;
         let spec = launch_spec_from(request.into_inner()).map_err(status_from)?;
-        let id = self.service.open(spec).map_err(status_from)?;
+        let id = service.open(spec).map_err(status_from)?;
         Ok(Response::new(pb::OpenResponse {
             terminal_id: id.to_string(),
         }))
@@ -44,6 +56,7 @@ impl pb::terminals_server::Terminals for TerminalsGrpc {
         &self,
         request: Request<Streaming<pb::TerminalInput>>,
     ) -> Result<Response<Self::AttachStream>, Status> {
+        let service = self.service(&request).await?;
         let mut inbound = request.into_inner();
         let target = match inbound.message().await? {
             Some(pb::TerminalInput {
@@ -52,8 +65,7 @@ impl pb::terminals_server::Terminals for TerminalsGrpc {
             _ => return Err(Status::invalid_argument("first message must be `attach`")),
         };
         let id = TerminalId::parse(&target.terminal_id).map_err(status_from)?;
-        let Attachment { session, output } = self
-            .service
+        let Attachment { session, output } = service
             .attach(&id, target.replay_scrollback)
             .map_err(status_from)?;
 
@@ -68,17 +80,19 @@ impl pb::terminals_server::Terminals for TerminalsGrpc {
         &self,
         request: Request<pb::CloseRequest>,
     ) -> Result<Response<pb::CloseResponse>, Status> {
+        let service = self.service(&request).await?;
         let id = TerminalId::parse(&request.into_inner().terminal_id).map_err(status_from)?;
-        self.service.close(&id).map_err(status_from)?;
+        service.close(&id).map_err(status_from)?;
         Ok(Response::new(pb::CloseResponse {}))
     }
 
     async fn list(
         &self,
-        _request: Request<pb::ListRequest>,
+        request: Request<pb::ListRequest>,
     ) -> Result<Response<pb::ListResponse>, Status> {
         let terminals = self
-            .service
+            .service(&request)
+            .await?
             .list()
             .into_iter()
             .map(terminal_info_to)
