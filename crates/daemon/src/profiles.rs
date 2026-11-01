@@ -16,7 +16,7 @@ use kumo_application::test_runs::{TestPorts, TestService};
 use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
 use kumo_domain::agents::ProgramLocator;
 use kumo_domain::pipelines::{HostTokens, TokenFallback};
-use kumo_domain::profiles::{Profile, ProfileActivity, ProfileError};
+use kumo_domain::profiles::{Profile, ProfileActivity, ProfileError, ProfileId};
 use kumo_domain::tasks::{SecretStore, TaskConnector};
 use kumo_domain::workspace::{WorkspaceStore, WorktreeLocation};
 use kumo_infrastructure::agents::{ClaudeStatusLine, CodexRollouts, codex_home};
@@ -28,6 +28,7 @@ use kumo_infrastructure::docs::{ConfluenceDocs, VaultDocs};
 use kumo_infrastructure::fs::{LocalFileStore, LocalProjectReader};
 use kumo_infrastructure::git::{FsRepoFinder, GitCli};
 use kumo_infrastructure::profiles::profile_dir;
+use kumo_infrastructure::secrets::{KeychainSecretStore, MemorySecretStore};
 use kumo_infrastructure::storage::{SqliteAgentStore, SqliteTaskStore, SqliteWorkspaceStore};
 use kumo_infrastructure::tasks::{
     BearConnector, GitHubConnector, JiraConnector, ObsidianConnector, TodoistConnector,
@@ -36,13 +37,42 @@ use kumo_infrastructure::watch::NotifyWatcher;
 
 const DATABASE: &str = "kumo.db";
 
+/// Where tokens are kept; each profile gets a store with its own names.
+#[derive(Debug, Clone)]
+pub(crate) enum Secrets {
+    Keychain(KeychainSecretStore),
+    Memory(MemorySecretStore),
+}
+
+impl Secrets {
+    /// The task sources' and hosts' tokens of `profile`.
+    fn for_profile(&self, profile: &ProfileId) -> (Arc<dyn SecretStore>, Arc<dyn HostTokens>) {
+        match self {
+            Self::Keychain(store) => {
+                let store = Arc::new(store.for_profile(profile));
+                (store.clone(), store)
+            }
+            Self::Memory(store) => {
+                let store = Arc::new(store.for_profile(profile));
+                (store.clone(), store)
+            }
+        }
+    }
+
+    fn purge(&self, profile: &ProfileId) -> Result<usize, String> {
+        match self {
+            Self::Keychain(store) => store.purge(profile),
+            Self::Memory(store) => store.purge(profile),
+        }
+    }
+}
+
 /// What every profile shares: the machine, its programs and its terminals.
 pub(crate) struct ProfileOpener {
     pub data_dir: PathBuf,
     pub home: PathBuf,
     pub locator: Arc<dyn ProgramLocator>,
-    pub secrets: Arc<dyn SecretStore>,
-    pub host_tokens: Arc<dyn HostTokens>,
+    pub secrets: Secrets,
     pub terminals: Arc<TerminalService>,
 }
 
@@ -73,6 +103,15 @@ impl OpenProfile<ProfileServices> for ProfileOpener {
             ..ProfileActivity::default()
         })
     }
+
+    fn forget(&self, profile: &Profile) -> Result<(), ProfileError> {
+        let deleted = self
+            .secrets
+            .purge(&profile.id)
+            .map_err(ProfileError::Storage)?;
+        tracing::info!(profile = %profile.id, deleted, "keychain tokens deleted");
+        Ok(())
+    }
 }
 
 impl ProfileOpener {
@@ -83,6 +122,8 @@ impl ProfileOpener {
         let db = dir.join(DATABASE);
         let home = &self.home;
         let locator = &self.locator;
+        let terminals = Arc::new(self.terminals.scoped(profile.id.clone()));
+        let (secrets, host_tokens) = self.secrets.for_profile(&profile.id);
 
         let workspace = Arc::new(
             WorkspaceService::load(WorkspacePorts {
@@ -112,7 +153,7 @@ impl ProfileOpener {
         let docs = Arc::new(DocsService::new(
             DocsPorts {
                 sources: task_store.clone(),
-                secrets: Arc::clone(&self.secrets),
+                secrets: Arc::clone(&secrets),
                 connectors: vec![Arc::new(ConfluenceDocs::default()), Arc::new(VaultDocs)],
             },
             std::time::Duration::from_secs(60),
@@ -120,7 +161,7 @@ impl ProfileOpener {
         let tasks = TaskService::load(
             TaskPorts {
                 store: task_store,
-                secrets: Arc::clone(&self.secrets),
+                secrets: Arc::clone(&secrets),
                 connectors,
                 watcher: Arc::new(NotifyWatcher),
             },
@@ -137,10 +178,10 @@ impl ProfileOpener {
                     Arc::new(GitLabCi::default()),
                     Arc::new(BitbucketPipelines::default()),
                 ],
-                tokens: Arc::clone(&self.host_tokens),
+                tokens: Arc::clone(&host_tokens),
                 fallback: Arc::clone(&gh),
                 branches: Arc::new(GitCli::default()),
-                terminals: Arc::clone(&self.terminals) as _,
+                terminals: Arc::clone(&terminals) as _,
             },
             PipelinesTiming::default(),
             workspace.watch(),
@@ -152,7 +193,7 @@ impl ProfileOpener {
                     Arc::new(GitLabPulls::default()),
                     Arc::new(BitbucketPulls::default()),
                 ],
-                tokens: Arc::clone(&self.host_tokens),
+                tokens: Arc::clone(&host_tokens),
                 fallback: gh,
                 branches: Arc::new(GitCli::default()),
             },
@@ -172,7 +213,7 @@ impl ProfileOpener {
                 ],
                 plans: agent_store,
             },
-            Arc::clone(&self.terminals),
+            Arc::clone(&terminals),
             Arc::clone(&workspace),
         ));
         let changes = Arc::new(ChangesService::new(
@@ -188,7 +229,7 @@ impl ProfileOpener {
                 files: Arc::new(LocalProjectReader),
                 locator: Arc::clone(locator),
             },
-            Arc::clone(&self.terminals),
+            Arc::clone(&terminals),
             Arc::clone(&workspace),
         ));
         Ok(ProfileServices {
@@ -201,6 +242,7 @@ impl ProfileOpener {
             pulls,
             docs,
             tests,
+            terminals,
         })
     }
 }

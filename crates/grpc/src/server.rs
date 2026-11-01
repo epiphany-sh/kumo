@@ -7,7 +7,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use kumo_application::daemon::{DaemonControl, HelloService};
-use kumo_application::terminal::TerminalService;
 use kumo_domain::daemon::{AuthToken, DaemonError, ListenAddress};
 use kumo_proto::v1::agents_server::AgentsServer;
 use kumo_proto::v1::core_server::CoreServer;
@@ -36,8 +35,8 @@ use crate::services::{
 pub struct Services {
     pub hello: HelloService,
     pub control: DaemonControl,
-    pub terminals: Arc<TerminalService>,
-    /// Every other service, per profile (the `kumo-profile` header).
+    /// Every other service, per profile (the `kumo-profile` header),
+    /// terminals included.
     pub profiles: Arc<Profiles>,
 }
 
@@ -94,7 +93,7 @@ impl GrpcServer {
                 auth.clone(),
             ))
             .add_service(TerminalsServer::with_interceptor(
-                TerminalsGrpc::new(self.services.terminals),
+                TerminalsGrpc::new(Arc::clone(&self.services.profiles)),
                 auth.clone(),
             ))
             .add_service(WorkspaceServer::with_interceptor(

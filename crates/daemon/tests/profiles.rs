@@ -380,3 +380,116 @@ async fn watch_streams_profile_changes() {
     let names: Vec<_> = next.profiles.iter().map(|p| p.name.as_str()).collect();
     assert_eq!(names, ["", "Workspace 1"]);
 }
+
+async fn host_token(client: &mut KumoClient, host: &str) -> bool {
+    client
+        .pipelines
+        .list_hosts(pb::ListHostsRequest {})
+        .await
+        .unwrap()
+        .into_inner()
+        .hosts
+        .into_iter()
+        .any(|h| h.host == host && h.has_token)
+}
+
+async fn delete_when_closed(client: &mut KumoClient, id: &str) {
+    tokio::time::timeout(TIMEOUT, async {
+        while client
+            .profiles
+            .delete(pb::DeleteProfileRequest { id: id.into() })
+            .await
+            .is_err()
+        {
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("profile not deleted");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn host_tokens_are_per_profile_and_go_with_it() {
+    let daemon = TestDaemon::start().await;
+    let mut first = daemon.client().await;
+    create(&mut first, "Workspace 1").await;
+    let mut second = first.with_profile(Some("workspace-1"));
+    let remote = Some("git@github.com:team/app.git");
+    let repo_a = git_repo(&daemon.home().join("dev/a"), remote);
+    let repo_b = git_repo(&daemon.home().join("dev/b"), remote);
+    save_namespace(&mut first, "a", &[&repo_a]).await;
+    save_namespace(&mut second, "b", &[&repo_b]).await;
+
+    second
+        .pipelines
+        .save_host_token(pb::SaveHostTokenRequest {
+            host: "github.com".into(),
+            token: "token-1".into(),
+        })
+        .await
+        .unwrap();
+    assert!(host_token(&mut second, "github.com").await);
+    assert!(!host_token(&mut first, "github.com").await);
+
+    // Deleting the profile deletes its tokens: one made again with the same
+    // name (and id) starts without them.
+    delete_when_closed(&mut first, "workspace-1").await;
+    assert_eq!(create(&mut first, "Workspace 1").await.id, "workspace-1");
+    save_namespace(&mut second, "b", &[&repo_b]).await;
+    assert!(!host_token(&mut second, "github.com").await);
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn terminals_belong_to_the_profile_that_opened_them() {
+    let daemon = TestDaemon::start().await;
+    let mut first = daemon.client().await;
+    create(&mut first, "Workspace 1").await;
+    let mut second = first.with_profile(Some("workspace-1"));
+    let mine = common::open(&mut first, "sleep", &["30"]).await;
+    let theirs = common::open(&mut second, "sleep", &["30"]).await;
+
+    let ids = |list: pb::ListResponse| -> Vec<String> {
+        list.terminals.into_iter().map(|t| t.terminal_id).collect()
+    };
+    let listed = first.terminals.list(pb::ListRequest {}).await.unwrap();
+    assert_eq!(ids(listed.into_inner()), std::slice::from_ref(&mine));
+    let listed = second.terminals.list(pb::ListRequest {}).await.unwrap();
+    assert_eq!(ids(listed.into_inner()), std::slice::from_ref(&theirs));
+
+    // Another profile's terminal can't be closed or attached to.
+    let closed = first
+        .terminals
+        .close(pb::CloseRequest {
+            terminal_id: theirs.clone(),
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(closed.code(), Code::NotFound);
+    let attach = pb::TerminalInput {
+        kind: Some(pb::terminal_input::Kind::Attach(pb::AttachTo {
+            terminal_id: theirs.clone(),
+            replay_scrollback: true,
+        })),
+    };
+    let attached = first
+        .terminals
+        .attach(tokio_stream::iter([attach]))
+        .await
+        .unwrap_err();
+    assert_eq!(attached.code(), Code::NotFound);
+
+    // Each profile counts its own.
+    let open: HashMap<String, u32> = list(&mut first)
+        .await
+        .into_iter()
+        .map(|p| (p.id, p.terminals_open))
+        .collect();
+    assert_eq!(open["default"], 1);
+    assert_eq!(open["workspace-1"], 1);
+
+    // Deleting a profile closes its terminals, and only those.
+    delete_when_closed(&mut first, "workspace-1").await;
+    let listed = first.terminals.list(pb::ListRequest {}).await.unwrap();
+    assert_eq!(ids(listed.into_inner()), [mine]);
+}

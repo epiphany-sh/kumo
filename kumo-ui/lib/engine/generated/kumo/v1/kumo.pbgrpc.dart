@@ -138,8 +138,8 @@ class ProfilesClient extends $grpc.Client {
     return $createUnaryCall(_$update, request, options: options);
   }
 
-  /// Stops its agents and deletes its data; repositories and worktrees on
-  /// disk stay. Refused (FAILED_PRECONDITION) for the default profile, the
+  /// Stops its agents and terminals and deletes its data and keychain
+  /// tokens; repositories and worktrees on disk stay. Refused (FAILED_PRECONDITION) for the default profile, the
   /// last one, and one a window is showing.
   $grpc.ResponseFuture<$0.DeleteProfileResponse> delete(
     $0.DeleteProfileRequest request, {

@@ -56,8 +56,8 @@ service Profiles {
   // Last in the switcher. Its id is a slug of the name, and never changes.
   rpc Create(CreateProfileRequest) returns (Profile);
   rpc Update(UpdateProfileRequest) returns (Profile);
-  // Stops its agents and deletes its data; repositories and worktrees on
-  // disk stay. Refused (FAILED_PRECONDITION) for the default profile, the
+  // Stops its agents and terminals and deletes its data and keychain
+  // tokens; repositories and worktrees on disk stay. Refused (FAILED_PRECONDITION) for the default profile, the
   // last one, and one a window is showing.
   rpc Delete(DeleteProfileRequest) returns (DeleteProfileResponse);
   // Every profile with what runs in it, then again on each change. A

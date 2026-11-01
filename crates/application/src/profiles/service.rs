@@ -31,6 +31,9 @@ pub trait OpenProfile<B>: Send + Sync + 'static {
     /// Namespaces and repositories of a profile that isn't open, read
     /// without starting anything. Blocks.
     fn stats(&self, profile: &Profile) -> ProfileActivity;
+    /// Removes what a deleted profile kept outside its data folder (its
+    /// keychain tokens). Blocks.
+    fn forget(&self, profile: &Profile) -> Result<(), ProfileError>;
 }
 
 /// A profile and what it has and runs right now.
@@ -247,6 +250,11 @@ impl<B: ProfileBundle> ProfileService<B> {
         lock(&self.stats).remove(&profile.id);
         profiles.retain(|p| p.id != profile.id);
         self.commit(profiles)?;
+        // Leftover tokens are harmless under a name no profile uses; the
+        // folder goes anyway.
+        if let Err(error) = self.opener.forget(&profile) {
+            tracing::warn!(profile = %profile.id, %error, "keychain tokens left behind");
+        }
         self.store.remove_data(&profile.id)
     }
 
