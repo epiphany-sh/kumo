@@ -13,6 +13,7 @@ use crate::docs::DocsService;
 use crate::pipelines::PipelinesService;
 use crate::pulls::PullRequestService;
 use crate::tasks::TaskService;
+use crate::terminal::TerminalService;
 use crate::test_runs::TestService;
 use crate::workspace::WorkspaceService;
 
@@ -29,6 +30,8 @@ pub struct ProfileServices {
     pub pulls: Arc<PullRequestService>,
     pub docs: Arc<DocsService>,
     pub tests: Arc<TestService>,
+    /// The daemon's terminals, scoped to this profile.
+    pub terminals: Arc<TerminalService>,
 }
 
 impl ProfileBundle for ProfileServices {
@@ -44,6 +47,7 @@ impl ProfileBundle for ProfileServices {
         let snapshot = self.workspace.watch().borrow().clone();
         activity.namespaces = count(snapshot.namespaces.len());
         activity.repos = count(snapshot.repos.len());
+        activity.terminals_open = count(self.terminals.running());
         activity
     }
 
@@ -65,6 +69,7 @@ impl ProfileBundle for ProfileServices {
                     let _ = self.agents.stop(&session.id);
                 }
             }
+            self.terminals.close_all();
         })
     }
 
