@@ -72,7 +72,10 @@ fix/…      ─┴─▶  release/X.Y.Z  ──▶  main  ──▶  vX.Y.Z pub
    El número tiene que ser mayor que el último tag.
 2. **Los cambios entran por PR** a esa rama, desde `feature/…`, `feat/…` o `fix/…`.
    Nada se pushea directo a una `release/*`: pasan por PR y `ci`, igual que
-   `main`.
+   `main`. Los checks obligatorios corren en Linux y Windows (`branch-policy`,
+   `fmt`, `clippy (…)`, `test (…)`, `ui`); el job `macos` corre lo mismo en
+   macOS pero no bloquea, porque los runners macOS arm64 de GitHub a veces
+   pasan días sin capacidad.
 3. **Mergeá la release a `main`** con un PR (`release/0.3.0` → `main`). Es lo
    único que entra a `main`. Con el merge, el workflow `release` publica
    `0.3.0`: buildea, firma, arma el zip, el appcast y el `install.sh`, crea el
