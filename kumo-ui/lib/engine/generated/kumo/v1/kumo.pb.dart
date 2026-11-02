@@ -5700,6 +5700,7 @@ class AgentProvider extends $pb.GeneratedMessage {
     $core.bool? hasLogin,
     $core.bool? usageReadable,
     $core.bool? readUsage,
+    $core.bool? ownSignIn,
   }) {
     final result = AgentProvider._();
     if (id != null) result.id = id;
@@ -5718,6 +5719,7 @@ class AgentProvider extends $pb.GeneratedMessage {
     if (hasLogin != null) result.hasLogin = hasLogin;
     if (usageReadable != null) result.usageReadable = usageReadable;
     if (readUsage != null) result.readUsage = readUsage;
+    if (ownSignIn != null) result.ownSignIn = ownSignIn;
     return result;
   }
 
@@ -5749,6 +5751,7 @@ class AgentProvider extends $pb.GeneratedMessage {
     ..aOB(13, _omitFieldNames ? '' : 'hasLogin')
     ..aOB(14, _omitFieldNames ? '' : 'usageReadable')
     ..aOB(15, _omitFieldNames ? '' : 'readUsage')
+    ..aOB(16, _omitFieldNames ? '' : 'ownSignIn')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5915,6 +5918,18 @@ class AgentProvider extends $pb.GeneratedMessage {
   $core.bool hasReadUsage() => $_has(14);
   @$pb.TagNumber(15)
   void clearReadUsage() => $_clearField(15);
+
+  /// Its sign-in, settings and sessions are this workspace's own. False: it
+  /// shares the Mac's (the first workspace, custom agents, and CLIs whose
+  /// sign-in can't be kept apart yet).
+  @$pb.TagNumber(16)
+  $core.bool get ownSignIn => $_getBF(15);
+  @$pb.TagNumber(16)
+  set ownSignIn($core.bool value) => $_setBool(15, value);
+  @$pb.TagNumber(16)
+  $core.bool hasOwnSignIn() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearOwnSignIn() => $_clearField(16);
 }
 
 class ListProvidersRequest extends $pb.GeneratedMessage {

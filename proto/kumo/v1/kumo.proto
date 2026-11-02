@@ -688,6 +688,10 @@ message AgentProvider {
   // The setting: read them ("Read Claude Code's usage through its status
   // line"). On by default.
   bool read_usage = 15;
+  // Its sign-in, settings and sessions are this workspace's own. False: it
+  // shares the Mac's (the first workspace, custom agents, and CLIs whose
+  // sign-in can't be kept apart yet).
+  bool own_sign_in = 16;
 }
 
 message ListProvidersRequest {}

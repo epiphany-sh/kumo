@@ -1861,6 +1861,7 @@ const AgentProvider$json = {
     {'1': 'has_login', '3': 13, '4': 1, '5': 8, '10': 'hasLogin'},
     {'1': 'usage_readable', '3': 14, '4': 1, '5': 8, '10': 'usageReadable'},
     {'1': 'read_usage', '3': 15, '4': 1, '5': 8, '10': 'readUsage'},
+    {'1': 'own_sign_in', '3': 16, '4': 1, '5': 8, '10': 'ownSignIn'},
   ],
 };
 
@@ -1874,7 +1875,7 @@ final $typed_data.Uint8List agentProviderDescriptor = $convert.base64Decode(
     'xfaGludBgLIAEoCVILaW5zdGFsbEhpbnQSMgoVdGFrZXNfcHJvbXB0X2FyZ3VtZW50GAwgASgI'
     'UhN0YWtlc1Byb21wdEFyZ3VtZW50EhsKCWhhc19sb2dpbhgNIAEoCFIIaGFzTG9naW4SJQoOdX'
     'NhZ2VfcmVhZGFibGUYDiABKAhSDXVzYWdlUmVhZGFibGUSHQoKcmVhZF91c2FnZRgPIAEoCFIJ'
-    'cmVhZFVzYWdl');
+    'cmVhZFVzYWdlEh4KC293bl9zaWduX2luGBAgASgIUglvd25TaWduSW4=');
 
 @$core.Deprecated('Use listProvidersRequestDescriptor instead')
 const ListProvidersRequest$json = {

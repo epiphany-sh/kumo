@@ -4,5 +4,5 @@
 mod claude;
 mod codex;
 
-pub use claude::ClaudeStatusLine;
+pub use claude::{ClaudeStatusLine, claude_config_dir};
 pub use codex::{CodexRollouts, codex_home};

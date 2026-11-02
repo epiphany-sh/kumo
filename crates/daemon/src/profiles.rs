@@ -14,12 +14,14 @@ use kumo_application::tasks::{TaskPorts, TaskService, TaskTiming};
 use kumo_application::terminal::TerminalService;
 use kumo_application::test_runs::{TestPorts, TestService};
 use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
-use kumo_domain::agents::ProgramLocator;
+use kumo_domain::agents::{CliHomes, ProgramLocator, SharedCliHomes};
 use kumo_domain::pipelines::{HostTokens, TokenFallback};
 use kumo_domain::profiles::{Profile, ProfileActivity, ProfileEnv, ProfileError, ProfileId};
 use kumo_domain::tasks::{SecretStore, TaskConnector};
 use kumo_domain::workspace::{WorkspaceStore, WorktreeLocation};
-use kumo_infrastructure::agents::{ClaudeStatusLine, CodexRollouts, codex_home};
+use kumo_infrastructure::agents::{
+    ClaudeStatusLine, CodexRollouts, ProfileCliHomes, claude_config_dir, codex_home,
+};
 use kumo_infrastructure::ci::{
     BitbucketPipelines, BitbucketPulls, GhTokenFallback, GitHubActions, GitHubPulls, GitLabCi,
     GitLabPulls,
@@ -217,6 +219,20 @@ impl ProfileOpener {
         )
         .await;
 
+        // CLIs whose sign-in can be kept apart get a folder of the profile's
+        // own; the default profile keeps the user's (~/.claude, ~/.codex).
+        let (homes, claude_dir, codex_dir): (Arc<dyn CliHomes>, _, _) = if profile.is_default() {
+            (
+                Arc::new(SharedCliHomes),
+                claude_config_dir(home),
+                codex_home(home),
+            )
+        } else {
+            let homes = ProfileCliHomes::new(&dir.join("cli"));
+            let (claude, codex) = (homes.dir("claude"), homes.dir("codex"));
+            (Arc::new(homes), claude, codex)
+        };
+
         let agent_store = Arc::new(SqliteAgentStore::open(&db)?);
         let agents = Arc::new(AgentService::new(
             AgentPorts {
@@ -224,10 +240,11 @@ impl ProfileOpener {
                 locator: Arc::clone(locator),
                 // Plan limits and context windows, as the CLIs report them.
                 usage: vec![
-                    Arc::new(ClaudeStatusLine::new(&dir.join("agents"), home)),
-                    Arc::new(CodexRollouts::new(&codex_home(home))),
+                    Arc::new(ClaudeStatusLine::new(&dir.join("agents"), &claude_dir)),
+                    Arc::new(CodexRollouts::new(&codex_dir)),
                 ],
                 plans: agent_store,
+                homes,
             },
             Arc::clone(&terminals),
             Arc::clone(&workspace),

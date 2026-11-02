@@ -104,12 +104,26 @@ prefijo adentro, así un servicio no puede agarrar el de otro.
 
 ### Agentes
 
-Cada CLI recibe su variable de carpeta (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
-`GEMINI_CLI_HOME`, `COPILOT_HOME`) apuntando a `profiles/<id>/cli/<cli>/`. Antes
-de ofrecer login por perfil en un CLI se verifica que su credencial quede
-separada; si la guarda en un ítem del llavero que no depende de la carpeta,
-ese CLI comparte el login de la máquina y la UI lo dice. El uso de plan se lee
-de la carpeta de cada perfil.
+Cada CLI recibe su variable de carpeta apuntando a `profiles/<id>/cli/<cli>/`
+(creada antes de arrancar, en `start` y en `login`), solo si se verificó que
+su credencial queda separada. Si la guardara en un ítem del llavero que no
+depende de la carpeta, loguearse desde un workspace pisaría el login del
+usuario también en su terminal. El resultado queda en `CLI_HOMES`
+(`kumo-domain`):
+
+| CLI | Variable | Verificado | Resultado |
+|---|---|---|---|
+| Claude Code | `CLAUDE_CONFIG_DIR` | 2.1.316 | ítem `Claude Code-credentials-<sha256(dir)[..8]>`, aparte del de siempre; con carpeta nueva `auth status` da deslogueado |
+| Codex CLI | `CODEX_HOME` | 0.157.0 | `auth.json` en la carpeta (`cli_auth_credentials_store` es `file` por defecto); con carpeta nueva `login status` da deslogueado |
+| Gemini CLI | `GEMINI_CLI_HOME` | no | sin verificar: comparte el login de la Mac |
+| Copilot CLI | `COPILOT_HOME` | no | sin verificar: comparte el login de la Mac |
+| Agentes propios | — | — | comparten el login de la Mac |
+
+`AgentProvider.own_sign_in` le dice a la UI cuáles tienen login propio en el
+workspace. El perfil por defecto no setea ninguna variable. El uso de plan se
+lee de la carpeta de cada perfil: el status line de Claude Code lee el
+`settings.json` de su `CLAUDE_CONFIG_DIR` y los rollouts de Codex su
+`CODEX_HOME`.
 
 ## Consecuencias
 

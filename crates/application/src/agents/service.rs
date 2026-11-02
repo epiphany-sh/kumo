@@ -5,8 +5,8 @@ use std::time::Duration;
 use bytes::Bytes;
 use kumo_domain::agents::{
     AgentContext, AgentError, AgentEventKind, AgentPreset, AgentProvider, AgentSession,
-    AgentSessionId, AgentState, AgentStore, PRESETS, PlanUsage, PlanUsageStore, ProgramLocator,
-    StoredProvider, UsageReport, UsageSource, UsageTarget,
+    AgentSessionId, AgentState, AgentStore, CliHomes, PRESETS, PlanUsage, PlanUsageStore,
+    ProgramLocator, StoredProvider, UsageReport, UsageSource, UsageTarget,
 };
 use kumo_domain::terminal::{LaunchSpec, TerminalError, TerminalId, TerminalSize};
 use kumo_domain::time::Timestamp;
@@ -27,6 +27,8 @@ pub struct AgentPorts {
     /// Where the CLIs that report their usage report it.
     pub usage: Vec<Arc<dyn UsageSource>>,
     pub plans: Arc<dyn PlanUsageStore>,
+    /// The CLIs' folders in this profile (their sign-ins and sessions).
+    pub homes: Arc<dyn CliHomes>,
 }
 
 impl std::fmt::Debug for AgentPorts {
@@ -40,6 +42,8 @@ impl std::fmt::Debug for AgentPorts {
 pub struct ProviderView {
     pub provider: AgentProvider,
     pub resolved: Option<PathBuf>,
+    /// It signs in for this profile only; false: the Mac's sign-in.
+    pub own_sign_in: bool,
 }
 
 /// What the user sets for a provider in Settings › AI agents.
@@ -96,9 +100,10 @@ impl AgentService {
 
     /// Known CLIs (with the user's settings) followed by custom agents.
     pub async fn providers(&self) -> Result<Vec<ProviderView>, AgentError> {
-        let (store, locator) = (
+        let (store, locator, homes) = (
             Arc::clone(&self.ports.store),
             Arc::clone(&self.ports.locator),
+            Arc::clone(&self.ports.homes),
         );
         blocking(move || {
             let providers = merge(store.load()?);
@@ -106,7 +111,12 @@ impl AgentService {
                 .into_iter()
                 .map(|provider| {
                     let resolved = locator.locate(&provider.program);
-                    ProviderView { provider, resolved }
+                    let own_sign_in = !provider.custom && homes.own_sign_in(&provider.id);
+                    ProviderView {
+                        provider,
+                        resolved,
+                        own_sign_in,
+                    }
                 })
                 .collect())
         })
@@ -220,12 +230,24 @@ impl AgentService {
     pub async fn login(&self, id: &str) -> Result<TerminalId, AgentError> {
         let provider = self.provider(id).await?;
         let program = self.installed(&provider).await?;
+        let env = self.env_for(&provider).await?;
         let spec = LaunchSpec::new(program.display().to_string())
             .map_err(launch_error)?
             .with_args(provider.login_args())
             .with_cwd(Some(self.ports.locator.home()))
-            .with_env([("PATH".to_owned(), self.ports.locator.search_path())]);
+            .with_env(env);
         self.terminals.open(spec).map_err(launch_error)
+    }
+
+    /// What a provider's processes get: the user's PATH, and the CLI's
+    /// folder in this profile (custom agents run as the user's).
+    async fn env_for(&self, provider: &AgentProvider) -> Result<Vec<(String, String)>, AgentError> {
+        let mut env = vec![("PATH".to_owned(), self.ports.locator.search_path())];
+        if !provider.custom {
+            let (homes, id) = (Arc::clone(&self.ports.homes), provider.id.clone());
+            env.extend(blocking(move || homes.env(&id)).await?);
+        }
+        Ok(env)
     }
 
     // ---- Sessions ----
@@ -270,11 +292,12 @@ impl AgentService {
         if let Some(source) = &source {
             args = usage::launch_args(source, &target, args).await;
         }
+        let env = self.env_for(&provider).await?;
         let spec = LaunchSpec::new(program.display().to_string())
             .map_err(launch_error)?
             .with_args(args)
             .with_cwd(Some(worktree.clone()))
-            .with_env([("PATH".to_owned(), self.ports.locator.search_path())])
+            .with_env(env)
             .with_size(size);
         let terminal = self.terminals.open(spec).map_err(launch_error)?;
         let attachment = self
