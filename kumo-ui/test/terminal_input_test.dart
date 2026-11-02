@@ -11,7 +11,7 @@ import 'package:kumo_ui/theme/kumo_theme.dart';
 import 'package:kumo_ui/theme/palette.dart';
 
 /// An interactive surface backed by the real parser, recording input.
-class _FakeShell implements TerminalSurface {
+class _FakeShell implements TerminalModes {
   _FakeShell() {
     _screen.feed(utf8.encode('\x1b[1;32m~\x1b[0m ❯ '));
     _buffer.value = _screen.snapshot();
@@ -38,6 +38,37 @@ class _FakeShell implements TerminalSurface {
   void resize(int cols, int rows) => size = (cols, rows);
   @override
   void dispose() => _buffer.dispose();
+
+  /// What the program writes, e.g. to set modes.
+  void feed(String output) {
+    _screen.feed(utf8.encode(output));
+    _buffer.value = _screen.snapshot();
+  }
+
+  @override
+  bool get applicationCursorKeys => _screen.applicationCursorKeys;
+  @override
+  bool get bracketedPaste => _screen.bracketedPaste;
+  @override
+  bool get mouseTracking => _screen.mouseTracking;
+  @override
+  bool get mouseDrags => _screen.mouseDrags;
+  @override
+  bool get mouseHover => _screen.mouseHover;
+  @override
+  bool get sgrMouse => _screen.sgrMouse;
+}
+
+Future<_FakeShell> _pumpShell(WidgetTester tester) async {
+  final shell = _FakeShell();
+  await tester.pumpWidget(KumoTheme(
+    mode: KumoThemeMode.dark,
+    palette: KumoPalette.dark,
+    terminalPalette: KumoPalette.dark,
+    child: MaterialApp(home: Scaffold(body: SizedBox(width: 600, height: 300, child: TerminalCanvas(surface: shell, active: true)))),
+  ));
+  await tester.pump();
+  return shell;
 }
 
 void main() {
@@ -62,6 +93,57 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
 
     expect(shell.sent.map(utf8.decode).toList(), ['l', 's', '\r', '\x1b[A', '\x03']);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('arrows carry their modifiers; ⌥← ⌥→ still jump words', (tester) async {
+    final shell = await _pumpShell(tester);
+    Future<void> with_(LogicalKeyboardKey modifier, LogicalKeyboardKey key) async {
+      await tester.sendKeyDownEvent(modifier);
+      await tester.sendKeyEvent(key);
+      await tester.sendKeyUpEvent(modifier);
+    }
+
+    await with_(LogicalKeyboardKey.altLeft, LogicalKeyboardKey.arrowDown);
+    await with_(LogicalKeyboardKey.controlLeft, LogicalKeyboardKey.arrowUp);
+    await with_(LogicalKeyboardKey.shiftLeft, LogicalKeyboardKey.arrowUp);
+    await with_(LogicalKeyboardKey.altLeft, LogicalKeyboardKey.arrowLeft);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x1b[1;3B', '\x1b[1;5A', '\x1b[1;2A', '\x1bb']);
+  });
+
+  testWidgets('a program that asked for the mouse gets clicks and drags; Shift still selects', (tester) async {
+    final shell = await _pumpShell(tester);
+    final canvas = tester.getRect(find.byType(TerminalCanvas));
+    final at = canvas.topLeft + const Offset(60, 40);
+
+    // Without asking, a click is the terminal's own (selection).
+    await tester.tapAt(at);
+    expect(shell.sent, isEmpty);
+
+    shell.feed('\x1b[?1002h\x1b[?1006h');
+    final drag = await tester.startGesture(at);
+    await drag.moveBy(const Offset(40, 0));
+    await drag.up();
+    final reports = shell.sent.map(utf8.decode).toList();
+    final press = RegExp(r'^\x1b\[<0;(\d+);(\d+)M$').firstMatch(reports.first)!;
+    expect(reports.sublist(1, reports.length - 1), everyElement(matches(r'^\x1b\[<32;\d+;\d+M$')));
+    expect(reports.length, greaterThan(2), reason: 'the drag is reported');
+    expect(reports.last, matches(r'^\x1b\[<0;\d+;\d+m$'));
+    expect(int.parse(RegExp(r'<0;(\d+)').firstMatch(reports.last)!.group(1)!), greaterThan(int.parse(press.group(1)!)));
+
+    // Shift keeps the selection, as in xterm.
+    shell.sent.clear();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.tapAt(at);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    expect(shell.sent, isEmpty);
+
+    // Only clicks (1000): no motion while dragging.
+    shell.feed('\x1b[?1000h');
+    final click = await tester.startGesture(at);
+    await click.moveBy(const Offset(40, 0));
+    await click.up();
+    expect(shell.sent.map(utf8.decode), [matches(r'M$'), matches(r'm$')]);
     expect(tester.takeException(), isNull);
   });
 

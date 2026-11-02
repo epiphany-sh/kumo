@@ -172,6 +172,16 @@ void main() {
       expect((screen.mouseTracking, screen.sgrMouse), (true, true));
       screen.feed(utf8.encode('\x1b[?1000l'));
       expect(screen.mouseTracking, isFalse);
+
+      bool flags(String modes) {
+        screen.feed(utf8.encode(modes));
+        return screen.mouseTracking;
+      }
+      expect((flags('\x1b[?1000h'), screen.mouseDrags, screen.mouseHover), (true, false, false));
+      expect((flags('\x1b[?1002h'), screen.mouseDrags, screen.mouseHover), (true, true, false));
+      expect((flags('\x1b[?1003h'), screen.mouseDrags, screen.mouseHover), (true, true, true));
+      // As in xterm, turning off any of them turns the mouse off.
+      expect((flags('\x1b[?1000l'), screen.mouseDrags, screen.mouseHover), (false, false, false));
     });
   });
 }

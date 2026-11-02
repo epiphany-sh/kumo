@@ -15,7 +15,7 @@ import 'kumo_engine.dart';
 ///
 /// Output is parsed as it arrives but published at most once per frame
 /// (kumo.md §5.6). Keystrokes typed before the stream is up are queued.
-class GrpcTerminalSurface implements TerminalSurface {
+class GrpcTerminalSurface implements TerminalModes {
   /// Opens the user's login shell in [directory] (their home directory by
   /// default). The PTY is opened at the pane's real size, once it is first
   /// laid out.
@@ -85,9 +85,17 @@ class GrpcTerminalSurface implements TerminalSurface {
   @override
   bool get interactive => true;
 
+  @override
   bool get applicationCursorKeys => _screen.applicationCursorKeys;
+  @override
   bool get bracketedPaste => _screen.bracketedPaste;
+  @override
   bool get mouseTracking => _screen.mouseTracking;
+  @override
+  bool get mouseDrags => _screen.mouseDrags;
+  @override
+  bool get mouseHover => _screen.mouseHover;
+  @override
   bool get sgrMouse => _screen.sgrMouse;
 
   /// Forgets the lines above the screen (the daemon's replay keeps them

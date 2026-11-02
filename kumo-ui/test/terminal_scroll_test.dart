@@ -112,6 +112,17 @@ void main() {
     expect(wheelReport(up: false, col: 0, row: 0), [0x1b, 0x5b, 0x4d, 32 + 65, 33, 33]);
   });
 
+  test('clicks, drags and hover report as in xterm', () {
+    String sgr(List<int> bytes) => utf8.decode(bytes);
+    expect(sgr(mouseReport(button: 0, col: 4, row: 2, sgr: true)), '\x1b[<0;5;3M');
+    expect(sgr(mouseReport(button: 0, col: 4, row: 2, sgr: true, release: true)), '\x1b[<0;5;3m');
+    expect(sgr(mouseReport(button: 0, col: 5, row: 2, sgr: true, motion: true)), '\x1b[<32;6;3M');
+    expect(sgr(mouseReport(button: 3, col: 0, row: 0, sgr: true, motion: true)), '\x1b[<35;1;1M');
+    // The legacy encoding has no button for a release: it says 3.
+    expect(mouseReport(button: 0, col: 0, row: 0), [0x1b, 0x5b, 0x4d, 32, 33, 33]);
+    expect(mouseReport(button: 0, col: 0, row: 0, release: true), [0x1b, 0x5b, 0x4d, 35, 33, 33]);
+  });
+
   testWidgets('the wheel reads the history; output doesn’t move it; typing goes back', (tester) async {
     String? copied;
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
