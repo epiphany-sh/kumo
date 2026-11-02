@@ -8,8 +8,10 @@ use kumo_proto::v1 as pb;
 use tokio_stream::wrappers::WatchStream;
 use tonic::{Request, Response, Status};
 
-use crate::mapping::{ci_problem_to, host_info_to, pipelines_snapshot_to, pipelines_status_from};
-use crate::profile::{Profiles, services_of};
+use crate::mapping::{
+    ci_problem_to, host_info_to, pipelines_snapshot_to, pipelines_status_from, profile_status_from,
+};
+use crate::profile::{Profiles, profile_of, services_of};
 
 type SnapshotStream = Pin<Box<dyn Stream<Item = Result<pb::PipelinesSnapshot, Status>> + Send>>;
 
@@ -103,10 +105,13 @@ impl pb::pipelines_server::Pipelines for PipelinesGrpc {
         &self,
         request: Request<pb::SignInWithGhRequest>,
     ) -> Result<Response<pb::SignInWithGhResponse>, Status> {
-        let service = self.service(&request).await?;
-        let terminal = service
-            .sign_in_with_cli(&request.into_inner().host)
+        // Through the profile: the account signed in becomes its account.
+        let profile = profile_of(request.metadata()).map(str::to_owned);
+        let terminal = self
+            .profiles
+            .sign_in_with_gh(profile.as_deref(), &request.into_inner().host)
             .await
+            .map_err(profile_status_from)?
             .map_err(pipelines_status_from)?;
         Ok(Response::new(pb::SignInWithGhResponse {
             terminal_id: terminal.to_string(),

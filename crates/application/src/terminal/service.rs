@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use kumo_domain::profiles::ProfileId;
+use kumo_domain::profiles::{ProfileEnv, ProfileId};
 use kumo_domain::terminal::{
     LaunchSpec, PtySystem, TerminalError, TerminalId, TerminalInfo, TerminalStatus,
 };
@@ -25,6 +25,8 @@ pub struct TerminalService {
     config: SessionConfig,
     registry: Arc<SessionRegistry>,
     scope: Option<ProfileId>,
+    /// What the profile's processes get (git identity, credentials, key).
+    env: ProfileEnv,
 }
 
 impl std::fmt::Debug for TerminalService {
@@ -44,17 +46,20 @@ impl TerminalService {
             config,
             registry: Arc::default(),
             scope: None,
+            env: ProfileEnv::default(),
         }
     }
 
     /// The same terminals, seen from `profile`: what it opens is tagged
-    /// with it, and other profiles' terminals are not found.
-    pub fn scoped(&self, profile: ProfileId) -> Self {
+    /// with it and gets `env` (under the variables it sets itself), and
+    /// other profiles' terminals are not found.
+    pub fn scoped(&self, profile: ProfileId, env: ProfileEnv) -> Self {
         Self {
             pty: Arc::clone(&self.pty),
             config: self.config.clone(),
             registry: Arc::clone(&self.registry),
             scope: Some(profile),
+            env,
         }
     }
 
@@ -65,6 +70,7 @@ impl TerminalService {
 
     /// Spawns the program on a new PTY. Must be called within a Tokio runtime.
     pub fn open(&self, spec: LaunchSpec) -> Result<TerminalId, TerminalError> {
+        let spec = spec.with_default_env(self.env.get().env());
         let process = self.pty.spawn(&spec)?;
         let id = TerminalId::generate();
         let session = TerminalSession::start(id.clone(), &spec, process, &self.config);

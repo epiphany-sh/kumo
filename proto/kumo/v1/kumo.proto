@@ -64,6 +64,15 @@ service Profiles {
   // window keeps this open with its `kumo-profile`: that profile counts as
   // in use while the stream lives.
   rpc Watch(WatchProfilesRequest) returns (stream ProfileList);
+  // Key pairs in ~/.ssh (and lone .pub files, for keys an agent holds):
+  // name, path and fingerprint. Never what a key holds.
+  rpc ListSshKeys(ListSshKeysRequest) returns (SshKeyList);
+  // Every account `gh` is signed in to, per host, to pick a profile's.
+  rpc ListGhAccounts(ListGhAccountsRequest) returns (GhAccountList);
+  // For `kumod git-credential`: the token git sends a host, as the profile
+  // in `kumo-profile`. Only hosts of that profile's repositories
+  // (NOT_FOUND otherwise); empty when it has none.
+  rpc GitCredential(GitCredentialRequest) returns (GitCredentialResponse);
 }
 
 message ListProfilesRequest {}
@@ -93,6 +102,54 @@ message Profile {
   uint32 terminals_open = 11;
   uint32 namespaces = 12;
   uint32 repos = 13;
+  // Path in ~/.ssh git uses inside this profile; empty: none. With a key
+  // SSH remotes use it; without one, SSH remotes of hosts the profile has
+  // an account or token for go over HTTPS with it.
+  string ssh_key = 14;
+  bool sign_commits = 15;      // sign with ssh_key; ignored without one
+  // The gh account it uses per host, whichever gh has active.
+  repeated GhAccount gh_accounts = 16;
+}
+
+message GhAccount {
+  string host = 1;             // "github.com"
+  string login = 2;
+}
+
+message GhAccounts {
+  repeated GhAccount accounts = 1;
+}
+
+message ListSshKeysRequest {}
+
+message SshKeyList {
+  repeated SshKey keys = 1;
+}
+
+message SshKey {
+  string name = 1;             // "id_ed25519"
+  // What Profile.ssh_key takes: "~/.ssh/id_ed25519" (".pub" when only
+  // that is on disk).
+  string path = 2;
+  string fingerprint = 3;      // "SHA256:…"; empty if unknown
+  string kind = 4;             // "ed25519"
+  bool agent_only = 5;         // only the .pub is on disk
+}
+
+message ListGhAccountsRequest {}
+
+message GhAccountList {
+  repeated GhAccount accounts = 1;
+}
+
+message GitCredentialRequest {
+  string host = 1;             // as git asks: "github.com"
+}
+
+message GitCredentialResponse {
+  // Both empty: the profile has no token for the host.
+  string username = 1;
+  string password = 2;
 }
 
 message CreateProfileRequest {
@@ -111,6 +168,10 @@ message UpdateProfileRequest {
   optional string worktrees_dir = 5;  // empty: unchanged
   optional string git_name = 6;       // empty: back to the user's git config
   optional string git_email = 7;
+  optional string ssh_key = 8;         // empty: no key
+  optional bool sign_commits = 9;
+  // Set: replaces them all (no accounts clears them).
+  optional GhAccounts gh_accounts = 10;
 }
 
 message DeleteProfileRequest {

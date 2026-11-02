@@ -104,10 +104,12 @@ pub fn pipelines_status_from(error: PipelinesError) -> Status {
 pub fn profile_status_from(error: ProfileError) -> Status {
     let message = error.to_string();
     match error {
-        ProfileError::NotFound(_) => Status::not_found(message),
-        ProfileError::InvalidId(_) | ProfileError::EmptyName | ProfileError::InvalidColor(_) => {
-            Status::invalid_argument(message)
-        }
+        ProfileError::NotFound(_) | ProfileError::UnknownHost(_) => Status::not_found(message),
+        ProfileError::InvalidId(_)
+        | ProfileError::EmptyName
+        | ProfileError::InvalidColor(_)
+        | ProfileError::InvalidSshKey(_)
+        | ProfileError::InvalidGhAccount(_) => Status::invalid_argument(message),
         ProfileError::DefaultProfile | ProfileError::LastProfile | ProfileError::InUse(_) => {
             Status::failed_precondition(message)
         }

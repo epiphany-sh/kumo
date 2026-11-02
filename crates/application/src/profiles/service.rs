@@ -258,6 +258,11 @@ impl<B: ProfileBundle> ProfileService<B> {
         self.store.remove_data(&profile.id)
     }
 
+    /// The profile `id` names (None or empty: the default one).
+    pub fn find_profile(&self, id: Option<&str>) -> Result<Profile, ProfileError> {
+        self.find(id)
+    }
+
     fn find(&self, id: Option<&str>) -> Result<Profile, ProfileError> {
         let id = id.filter(|id| !id.is_empty()).unwrap_or(ProfileId::DEFAULT);
         lock(&self.profiles)

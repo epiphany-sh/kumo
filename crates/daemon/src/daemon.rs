@@ -8,11 +8,12 @@ use kumo_application::profiles::ProfileService;
 use kumo_application::terminal::TerminalService;
 use kumo_domain::agents::ProgramLocator;
 use kumo_domain::daemon::{ApiVersion, DaemonEndpoint, DiscoveryStore};
+use kumo_domain::profiles::shell_quote;
 use kumo_grpc::server::{GrpcServer, Services};
 use kumo_infrastructure::agents::ShellPathLocator;
 use kumo_infrastructure::discovery::FileDiscoveryStore;
 use kumo_infrastructure::executable::ProgramFile;
-use kumo_infrastructure::profiles::FileProfileStore;
+use kumo_infrastructure::profiles::{FileProfileStore, LocalMachineAccounts};
 use kumo_infrastructure::pty::PortablePtySystem;
 use kumo_infrastructure::secrets::{KeychainSecretStore, MemorySecretStore};
 use kumo_infrastructure::security::generate_auth_token;
@@ -72,7 +73,19 @@ impl Daemon {
         // Every other service is per profile, built the first time a call
         // names it. The default one (Kumo's data from before profiles) is
         // opened now, so its repositories are read at start as before.
+        // Git asks this program for a profile's tokens.
+        let helper_program = match config.credential_helper {
+            Some(program) => program,
+            None => std::env::current_exe().context("no path to kumod")?,
+        };
+        let helper = format!(
+            "!{} --data-dir {} git-credential",
+            shell_quote(&helper_program.display().to_string()),
+            shell_quote(&data_dir.display().to_string()),
+        );
+        let machine = Arc::new(LocalMachineAccounts::new(&home, Arc::clone(&locator)));
         let opener = ProfileOpener {
+            helper,
             data_dir: data_dir.clone(),
             home: home.clone(),
             locator,
@@ -94,6 +107,7 @@ impl Daemon {
             ),
             control: control.clone(),
             profiles,
+            machine,
         };
         let server = GrpcServer::bind(config.listen, token.clone(), services).await?;
 

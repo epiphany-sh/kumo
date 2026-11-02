@@ -1,4 +1,5 @@
 use kumo_application::profiles::ProfileView;
+use kumo_domain::profiles::{GhAccount, SshKey};
 use kumo_proto::v1 as pb;
 
 pub fn profile_to(view: &ProfileView) -> pb::Profile {
@@ -17,6 +18,30 @@ pub fn profile_to(view: &ProfileView) -> pb::Profile {
         terminals_open: a.terminals_open,
         namespaces: a.namespaces,
         repos: a.repos,
+        ssh_key: p.ssh_key.clone(),
+        sign_commits: p.sign_commits,
+        gh_accounts: p.gh_accounts.iter().map(gh_account_to).collect(),
+    }
+}
+
+pub fn gh_account_to(account: &GhAccount) -> pb::GhAccount {
+    pb::GhAccount {
+        host: account.host.clone(),
+        login: account.login.clone(),
+    }
+}
+
+pub fn gh_account_from(account: pb::GhAccount) -> GhAccount {
+    GhAccount::new(&account.host, &account.login)
+}
+
+pub fn ssh_key_to(key: SshKey) -> pb::SshKey {
+    pb::SshKey {
+        name: key.name,
+        path: key.path,
+        fingerprint: key.fingerprint,
+        kind: key.kind,
+        agent_only: key.agent_only,
     }
 }
 

@@ -2,7 +2,7 @@ use std::fs::{self, File};
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
-use kumo_domain::profiles::{Profile, ProfileError, ProfileId, ProfileStore};
+use kumo_domain::profiles::{GhAccount, Profile, ProfileError, ProfileId, ProfileStore};
 use kumo_domain::time::Timestamp;
 use serde::{Deserialize, Serialize};
 
@@ -57,7 +57,19 @@ struct Record {
     git_name: String,
     #[serde(default)]
     git_email: String,
+    #[serde(default)]
+    ssh_key: String,
+    #[serde(default)]
+    sign_commits: bool,
+    #[serde(default)]
+    gh_accounts: Vec<AccountRecord>,
     created_at_unix_nanos: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct AccountRecord {
+    host: String,
+    login: String,
 }
 
 impl ProfileStore for FileProfileStore {
@@ -85,6 +97,13 @@ impl ProfileStore for FileProfileStore {
                     worktrees_dir: r.worktrees_dir,
                     git_name: r.git_name,
                     git_email: r.git_email,
+                    ssh_key: r.ssh_key,
+                    sign_commits: r.sign_commits,
+                    gh_accounts: r
+                        .gh_accounts
+                        .iter()
+                        .map(|a| GhAccount::new(&a.host, &a.login))
+                        .collect(),
                     created_at: Timestamp::from_unix_nanos(r.created_at_unix_nanos),
                 })
             })
@@ -105,6 +124,16 @@ impl ProfileStore for FileProfileStore {
                     worktrees_dir: p.worktrees_dir.clone(),
                     git_name: p.git_name.clone(),
                     git_email: p.git_email.clone(),
+                    ssh_key: p.ssh_key.clone(),
+                    sign_commits: p.sign_commits,
+                    gh_accounts: p
+                        .gh_accounts
+                        .iter()
+                        .map(|a| AccountRecord {
+                            host: a.host.clone(),
+                            login: a.login.clone(),
+                        })
+                        .collect(),
                     created_at_unix_nanos: p.created_at.as_unix_nanos(),
                 })
                 .collect(),

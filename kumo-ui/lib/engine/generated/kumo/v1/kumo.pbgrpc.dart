@@ -159,6 +159,33 @@ class ProfilesClient extends $grpc.Client {
         options: options);
   }
 
+  /// Key pairs in ~/.ssh (and lone .pub files, for keys an agent holds):
+  /// name, path and fingerprint. Never what a key holds.
+  $grpc.ResponseFuture<$0.SshKeyList> listSshKeys(
+    $0.ListSshKeysRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$listSshKeys, request, options: options);
+  }
+
+  /// Every account `gh` is signed in to, per host, to pick a profile's.
+  $grpc.ResponseFuture<$0.GhAccountList> listGhAccounts(
+    $0.ListGhAccountsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$listGhAccounts, request, options: options);
+  }
+
+  /// For `kumod git-credential`: the token git sends a host, as the profile
+  /// in `kumo-profile`. Only hosts of that profile's repositories
+  /// (NOT_FOUND otherwise); empty when it has none.
+  $grpc.ResponseFuture<$0.GitCredentialResponse> gitCredential(
+    $0.GitCredentialRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$gitCredential, request, options: options);
+  }
+
   // method descriptors
 
   static final _$list =
@@ -186,6 +213,21 @@ class ProfilesClient extends $grpc.Client {
           '/kumo.v1.Profiles/Watch',
           ($0.WatchProfilesRequest value) => value.writeToBuffer(),
           $0.ProfileList.fromBuffer);
+  static final _$listSshKeys =
+      $grpc.ClientMethod<$0.ListSshKeysRequest, $0.SshKeyList>(
+          '/kumo.v1.Profiles/ListSshKeys',
+          ($0.ListSshKeysRequest value) => value.writeToBuffer(),
+          $0.SshKeyList.fromBuffer);
+  static final _$listGhAccounts =
+      $grpc.ClientMethod<$0.ListGhAccountsRequest, $0.GhAccountList>(
+          '/kumo.v1.Profiles/ListGhAccounts',
+          ($0.ListGhAccountsRequest value) => value.writeToBuffer(),
+          $0.GhAccountList.fromBuffer);
+  static final _$gitCredential =
+      $grpc.ClientMethod<$0.GitCredentialRequest, $0.GitCredentialResponse>(
+          '/kumo.v1.Profiles/GitCredential',
+          ($0.GitCredentialRequest value) => value.writeToBuffer(),
+          $0.GitCredentialResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Profiles')
@@ -234,6 +276,31 @@ abstract class ProfilesServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.WatchProfilesRequest.fromBuffer(value),
         ($0.ProfileList value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ListSshKeysRequest, $0.SshKeyList>(
+        'ListSshKeys',
+        listSshKeys_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ListSshKeysRequest.fromBuffer(value),
+        ($0.SshKeyList value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ListGhAccountsRequest, $0.GhAccountList>(
+        'ListGhAccounts',
+        listGhAccounts_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ListGhAccountsRequest.fromBuffer(value),
+        ($0.GhAccountList value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.GitCredentialRequest, $0.GitCredentialResponse>(
+            'GitCredential',
+            gitCredential_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.GitCredentialRequest.fromBuffer(value),
+            ($0.GitCredentialResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.ProfileList> list_Pre($grpc.ServiceCall $call,
@@ -275,6 +342,31 @@ abstract class ProfilesServiceBase extends $grpc.Service {
 
   $async.Stream<$0.ProfileList> watch(
       $grpc.ServiceCall call, $0.WatchProfilesRequest request);
+
+  $async.Future<$0.SshKeyList> listSshKeys_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ListSshKeysRequest> $request) async {
+    return listSshKeys($call, await $request);
+  }
+
+  $async.Future<$0.SshKeyList> listSshKeys(
+      $grpc.ServiceCall call, $0.ListSshKeysRequest request);
+
+  $async.Future<$0.GhAccountList> listGhAccounts_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ListGhAccountsRequest> $request) async {
+    return listGhAccounts($call, await $request);
+  }
+
+  $async.Future<$0.GhAccountList> listGhAccounts(
+      $grpc.ServiceCall call, $0.ListGhAccountsRequest request);
+
+  $async.Future<$0.GitCredentialResponse> gitCredential_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.GitCredentialRequest> $request) async {
+    return gitCredential($call, await $request);
+  }
+
+  $async.Future<$0.GitCredentialResponse> gitCredential(
+      $grpc.ServiceCall call, $0.GitCredentialRequest request);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Terminals')

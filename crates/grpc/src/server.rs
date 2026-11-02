@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use kumo_application::daemon::{DaemonControl, HelloService};
 use kumo_domain::daemon::{AuthToken, DaemonError, ListenAddress};
+use kumo_domain::profiles::MachineAccounts;
 use kumo_proto::v1::agents_server::AgentsServer;
 use kumo_proto::v1::core_server::CoreServer;
 use kumo_proto::v1::docs_server::DocsServer;
@@ -31,13 +32,23 @@ use crate::services::{
 };
 
 /// Use cases the server exposes.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Services {
     pub hello: HelloService,
     pub control: DaemonControl,
     /// Every other service, per profile (the `kumo-profile` header),
     /// terminals included.
     pub profiles: Arc<Profiles>,
+    /// SSH keys and `gh` accounts to pick a profile's from.
+    pub machine: Arc<dyn MachineAccounts>,
+}
+
+impl std::fmt::Debug for Services {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Services")
+            .field("profiles", &self.profiles)
+            .finish_non_exhaustive()
+    }
 }
 
 /// A bound, not yet serving, gRPC server.
@@ -89,7 +100,10 @@ impl GrpcServer {
                 auth.clone(),
             ))
             .add_service(ProfilesServer::with_interceptor(
-                ProfilesGrpc::new(Arc::clone(&self.services.profiles)),
+                ProfilesGrpc::new(
+                    Arc::clone(&self.services.profiles),
+                    Arc::clone(&self.services.machine),
+                ),
                 auth.clone(),
             ))
             .add_service(TerminalsServer::with_interceptor(

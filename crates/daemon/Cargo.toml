@@ -20,6 +20,7 @@ kumo-domain.workspace = true
 kumo-application.workspace = true
 kumo-infrastructure.workspace = true
 kumo-grpc.workspace = true
+kumo-proto.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "time", "sync"] }
 anyhow.workspace = true
 futures.workspace = true
@@ -29,7 +30,6 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [dev-dependencies]
-kumo-proto.workspace = true
 tokio-stream.workspace = true
 futures.workspace = true
 bytes.workspace = true

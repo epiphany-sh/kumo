@@ -440,6 +440,9 @@ class Profile extends $pb.GeneratedMessage {
     $core.int? terminalsOpen,
     $core.int? namespaces,
     $core.int? repos,
+    $core.String? sshKey,
+    $core.bool? signCommits,
+    $core.Iterable<GhAccount>? ghAccounts,
   }) {
     final result = Profile._();
     if (id != null) result.id = id;
@@ -455,6 +458,9 @@ class Profile extends $pb.GeneratedMessage {
     if (terminalsOpen != null) result.terminalsOpen = terminalsOpen;
     if (namespaces != null) result.namespaces = namespaces;
     if (repos != null) result.repos = repos;
+    if (sshKey != null) result.sshKey = sshKey;
+    if (signCommits != null) result.signCommits = signCommits;
+    if (ghAccounts != null) result.ghAccounts.addAll(ghAccounts);
     return result;
   }
 
@@ -488,6 +494,10 @@ class Profile extends $pb.GeneratedMessage {
     ..aI(12, _omitFieldNames ? '' : 'namespaces',
         fieldType: $pb.PbFieldType.OU3)
     ..aI(13, _omitFieldNames ? '' : 'repos', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(14, _omitFieldNames ? '' : 'sshKey')
+    ..aOB(15, _omitFieldNames ? '' : 'signCommits')
+    ..pPM<GhAccount>(16, _omitFieldNames ? '' : 'ghAccounts',
+        subBuilder: GhAccount.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -630,6 +640,569 @@ class Profile extends $pb.GeneratedMessage {
   $core.bool hasRepos() => $_has(12);
   @$pb.TagNumber(13)
   void clearRepos() => $_clearField(13);
+
+  /// Path in ~/.ssh git uses inside this profile; empty: none. With a key
+  /// SSH remotes use it; without one, SSH remotes of hosts the profile has
+  /// an account or token for go over HTTPS with it.
+  @$pb.TagNumber(14)
+  $core.String get sshKey => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set sshKey($core.String value) => $_setString(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasSshKey() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearSshKey() => $_clearField(14);
+
+  @$pb.TagNumber(15)
+  $core.bool get signCommits => $_getBF(14);
+  @$pb.TagNumber(15)
+  set signCommits($core.bool value) => $_setBool(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasSignCommits() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearSignCommits() => $_clearField(15);
+
+  /// The gh account it uses per host, whichever gh has active.
+  @$pb.TagNumber(16)
+  $pb.PbList<GhAccount> get ghAccounts => $_getList(15);
+}
+
+class GhAccount extends $pb.GeneratedMessage {
+  factory GhAccount({
+    $core.String? host,
+    $core.String? login,
+  }) {
+    final result = GhAccount._();
+    if (host != null) result.host = host;
+    if (login != null) result.login = login;
+    return result;
+  }
+
+  GhAccount._();
+
+  factory GhAccount.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GhAccount()..mergeFromBuffer(data, registry);
+  factory GhAccount.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GhAccount()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GhAccount',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: GhAccount.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'host')
+    ..aOS(2, _omitFieldNames ? '' : 'login')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GhAccount clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GhAccount copyWith(void Function(GhAccount) updates) =>
+      super.copyWith((message) => updates(message as GhAccount)) as GhAccount;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use GhAccount() / GhAccount.new instead')
+  static GhAccount create() => GhAccount._();
+  static $pb.GeneratedMessage $_createMessage() => GhAccount._();
+  @$core.override
+  GhAccount createEmptyInstance() => GhAccount._();
+  @$core.pragma('dart2js:noInline')
+  static GhAccount getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GhAccount>(GhAccount.$_createMessage);
+  static GhAccount? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get host => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set host($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasHost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHost() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get login => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set login($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLogin() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLogin() => $_clearField(2);
+}
+
+class GhAccounts extends $pb.GeneratedMessage {
+  factory GhAccounts({
+    $core.Iterable<GhAccount>? accounts,
+  }) {
+    final result = GhAccounts._();
+    if (accounts != null) result.accounts.addAll(accounts);
+    return result;
+  }
+
+  GhAccounts._();
+
+  factory GhAccounts.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GhAccounts()..mergeFromBuffer(data, registry);
+  factory GhAccounts.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GhAccounts()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GhAccounts',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: GhAccounts.$_createMessage)
+    ..pPM<GhAccount>(1, _omitFieldNames ? '' : 'accounts',
+        subBuilder: GhAccount.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GhAccounts clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GhAccounts copyWith(void Function(GhAccounts) updates) =>
+      super.copyWith((message) => updates(message as GhAccounts)) as GhAccounts;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use GhAccounts() / GhAccounts.new instead')
+  static GhAccounts create() => GhAccounts._();
+  static $pb.GeneratedMessage $_createMessage() => GhAccounts._();
+  @$core.override
+  GhAccounts createEmptyInstance() => GhAccounts._();
+  @$core.pragma('dart2js:noInline')
+  static GhAccounts getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GhAccounts>(GhAccounts.$_createMessage);
+  static GhAccounts? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<GhAccount> get accounts => $_getList(0);
+}
+
+class ListSshKeysRequest extends $pb.GeneratedMessage {
+  factory ListSshKeysRequest() => ListSshKeysRequest._();
+
+  ListSshKeysRequest._();
+
+  factory ListSshKeysRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListSshKeysRequest()..mergeFromBuffer(data, registry);
+  factory ListSshKeysRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListSshKeysRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListSshKeysRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ListSshKeysRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListSshKeysRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListSshKeysRequest copyWith(void Function(ListSshKeysRequest) updates) =>
+      super.copyWith((message) => updates(message as ListSshKeysRequest))
+          as ListSshKeysRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ListSshKeysRequest() / ListSshKeysRequest.new instead')
+  static ListSshKeysRequest create() => ListSshKeysRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListSshKeysRequest._();
+  @$core.override
+  ListSshKeysRequest createEmptyInstance() => ListSshKeysRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListSshKeysRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListSshKeysRequest>(
+          ListSshKeysRequest.$_createMessage);
+  static ListSshKeysRequest? _defaultInstance;
+}
+
+class SshKeyList extends $pb.GeneratedMessage {
+  factory SshKeyList({
+    $core.Iterable<SshKey>? keys,
+  }) {
+    final result = SshKeyList._();
+    if (keys != null) result.keys.addAll(keys);
+    return result;
+  }
+
+  SshKeyList._();
+
+  factory SshKeyList.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SshKeyList()..mergeFromBuffer(data, registry);
+  factory SshKeyList.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SshKeyList()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SshKeyList',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SshKeyList.$_createMessage)
+    ..pPM<SshKey>(1, _omitFieldNames ? '' : 'keys',
+        subBuilder: SshKey.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SshKeyList clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SshKeyList copyWith(void Function(SshKeyList) updates) =>
+      super.copyWith((message) => updates(message as SshKeyList)) as SshKeyList;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SshKeyList() / SshKeyList.new instead')
+  static SshKeyList create() => SshKeyList._();
+  static $pb.GeneratedMessage $_createMessage() => SshKeyList._();
+  @$core.override
+  SshKeyList createEmptyInstance() => SshKeyList._();
+  @$core.pragma('dart2js:noInline')
+  static SshKeyList getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SshKeyList>(SshKeyList.$_createMessage);
+  static SshKeyList? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<SshKey> get keys => $_getList(0);
+}
+
+class SshKey extends $pb.GeneratedMessage {
+  factory SshKey({
+    $core.String? name,
+    $core.String? path,
+    $core.String? fingerprint,
+    $core.String? kind,
+    $core.bool? agentOnly,
+  }) {
+    final result = SshKey._();
+    if (name != null) result.name = name;
+    if (path != null) result.path = path;
+    if (fingerprint != null) result.fingerprint = fingerprint;
+    if (kind != null) result.kind = kind;
+    if (agentOnly != null) result.agentOnly = agentOnly;
+    return result;
+  }
+
+  SshKey._();
+
+  factory SshKey.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SshKey()..mergeFromBuffer(data, registry);
+  factory SshKey.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SshKey()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SshKey',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SshKey.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aOS(2, _omitFieldNames ? '' : 'path')
+    ..aOS(3, _omitFieldNames ? '' : 'fingerprint')
+    ..aOS(4, _omitFieldNames ? '' : 'kind')
+    ..aOB(5, _omitFieldNames ? '' : 'agentOnly')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SshKey clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SshKey copyWith(void Function(SshKey) updates) =>
+      super.copyWith((message) => updates(message as SshKey)) as SshKey;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SshKey() / SshKey.new instead')
+  static SshKey create() => SshKey._();
+  static $pb.GeneratedMessage $_createMessage() => SshKey._();
+  @$core.override
+  SshKey createEmptyInstance() => SshKey._();
+  @$core.pragma('dart2js:noInline')
+  static SshKey getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SshKey>(SshKey.$_createMessage);
+  static SshKey? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => $_clearField(1);
+
+  /// What Profile.ssh_key takes: "~/.ssh/id_ed25519" (".pub" when only
+  /// that is on disk).
+  @$pb.TagNumber(2)
+  $core.String get path => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set path($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPath() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPath() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get fingerprint => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set fingerprint($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFingerprint() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFingerprint() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get kind => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set kind($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasKind() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearKind() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get agentOnly => $_getBF(4);
+  @$pb.TagNumber(5)
+  set agentOnly($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasAgentOnly() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearAgentOnly() => $_clearField(5);
+}
+
+class ListGhAccountsRequest extends $pb.GeneratedMessage {
+  factory ListGhAccountsRequest() => ListGhAccountsRequest._();
+
+  ListGhAccountsRequest._();
+
+  factory ListGhAccountsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListGhAccountsRequest()..mergeFromBuffer(data, registry);
+  factory ListGhAccountsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListGhAccountsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListGhAccountsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ListGhAccountsRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListGhAccountsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListGhAccountsRequest copyWith(
+          void Function(ListGhAccountsRequest) updates) =>
+      super.copyWith((message) => updates(message as ListGhAccountsRequest))
+          as ListGhAccountsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListGhAccountsRequest() / ListGhAccountsRequest.new instead')
+  static ListGhAccountsRequest create() => ListGhAccountsRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListGhAccountsRequest._();
+  @$core.override
+  ListGhAccountsRequest createEmptyInstance() => ListGhAccountsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListGhAccountsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListGhAccountsRequest>(
+          ListGhAccountsRequest.$_createMessage);
+  static ListGhAccountsRequest? _defaultInstance;
+}
+
+class GhAccountList extends $pb.GeneratedMessage {
+  factory GhAccountList({
+    $core.Iterable<GhAccount>? accounts,
+  }) {
+    final result = GhAccountList._();
+    if (accounts != null) result.accounts.addAll(accounts);
+    return result;
+  }
+
+  GhAccountList._();
+
+  factory GhAccountList.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GhAccountList()..mergeFromBuffer(data, registry);
+  factory GhAccountList.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GhAccountList()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GhAccountList',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: GhAccountList.$_createMessage)
+    ..pPM<GhAccount>(1, _omitFieldNames ? '' : 'accounts',
+        subBuilder: GhAccount.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GhAccountList clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GhAccountList copyWith(void Function(GhAccountList) updates) =>
+      super.copyWith((message) => updates(message as GhAccountList))
+          as GhAccountList;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use GhAccountList() / GhAccountList.new instead')
+  static GhAccountList create() => GhAccountList._();
+  static $pb.GeneratedMessage $_createMessage() => GhAccountList._();
+  @$core.override
+  GhAccountList createEmptyInstance() => GhAccountList._();
+  @$core.pragma('dart2js:noInline')
+  static GhAccountList getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<GhAccountList>(
+          GhAccountList.$_createMessage);
+  static GhAccountList? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<GhAccount> get accounts => $_getList(0);
+}
+
+class GitCredentialRequest extends $pb.GeneratedMessage {
+  factory GitCredentialRequest({
+    $core.String? host,
+  }) {
+    final result = GitCredentialRequest._();
+    if (host != null) result.host = host;
+    return result;
+  }
+
+  GitCredentialRequest._();
+
+  factory GitCredentialRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GitCredentialRequest()..mergeFromBuffer(data, registry);
+  factory GitCredentialRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GitCredentialRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GitCredentialRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: GitCredentialRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'host')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GitCredentialRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GitCredentialRequest copyWith(void Function(GitCredentialRequest) updates) =>
+      super.copyWith((message) => updates(message as GitCredentialRequest))
+          as GitCredentialRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GitCredentialRequest() / GitCredentialRequest.new instead')
+  static GitCredentialRequest create() => GitCredentialRequest._();
+  static $pb.GeneratedMessage $_createMessage() => GitCredentialRequest._();
+  @$core.override
+  GitCredentialRequest createEmptyInstance() => GitCredentialRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GitCredentialRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GitCredentialRequest>(
+          GitCredentialRequest.$_createMessage);
+  static GitCredentialRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get host => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set host($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasHost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHost() => $_clearField(1);
+}
+
+class GitCredentialResponse extends $pb.GeneratedMessage {
+  factory GitCredentialResponse({
+    $core.String? username,
+    $core.String? password,
+  }) {
+    final result = GitCredentialResponse._();
+    if (username != null) result.username = username;
+    if (password != null) result.password = password;
+    return result;
+  }
+
+  GitCredentialResponse._();
+
+  factory GitCredentialResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GitCredentialResponse()..mergeFromBuffer(data, registry);
+  factory GitCredentialResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GitCredentialResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GitCredentialResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: GitCredentialResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'username')
+    ..aOS(2, _omitFieldNames ? '' : 'password')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GitCredentialResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GitCredentialResponse copyWith(
+          void Function(GitCredentialResponse) updates) =>
+      super.copyWith((message) => updates(message as GitCredentialResponse))
+          as GitCredentialResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GitCredentialResponse() / GitCredentialResponse.new instead')
+  static GitCredentialResponse create() => GitCredentialResponse._();
+  static $pb.GeneratedMessage $_createMessage() => GitCredentialResponse._();
+  @$core.override
+  GitCredentialResponse createEmptyInstance() => GitCredentialResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GitCredentialResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GitCredentialResponse>(
+          GitCredentialResponse.$_createMessage);
+  static GitCredentialResponse? _defaultInstance;
+
+  /// Both empty: the profile has no token for the host.
+  @$pb.TagNumber(1)
+  $core.String get username => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set username($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUsername() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUsername() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get password => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set password($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPassword() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPassword() => $_clearField(2);
 }
 
 class CreateProfileRequest extends $pb.GeneratedMessage {
@@ -725,6 +1298,9 @@ class UpdateProfileRequest extends $pb.GeneratedMessage {
     $core.String? worktreesDir,
     $core.String? gitName,
     $core.String? gitEmail,
+    $core.String? sshKey,
+    $core.bool? signCommits,
+    GhAccounts? ghAccounts,
   }) {
     final result = UpdateProfileRequest._();
     if (id != null) result.id = id;
@@ -734,6 +1310,9 @@ class UpdateProfileRequest extends $pb.GeneratedMessage {
     if (worktreesDir != null) result.worktreesDir = worktreesDir;
     if (gitName != null) result.gitName = gitName;
     if (gitEmail != null) result.gitEmail = gitEmail;
+    if (sshKey != null) result.sshKey = sshKey;
+    if (signCommits != null) result.signCommits = signCommits;
+    if (ghAccounts != null) result.ghAccounts = ghAccounts;
     return result;
   }
 
@@ -757,6 +1336,10 @@ class UpdateProfileRequest extends $pb.GeneratedMessage {
     ..aOS(5, _omitFieldNames ? '' : 'worktreesDir')
     ..aOS(6, _omitFieldNames ? '' : 'gitName')
     ..aOS(7, _omitFieldNames ? '' : 'gitEmail')
+    ..aOS(8, _omitFieldNames ? '' : 'sshKey')
+    ..aOB(9, _omitFieldNames ? '' : 'signCommits')
+    ..aOM<GhAccounts>(10, _omitFieldNames ? '' : 'ghAccounts',
+        subBuilder: GhAccounts.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -844,6 +1427,36 @@ class UpdateProfileRequest extends $pb.GeneratedMessage {
   $core.bool hasGitEmail() => $_has(6);
   @$pb.TagNumber(7)
   void clearGitEmail() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get sshKey => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set sshKey($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasSshKey() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearSshKey() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.bool get signCommits => $_getBF(8);
+  @$pb.TagNumber(9)
+  set signCommits($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasSignCommits() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearSignCommits() => $_clearField(9);
+
+  /// Set: replaces them all (no accounts clears them).
+  @$pb.TagNumber(10)
+  GhAccounts get ghAccounts => $_getN(9);
+  @$pb.TagNumber(10)
+  set ghAccounts(GhAccounts value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasGhAccounts() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearGhAccounts() => $_clearField(10);
+  @$pb.TagNumber(10)
+  GhAccounts ensureGhAccounts() => $_ensure(9);
 }
 
 class DeleteProfileRequest extends $pb.GeneratedMessage {

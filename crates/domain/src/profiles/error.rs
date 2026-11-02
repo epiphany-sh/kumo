@@ -15,6 +15,12 @@ pub enum ProfileError {
     LastProfile,
     #[error("workspace {0} is open in a window")]
     InUse(String),
+    #[error("invalid SSH key {0:?}: use a path like ~/.ssh/id_ed25519")]
+    InvalidSshKey(String),
+    #[error("invalid gh account: {0}")]
+    InvalidGhAccount(String),
+    #[error("{0} isn't a host of this workspace's repositories")]
+    UnknownHost(String),
     #[error("workspace storage: {0}")]
     Storage(String),
     #[error("couldn't open workspace {id}: {reason}")]

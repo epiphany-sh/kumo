@@ -17,7 +17,31 @@ pub struct Profile {
     /// Commit identity inside this profile; empty: the user's git config.
     pub git_name: String,
     pub git_email: String,
+    /// The SSH key git uses inside this profile: a path in `~/.ssh` (the
+    /// private key, or a `.pub` whose key an agent holds). Empty: none.
+    pub ssh_key: String,
+    /// Signs commits with [`Self::ssh_key`]; ignored without one.
+    pub sign_commits: bool,
+    /// The `gh` account used per host, at most one per host.
+    pub gh_accounts: Vec<GhAccount>,
     pub created_at: Timestamp,
+}
+
+/// A `gh` account a profile uses on a host.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct GhAccount {
+    /// `github.com`, or a GitHub Enterprise host.
+    pub host: String,
+    pub login: String,
+}
+
+impl GhAccount {
+    pub fn new(host: &str, login: &str) -> Self {
+        Self {
+            host: host.trim().to_lowercase(),
+            login: login.trim().to_owned(),
+        }
+    }
 }
 
 impl Profile {
@@ -35,6 +59,9 @@ impl Profile {
             worktrees_dir: Self::DEFAULT_WORKTREES_DIR.to_owned(),
             git_name: String::new(),
             git_email: String::new(),
+            ssh_key: String::new(),
+            sign_commits: false,
+            gh_accounts: Vec::new(),
             created_at,
         }
     }
@@ -55,6 +82,9 @@ impl Profile {
             position,
             git_name: String::new(),
             git_email: String::new(),
+            ssh_key: String::new(),
+            sign_commits: false,
+            gh_accounts: Vec::new(),
             created_at,
         };
         profile.apply(ProfileChanges {
@@ -67,6 +97,14 @@ impl Profile {
 
     pub fn is_default(&self) -> bool {
         self.id.is_default()
+    }
+
+    /// The `gh` account it uses on `host`.
+    pub fn gh_account(&self, host: &str) -> Option<&str> {
+        self.gh_accounts
+            .iter()
+            .find(|a| a.host.eq_ignore_ascii_case(host))
+            .map(|a| a.login.as_str())
     }
 
     /// Applies the fields that are set, validating them first: on error
@@ -86,6 +124,14 @@ impl Profile {
             .worktrees_dir
             .map(|d| d.trim().trim_end_matches('/').to_owned())
             .filter(|d| !d.is_empty());
+        let ssh_key = changes.ssh_key.map(|k| k.trim().to_owned());
+        if let Some(key) = &ssh_key
+            && !key.is_empty()
+            && !(key.starts_with("~/") || std::path::Path::new(key).is_absolute())
+        {
+            return Err(ProfileError::InvalidSshKey(key.clone()));
+        }
+        let gh_accounts = changes.gh_accounts.map(accounts).transpose()?;
         if let Some(name) = name {
             self.name = name;
         }
@@ -101,8 +147,39 @@ impl Profile {
         if let Some(git_email) = changes.git_email {
             self.git_email = git_email.trim().to_owned();
         }
+        if let Some(key) = ssh_key {
+            self.ssh_key = key;
+        }
+        if let Some(sign) = changes.sign_commits {
+            self.sign_commits = sign;
+        }
+        if let Some(accounts) = gh_accounts {
+            self.gh_accounts = accounts;
+        }
         Ok(())
     }
+}
+
+/// Accounts, cleaned up and sorted; one per host.
+fn accounts(accounts: Vec<GhAccount>) -> Result<Vec<GhAccount>, ProfileError> {
+    let mut clean: Vec<GhAccount> = Vec::with_capacity(accounts.len());
+    for account in accounts {
+        let account = GhAccount::new(&account.host, &account.login);
+        if account.host.is_empty() || account.login.is_empty() {
+            return Err(ProfileError::InvalidGhAccount(
+                "an account needs a host and a login".into(),
+            ));
+        }
+        if clean.iter().any(|a| a.host == account.host) {
+            return Err(ProfileError::InvalidGhAccount(format!(
+                "one account per host: {} twice",
+                account.host
+            )));
+        }
+        clean.push(account);
+    }
+    clean.sort();
+    Ok(clean)
 }
 
 /// Fields to change in a profile; None leaves one as is.
@@ -116,6 +193,11 @@ pub struct ProfileChanges {
     /// Empty clears it (back to the user's git config).
     pub git_name: Option<String>,
     pub git_email: Option<String>,
+    /// Empty clears it.
+    pub ssh_key: Option<String>,
+    pub sign_commits: Option<bool>,
+    /// Replaces them all; empty clears them.
+    pub gh_accounts: Option<Vec<GhAccount>>,
 }
 
 /// What a profile has and runs right now, for the switcher.
@@ -203,5 +285,40 @@ mod tests {
         .unwrap();
         assert_eq!(p.worktrees_dir, "~/work");
         assert!(p.git_email.is_empty());
+    }
+
+    #[test]
+    fn ssh_keys_are_paths_and_accounts_one_per_host() {
+        let mut p = Profile::first(Timestamp::from_unix_nanos(1));
+        assert_eq!(
+            p.apply(ProfileChanges {
+                ssh_key: Some("id_workspace_1".into()),
+                ..ProfileChanges::default()
+            }),
+            Err(ProfileError::InvalidSshKey("id_workspace_1".into()))
+        );
+        let twice = vec![
+            GhAccount::new("github.com", "user-1"),
+            GhAccount::new("GitHub.com", "user-2"),
+        ];
+        assert!(matches!(
+            p.apply(ProfileChanges {
+                gh_accounts: Some(twice),
+                ..ProfileChanges::default()
+            }),
+            Err(ProfileError::InvalidGhAccount(_))
+        ));
+
+        p.apply(ProfileChanges {
+            ssh_key: Some(" ~/.ssh/id_workspace_1 ".into()),
+            sign_commits: Some(true),
+            gh_accounts: Some(vec![GhAccount::new(" GitHub.com ", " user-1 ")]),
+            ..ProfileChanges::default()
+        })
+        .unwrap();
+        assert_eq!(p.ssh_key, "~/.ssh/id_workspace_1");
+        assert!(p.sign_commits);
+        assert_eq!(p.gh_account("github.com"), Some("user-1"));
+        assert_eq!(p.gh_account("gitlab.com"), None);
     }
 }

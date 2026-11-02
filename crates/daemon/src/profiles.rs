@@ -8,7 +8,7 @@ use kumo_application::agents::{AgentPorts, AgentService};
 use kumo_application::changes::{ChangesPorts, ChangesService};
 use kumo_application::docs::{DocsPorts, DocsService};
 use kumo_application::pipelines::{PipelinesPorts, PipelinesService, PipelinesTiming};
-use kumo_application::profiles::{OpenProfile, ProfileServices};
+use kumo_application::profiles::{GitEnvironment, OpenProfile, ProfileServices};
 use kumo_application::pulls::{PullRequestPorts, PullRequestService};
 use kumo_application::tasks::{TaskPorts, TaskService, TaskTiming};
 use kumo_application::terminal::TerminalService;
@@ -16,7 +16,7 @@ use kumo_application::test_runs::{TestPorts, TestService};
 use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
 use kumo_domain::agents::ProgramLocator;
 use kumo_domain::pipelines::{HostTokens, TokenFallback};
-use kumo_domain::profiles::{Profile, ProfileActivity, ProfileError, ProfileId};
+use kumo_domain::profiles::{Profile, ProfileActivity, ProfileEnv, ProfileError, ProfileId};
 use kumo_domain::tasks::{SecretStore, TaskConnector};
 use kumo_domain::workspace::{WorkspaceStore, WorktreeLocation};
 use kumo_infrastructure::agents::{ClaudeStatusLine, CodexRollouts, codex_home};
@@ -73,6 +73,8 @@ pub(crate) struct ProfileOpener {
     pub home: PathBuf,
     pub locator: Arc<dyn ProgramLocator>,
     pub secrets: Secrets,
+    /// `!'<kumod>' --data-dir '<data>' git-credential`, for git config.
+    pub helper: String,
     pub terminals: Arc<TerminalService>,
 }
 
@@ -122,12 +124,16 @@ impl ProfileOpener {
         let db = dir.join(DATABASE);
         let home = &self.home;
         let locator = &self.locator;
-        let terminals = Arc::new(self.terminals.scoped(profile.id.clone()));
+        // Filled in once the services it reads exist (below); git and
+        // terminals read it on every run.
+        let env = ProfileEnv::default();
+        let terminals = Arc::new(self.terminals.scoped(profile.id.clone(), env.clone()));
+        let git = GitCli::for_profile(env.clone());
         let (secrets, host_tokens) = self.secrets.for_profile(&profile.id);
 
         let workspace = Arc::new(
             WorkspaceService::load(WorkspacePorts {
-                git: Arc::new(GitCli::default()),
+                git: Arc::new(git.clone()),
                 store: Arc::new(SqliteWorkspaceStore::open(&db)?),
                 finder: Arc::new(FsRepoFinder::new(home)),
                 watcher: Arc::new(NotifyWatcher),
@@ -180,7 +186,7 @@ impl ProfileOpener {
                 ],
                 tokens: Arc::clone(&host_tokens),
                 fallback: Arc::clone(&gh),
-                branches: Arc::new(GitCli::default()),
+                branches: Arc::new(git.clone()),
                 terminals: Arc::clone(&terminals) as _,
             },
             PipelinesTiming::default(),
@@ -195,11 +201,21 @@ impl ProfileOpener {
                 ],
                 tokens: Arc::clone(&host_tokens),
                 fallback: gh,
-                branches: Arc::new(GitCli::default()),
+                branches: Arc::new(git.clone()),
             },
             workspace.watch(),
             std::time::Duration::from_secs(60),
         ));
+
+        let git_env = GitEnvironment::start(
+            env,
+            profile.clone(),
+            home.clone(),
+            self.helper.clone(),
+            workspace.watch(),
+            Arc::clone(&pipelines),
+        )
+        .await;
 
         let agent_store = Arc::new(SqliteAgentStore::open(&db)?);
         let agents = Arc::new(AgentService::new(
@@ -218,7 +234,7 @@ impl ProfileOpener {
         ));
         let changes = Arc::new(ChangesService::new(
             ChangesPorts {
-                git: Arc::new(GitCli::default()),
+                git: Arc::new(git.clone()),
                 files: Arc::new(LocalFileStore),
                 watcher: Arc::new(NotifyWatcher),
             },
@@ -243,6 +259,7 @@ impl ProfileOpener {
             docs,
             tests,
             terminals,
+            git: git_env,
         })
     }
 }

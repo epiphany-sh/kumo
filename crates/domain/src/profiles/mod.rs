@@ -6,11 +6,13 @@
 //! means namespaces, repositories and worktrees.
 
 mod error;
+mod git;
 mod id;
 mod ports;
 mod profile;
 
 pub use error::ProfileError;
+pub use git::{GitSetup, ProfileEnv, shell_quote};
 pub use id::ProfileId;
-pub use ports::ProfileStore;
-pub use profile::{Profile, ProfileActivity, ProfileChanges};
+pub use ports::{MachineAccounts, ProfileStore, SshKey};
+pub use profile::{GhAccount, Profile, ProfileActivity, ProfileChanges};

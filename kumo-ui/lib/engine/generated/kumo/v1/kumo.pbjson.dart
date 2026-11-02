@@ -550,6 +550,16 @@ const Profile$json = {
     {'1': 'terminals_open', '3': 11, '4': 1, '5': 13, '10': 'terminalsOpen'},
     {'1': 'namespaces', '3': 12, '4': 1, '5': 13, '10': 'namespaces'},
     {'1': 'repos', '3': 13, '4': 1, '5': 13, '10': 'repos'},
+    {'1': 'ssh_key', '3': 14, '4': 1, '5': 9, '10': 'sshKey'},
+    {'1': 'sign_commits', '3': 15, '4': 1, '5': 8, '10': 'signCommits'},
+    {
+      '1': 'gh_accounts',
+      '3': 16,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.GhAccount',
+      '10': 'ghAccounts'
+    },
   ],
 };
 
@@ -562,7 +572,143 @@ final $typed_data.Uint8List profileDescriptor = $convert.base64Decode(
     'DmFnZW50c19ydW5uaW5nGAkgASgNUg1hZ2VudHNSdW5uaW5nEiUKDmFnZW50c193YWl0aW5nGA'
     'ogASgNUg1hZ2VudHNXYWl0aW5nEiUKDnRlcm1pbmFsc19vcGVuGAsgASgNUg10ZXJtaW5hbHNP'
     'cGVuEh4KCm5hbWVzcGFjZXMYDCABKA1SCm5hbWVzcGFjZXMSFAoFcmVwb3MYDSABKA1SBXJlcG'
-    '9z');
+    '9zEhcKB3NzaF9rZXkYDiABKAlSBnNzaEtleRIhCgxzaWduX2NvbW1pdHMYDyABKAhSC3NpZ25D'
+    'b21taXRzEjMKC2doX2FjY291bnRzGBAgAygLMhIua3Vtby52MS5HaEFjY291bnRSCmdoQWNjb3'
+    'VudHM=');
+
+@$core.Deprecated('Use ghAccountDescriptor instead')
+const GhAccount$json = {
+  '1': 'GhAccount',
+  '2': [
+    {'1': 'host', '3': 1, '4': 1, '5': 9, '10': 'host'},
+    {'1': 'login', '3': 2, '4': 1, '5': 9, '10': 'login'},
+  ],
+};
+
+/// Descriptor for `GhAccount`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ghAccountDescriptor = $convert.base64Decode(
+    'CglHaEFjY291bnQSEgoEaG9zdBgBIAEoCVIEaG9zdBIUCgVsb2dpbhgCIAEoCVIFbG9naW4=');
+
+@$core.Deprecated('Use ghAccountsDescriptor instead')
+const GhAccounts$json = {
+  '1': 'GhAccounts',
+  '2': [
+    {
+      '1': 'accounts',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.GhAccount',
+      '10': 'accounts'
+    },
+  ],
+};
+
+/// Descriptor for `GhAccounts`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ghAccountsDescriptor = $convert.base64Decode(
+    'CgpHaEFjY291bnRzEi4KCGFjY291bnRzGAEgAygLMhIua3Vtby52MS5HaEFjY291bnRSCGFjY2'
+    '91bnRz');
+
+@$core.Deprecated('Use listSshKeysRequestDescriptor instead')
+const ListSshKeysRequest$json = {
+  '1': 'ListSshKeysRequest',
+};
+
+/// Descriptor for `ListSshKeysRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listSshKeysRequestDescriptor =
+    $convert.base64Decode('ChJMaXN0U3NoS2V5c1JlcXVlc3Q=');
+
+@$core.Deprecated('Use sshKeyListDescriptor instead')
+const SshKeyList$json = {
+  '1': 'SshKeyList',
+  '2': [
+    {
+      '1': 'keys',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.SshKey',
+      '10': 'keys'
+    },
+  ],
+};
+
+/// Descriptor for `SshKeyList`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sshKeyListDescriptor = $convert.base64Decode(
+    'CgpTc2hLZXlMaXN0EiMKBGtleXMYASADKAsyDy5rdW1vLnYxLlNzaEtleVIEa2V5cw==');
+
+@$core.Deprecated('Use sshKeyDescriptor instead')
+const SshKey$json = {
+  '1': 'SshKey',
+  '2': [
+    {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'path', '3': 2, '4': 1, '5': 9, '10': 'path'},
+    {'1': 'fingerprint', '3': 3, '4': 1, '5': 9, '10': 'fingerprint'},
+    {'1': 'kind', '3': 4, '4': 1, '5': 9, '10': 'kind'},
+    {'1': 'agent_only', '3': 5, '4': 1, '5': 8, '10': 'agentOnly'},
+  ],
+};
+
+/// Descriptor for `SshKey`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sshKeyDescriptor = $convert.base64Decode(
+    'CgZTc2hLZXkSEgoEbmFtZRgBIAEoCVIEbmFtZRISCgRwYXRoGAIgASgJUgRwYXRoEiAKC2Zpbm'
+    'dlcnByaW50GAMgASgJUgtmaW5nZXJwcmludBISCgRraW5kGAQgASgJUgRraW5kEh0KCmFnZW50'
+    'X29ubHkYBSABKAhSCWFnZW50T25seQ==');
+
+@$core.Deprecated('Use listGhAccountsRequestDescriptor instead')
+const ListGhAccountsRequest$json = {
+  '1': 'ListGhAccountsRequest',
+};
+
+/// Descriptor for `ListGhAccountsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listGhAccountsRequestDescriptor =
+    $convert.base64Decode('ChVMaXN0R2hBY2NvdW50c1JlcXVlc3Q=');
+
+@$core.Deprecated('Use ghAccountListDescriptor instead')
+const GhAccountList$json = {
+  '1': 'GhAccountList',
+  '2': [
+    {
+      '1': 'accounts',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.GhAccount',
+      '10': 'accounts'
+    },
+  ],
+};
+
+/// Descriptor for `GhAccountList`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ghAccountListDescriptor = $convert.base64Decode(
+    'Cg1HaEFjY291bnRMaXN0Ei4KCGFjY291bnRzGAEgAygLMhIua3Vtby52MS5HaEFjY291bnRSCG'
+    'FjY291bnRz');
+
+@$core.Deprecated('Use gitCredentialRequestDescriptor instead')
+const GitCredentialRequest$json = {
+  '1': 'GitCredentialRequest',
+  '2': [
+    {'1': 'host', '3': 1, '4': 1, '5': 9, '10': 'host'},
+  ],
+};
+
+/// Descriptor for `GitCredentialRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List gitCredentialRequestDescriptor = $convert
+    .base64Decode('ChRHaXRDcmVkZW50aWFsUmVxdWVzdBISCgRob3N0GAEgASgJUgRob3N0');
+
+@$core.Deprecated('Use gitCredentialResponseDescriptor instead')
+const GitCredentialResponse$json = {
+  '1': 'GitCredentialResponse',
+  '2': [
+    {'1': 'username', '3': 1, '4': 1, '5': 9, '10': 'username'},
+    {'1': 'password', '3': 2, '4': 1, '5': 9, '10': 'password'},
+  ],
+};
+
+/// Descriptor for `GitCredentialResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List gitCredentialResponseDescriptor = $convert.base64Decode(
+    'ChVHaXRDcmVkZW50aWFsUmVzcG9uc2USGgoIdXNlcm5hbWUYASABKAlSCHVzZXJuYW1lEhoKCH'
+    'Bhc3N3b3JkGAIgASgJUghwYXNzd29yZA==');
 
 @$core.Deprecated('Use createProfileRequestDescriptor instead')
 const CreateProfileRequest$json = {
@@ -622,6 +768,34 @@ const UpdateProfileRequest$json = {
       '10': 'gitEmail',
       '17': true
     },
+    {
+      '1': 'ssh_key',
+      '3': 8,
+      '4': 1,
+      '5': 9,
+      '9': 6,
+      '10': 'sshKey',
+      '17': true
+    },
+    {
+      '1': 'sign_commits',
+      '3': 9,
+      '4': 1,
+      '5': 8,
+      '9': 7,
+      '10': 'signCommits',
+      '17': true
+    },
+    {
+      '1': 'gh_accounts',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.GhAccounts',
+      '9': 8,
+      '10': 'ghAccounts',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_name'},
@@ -630,6 +804,9 @@ const UpdateProfileRequest$json = {
     {'1': '_worktrees_dir'},
     {'1': '_git_name'},
     {'1': '_git_email'},
+    {'1': '_ssh_key'},
+    {'1': '_sign_commits'},
+    {'1': '_gh_accounts'},
   ],
 };
 
@@ -639,8 +816,11 @@ final $typed_data.Uint8List updateProfileRequestDescriptor = $convert.base64Deco
     'RuYW1liAEBEhkKBWNvbG9yGAMgASgJSAFSBWNvbG9yiAEBEh8KCHBvc2l0aW9uGAQgASgNSAJS'
     'CHBvc2l0aW9uiAEBEigKDXdvcmt0cmVlc19kaXIYBSABKAlIA1IMd29ya3RyZWVzRGlyiAEBEh'
     '4KCGdpdF9uYW1lGAYgASgJSARSB2dpdE5hbWWIAQESIAoJZ2l0X2VtYWlsGAcgASgJSAVSCGdp'
-    'dEVtYWlsiAEBQgcKBV9uYW1lQggKBl9jb2xvckILCglfcG9zaXRpb25CEAoOX3dvcmt0cmVlc1'
-    '9kaXJCCwoJX2dpdF9uYW1lQgwKCl9naXRfZW1haWw=');
+    'dEVtYWlsiAEBEhwKB3NzaF9rZXkYCCABKAlIBlIGc3NoS2V5iAEBEiYKDHNpZ25fY29tbWl0cx'
+    'gJIAEoCEgHUgtzaWduQ29tbWl0c4gBARI5CgtnaF9hY2NvdW50cxgKIAEoCzITLmt1bW8udjEu'
+    'R2hBY2NvdW50c0gIUgpnaEFjY291bnRziAEBQgcKBV9uYW1lQggKBl9jb2xvckILCglfcG9zaX'
+    'Rpb25CEAoOX3dvcmt0cmVlc19kaXJCCwoJX2dpdF9uYW1lQgwKCl9naXRfZW1haWxCCgoIX3Nz'
+    'aF9rZXlCDwoNX3NpZ25fY29tbWl0c0IOCgxfZ2hfYWNjb3VudHM=');
 
 @$core.Deprecated('Use deleteProfileRequestDescriptor instead')
 const DeleteProfileRequest$json = {

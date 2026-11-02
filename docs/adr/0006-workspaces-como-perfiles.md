@@ -65,8 +65,16 @@ prefijo adentro, así un servicio no puede agarrar el de otro.
 ### Git
 
 - **Identidad** (`user.name` / `user.email`) por `GIT_CONFIG_COUNT`, no con
-  `GIT_AUTHOR_*`: así rebase, cherry-pick y amend conservan al autor original.
-  Se aplica donde se commitea (Kumo, shells, agentes), no al pushear.
+  `GIT_AUTHOR_*`: así rebase, cherry-pick y amend conservan al autor original
+  (un test lo verifica con `commit --amend`). Se aplica donde se commitea
+  (Kumo, shells, agentes), no al pushear. Va por encima del `user.*` del
+  repo, sin tocarlo.
+- **Un solo armado** (`GitSetup`, en el dominio) produce las variables de un
+  perfil: `GIT_CONFIG_*`, `GIT_SSH_COMMAND`, `GH_TOKEN` /
+  `GH_ENTERPRISE_TOKEN` y `KUMO_PROFILE`. Lo recalcula `GitEnvironment` cuando
+  cambia el perfil, los hosts de sus remotes o una credencial, y lo leen el
+  git de Kumo y las terminales del perfil (agentes incluidos). El perfil por
+  defecto sin configurar no agrega nada.
 - **Cuentas de GitHub con `gh` multi-cuenta**: el perfil fija una cuenta por
   host y Kumo pide siempre `gh auth token --user <cuenta>`, sin depender de la
   cuenta activa. `GH_CONFIG_DIR` por perfil no sirve: el token activo de gh es
@@ -81,8 +89,17 @@ prefijo adentro, así un servicio no puede agarrar el de otro.
   | nada | como hoy | como hoy |
 
   La reescritura es `url.<https>.insteadOf` por env, y el token lo da
-  `kumod git-credential`, un helper único para todos los hosts. Un perfil que
-  no es el por defecto y no tiene nada configurado muestra un aviso.
+  `kumod git-credential`, un helper único para todos los hosts (antes se
+  vacía la lista de helpers del host, así no se ofrece el del usuario). El
+  helper le pide el token al daemon (`Profiles.GitCredential`), que solo
+  contesta para hosts de los remotes del perfil y nunca lo loguea. Usuario por
+  proveedor: GitHub `x-access-token`, GitLab `oauth2`, Bitbucket
+  `x-bitbucket-api-token-auth`. Un perfil que no es el por defecto y no tiene
+  nada configurado muestra un aviso.
+- **Un token pegado en el perfil por defecto no cambia su git**: antes de los
+  perfiles esos tokens eran solo para pipelines (scopes de lectura), y
+  reescribir sus remotes rompería pushes que hoy andan. En el perfil por
+  defecto solo cuenta una cuenta de `gh` elegida a propósito.
 - **Firma opcional** con la misma clave SSH (`gpg.format=ssh`).
 
 ### Agentes
