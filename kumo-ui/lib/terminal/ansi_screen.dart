@@ -50,7 +50,8 @@ class AnsiScreen {
   bool _cursorVisible = true;
   bool _appCursorKeys = false;
   bool _bracketedPaste = false;
-  bool _mouseTracking = false;
+  /// 0 (off), 1000 (clicks), 1002 (+ drags) or 1003 (+ any motion).
+  int _mouseMode = 0;
   bool _sgrMouse = false;
   int _top = 0;
   int _bottom = 0x7fffffff; // clamped to rows - 1
@@ -71,7 +72,13 @@ class AnsiScreen {
   bool get bracketedPaste => _bracketedPaste;
 
   /// The program asked for mouse reports (modes 1000/1002/1003).
-  bool get mouseTracking => _mouseTracking;
+  bool get mouseTracking => _mouseMode != 0;
+
+  /// … with motion while a button is held (1002, 1003).
+  bool get mouseDrags => _mouseMode >= 1002;
+
+  /// … and with motion without a button (1003): hover.
+  bool get mouseHover => _mouseMode == 1003;
 
   /// … in the SGR encoding (mode 1006).
   bool get sgrMouse => _sgrMouse;
@@ -407,8 +414,9 @@ class AnsiScreen {
           _cursorVisible = on;
         case 2004:
           _bracketedPaste = on;
+        // One mode at a time, as in xterm: resetting any turns it off.
         case 1000 || 1002 || 1003:
-          _mouseTracking = on;
+          _mouseMode = on ? mode : 0;
         case 1006:
           _sgrMouse = on;
         case 1049 || 1047 || 47:
@@ -552,7 +560,7 @@ class AnsiScreen {
     _cursorVisible = true;
     _appCursorKeys = false;
     _bracketedPaste = false;
-    _mouseTracking = false;
+    _mouseMode = 0;
     _sgrMouse = false;
   }
 

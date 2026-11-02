@@ -13,7 +13,13 @@ List<int>? terminalInputFor(KeyEvent event, {bool applicationCursorKeys = false}
   final arrow = _arrows[key];
   if (arrow != null) {
     // ⌥← / ⌥→ jump words, like macOS Terminal.
-    if (keys.isAltPressed && (arrow == 'C' || arrow == 'D')) return [0x1b, arrow == 'C' ? 0x66 : 0x62];
+    if (keys.isAltPressed && !keys.isControlPressed && !keys.isShiftPressed && (arrow == 'C' || arrow == 'D')) {
+      return [0x1b, arrow == 'C' ? 0x66 : 0x62];
+    }
+    // With modifiers, xterm's `ESC [1;<1 + ⇧1 + ⌥2 + ⌃4><arrow>`: ⌥↓ is
+    // what Claude Code scrolls its diff panel with.
+    final mods = (keys.isShiftPressed ? 1 : 0) + (keys.isAltPressed ? 2 : 0) + (keys.isControlPressed ? 4 : 0);
+    if (mods > 0) return utf8.encode('\x1b[1;${1 + mods}$arrow');
     return utf8.encode(applicationCursorKeys ? '\x1bO$arrow' : '\x1b[$arrow');
   }
   if (key == LogicalKeyboardKey.tab && keys.isShiftPressed) return utf8.encode('\x1b[Z');

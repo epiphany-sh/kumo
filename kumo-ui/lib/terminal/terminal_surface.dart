@@ -133,3 +133,18 @@ abstract interface class TerminalSurface {
   void resize(int cols, int rows);
   void dispose();
 }
+
+/// A surface whose program sets terminal modes (a real PTY): how keys,
+/// paste and the mouse reach it.
+abstract interface class TerminalModes implements TerminalSurface {
+  /// DECCKM: arrows send `ESC O x`.
+  bool get applicationCursorKeys;
+  bool get bracketedPaste;
+
+  /// Mouse reports were asked for (1000), with drags (1002), with hover
+  /// (1003), in the SGR encoding (1006).
+  bool get mouseTracking;
+  bool get mouseDrags;
+  bool get mouseHover;
+  bool get sgrMouse;
+}
