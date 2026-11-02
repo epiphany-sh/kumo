@@ -6,6 +6,7 @@ import '../data/agents_source.dart';
 import '../data/ai_usage_source.dart';
 import '../data/ci_hosts_source.dart';
 import '../data/pipelines_source.dart';
+import '../data/profiles_source.dart';
 import '../data/docs_source.dart';
 import '../data/pull_requests_source.dart';
 import '../data/tasks_source.dart';
@@ -89,6 +90,9 @@ class AppState extends ChangeNotifier {
     PullRequestsSource? pullRequests,
     DocsSource? docs,
     AppUpdates? updates,
+    ProfilesSource? profiles,
+    String? initialProfile,
+    this.ownsShared = true,
   })  : prefs = prefs ?? Preferences.memory(),
         workspace = workspace ?? MockWorkspaceSource(),
         agents = agents ?? MockAgentsSource(),
@@ -101,6 +105,7 @@ class AppState extends ChangeNotifier {
         pullRequests = pullRequests ?? MockPullRequests(),
         docs = docs ?? MockDocsSource(),
         updates = updates ?? AppUpdates(),
+        profiles = profiles ?? MockProfilesSource(),
         _mode = mode {
     _changes = changesFor == null ? MockWorktreeChanges() : NoWorktreeChanges();
     _changes.addListener(notifyListeners);
@@ -110,6 +115,7 @@ class AppState extends ChangeNotifier {
     this.agents.addListener(notifyListeners);
     this.usage.addListener(notifyListeners);
     this.updates.addListener(notifyListeners);
+    this.profiles.addListener(notifyListeners);
     final p = this.prefs;
     final saved = p.get<String>('theme', '');
     for (final m in KumoThemeMode.values) {
@@ -119,11 +125,100 @@ class AppState extends ChangeNotifier {
     _sidePanelRight = p.get<bool>('sidePanel.right', false);
     _sidePanelOpen = p.get<bool>('sidePanel.onLaunch', true);
     _sidebarWidth = p.get<num>('sidebar.width', defaultSidebarWidth).toDouble().clamp(minSidebarWidth, maxSidebarWidth).toDouble();
+    // The workspace this window opens on: the one it was opened for (a new
+    // window), else the last one.
+    final want = initialProfile ?? p.get<String>('profile.current', '');
+    if (want.isNotEmpty && want != this.profiles.currentId && this.profiles.profiles.any((x) => x.id == want)) this.profiles.select(want);
     _sidePanelTab = SidePanelTab.values.where((t) => t.name == p.get<String>('sidePanel.tab', 'widgets')).firstOrNull ?? SidePanelTab.widgets;
   }
 
   /// New versions of Kumo, ready to install.
   final AppUpdates updates;
+
+  // ---- Workspaces ----
+
+  /// The user's workspaces (the daemon's profiles); each keeps its own
+  /// accounts, tokens, namespaces and agents apart from the others.
+  final ProfilesSource profiles;
+
+  /// The workspace this window shows.
+  AppProfile get profile => profiles.current;
+
+  /// Disposes [profiles], [updates] and the like with itself: false for the
+  /// state of a workspace that shares them with the window's first one.
+  final bool ownsShared;
+
+  /// Set by the window when each workspace has its own state (and engine):
+  /// it shows workspace [id]'s, made the first time, and has it announce
+  /// the switch from [announceFrom] (null: quietly). Null (tests, mocks):
+  /// this state switches in place.
+  Future<void> Function(String id, AppProfile? announceFrom)? profileOpener;
+
+  /// Takes the app-wide look of [other] (theme, glass, sidebar and side
+  /// panel), changed there while this workspace's state waited.
+  void adoptLook(AppState other) {
+    _mode = other._mode;
+    _translucency = other._translucency;
+    demoWallpaper = other.demoWallpaper;
+    _sidebarVisible = other._sidebarVisible;
+    _sidebarWidth = other._sidebarWidth;
+    _sidePanelRight = other._sidePanelRight;
+    notifyListeners();
+  }
+
+  /// Shown by the state of the workspace just switched to.
+  void announceSwitch(AppProfile from) {
+    final busy = from.agentsRunning > 0 || from.agentsWaiting > 0 || from.terminalsOpen > 0;
+    _offerUndo('In ${profile.displayName}${busy ? ' · ${from.displayName} keeps running' : ''}', () {
+      switchProfile(from.id, offerUndo: false);
+    });
+  }
+
+  /// Where you were in each workspace: (branch, path, Home).
+  final Map<String, (String, String?, bool)> _placeIn = {};
+
+  /// Shows workspace [id] in this window. Unsaved edits are saved first and
+  /// the place in the one left is remembered; nothing running there stops.
+  Future<void> switchProfile(String id, {bool offerUndo = true}) async {
+    final from = profiles.current;
+    if (id == from.id || !profiles.profiles.any((p) => p.id == id)) return;
+    _buffers?.saveAll();
+    final opener = profileOpener;
+    if (opener != null) {
+      await profiles.select(id);
+      prefs.set('profile.current', id);
+      await opener(id, offerUndo ? from : null);
+      return;
+    }
+    _placeIn[from.id] = (activeWorktree, activeWorktreePath, _home);
+    await profiles.select(id);
+    if (_disposed) return;
+    prefs.set('profile.current', id);
+    final back = _placeIn[id];
+    if (back != null) {
+      activeWorktree = back.$1;
+      activeWorktreePath = back.$2;
+      _home = back.$3;
+    } else {
+      // A workspace you haven't been in yet starts at Home.
+      _home = true;
+    }
+    _bindChanges();
+    _bindPipelines();
+    _bindTests();
+    if (offerUndo) announceSwitch(from);
+    notifyListeners();
+  }
+
+  /// A workspace action that couldn't happen (e.g. a new window), said
+  /// where undo notices show.
+  void reportWorkspaceError(String message) => _offerUndo(message, () {}, action: null);
+
+  /// ⌃⌘1…9: the [n]th workspace (1-based).
+  void switchToProfileAt(int n) {
+    final all = profiles.profiles;
+    if (n >= 1 && n <= all.length) switchProfile(all[n - 1].id);
+  }
 
   /// Persisted user settings. Settings screens read and write through
   /// [setting] / [setSetting]; typed ones also have fields here.
@@ -1315,9 +1410,12 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    updates
-      ..removeListener(notifyListeners)
-      ..dispose();
+    updates.removeListener(notifyListeners);
+    profiles.removeListener(notifyListeners);
+    if (ownsShared) {
+      updates.dispose();
+      profiles.dispose();
+    }
     agents
       ..removeListener(notifyListeners)
       ..dispose();

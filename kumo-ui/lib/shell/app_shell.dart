@@ -42,6 +42,22 @@ class AppShell extends StatelessWidget {
         map[SingleActivator(keys[i], meta: true)] = go;
         map[SingleActivator(keys[i], control: true)] = go;
       }
+      // ⌃⌘1…9 (⌃⌥ off macOS): the workspaces, in switcher order.
+      const digits = [
+        LogicalKeyboardKey.digit1,
+        LogicalKeyboardKey.digit2,
+        LogicalKeyboardKey.digit3,
+        LogicalKeyboardKey.digit4,
+        LogicalKeyboardKey.digit5,
+        LogicalKeyboardKey.digit6,
+        LogicalKeyboardKey.digit7,
+        LogicalKeyboardKey.digit8,
+        LogicalKeyboardKey.digit9,
+      ];
+      for (var i = 0; i < digits.length; i++) {
+        map[SingleActivator(digits[i], control: true, meta: true)] = () => s.switchToProfileAt(i + 1);
+        map[SingleActivator(digits[i], control: true, alt: true)] = () => s.switchToProfileAt(i + 1);
+      }
       for (final mod in [true, false]) {
         map[SingleActivator(LogicalKeyboardKey.keyL, meta: mod, control: !mod, shift: true)] = s.cycleTheme;
         map[SingleActivator(LogicalKeyboardKey.keyN, meta: mod, control: !mod, shift: true)] = s.requestNewWorktree;

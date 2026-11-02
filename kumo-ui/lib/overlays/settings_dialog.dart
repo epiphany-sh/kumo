@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../app/app_state.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
+import '../widgets/profile_tile.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kumo_mark.dart';
@@ -13,12 +14,14 @@ import 'agent_settings.dart';
 import 'docs_settings.dart';
 import 'host_settings.dart';
 import 'task_settings.dart';
+import 'workspace_settings.dart';
 
 enum SettingsTab {
   general('General', Icons.settings_outlined),
   appearance('Appearance', Icons.palette_outlined),
   terminal('Terminal', Icons.terminal_rounded),
   shortcuts('Shortcuts', Icons.keyboard_outlined),
+  workspaces('Workspaces', Icons.layers_outlined),
   ai('AI agents', Icons.auto_awesome_outlined),
   tickets('Tasks', Icons.task_alt_rounded),
   repos('Repositories', Icons.account_tree_outlined),
@@ -168,6 +171,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           ]),
         ),
       ]),
+      if (page.scoped) ...[const SizedBox(height: 14), _ScopeNote(note: page.scopeNote, onManage: () => setState(() => _tab = SettingsTab.workspaces))],
       if (page.custom != null) page.custom!,
       for (final sec in page.sections) ...[const SizedBox(height: 16), _Section(title: sec.$1, rows: sec.$2)],
     ];
@@ -259,15 +263,25 @@ class _SettingsDialogState extends State<SettingsDialog> {
             _KbdRow('New worktree', ['⇧', '⌘', 'N']),
             _KbdRow('Show / hide sidebar', ['⌥', '⌘', 'S']),
             _KbdRow('Cycle theme', ['⇧', '⌘', 'L']),
+            _KbdRow('Switch to workspace 1…9', ['⌃', '⌘', '1…9']),
           ]),
           ('Source control', const [
             _KbdRow('Commit', ['⌘', '↩']),
           ]),
         ]);
+      case SettingsTab.workspaces:
+        return _Page(
+          'Workspaces',
+          'A workspace keeps one context apart from another: its own Git hosts and tokens, task sources, knowledge bases, agents’ sign-ins, namespaces and worktrees. Switch from the top of the sidebar, or with ⌃⌘1…9; the others keep running.',
+          custom: WorkspacesSettingsPanel(
+            onOpenTab: (t) => setState(() => _tab = SettingsTab.values.firstWhere((x) => x.name == t, orElse: () => SettingsTab.workspaces)),
+          ),
+        );
       case SettingsTab.ai:
         return _Page(
           'AI agents',
           'Coding agents Kumo can run in your worktrees, with your own sign-in: Kumo never proxies models. Each one runs in its own terminal. Optional: everything else works without them.',
+          scopeNote: 'Agents sign in here with this workspace’s accounts; another workspace connects its own.',
           custom: const AgentSettingsPanel(),
           sections: [
             ('Defaults', [
@@ -294,12 +308,14 @@ class _SettingsDialogState extends State<SettingsDialog> {
         return _Page(
           'Tasks',
           'Where your tasks come from. Kumo keeps them on this Mac so Tasks opens instantly, re-reads them in the background and writes status changes back. Start a worktree with an agent from any of them.',
+          scopeNote: 'These task sources and their tokens aren’t visible from other workspaces.',
           custom: const TaskSourceSettingsPanel(),
         );
       case SettingsTab.repos:
         return _Page(
           'Repositories',
           'Tokens for the hosts of your repositories, so the Pipelines widget shows their CI. One per host, kept in the macOS Keychain.',
+          scopeNote: 'Git hosts, tokens and the folders below belong to this workspace. Repos of other workspaces never use them.',
           custom: const HostTokensPanel(),
           sections: [
             ('Where code lives', [
@@ -317,6 +333,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
         return _Page(
           'Docs',
           'Knowledge bases agents can read for context: specs, ADRs, runbooks. Docs reads them through your task sources, so there is nothing else to connect.',
+          scopeNote: 'Knowledge bases belong to this workspace; agents here only read these.',
           custom: const DocsSourcesPanel(),
         );
     }
@@ -381,9 +398,13 @@ class _About extends StatelessWidget {
 }
 
 class _Page {
-  _Page(this.heading, this.intro, {this.sections = const [], this.custom});
+  _Page(this.heading, this.intro, {this.sections = const [], this.custom, this.scopeNote = ''});
   final String heading;
   final String intro;
+
+  /// What makes this page the current workspace's own; empty: app-wide.
+  final String scopeNote;
+  bool get scoped => scopeNote.isNotEmpty;
   final List<(String, List<Widget>)> sections;
 
   /// A page-specific panel shown before the sections (AI agents).
@@ -421,6 +442,40 @@ class _TabButton extends StatelessWidget {
           ),
         ]),
       ),
+    );
+  }
+}
+
+/// "Only for <workspace>": a settings page that belongs to the current
+/// workspace, with the way to the others.
+class _ScopeNote extends StatelessWidget {
+  const _ScopeNote({required this.note, required this.onManage});
+  final String note;
+  final VoidCallback onManage;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    final p = s.profile;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(12)),
+      child: Row(children: [
+        ProfileTile(profile: p, size: 26),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text.rich(
+            TextSpan(children: [
+              TextSpan(text: 'Only for ${p.displayName}. ', style: sans(12, weight: FontWeight.w600, color: c.text)),
+              TextSpan(text: note, style: sans(12, color: c.text2)),
+            ]),
+            style: const TextStyle(height: 1.45),
+          ),
+        ),
+        const SizedBox(width: 10),
+        KButton(label: 'Workspaces…', height: 30, fontSize: 12.5, onTap: onManage),
+      ]),
     );
   }
 }
