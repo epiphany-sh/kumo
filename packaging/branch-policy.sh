@@ -2,7 +2,7 @@
 # Which branch may merge into which, checked on every pull request:
 #
 #   main       ← release/X.Y.Z, above every v* tag (merging it releases X.Y.Z)
-#   release/*  ← feature/… or fix/…
+#   release/*  ← feature/…, feat/… or fix/…
 #
 # Other bases have no rule. Usage: branch-policy.sh <base> <head>
 set -eu
@@ -35,8 +35,8 @@ main)
 	;;
 release/*)
 	case $head in
-	feature/* | fix/*) ;;
-	*) fail "A release branch takes feature/… or fix/… branches, not '$head'." ;;
+	feature/* | feat/* | fix/*) ;;
+	*) fail "A release branch takes feature/…, feat/… or fix/… branches, not '$head'." ;;
 	esac
 	;;
 esac

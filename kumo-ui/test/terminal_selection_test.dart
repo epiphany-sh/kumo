@@ -59,6 +59,22 @@ void main() {
     expect(selectedText(_lines, lineAt(_lines, 0)), '~/dev/kumo ❯ git status');
   });
 
+  test('a link is the URL under the cell, without trailing punctuation', () {
+    final lines = [
+      TermLine.of([('  ➜  Local:   ', TermRole.ok), ('http://localhost:', TermRole.acc), ('5173', TermRole.acc), ('/', TermRole.acc)]),
+      TermLine.of([('docs (see https://example.com/a_(b)).', TermRole.text)]),
+      TermLine.of([('漢字 https://x.dev/y', TermRole.text)]),
+    ];
+    expect(linkAt(lines, const TermPoint(0, 20))?.$2, 'http://localhost:5173/');
+    expect(linkAt(lines, const TermPoint(0, 13)), isNull, reason: 'the label before it is not the link');
+    expect(linkAt(lines, const TermPoint(0, 36)), isNull, reason: 'past the end');
+    expect(linkAt(lines, const TermPoint(1, 12))?.$2, 'https://example.com/a_(b)');
+    expect(linkAt(lines, const TermPoint(1, 35)), isNull, reason: 'the closing bracket of the sentence');
+    final (cells, url) = linkAt(lines, const TermPoint(2, 6))!;
+    expect(url, 'https://x.dev/y');
+    expect((cells.start.col, cells.end.col), (5, 20), reason: 'wide glyphs before it take two cells');
+  });
+
   testWidgets('drag selects in the terminal; Ctrl+Shift+C copies, typing clears it', (tester) async {
     String? copied;
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {

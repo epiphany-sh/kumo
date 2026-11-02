@@ -15,7 +15,7 @@ env:
 
 jobs:
   # main takes only release/X.Y.Z branches (each merge releases one), and
-  # release branches take feature/… or fix/…: packaging/branch-policy.sh.
+  # release branches take feature/…, feat/… or fix/…: packaging/branch-policy.sh.
   branch-policy:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -36,11 +36,13 @@ jobs:
       - run: rustup show active-toolchain
       - run: cargo fmt --all --check
 
+  # The required checks run where GitHub always has runners: Linux and
+  # Windows. macOS gets its own job below, which doesn't block a merge.
   clippy:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -54,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -63,9 +65,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --no-fail-fast
 
-  # The Flutter app, on the platform it ships for.
+  # The Flutter app: analyze and tests don't depend on the desktop.
   ui:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
       run:
@@ -80,3 +82,26 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
+
+  # The platform Kumo ships for, in one job instead of three: GitHub's
+  # macOS arm64 runners have gone days without capacity (jobs cancelled,
+  # never started), so it isn't required. The release build in
+  # `release.yml` still runs on macOS.
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace --no-fail-fast
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5 # as in release.yml
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: kumo-ui
+      - run: flutter test
+        working-directory: kumo-ui

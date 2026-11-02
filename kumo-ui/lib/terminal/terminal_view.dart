@@ -10,6 +10,7 @@ import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter/services.dart';
 
 import '../engine/grpc_terminal_surface.dart';
+import '../platform/open_url.dart';
 
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
@@ -84,6 +85,11 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   double _wheelRest = 0;
   bool _barDrag = false;
   bool _barHover = false;
+  bool _linkHover = false;
+  Offset? _hoverAt;
+  // A press that went to the program: its drag and release go there too.
+  bool _reporting = false;
+  (int, int)? _reportedCell;
   bool _barFlash = false;
   Timer? _barTimer;
   Timer? _autoScroll;
@@ -200,22 +206,21 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   /// can't go farther that way.
   bool _wheel(double pixels, Offset local) {
     final surface = widget.surface;
-    final grpc = surface is GrpcTerminalSurface ? surface : null;
+    final modes = surface is TerminalModes ? surface : null;
     final b = _buffer;
-    if (grpc != null && (grpc.mouseTracking || b.altScreen)) {
+    if (modes != null && (modes.mouseTracking || b.altScreen)) {
       // The program moves by whole lines: keep the rest for the next event.
       _wheelRest += pixels / _cell.height;
       final lines = _wheelRest.truncate();
       if (lines == 0) return true;
       _wheelRest -= lines;
       final up = lines < 0;
-      final col = ((local.dx - widget.padding.left) / _cell.width).floor().clamp(0, _cols - 1);
-      final row = ((local.dy - widget.padding.top) / _cell.height).floor().clamp(0, _rows - 1);
-      final once = grpc.mouseTracking
-          ? wheelReport(up: up, col: col, row: row, sgr: grpc.sgrMouse)
-          : utf8.encode(grpc.applicationCursorKeys ? '\x1bO${up ? 'A' : 'B'}' : '\x1b[${up ? 'A' : 'B'}');
+      final (col, row) = _screenCell(local);
+      final once = modes.mouseTracking
+          ? wheelReport(up: up, col: col, row: row, sgr: modes.sgrMouse)
+          : utf8.encode(modes.applicationCursorKeys ? '\x1bO${up ? 'A' : 'B'}' : '\x1b[${up ? 'A' : 'B'}');
       final bytes = <int>[for (var i = 0; i < math.min(lines.abs(), 12); i++) ...once];
-      grpc.sendBytes(bytes);
+      modes.sendBytes(bytes);
       return true;
     }
     return _scrollBy(pixels / _cell.height);
@@ -281,6 +286,66 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     _scrollTo(t * bottom);
   }
 
+  // ---- Links: Shift-click (or ⌘-click on macOS, Ctrl-click elsewhere)
+  // opens the URL under the pointer.
+
+  static bool get _linkModifier {
+    final keys = HardwareKeyboard.instance;
+    return keys.isShiftPressed || (_mac ? keys.isMetaPressed : keys.isControlPressed);
+  }
+
+  String? _linkAt(Offset local) {
+    if (!_linkModifier || _onBar(local)) return null;
+    return linkAt(_buffer.lines, _pointAt(local, cell: true))?.$2;
+  }
+
+  /// Pressing or letting go of the modifier over a link swaps the cursor
+  /// without the mouse moving.
+  bool _modifierChanged(KeyEvent _) {
+    final at = _hoverAt;
+    if (at != null && mounted) _hover(at);
+    return false;
+  }
+
+  void _hover(Offset local) {
+    final bar = _onBar(local);
+    final link = _linkAt(local) != null;
+    if (bar != _barHover || link != _linkHover) {
+      setState(() {
+        _barHover = bar;
+        _linkHover = link;
+      });
+    }
+  }
+
+  // ---- Mouse reports: a program that asked for the mouse (Claude Code's
+  // panels, vim, htop) gets clicks, drags and hover. Shift keeps the
+  // terminal's own selection, as in xterm.
+
+  TerminalModes? get _reportsTo {
+    final surface = widget.surface;
+    return surface is TerminalModes && surface.mouseTracking && _top == null ? surface : null;
+  }
+
+  /// Cell of the visible screen under [local], clamped to the grid.
+  (int, int) _screenCell(Offset local) => (
+        ((local.dx - widget.padding.left) / _cell.width).floor().clamp(0, _cols - 1),
+        ((local.dy - widget.padding.top) / _cell.height).floor().clamp(0, _rows - 1),
+      );
+
+  void _report(TerminalModes to, Offset local, {int button = 0, bool release = false, bool motion = false}) {
+    final cell = _screenCell(local);
+    // Moving within a cell says nothing new.
+    if (motion && cell == _reportedCell) return;
+    _reportedCell = cell;
+    to.sendBytes(mouseReport(button: button, col: cell.$1, row: cell.$2, sgr: to.sgrMouse, release: release, motion: motion));
+  }
+
+  void _hoverReport(Offset local) {
+    final to = _reportsTo;
+    if (to != null && to.mouseHover && !_reporting) _report(to, local, button: 3, motion: true);
+  }
+
   // ---- Selection and pointer
 
   void _down(PointerDownEvent e) {
@@ -291,9 +356,20 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
       return;
     }
     if (e.buttons != kPrimaryButton) return;
+    final url = _linkAt(e.localPosition);
+    if (url != null) {
+      openUrl(url);
+      return;
+    }
     if (_onBar(e.localPosition)) {
       setState(() => _barDrag = true);
       _dragBar(e.localPosition);
+      return;
+    }
+    final to = _reportsTo;
+    if (to != null && !HardwareKeyboard.instance.isShiftPressed) {
+      _reporting = true;
+      _report(to, e.localPosition);
       return;
     }
     // Clicks in quick succession at the same spot count up: 2 word, 3 line.
@@ -323,6 +399,11 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   void _move(PointerMoveEvent e) {
     if (_barDrag) {
       _dragBar(e.localPosition);
+      return;
+    }
+    if (_reporting) {
+      final to = _reportsTo;
+      if (to != null && to.mouseDrags) _report(to, e.localPosition, motion: true);
       return;
     }
     if (!_dragging || e.buttons != kPrimaryButton) return;
@@ -376,6 +457,12 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
       setState(() => _barDrag = false);
       return;
     }
+    if (_reporting) {
+      _reporting = false;
+      final to = _reportsTo;
+      if (to != null) _report(to, e.localPosition, release: true);
+      return;
+    }
     if (!_dragging) return;
     setState(() {
       _dragging = false;
@@ -397,12 +484,12 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   void _paste() {
     final surface = widget.surface;
     if (!surface.interactive) return;
-    final grpc = surface is GrpcTerminalSurface ? surface : null;
+    final modes = surface is TerminalModes ? surface : null;
     Clipboard.getData(Clipboard.kTextPlain).then((data) {
       final text = data?.text;
       if (text != null && text.isNotEmpty) {
         _toBottom();
-        surface.sendBytes(terminalPaste(text, bracketed: grpc?.bracketedPaste ?? false));
+        surface.sendBytes(terminalPaste(text, bracketed: modes?.bracketedPaste ?? false));
       }
     });
   }
@@ -451,6 +538,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   void initState() {
     super.initState();
     _fling = createTicker(_coast);
+    HardwareKeyboard.instance.addHandler(_modifierChanged);
     _focus.addListener(() => setState(() => _hasFocus = _focus.hasFocus));
     if (widget.active) _grabKeyboard();
   }
@@ -467,6 +555,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_modifierChanged);
     _barTimer?.cancel();
     _stopAutoScroll();
     _fling.dispose();
@@ -530,7 +619,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     final surface = widget.surface;
-    final grpc = surface is GrpcTerminalSurface ? surface : null;
+    final modes = surface is TerminalModes ? surface : null;
     final keys = HardwareKeyboard.instance;
     if (_scrollKey(event)) return KeyEventResult.handled;
     // ⌘C / ⌘V / ⌘A on macOS; Ctrl+Shift+C / V elsewhere (Ctrl+C is ^C).
@@ -551,7 +640,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
       }
     }
     if (!surface.interactive) return KeyEventResult.ignored;
-    final bytes = terminalInputFor(event, applicationCursorKeys: grpc?.applicationCursorKeys ?? false);
+    final bytes = terminalInputFor(event, applicationCursorKeys: modes?.applicationCursorKeys ?? false);
     if (bytes == null) return KeyEventResult.ignored;
     // Typing drops the selection and goes back to the prompt, like any
     // terminal.
@@ -619,13 +708,24 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
           onPointerPanZoomUpdate: _panUpdate,
           onPointerPanZoomEnd: _panEnd,
           child: MouseRegion(
-            cursor: _barHover || _barDrag ? SystemMouseCursors.basic : SystemMouseCursors.text,
+            cursor: _linkHover
+                ? SystemMouseCursors.click
+                : _barHover || _barDrag
+                    ? SystemMouseCursors.basic
+                    : SystemMouseCursors.text,
             onHover: (e) {
-              final over = _onBar(e.localPosition);
-              if (over != _barHover) setState(() => _barHover = over);
+              _hoverAt = e.localPosition;
+              _hover(e.localPosition);
+              _hoverReport(e.localPosition);
             },
             onExit: (_) {
-              if (_barHover) setState(() => _barHover = false);
+              _hoverAt = null;
+              if (_barHover || _linkHover) {
+                setState(() {
+                  _barHover = false;
+                  _linkHover = false;
+                });
+              }
             },
             child: Stack(children: [
               Positioned.fill(child: canvas),
@@ -661,10 +761,16 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
 }
 
 /// Wheel up or down as a mouse report (xterm: button 64/65), at a cell.
-List<int> wheelReport({required bool up, required int col, required int row, bool sgr = false}) {
-  final button = up ? 64 : 65;
-  if (sgr) return utf8.encode('\x1b[<$button;${col + 1};${row + 1}M');
-  return [0x1b, 0x5b, 0x4d, 32 + button, 32 + math.min(col + 1, 223), 32 + math.min(row + 1, 223)];
+List<int> wheelReport({required bool up, required int col, required int row, bool sgr = false}) =>
+    mouseReport(button: up ? 64 : 65, col: col, row: row, sgr: sgr);
+
+/// A mouse report at a cell (xterm): [button] 0 left, 1 middle, 2 right,
+/// 3 none (hover), 64/65 wheel; [motion] adds 32. The legacy encoding has
+/// no button for a release, so it says 3.
+List<int> mouseReport({required int button, required int col, required int row, bool sgr = false, bool release = false, bool motion = false}) {
+  final code = button + (motion ? 32 : 0);
+  if (sgr) return utf8.encode('\x1b[<$code;${col + 1};${row + 1}${release ? 'm' : 'M'}');
+  return [0x1b, 0x5b, 0x4d, 32 + (release ? 3 : code), 32 + math.min(col + 1, 223), 32 + math.min(row + 1, 223)];
 }
 
 /// Height of the scrollbar's thumb on a [track] showing [fit] of [total]

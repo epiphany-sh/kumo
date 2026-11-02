@@ -47,6 +47,9 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
   final _branch = TextEditingController();
   final _path = TextEditingController();
 
+  /// The last path we filled in; a different one is the user's.
+  String _autoPath = '';
+
   /// Open tasks, the ones already in progress first.
   List<TaskEntry> get _tickets {
     final open = [for (final t in AppScope.read(context).tasks.tasks) if (t.column != TaskColumn.done) t];
@@ -88,7 +91,19 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
   void initState() {
     super.initState();
     _fillNames();
+    _branch.addListener(_followBranch);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadBranches());
+  }
+
+  /// `~/wt/<repo>/<branch-slug>`, the daemon's own default.
+  String _defaultPath(String branch) => '~/wt/$_repoName/${branch.trim().replaceAll('/', '-')}';
+
+  /// The path follows the branch as it's typed, until the user writes a
+  /// path of their own.
+  void _followBranch() {
+    final follows = _path.text == _autoPath;
+    _autoPath = _defaultPath(_branch.text);
+    if (follows) _path.text = _autoPath;
   }
 
   Future<void> _loadBranches() async {
@@ -112,16 +127,13 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
   }
 
   void _fillNames() {
-    final (b, p) = switch (_src) {
-      _Source.ticket => switch (_task?.suggestedBranch) {
-          final branch? => (branch, '~/wt/$_repoName/${branch.replaceAll('/', '-')}'),
-          null => ('feat/', '~/wt/$_repoName/'),
-        },
-      _Source.fresh => ('feat/', '~/wt/$_repoName/'),
-      _Source.existing => (_localName(_existing), '~/wt/$_repoName/${_localName(_existing).replaceAll('/', '-')}'),
+    _branch.text = switch (_src) {
+      _Source.ticket => _task?.suggestedBranch ?? 'feat/',
+      _Source.fresh => 'feat/',
+      _Source.existing => _localName(_existing),
     };
-    _branch.text = b;
-    _path.text = p;
+    _autoPath = _defaultPath(_branch.text);
+    _path.text = _autoPath;
   }
 
   /// `origin/fix/x` → `fix/x`: git checks out a remote branch by its short
