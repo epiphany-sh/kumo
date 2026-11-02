@@ -206,6 +206,13 @@ mod tests {
         p
     }
 
+    /// An absolute key path on the platform running the tests.
+    const KEY: &str = if cfg!(windows) {
+        r"C:\keys\id_one"
+    } else {
+        "/keys/id_one"
+    };
+
     fn hosts(setup: GitSetup) -> GitSetup {
         GitSetup {
             credential_hosts: ["github.com".to_owned()].into(),
@@ -291,9 +298,14 @@ mod tests {
             },
         );
         let setup = hosts(GitSetup::of(&p, Path::new("/h")));
+        // `~/` expands with the platform's separator.
+        let key = Path::new("/h").join(".ssh/id_workspace 1");
         assert_eq!(
-            setup.ssh_command().as_deref(),
-            Some("ssh -i '/h/.ssh/id_workspace 1' -o IdentitiesOnly=yes")
+            setup.ssh_command(),
+            Some(format!(
+                "ssh -i {} -o IdentitiesOnly=yes",
+                shell_quote(&key.display().to_string())
+            ))
         );
         assert!(setup.config().iter().all(|(k, _)| !k.contains("insteadOf")));
         // HTTPS remotes still get the profile's token.
@@ -310,14 +322,14 @@ mod tests {
         let p = profile(
             "workspace-1",
             ProfileChanges {
-                ssh_key: Some("/keys/id_one".into()),
+                ssh_key: Some(KEY.into()),
                 sign_commits: Some(true),
                 ..ProfileChanges::default()
             },
         );
         let config = GitSetup::of(&p, Path::new("/h")).config();
         assert!(config.contains(&("gpg.format".into(), "ssh".into())));
-        assert!(config.contains(&("user.signingkey".into(), "/keys/id_one.pub".into())));
+        assert!(config.contains(&("user.signingkey".into(), format!("{KEY}.pub"))));
         assert!(config.contains(&("commit.gpgsign".into(), "true".into())));
 
         // Without a key there's nothing to sign with.
