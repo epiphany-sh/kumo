@@ -274,6 +274,60 @@ async fn existing_branch_and_explicit_path() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_taken_path_is_refused_before_git_runs() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let root = git_repo(&daemon.home().join("dev/price-admin"), None);
+    save_namespace(&mut client, "pricing", &[&root]).await;
+    let create = |branch: &str, path: &str| pb::CreateWorktreeRequest {
+        repo_path: root.display().to_string(),
+        branch: branch.into(),
+        create_branch: true,
+        path: path.into(),
+        ..Default::default()
+    };
+    client
+        .workspace
+        .create_worktree(create("feat/first", ""))
+        .await
+        .unwrap();
+
+    // The repo's folder under ~/wt holds the first worktree: what the UI
+    // sent when the path didn't follow the branch.
+    let error = client
+        .workspace
+        .create_worktree(create("feat/test", "~/wt/price-admin/"))
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), tonic::Code::AlreadyExists);
+    assert!(
+        error.message().contains("choose a new folder"),
+        "{}",
+        error.message()
+    );
+    let branches = client
+        .workspace
+        .list_branches(pb::ListBranchesRequest {
+            repo_path: root.display().to_string(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(
+        !branches.local.contains(&"feat/test".to_string()),
+        "no branch is left behind"
+    );
+
+    // An empty folder is still fine, as it is for git.
+    std::fs::create_dir_all(daemon.home().join("wt/price-admin/empty")).unwrap();
+    client
+        .workspace
+        .create_worktree(create("feat/test", "~/wt/price-admin/empty"))
+        .await
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn rejects_invalid_input() {
     let daemon = TestDaemon::start().await;
     let mut client = daemon.client().await;

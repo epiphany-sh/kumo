@@ -32,6 +32,7 @@ pub fn workspace_status_from(error: WorkspaceError) -> Status {
         WorkspaceError::RepoNotFound(_)
         | WorkspaceError::WorktreeNotFound(_)
         | WorkspaceError::NamespaceNotFound(_) => Status::not_found(message),
+        WorkspaceError::PathTaken(_) => Status::already_exists(message),
         WorkspaceError::CannotRemoveMainCheckout
         | WorkspaceError::HasChanges(_)
         | WorkspaceError::BranchNotMerged(_)

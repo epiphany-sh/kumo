@@ -120,6 +120,9 @@ impl Git for GitCli {
     /// Git creates the missing parent folders itself, and leaves none
     /// behind when it fails (e.g. the branch already exists).
     fn add_worktree(&self, repo: &Path, worktree: &NewWorktree) -> Result<(), WorkspaceError> {
+        if taken(&worktree.path) {
+            return Err(WorkspaceError::PathTaken(worktree.path.clone()));
+        }
         let mut args: Vec<&OsStr> = vec![OsStr::new("worktree"), OsStr::new("add")];
         if worktree.create_branch {
             args.extend([
@@ -189,6 +192,15 @@ impl Git for GitCli {
 }
 
 /// Splits `git for-each-ref` output into local and remote branches.
+/// Git takes an empty folder as a new worktree, and nothing else that
+/// exists.
+fn taken(path: &Path) -> bool {
+    match std::fs::read_dir(path) {
+        Ok(mut entries) => entries.next().is_some(),
+        Err(_) => path.exists(),
+    }
+}
+
 fn parse_branches(refs: &str, current: Option<&str>) -> Branches {
     let mut branches = Branches {
         current: current

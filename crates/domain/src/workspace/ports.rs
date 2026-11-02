@@ -17,6 +17,8 @@ pub trait Git: Send + Sync + 'static {
     /// Worktrees, main checkout first. Status is left empty.
     fn worktrees(&self, repo: &Path) -> Result<Vec<Worktree>, WorkspaceError>;
     fn status(&self, worktree: &Path) -> Result<WorktreeStatus, WorkspaceError>;
+    /// A path that exists and isn't an empty folder is left alone:
+    /// [`WorkspaceError::PathTaken`].
     fn add_worktree(&self, repo: &Path, worktree: &NewWorktree) -> Result<(), WorkspaceError>;
     /// Without `force`, a worktree with changes (ignored files aside) is
     /// left as is: [`WorkspaceError::HasChanges`].
