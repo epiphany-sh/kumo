@@ -64,6 +64,8 @@ pub fn test_config(dir: &std::path::Path) -> DaemonConfig {
         agent_path: Some(bin.display().to_string()),
         // Never the real keychain.
         secrets: SecretsBackend::Memory,
+        // Git's credential helper: the real kumod (not the test binary).
+        credential_helper: Some(env!("CARGO_BIN_EXE_kumod").into()),
         ..Default::default()
     }
 }

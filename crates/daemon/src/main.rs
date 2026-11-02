@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use kumo_domain::daemon::{DaemonError, ListenAddress};
 use kumod::{Daemon, DaemonConfig};
 use tracing_subscriber::EnvFilter;
@@ -26,6 +26,19 @@ struct Args {
     /// one per core (less wake-up contention), see docs/perf/.
     #[arg(long, default_value_t = 2)]
     worker_threads: usize,
+
+    #[command(subcommand)]
+    command: Option<Tool>,
+}
+
+#[derive(Debug, Subcommand)]
+enum Tool {
+    /// Git's credential helper inside a workspace: answers `get` with the
+    /// token of the workspace in `KUMO_PROFILE`, asking the running daemon.
+    GitCredential {
+        /// `get`, `store` or `erase` (only `get` answers).
+        operation: String,
+    },
 }
 
 fn main() -> ExitCode {
@@ -45,6 +58,17 @@ fn main() -> ExitCode {
 }
 
 async fn async_main(args: Args) -> ExitCode {
+    if let Some(Tool::GitCredential { operation }) = &args.command {
+        // Git reads stdout: nothing else may go there.
+        let data_dir = args
+            .data_dir
+            .clone()
+            .or_else(|| dirs::data_local_dir().map(|d| d.join("kumo")));
+        if let Some(data_dir) = data_dir {
+            kumod::git_credential::run(&data_dir, operation).await;
+        }
+        return ExitCode::SUCCESS;
+    }
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .with_ansi(std::io::stderr().is_terminal())

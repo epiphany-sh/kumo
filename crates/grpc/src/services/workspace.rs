@@ -10,18 +10,26 @@ use tokio_stream::wrappers::WatchStream;
 use tonic::{Request, Response, Status};
 
 use crate::mapping::{candidate_to, snapshot_to, workspace_status_from, worktree_to};
+use crate::profile::{Profiles, services_of};
 
 type SnapshotStream = Pin<Box<dyn Stream<Item = Result<pb::WorkspaceSnapshot, Status>> + Send>>;
 
 /// `kumo.v1.Workspace`.
 #[derive(Debug, Clone)]
 pub struct WorkspaceGrpc {
-    service: Arc<WorkspaceService>,
+    profiles: Arc<Profiles>,
 }
 
 impl WorkspaceGrpc {
-    pub fn new(service: Arc<WorkspaceService>) -> Self {
-        Self { service }
+    pub fn new(profiles: Arc<Profiles>) -> Self {
+        Self { profiles }
+    }
+
+    /// The workspace service of the profile the call names.
+    async fn service<T>(&self, request: &Request<T>) -> Result<Arc<WorkspaceService>, Status> {
+        Ok(Arc::clone(
+            &services_of(&self.profiles, request).await?.workspace,
+        ))
     }
 }
 
@@ -31,18 +39,20 @@ impl pb::workspace_server::Workspace for WorkspaceGrpc {
 
     async fn watch(
         &self,
-        _request: Request<pb::WatchWorkspaceRequest>,
+        request: Request<pb::WatchWorkspaceRequest>,
     ) -> Result<Response<Self::WatchStream>, Status> {
+        let service = self.service(&request).await?;
         let snapshots =
-            WatchStream::new(self.service.watch()).map(|snapshot| Ok(snapshot_to(&snapshot)));
+            WatchStream::new(service.watch()).map(|snapshot| Ok(snapshot_to(&snapshot)));
         Ok(Response::new(Box::pin(snapshots)))
     }
 
     async fn refresh(
         &self,
-        _request: Request<pb::RefreshWorkspaceRequest>,
+        request: Request<pb::RefreshWorkspaceRequest>,
     ) -> Result<Response<pb::RefreshWorkspaceResponse>, Status> {
-        self.service.refresh().await;
+        let service = self.service(&request).await?;
+        service.refresh().await;
         Ok(Response::new(pb::RefreshWorkspaceResponse {}))
     }
 
@@ -50,14 +60,14 @@ impl pb::workspace_server::Workspace for WorkspaceGrpc {
         &self,
         request: Request<pb::DiscoverReposRequest>,
     ) -> Result<Response<pb::DiscoverReposResponse>, Status> {
+        let service = self.service(&request).await?;
         let roots = request
             .into_inner()
             .roots
             .into_iter()
             .map(PathBuf::from)
             .collect();
-        let candidates = self
-            .service
+        let candidates = service
             .discover(roots)
             .await
             .iter()
@@ -70,9 +80,9 @@ impl pb::workspace_server::Workspace for WorkspaceGrpc {
         &self,
         request: Request<pb::SaveNamespaceRequest>,
     ) -> Result<Response<pb::SaveNamespaceResponse>, Status> {
+        let service = self.service(&request).await?;
         let request = request.into_inner();
-        let id = self
-            .service
+        let id = service
             .save_namespace(
                 NamespaceId::parse(&request.id),
                 &request.name,
@@ -91,9 +101,10 @@ impl pb::workspace_server::Workspace for WorkspaceGrpc {
         &self,
         request: Request<pb::DeleteNamespaceRequest>,
     ) -> Result<Response<pb::DeleteNamespaceResponse>, Status> {
+        let service = self.service(&request).await?;
         let id = NamespaceId::parse(&request.into_inner().id)
             .ok_or_else(|| Status::invalid_argument("namespace id is empty"))?;
-        self.service
+        service
             .delete_namespace(&id)
             .await
             .map_err(workspace_status_from)?;
@@ -104,10 +115,10 @@ impl pb::workspace_server::Workspace for WorkspaceGrpc {
         &self,
         request: Request<pb::CreateWorktreeRequest>,
     ) -> Result<Response<pb::CreateWorktreeResponse>, Status> {
+        let service = self.service(&request).await?;
         let request = request.into_inner();
         let base = Some(request.base).filter(|b| !b.trim().is_empty());
-        let worktree = self
-            .service
+        let worktree = service
             .create_worktree(
                 PathBuf::from(request.repo_path).as_path(),
                 &request.branch,
@@ -126,9 +137,9 @@ impl pb::workspace_server::Workspace for WorkspaceGrpc {
         &self,
         request: Request<pb::RemoveWorktreeRequest>,
     ) -> Result<Response<pb::RemoveWorktreeResponse>, Status> {
+        let service = self.service(&request).await?;
         let request = request.into_inner();
-        let removal = self
-            .service
+        let removal = service
             .remove_worktree(
                 PathBuf::from(request.repo_path).as_path(),
                 PathBuf::from(request.worktree_path).as_path(),
@@ -148,9 +159,9 @@ impl pb::workspace_server::Workspace for WorkspaceGrpc {
         &self,
         request: Request<pb::ListBranchesRequest>,
     ) -> Result<Response<pb::ListBranchesResponse>, Status> {
+        let service = self.service(&request).await?;
         let path = PathBuf::from(request.into_inner().repo_path);
-        let branches = self
-            .service
+        let branches = service
             .branches(&path)
             .await
             .map_err(workspace_status_from)?;

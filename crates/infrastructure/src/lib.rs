@@ -8,6 +8,7 @@
 //! - [`fs`]: files inside worktrees.
 //! - [`watch`]: file system change notifications.
 //! - [`storage`]: SQLite persistence.
+//! - [`profiles`]: the profile registry and each profile's data folder.
 //! - [`tasks`]: connectors to the tools tasks come from.
 //! - [`secrets`]: API tokens in the OS keychain.
 
@@ -18,6 +19,7 @@ pub mod docs;
 pub mod executable;
 pub mod fs;
 pub mod git;
+pub mod profiles;
 pub mod pty;
 pub mod secrets;
 pub mod security;

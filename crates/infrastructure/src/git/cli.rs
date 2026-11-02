@@ -2,6 +2,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use kumo_domain::profiles::ProfileEnv;
 use kumo_domain::workspace::{
     Branches, Git, NewWorktree, WorkspaceError, Worktree, WorktreeStatus,
 };
@@ -10,32 +11,60 @@ use kumo_domain::workspace::{
 #[derive(Debug, Clone)]
 pub struct GitCli {
     program: PathBuf,
+    /// The profile's identity, credentials and SSH key; None: the user's.
+    env: Option<ProfileEnv>,
 }
 
 impl Default for GitCli {
     fn default() -> Self {
         Self {
             program: PathBuf::from("git"),
+            env: None,
         }
     }
 }
 
 impl GitCli {
+    /// Git as a profile runs it (see [`kumo_domain::profiles::GitSetup`]).
+    pub fn for_profile(env: ProfileEnv) -> Self {
+        Self {
+            env: Some(env),
+            ..Self::default()
+        }
+    }
+
+    /// What the profile adds: git config, and its key for ssh. `gh`'s
+    /// tokens are for shells and agents, not for git.
+    fn profile_env(&self) -> (Vec<(String, String)>, String) {
+        let Some(setup) = self.env.as_ref().map(ProfileEnv::get) else {
+            return (Vec::new(), "ssh".to_owned());
+        };
+        let ssh = setup.ssh_command().unwrap_or_else(|| "ssh".to_owned());
+        let vars = setup
+            .env()
+            .into_iter()
+            .filter(|(k, _)| k.starts_with("GIT_CONFIG_") || k == "KUMO_PROFILE")
+            .collect();
+        (vars, ssh)
+    }
+
     /// Runs `git -C <dir> <args>` and returns stdout, or git's error text.
     pub(super) fn exec<I, S>(&self, dir: &Path, args: I) -> Result<String, String>
     where
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
+        let (vars, ssh) = self.profile_env();
         let output = Command::new(&self.program)
             .arg("-C")
             .arg(dir)
             .args(args)
+            .envs(vars)
             // Stable, English, non-interactive output; ssh never prompts.
             .env("LC_ALL", "C")
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("GIT_OPTIONAL_LOCKS", "0")
-            .env("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
+            .env("GIT_SSH_COMMAND", format!("{ssh} -o BatchMode=yes"))
             .output()
             .map_err(|e| format!("can't run git: {e}"))?;
         if !output.status.success() {

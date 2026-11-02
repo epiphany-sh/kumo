@@ -8,19 +8,29 @@ use kumo_proto::v1 as pb;
 use tokio_stream::wrappers::WatchStream;
 use tonic::{Request, Response, Status};
 
-use crate::mapping::{ci_problem_to, host_info_to, pipelines_snapshot_to, pipelines_status_from};
+use crate::mapping::{
+    ci_problem_to, host_info_to, pipelines_snapshot_to, pipelines_status_from, profile_status_from,
+};
+use crate::profile::{Profiles, profile_of, services_of};
 
 type SnapshotStream = Pin<Box<dyn Stream<Item = Result<pb::PipelinesSnapshot, Status>> + Send>>;
 
 /// `kumo.v1.Pipelines`.
 #[derive(Debug, Clone)]
 pub struct PipelinesGrpc {
-    service: Arc<PipelinesService>,
+    profiles: Arc<Profiles>,
 }
 
 impl PipelinesGrpc {
-    pub fn new(service: Arc<PipelinesService>) -> Self {
-        Self { service }
+    pub fn new(profiles: Arc<Profiles>) -> Self {
+        Self { profiles }
+    }
+
+    /// The pipelines service of the profile the call names.
+    async fn service<T>(&self, request: &Request<T>) -> Result<Arc<PipelinesService>, Status> {
+        Ok(Arc::clone(
+            &services_of(&self.profiles, request).await?.pipelines,
+        ))
     }
 }
 
@@ -32,11 +42,9 @@ impl pb::pipelines_server::Pipelines for PipelinesGrpc {
         &self,
         request: Request<pb::WatchPipelinesRequest>,
     ) -> Result<Response<Self::WatchStream>, Status> {
+        let service = self.service(&request).await?;
         let worktree = PathBuf::from(request.into_inner().worktree_path);
-        let updates = self
-            .service
-            .watch(&worktree)
-            .map_err(pipelines_status_from)?;
+        let updates = service.watch(&worktree).map_err(pipelines_status_from)?;
         // Nothing until the first answer: the UI shows "loading" meanwhile.
         let stream = WatchStream::new(updates)
             .filter_map(|latest| future::ready(latest.map(|s| Ok(pipelines_snapshot_to(&s)))));
@@ -47,8 +55,9 @@ impl pb::pipelines_server::Pipelines for PipelinesGrpc {
         &self,
         request: Request<pb::WorktreeRequest>,
     ) -> Result<Response<pb::PipelinesActionResponse>, Status> {
+        let service = self.service(&request).await?;
         let worktree = PathBuf::from(request.into_inner().worktree_path);
-        self.service
+        service
             .refresh(&worktree)
             .await
             .map_err(pipelines_status_from)?;
@@ -59,8 +68,9 @@ impl pb::pipelines_server::Pipelines for PipelinesGrpc {
         &self,
         request: Request<pb::RerunFailedRequest>,
     ) -> Result<Response<pb::PipelinesActionResponse>, Status> {
+        let service = self.service(&request).await?;
         let r = request.into_inner();
-        self.service
+        service
             .rerun_failed(&PathBuf::from(r.worktree_path), &r.run_id)
             .await
             .map_err(pipelines_status_from)?;
@@ -69,9 +79,10 @@ impl pb::pipelines_server::Pipelines for PipelinesGrpc {
 
     async fn list_hosts(
         &self,
-        _request: Request<pb::ListHostsRequest>,
+        request: Request<pb::ListHostsRequest>,
     ) -> Result<Response<pb::ListHostsResponse>, Status> {
-        let hosts = self.service.hosts().await;
+        let service = self.service(&request).await?;
+        let hosts = service.hosts().await;
         Ok(Response::new(pb::ListHostsResponse {
             hosts: hosts.into_iter().map(host_info_to).collect(),
         }))
@@ -81,9 +92,9 @@ impl pb::pipelines_server::Pipelines for PipelinesGrpc {
         &self,
         request: Request<pb::SaveHostTokenRequest>,
     ) -> Result<Response<pb::CiHostInfo>, Status> {
+        let service = self.service(&request).await?;
         let r = request.into_inner();
-        let info = self
-            .service
+        let info = service
             .save_host_token(&r.host, &r.token)
             .await
             .map_err(pipelines_status_from)?;
@@ -94,10 +105,13 @@ impl pb::pipelines_server::Pipelines for PipelinesGrpc {
         &self,
         request: Request<pb::SignInWithGhRequest>,
     ) -> Result<Response<pb::SignInWithGhResponse>, Status> {
+        // Through the profile: the account signed in becomes its account.
+        let profile = profile_of(request.metadata()).map(str::to_owned);
         let terminal = self
-            .service
-            .sign_in_with_cli(&request.into_inner().host)
+            .profiles
+            .sign_in_with_gh(profile.as_deref(), &request.into_inner().host)
             .await
+            .map_err(profile_status_from)?
             .map_err(pipelines_status_from)?;
         Ok(Response::new(pb::SignInWithGhResponse {
             terminal_id: terminal.to_string(),
@@ -108,9 +122,9 @@ impl pb::pipelines_server::Pipelines for PipelinesGrpc {
         &self,
         request: Request<pb::TestHostRequest>,
     ) -> Result<Response<pb::TestHostResponse>, Status> {
+        let service = self.service(&request).await?;
         let r = request.into_inner();
-        let answer = self
-            .service
+        let answer = service
             .test_host(&r.host, &r.token)
             .await
             .map_err(pipelines_status_from)?;
