@@ -103,9 +103,12 @@ release: ## Release build: make release VERSION=0.2.0 → dist/Kumo-0.2.0.zip + 
 	@# install.sh downloads the latest one by a fixed name.
 	cp dist/Kumo-$(VERSION).zip dist/Kumo.zip
 	sed -e 's|@RELEASE_REPO@|$(RELEASE_REPO)|g' packaging/install.sh.in > dist/install.sh
+	@# "Latest" is macOS's release: it carries install.ps1 too, which finds
+	@# the newest Windows zip wherever it is.
+	sed -e 's|@RELEASE_REPO@|$(RELEASE_REPO)|g' packaging/install.ps1.in > dist/install.ps1
 	sed -e 's|@RELEASE_REPO@|$(RELEASE_REPO)|g' -e 's|@RELEASE_ORG@|$(RELEASE_ORG)|g' -e 's|@VERSION@|$(VERSION)|g' \
 		-e "s|@SHA256@|$$(shasum -a 256 dist/Kumo-$(VERSION).zip | cut -d' ' -f1)|g" packaging/homebrew/kumo.rb.in > dist/kumo.rb
-	@echo "✓ dist/: Kumo-$(VERSION).zip, Kumo.zip, appcast.xml, install.sh, kumo.rb"
+	@echo "✓ dist/: Kumo-$(VERSION).zip, Kumo.zip, appcast.xml, install.sh, install.ps1, kumo.rb"
 
 $(SPARKLE_TOOLS)/sign_update:
 	mkdir -p target/sparkle-$(SPARKLE_VERSION)

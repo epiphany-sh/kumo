@@ -1,8 +1,10 @@
 name: release
 
 # Publishes Kumo X.Y.Z: the GitHub release (the macOS zip, appcast and
-# install.sh; the Windows zip and install.ps1) and the Homebrew cask. Both
-# builds finish before anything is published: a release is never half there. A release/X.Y.Z branch merged into main (the only kind
+# install.sh; the Windows zip and install.ps1) and the Homebrew cask. macOS
+# and Windows publish on their own (GitHub's macOS runners can go days
+# without capacity): only macOS makes the release "Latest", which is what
+# Sparkle, install.sh and brew download from (packaging/github-release.sh). A release/X.Y.Z branch merged into main (the only kind
 # `ci` lets in) publishes X.Y.Z; so does a tag vX.Y.Z pushed by hand.
 # One-time setup: docs/releasing.md.
 
@@ -60,6 +62,7 @@ jobs:
     runs-on: macos-latest
     env:
       VERSION: ${{ needs.version.outputs.version }}
+      SHA: ${{ needs.version.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -97,11 +100,33 @@ jobs:
             make release VERSION="$VERSION" RELEASE_ORG="${{ github.repository_owner }}"
           rm "$RUNNER_TEMP/sparkle-key"
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos
-          path: dist/
-          if-no-files-found: error
+      # Tags the commit (for a merge) only once it's built: a failed build
+      # leaves no tag, and its number is used again (unless Windows already
+      # published it: then re-run this job from Actions). A tag made with
+      # this token doesn't start another run. A release made by hand on
+      # GitHub (which tags it) gets the files instead.
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          packaging/github-release.sh --latest "$VERSION" "$SHA" \
+            "dist/Kumo-$VERSION.zip" dist/Kumo.zip dist/appcast.xml dist/install.sh dist/install.ps1
+
+      - name: Homebrew cask
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          tap="${{ github.repository_owner }}/homebrew-kumo"
+          git clone "https://x-access-token:$TAP_TOKEN@github.com/$tap.git" "$RUNNER_TEMP/tap"
+          mkdir -p "$RUNNER_TEMP/tap/Casks"
+          cp dist/kumo.rb "$RUNNER_TEMP/tap/Casks/kumo.rb"
+          cd "$RUNNER_TEMP/tap"
+          git config user.name "kumo release"
+          git config user.email "release@users.noreply.github.com"
+          git add Casks/kumo.rb
+          git commit -m "kumo $VERSION"
+          git push origin HEAD:main
 
   windows:
     needs: version
@@ -112,6 +137,7 @@ jobs:
         shell: bash
     env:
       VERSION: ${{ needs.version.outputs.version }}
+      SHA: ${{ needs.version.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -128,52 +154,10 @@ jobs:
       - name: Build and package
         run: RELEASE_REPO="${{ github.repository }}" packaging/windows-zip.sh "$VERSION"
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: dist/
-          if-no-files-found: error
-
-  publish:
-    needs: [version, macos, windows]
-    runs-on: ubuntu-latest
-    env:
-      VERSION: ${{ needs.version.outputs.version }}
-      SHA: ${{ needs.version.outputs.sha }}
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-
-      # Tags the commit (for a merge) only once it's built: a failed build
-      # leaves no tag, and its number is used again. A tag made with this
-      # token doesn't start another run. A release made by hand on GitHub
-      # (which tags it) gets the files instead.
+      # Doesn't wait for macOS, and doesn't make the release "Latest":
+      # install.ps1 finds the newest release with a Windows zip.
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: |
-          files=("dist/Kumo-$VERSION.zip" dist/Kumo.zip dist/appcast.xml dist/install.sh
-            "dist/Kumo-$VERSION-windows-x64.zip" dist/Kumo-windows-x64.zip dist/install.ps1)
-          if gh release view "v$VERSION" >/dev/null 2>&1; then
-            gh release upload "v$VERSION" "${files[@]}" --clobber
-          else
-            gh release create "v$VERSION" --target "$SHA" --title "Kumo $VERSION" --generate-notes "${files[@]}"
-          fi
-
-      - name: Homebrew cask
-        env:
-          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: |
-          tap="${{ github.repository_owner }}/homebrew-kumo"
-          git clone "https://x-access-token:$TAP_TOKEN@github.com/$tap.git" "$RUNNER_TEMP/tap"
-          mkdir -p "$RUNNER_TEMP/tap/Casks"
-          cp dist/kumo.rb "$RUNNER_TEMP/tap/Casks/kumo.rb"
-          cd "$RUNNER_TEMP/tap"
-          git config user.name "kumo release"
-          git config user.email "release@users.noreply.github.com"
-          git add Casks/kumo.rb
-          git commit -m "kumo $VERSION"
-          git push origin HEAD:main
+        run: packaging/github-release.sh "$VERSION" "$SHA" "dist/Kumo-$VERSION-windows-x64.zip" dist/install.ps1

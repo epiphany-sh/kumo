@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Builds Kumo for Windows and zips it, from Git Bash at the repo root:
 #
-#   packaging/windows-zip.sh 0.5.1  →  dist/Kumo-0.5.1-windows-x64.zip,
-#                                      dist/Kumo-windows-x64.zip, dist/install.ps1
+#   packaging/windows-zip.sh 0.5.1  →  dist/Kumo-0.5.1-windows-x64.zip, dist/install.ps1
 #
 # The zip holds a Kumo folder: Kumo.exe (the UI), kumod.exe next to it (where
 # the UI looks for it) and the VC++ runtime both need, which a fresh Windows
@@ -29,9 +28,7 @@ staging=$(mktemp -d)
 trap 'rm -rf "$staging"' EXIT
 cp -r "$app" "$staging/Kumo"
 rm -f "dist/Kumo-$version-windows-x64.zip"
-(cd "$staging" && 7z a -tzip -bso0 "Kumo.zip" Kumo)
+(cd "$staging" && 7z a -tzip -bso0 Kumo.zip Kumo)
 cp "$staging/Kumo.zip" "dist/Kumo-$version-windows-x64.zip"
-# install.ps1 downloads the latest one by a fixed name.
-cp "$staging/Kumo.zip" dist/Kumo-windows-x64.zip
 sed -e "s|@RELEASE_REPO@|$repo|g" packaging/install.ps1.in > dist/install.ps1
-echo "✓ dist/: Kumo-$version-windows-x64.zip, Kumo-windows-x64.zip, install.ps1"
+echo "✓ dist/: Kumo-$version-windows-x64.zip, install.ps1"

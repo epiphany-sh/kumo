@@ -17,9 +17,19 @@ if (-not [Environment]::Is64BitOperatingSystem) {
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ("kumo-" + [Guid]::NewGuid())
 New-Item -ItemType Directory -Path $tmp | Out-Null
 try {
-    Write-Host 'Downloading Kumo...'
+    # Not "latest": that's the newest release with the macOS build, and
+    # Windows publishes without waiting for it (docs/releasing.md).
+    $releases = Invoke-RestMethod "https://api.github.com/repos/$repo/releases?per_page=20"
+    $asset = $releases |
+        Where-Object { -not $_.draft -and -not $_.prerelease } |
+        ForEach-Object { $_.assets } |
+        Where-Object { $_.name -like 'Kumo-*-windows-x64.zip' } |
+        Select-Object -First 1
+    if (-not $asset) { throw "No Windows build in $repo's releases yet." }
+
+    Write-Host "Downloading $($asset.name)..."
     $zip = Join-Path $tmp 'Kumo.zip'
-    Invoke-WebRequest "https://github.com/$repo/releases/latest/download/Kumo-windows-x64.zip" -OutFile $zip -UseBasicParsing
+    Invoke-WebRequest $asset.browser_download_url -OutFile $zip -UseBasicParsing
     Expand-Archive $zip -DestinationPath $tmp
 
     $ui = Get-Process -Name Kumo -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$dest\*" }

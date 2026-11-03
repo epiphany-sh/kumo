@@ -20,8 +20,9 @@ se reemplazan solos por la versión publicada.
 
 **Windows** sale en el mismo release, sin firmar y sin auto-update:
 
-- **Instalación y updates**: `install.ps1` baja `Kumo-windows-x64.zip`, lo
-  copia a `%LOCALAPPDATA%\Programs\Kumo`, le saca la marca de "bajado de
+- **Instalación y updates**: `install.ps1` baja el zip de Windows del release
+  más nuevo que lo tenga (no de "Latest", ver abajo), lo copia a
+  `%LOCALAPPDATA%\Programs\Kumo`, le saca la marca de "bajado de
   internet" (así SmartScreen no frena) y crea el acceso en el menú Inicio.
   Para actualizar se vuelve a correr.
 - **El daemon**: un `kumod.exe` corriendo no se puede pisar, pero sí
@@ -93,12 +94,22 @@ fix/…      ─┴─▶  release/X.Y.Z  ──▶  main  ──▶  vX.Y.Z pub
 3. **Mergeá la release a `main`** con un PR (`release/0.3.0` → `main`). Es lo
    único que entra a `main`. Con el merge, el workflow `release` publica
    `0.3.0`: buildea, firma, arma el zip, el appcast y el `install.sh` en
-   macOS; el zip y el `install.ps1` en Windows. Cuando los dos terminan, crea
-   el release (y su tag) en GitHub y actualiza el cask del tap. Si falla
-   cualquiera de los dos builds, no se publica nada.
+   macOS; el zip y el `install.ps1` en Windows. Cada uno sube lo suyo al release
+   (el primero que termina lo crea, con su tag); macOS además actualiza el
+   cask del tap.
 
-Los releases van de a uno. Si el build falla, no queda tag: re-correlo desde
-Actions.
+   **Windows no espera a macOS**, porque los runners macOS de GitHub a veces
+   pasan días sin capacidad. Por eso solo macOS marca el release como
+   "Latest", que es de donde bajan Sparkle, `install.sh` y brew: si Windows
+   publica primero, el release queda sin "Latest" hasta que termina macOS, y
+   las Macs siguen viendo la versión anterior. `install.ps1` viaja con los
+   dos y busca el zip de Windows más nuevo, esté o no en "Latest"
+   (`packaging/github-release.sh`).
+
+Los releases van de a uno. Si fallan los dos builds, no queda tag:
+re-correlo desde Actions. Si falla uno solo, el otro ya creó el tag y el
+número quedó usado: re-corré el job que falló (no el workflow entero, que
+vería el tag y no haría nada).
 
 **A mano**, con el número que quieras:
 
