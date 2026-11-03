@@ -5,7 +5,11 @@ use kumo_domain::agents::{
 use kumo_proto::v1 as pb;
 
 pub fn provider_to(view: ProviderView) -> pb::AgentProvider {
-    let ProviderView { provider, resolved } = view;
+    let ProviderView {
+        provider,
+        resolved,
+        own_sign_in,
+    } = view;
     pb::AgentProvider {
         takes_prompt_argument: provider.takes_prompt_argument(),
         has_login: provider.has_login(),
@@ -27,6 +31,7 @@ pub fn provider_to(view: ProviderView) -> pb::AgentProvider {
         resolved_path: resolved
             .map(|p| p.display().to_string())
             .unwrap_or_default(),
+        own_sign_in,
     }
 }
 

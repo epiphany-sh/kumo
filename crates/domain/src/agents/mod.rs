@@ -5,6 +5,7 @@ mod actions;
 mod activity;
 mod args;
 mod error;
+mod homes;
 mod ports;
 mod presets;
 mod provider;
@@ -15,7 +16,8 @@ pub use actions::{ActionReader, action_of};
 pub use activity::{ActivityTracker, LastLine};
 pub use args::split_args;
 pub use error::AgentError;
-pub use ports::{AgentStore, ProgramLocator, StoredProvider};
+pub use homes::{CLI_HOMES, CliHome, cli_home};
+pub use ports::{AgentStore, CliHomes, ProgramLocator, SharedCliHomes, StoredProvider};
 pub use presets::{AgentPreset, PRESETS};
 pub use provider::{AgentProvider, PromptStyle};
 pub use session::{

@@ -752,3 +752,99 @@ async fn compact_refuses_agents_without_a_compact_command() {
         .unwrap_err();
     assert_eq!(unknown.code(), tonic::Code::NotFound);
 }
+
+/// What a fake CLI saw of its folder variables.
+const PRINT_HOMES: &str = "echo \"claude-dir=[$CLAUDE_CONFIG_DIR] codex-home=[$CODEX_HOME] gemini-home=[$GEMINI_CLI_HOME]\"";
+
+#[tokio::test(flavor = "multi_thread")]
+async fn each_profile_gives_the_clis_their_own_folders() {
+    let daemon = TestDaemon::start().await;
+    for cli in ["claude", "codex", "gemini"] {
+        fake_cli(&daemon.bin(), cli, &format!("{PRINT_HOMES}; sleep 5"));
+    }
+    let mut first = daemon.client().await;
+    let id = first
+        .profiles
+        .create(pb::CreateProfileRequest {
+            name: "Workspace 1".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .id;
+    let mut one = first.with_profile(Some(&id));
+    let cli = daemon
+        .home()
+        .parent()
+        .unwrap()
+        .join("data/profiles/workspace-1/cli");
+
+    // The default profile keeps the user's folders.
+    let repo = worktree(&daemon, &mut first).await;
+    connect(&mut first, "claude", true).await;
+    let session = first
+        .agents
+        .start(start(&repo, "claude", "hi"))
+        .await
+        .unwrap()
+        .into_inner();
+    let mut terminal = Attached::new(&mut first, &session.terminal_id, true).await;
+    // Whatever the daemon itself has (usually nothing), never a profile's.
+    terminal.read_until("gemini-home=[").await;
+    let seen = terminal.received.text();
+    assert!(!seen.contains("profiles/"), "{seen}");
+    let claude = providers(&mut first)
+        .await
+        .into_iter()
+        .find(|p| p.id == "claude")
+        .unwrap();
+    assert!(!claude.own_sign_in);
+
+    // Workspace 1: Claude Code and Codex in folders of its own, created
+    // before they start; Gemini (not checked yet) shares the Mac's.
+    save_namespace(&mut one, "app", &[&repo]).await;
+    connect(&mut one, "claude", true).await;
+    connect(&mut one, "gemini", false).await;
+    let session = one
+        .agents
+        .start(start(&repo, "claude", "hi"))
+        .await
+        .unwrap()
+        .into_inner();
+    let mut terminal = Attached::new(&mut one, &session.terminal_id, true).await;
+    terminal
+        .read_until(&format!("claude-dir=[{}]", cli.join("claude").display()))
+        .await;
+    assert!(cli.join("claude").is_dir());
+    let session = one
+        .agents
+        .start(start(&repo, "gemini", "hi"))
+        .await
+        .unwrap()
+        .into_inner();
+    let mut terminal = Attached::new(&mut one, &session.terminal_id, true).await;
+    terminal.read_until("gemini-home=[").await;
+    let seen = terminal.received.text();
+    assert!(!seen.contains("cli/gemini"), "{seen}");
+    assert!(!cli.join("gemini").exists());
+
+    // Signing in gets the same folder.
+    let login = one
+        .agents
+        .login_provider(pb::LoginProviderRequest { id: "codex".into() })
+        .await
+        .unwrap()
+        .into_inner()
+        .terminal_id;
+    let mut terminal = Attached::new(&mut one, &login, true).await;
+    terminal
+        .read_until(&format!("codex-home=[{}]", cli.join("codex").display()))
+        .await;
+    assert!(cli.join("codex").is_dir());
+
+    let list = providers(&mut one).await;
+    let own = |id: &str| list.iter().find(|p| p.id == id).unwrap().own_sign_in;
+    assert!(own("claude") && own("codex"));
+    assert!(!own("gemini") && !own("copilot"));
+}

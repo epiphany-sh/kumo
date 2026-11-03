@@ -37,3 +37,26 @@ pub trait ProgramLocator: Send + Sync + 'static {
     /// Where sign-in flows start.
     fn home(&self) -> PathBuf;
 }
+
+/// The CLIs' own folders in a profile (see [`super::CLI_HOMES`]).
+pub trait CliHomes: Send + Sync + 'static {
+    /// The variables that point `provider` at the profile's folder, which
+    /// exists once this returns. Empty when it shares the user's (the
+    /// default profile, and CLIs whose sign-in can't be separated).
+    fn env(&self, provider: &str) -> Result<Vec<(String, String)>, AgentError>;
+    /// Whether `provider` signs in for this profile only.
+    fn own_sign_in(&self, provider: &str) -> bool;
+}
+
+/// The user's own folders: no variable for any CLI.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SharedCliHomes;
+
+impl CliHomes for SharedCliHomes {
+    fn env(&self, _provider: &str) -> Result<Vec<(String, String)>, AgentError> {
+        Ok(Vec::new())
+    }
+    fn own_sign_in(&self, _provider: &str) -> bool {
+        false
+    }
+}

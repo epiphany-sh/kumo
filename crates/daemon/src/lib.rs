@@ -6,6 +6,8 @@
 
 mod config;
 mod daemon;
+pub mod git_credential;
+mod profiles;
 mod single_instance;
 
 pub use config::{DaemonConfig, SecretsBackend};

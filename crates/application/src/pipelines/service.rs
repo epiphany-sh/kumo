@@ -4,8 +4,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use kumo_domain::pipelines::{
-    BranchReader, CiClient, CiHost, CiProblem, CiProblemKind, CiRun, CiTarget, HostInfo,
-    HostTokens, LocalBranch, PipelinesError, PipelinesSnapshot, TokenFallback,
+    BranchReader, CiClient, CiHost, CiProblem, CiProblemKind, CiProvider, CiRun, CiTarget,
+    HostInfo, HostTokens, LocalBranch, PipelinesError, PipelinesSnapshot, TokenFallback,
 };
 use kumo_domain::terminal::{LaunchSpec, TerminalId};
 use kumo_domain::time::Timestamp;
@@ -91,6 +91,26 @@ struct Inner {
     timing: PipelinesTiming,
     workspace: watch::Receiver<Arc<WorkspaceSnapshot>>,
     pollers: Mutex<HashMap<PathBuf, Arc<Poller>>>,
+    /// Bumped whenever a host's credential may have changed.
+    credentials: watch::Sender<u64>,
+    /// `(host, account)` once a CLI sign-in finished.
+    signed_in: tokio::sync::broadcast::Sender<(String, String)>,
+}
+
+/// What git sends a host as the profile: user name and token.
+#[derive(Clone, PartialEq, Eq)]
+pub struct GitCredential {
+    pub username: String,
+    pub password: String,
+}
+
+/// The token never shows in logs.
+impl std::fmt::Debug for GitCredential {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GitCredential")
+            .field("username", &self.username)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Polls one worktree's pipelines while someone watches them.
@@ -123,8 +143,58 @@ impl PipelinesService {
                 timing,
                 workspace,
                 pollers: Mutex::new(HashMap::new()),
+                credentials: watch::channel(0).0,
+                signed_in: tokio::sync::broadcast::channel(8).0,
             }),
         }
+    }
+
+    /// Ticks when a saved token or a CLI sign-in changes a credential.
+    pub fn credentials_changed(&self) -> watch::Receiver<u64> {
+        self.inner.credentials.subscribe()
+    }
+
+    /// `(host, account)` each time a CLI sign-in finishes.
+    pub fn signed_in(&self) -> tokio::sync::broadcast::Receiver<(String, String)> {
+        self.inner.signed_in.subscribe()
+    }
+
+    /// The fallback (`gh`) uses these accounts on their hosts.
+    pub fn use_accounts(&self, accounts: &[kumo_domain::profiles::GhAccount]) {
+        self.inner.ports.fallback.use_accounts(accounts);
+    }
+
+    /// Whether `host` has a token saved in Kumo (not the fallback's).
+    pub async fn has_saved_token(&self, host: &str) -> bool {
+        let (tokens, host) = (Arc::clone(&self.inner.ports.tokens), host.to_owned());
+        blocking(move || matches!(tokens.get(&host), Ok(Some(_))))
+            .await
+            .unwrap_or(false)
+    }
+
+    /// The fallback's token for `host` (`gh`, with the profile's account).
+    pub async fn fallback_token(&self, host: &CiHost) -> Option<String> {
+        let (fallback, host) = (Arc::clone(&self.inner.ports.fallback), host.clone());
+        blocking(move || fallback.token(&host)).await.ok().flatten()
+    }
+
+    /// What git sends `host`, a host of the workspace's remotes: the saved
+    /// token, else the fallback's. Other hosts are unknown. Never logged.
+    pub async fn git_credential(
+        &self,
+        host: &str,
+    ) -> Result<Option<GitCredential>, PipelinesError> {
+        let ci = self.inner.ci_host(host)?;
+        let username = match ci.provider {
+            CiProvider::GitHubActions => "x-access-token",
+            CiProvider::GitLabCi => "oauth2",
+            // Atlassian API tokens over git.
+            CiProvider::BitbucketPipelines => "x-bitbucket-api-token-auth",
+        };
+        Ok(self.inner.token(&ci).await.map(|password| GitCredential {
+            username: username.to_owned(),
+            password,
+        }))
     }
 
     /// How many worktrees are being polled.
@@ -230,6 +300,7 @@ impl PipelinesService {
             }
         })
         .await??;
+        self.inner.credentials.send_modify(|n| *n += 1);
         self.inner.wake_host(host).await;
         Ok(self
             .hosts()
@@ -338,13 +409,13 @@ impl Inner {
         while started.elapsed() < self.timing.sign_in_wait {
             tokio::time::sleep(self.timing.sign_in_check).await;
             let (fallback, h) = (Arc::clone(&self.ports.fallback), host.clone());
-            let signed_in = tokio::task::spawn_blocking(move || {
-                fallback.forget(&h);
-                fallback.token(&h).is_some()
-            })
-            .await
-            .unwrap_or(false);
-            if signed_in {
+            let account = tokio::task::spawn_blocking(move || fallback.signed_in(&h))
+                .await
+                .ok()
+                .flatten();
+            if let Some(account) = account {
+                let _ = self.signed_in.send((host.host.clone(), account));
+                self.credentials.send_modify(|n| *n += 1);
                 self.wake_host(&host.host).await;
                 return;
             }

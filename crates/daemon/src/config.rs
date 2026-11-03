@@ -19,6 +19,9 @@ pub struct DaemonConfig {
     /// Where API tokens of task sources are kept.
     pub secrets: SecretsBackend,
     pub session: SessionConfig,
+    /// The `kumod` git runs as its credential helper (`kumod
+    /// git-credential`). `None` is this program.
+    pub credential_helper: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

@@ -2,6 +2,9 @@
 //
 // Transport: gRPC over HTTP/2 on TCP loopback. Every call carries
 // `authorization: Bearer <token>` (token from the discovery file).
+// Calls to every service except Core and Profiles may carry
+// `kumo-profile: <id>`: the workspace (profile) they act on. Without it
+// they act on the default profile; an unknown id fails with NOT_FOUND.
 // Keep this file backwards compatible once the UI consumes it:
 // never reuse or renumber fields, only add.
 syntax = "proto3";
@@ -40,6 +43,142 @@ message ShutdownRequest {
 }
 
 message ShutdownResponse {}
+
+// ---------------------------------------------------------------------------
+// Profiles
+// ---------------------------------------------------------------------------
+
+// Workspaces in the UI: separate accounts, tokens, namespaces and agents.
+// The engine calls them profiles (Workspace is the namespaces service).
+// A window sends its profile's id in `kumo-profile` on every other call.
+service Profiles {
+  rpc List(ListProfilesRequest) returns (ProfileList);
+  // Last in the switcher. Its id is a slug of the name, and never changes.
+  rpc Create(CreateProfileRequest) returns (Profile);
+  rpc Update(UpdateProfileRequest) returns (Profile);
+  // Stops its agents and terminals and deletes its data and keychain
+  // tokens; repositories and worktrees on disk stay. Refused (FAILED_PRECONDITION) for the default profile, the
+  // last one, and one a window is showing.
+  rpc Delete(DeleteProfileRequest) returns (DeleteProfileResponse);
+  // Every profile with what runs in it, then again on each change. A
+  // window keeps this open with its `kumo-profile`: that profile counts as
+  // in use while the stream lives.
+  rpc Watch(WatchProfilesRequest) returns (stream ProfileList);
+  // Key pairs in ~/.ssh (and lone .pub files, for keys an agent holds):
+  // name, path and fingerprint. Never what a key holds.
+  rpc ListSshKeys(ListSshKeysRequest) returns (SshKeyList);
+  // Every account `gh` is signed in to, per host, to pick a profile's.
+  rpc ListGhAccounts(ListGhAccountsRequest) returns (GhAccountList);
+  // For `kumod git-credential`: the token git sends a host, as the profile
+  // in `kumo-profile`. Only hosts of that profile's repositories
+  // (NOT_FOUND otherwise); empty when it has none.
+  rpc GitCredential(GitCredentialRequest) returns (GitCredentialResponse);
+}
+
+message ListProfilesRequest {}
+
+message WatchProfilesRequest {}
+
+message ProfileList {
+  // In switcher order.
+  repeated Profile profiles = 1;
+}
+
+message Profile {
+  string id = 1;
+  // Empty for the default profile until the user names it.
+  string name = 2;
+  string color = 3;            // "#8C9BFF"
+  uint32 position = 4;
+  // Where new worktrees go: <dir>/<repo>/<branch>. `~/` is the home.
+  string worktrees_dir = 5;
+  string git_name = 6;         // empty: the user's git config
+  string git_email = 7;
+  // Kumo's data from before profiles. Can't be deleted.
+  bool is_default = 8;
+  // What it has and runs right now (for the switcher).
+  uint32 agents_running = 9;
+  uint32 agents_waiting = 10;  // agents whose turn ended (needs you)
+  uint32 terminals_open = 11;
+  uint32 namespaces = 12;
+  uint32 repos = 13;
+  // Path in ~/.ssh git uses inside this profile; empty: none. With a key
+  // SSH remotes use it; without one, SSH remotes of hosts the profile has
+  // an account or token for go over HTTPS with it.
+  string ssh_key = 14;
+  bool sign_commits = 15;      // sign with ssh_key; ignored without one
+  // The gh account it uses per host, whichever gh has active.
+  repeated GhAccount gh_accounts = 16;
+}
+
+message GhAccount {
+  string host = 1;             // "github.com"
+  string login = 2;
+}
+
+message GhAccounts {
+  repeated GhAccount accounts = 1;
+}
+
+message ListSshKeysRequest {}
+
+message SshKeyList {
+  repeated SshKey keys = 1;
+}
+
+message SshKey {
+  string name = 1;             // "id_ed25519"
+  // What Profile.ssh_key takes: "~/.ssh/id_ed25519" (".pub" when only
+  // that is on disk).
+  string path = 2;
+  string fingerprint = 3;      // "SHA256:…"; empty if unknown
+  string kind = 4;             // "ed25519"
+  bool agent_only = 5;         // only the .pub is on disk
+}
+
+message ListGhAccountsRequest {}
+
+message GhAccountList {
+  repeated GhAccount accounts = 1;
+}
+
+message GitCredentialRequest {
+  string host = 1;             // as git asks: "github.com"
+}
+
+message GitCredentialResponse {
+  // Both empty: the profile has no token for the host.
+  string username = 1;
+  string password = 2;
+}
+
+message CreateProfileRequest {
+  string name = 1;
+  string color = 2;            // empty: the default color
+  // Copies that profile's agent commands (never sign-ins). Empty: none.
+  string copy_agents_from = 3;
+}
+
+// Unset fields stay as they are.
+message UpdateProfileRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string color = 3;
+  optional uint32 position = 4;
+  optional string worktrees_dir = 5;  // empty: unchanged
+  optional string git_name = 6;       // empty: back to the user's git config
+  optional string git_email = 7;
+  optional string ssh_key = 8;         // empty: no key
+  optional bool sign_commits = 9;
+  // Set: replaces them all (no accounts clears them).
+  optional GhAccounts gh_accounts = 10;
+}
+
+message DeleteProfileRequest {
+  string id = 1;
+}
+
+message DeleteProfileResponse {}
 
 // ---------------------------------------------------------------------------
 // Terminals
@@ -549,6 +688,10 @@ message AgentProvider {
   // The setting: read them ("Read Claude Code's usage through its status
   // line"). On by default.
   bool read_usage = 15;
+  // Its sign-in, settings and sessions are this workspace's own. False: it
+  // shares the Mac's (the first workspace, custom agents, and CLIs whose
+  // sign-in can't be kept apart yet).
+  bool own_sign_in = 16;
 }
 
 message ListProvidersRequest {}

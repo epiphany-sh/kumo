@@ -1,0 +1,282 @@
+//! Builds each profile's services over that profile's data folder.
+
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use futures::future::BoxFuture;
+use kumo_application::agents::{AgentPorts, AgentService};
+use kumo_application::changes::{ChangesPorts, ChangesService};
+use kumo_application::docs::{DocsPorts, DocsService};
+use kumo_application::pipelines::{PipelinesPorts, PipelinesService, PipelinesTiming};
+use kumo_application::profiles::{GitEnvironment, OpenProfile, ProfileServices};
+use kumo_application::pulls::{PullRequestPorts, PullRequestService};
+use kumo_application::tasks::{TaskPorts, TaskService, TaskTiming};
+use kumo_application::terminal::TerminalService;
+use kumo_application::test_runs::{TestPorts, TestService};
+use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
+use kumo_domain::agents::{CliHomes, ProgramLocator, SharedCliHomes};
+use kumo_domain::pipelines::{HostTokens, TokenFallback};
+use kumo_domain::profiles::{Profile, ProfileActivity, ProfileEnv, ProfileError, ProfileId};
+use kumo_domain::tasks::{SecretStore, TaskConnector};
+use kumo_domain::workspace::{WorkspaceStore, WorktreeLocation};
+use kumo_infrastructure::agents::{
+    ClaudeStatusLine, CodexRollouts, ProfileCliHomes, claude_config_dir, codex_home,
+};
+use kumo_infrastructure::ci::{
+    BitbucketPipelines, BitbucketPulls, GhTokenFallback, GitHubActions, GitHubPulls, GitLabCi,
+    GitLabPulls,
+};
+use kumo_infrastructure::docs::{ConfluenceDocs, VaultDocs};
+use kumo_infrastructure::fs::{LocalFileStore, LocalProjectReader};
+use kumo_infrastructure::git::{FsRepoFinder, GitCli};
+use kumo_infrastructure::profiles::profile_dir;
+use kumo_infrastructure::secrets::{KeychainSecretStore, MemorySecretStore};
+use kumo_infrastructure::storage::{SqliteAgentStore, SqliteTaskStore, SqliteWorkspaceStore};
+use kumo_infrastructure::tasks::{
+    BearConnector, GitHubConnector, JiraConnector, ObsidianConnector, TodoistConnector,
+};
+use kumo_infrastructure::watch::NotifyWatcher;
+
+const DATABASE: &str = "kumo.db";
+
+/// Where tokens are kept; each profile gets a store with its own names.
+#[derive(Debug, Clone)]
+pub(crate) enum Secrets {
+    Keychain(KeychainSecretStore),
+    Memory(MemorySecretStore),
+}
+
+impl Secrets {
+    /// The task sources' and hosts' tokens of `profile`.
+    fn for_profile(&self, profile: &ProfileId) -> (Arc<dyn SecretStore>, Arc<dyn HostTokens>) {
+        match self {
+            Self::Keychain(store) => {
+                let store = Arc::new(store.for_profile(profile));
+                (store.clone(), store)
+            }
+            Self::Memory(store) => {
+                let store = Arc::new(store.for_profile(profile));
+                (store.clone(), store)
+            }
+        }
+    }
+
+    fn purge(&self, profile: &ProfileId) -> Result<usize, String> {
+        match self {
+            Self::Keychain(store) => store.purge(profile),
+            Self::Memory(store) => store.purge(profile),
+        }
+    }
+}
+
+/// What every profile shares: the machine, its programs and its terminals.
+pub(crate) struct ProfileOpener {
+    pub data_dir: PathBuf,
+    pub home: PathBuf,
+    pub locator: Arc<dyn ProgramLocator>,
+    pub secrets: Secrets,
+    /// `!'<kumod>' --data-dir '<data>' git-credential`, for git config.
+    pub helper: String,
+    pub terminals: Arc<TerminalService>,
+}
+
+impl OpenProfile<ProfileServices> for ProfileOpener {
+    fn open<'a>(
+        &'a self,
+        profile: &'a Profile,
+    ) -> BoxFuture<'a, Result<ProfileServices, ProfileError>> {
+        Box::pin(async move {
+            self.build(profile).await.map_err(|e| ProfileError::Open {
+                id: profile.id.to_string(),
+                reason: format!("{e:#}"),
+            })
+        })
+    }
+
+    fn stats(&self, profile: &Profile) -> ProfileActivity {
+        let db = profile_dir(&self.data_dir, &profile.id).join(DATABASE);
+        if !db.exists() {
+            return ProfileActivity::default();
+        }
+        let stored = SqliteWorkspaceStore::open(&db)
+            .ok()
+            .and_then(|s| s.load().ok());
+        stored.map_or_else(ProfileActivity::default, |stored| ProfileActivity {
+            namespaces: u32::try_from(stored.namespaces.len()).unwrap_or(u32::MAX),
+            repos: u32::try_from(stored.repos.len()).unwrap_or(u32::MAX),
+            ..ProfileActivity::default()
+        })
+    }
+
+    fn forget(&self, profile: &Profile) -> Result<(), ProfileError> {
+        let deleted = self
+            .secrets
+            .purge(&profile.id)
+            .map_err(ProfileError::Storage)?;
+        tracing::info!(profile = %profile.id, deleted, "keychain tokens deleted");
+        Ok(())
+    }
+}
+
+impl ProfileOpener {
+    /// Every per-profile service over `<profile dir>/kumo.db`.
+    async fn build(&self, profile: &Profile) -> anyhow::Result<ProfileServices> {
+        let dir = profile_dir(&self.data_dir, &profile.id);
+        std::fs::create_dir_all(&dir)?;
+        let db = dir.join(DATABASE);
+        let home = &self.home;
+        let locator = &self.locator;
+        // Filled in once the services it reads exist (below); git and
+        // terminals read it on every run.
+        let env = ProfileEnv::default();
+        let terminals = Arc::new(self.terminals.scoped(profile.id.clone(), env.clone()));
+        let git = GitCli::for_profile(env.clone());
+        let (secrets, host_tokens) = self.secrets.for_profile(&profile.id);
+
+        let workspace = Arc::new(
+            WorkspaceService::load(WorkspacePorts {
+                git: Arc::new(git.clone()),
+                store: Arc::new(SqliteWorkspaceStore::open(&db)?),
+                finder: Arc::new(FsRepoFinder::new(home)),
+                watcher: Arc::new(NotifyWatcher),
+                location: WorktreeLocation::new(home),
+            })
+            .await?,
+        );
+        // Git state is read in the background: the daemon answers right away.
+        let initial = Arc::clone(&workspace);
+        tokio::spawn(async move { initial.refresh().await });
+        // Worktrees and changes made from a terminal show without a refresh.
+        workspace.sync();
+
+        let connectors: Vec<Arc<dyn TaskConnector>> = vec![
+            Arc::new(ObsidianConnector::new(home)),
+            Arc::new(BearConnector::new(home)),
+            Arc::new(GitHubConnector::new(Arc::clone(locator))),
+            Arc::new(JiraConnector::default()),
+            Arc::new(TodoistConnector::default()),
+        ];
+        let task_store = Arc::new(SqliteTaskStore::open(&db)?);
+        // Docs read through the task sources' accounts and vaults.
+        let docs = Arc::new(DocsService::new(
+            DocsPorts {
+                sources: task_store.clone(),
+                secrets: Arc::clone(&secrets),
+                connectors: vec![Arc::new(ConfluenceDocs::default()), Arc::new(VaultDocs)],
+            },
+            std::time::Duration::from_secs(60),
+        ));
+        let tasks = TaskService::load(
+            TaskPorts {
+                store: task_store,
+                secrets: Arc::clone(&secrets),
+                connectors,
+                watcher: Arc::new(NotifyWatcher),
+            },
+            TaskTiming::default(),
+        )
+        .await?;
+
+        // gh's sign-in: one cached token for pipelines and pull requests.
+        let gh: Arc<dyn TokenFallback> = Arc::new(GhTokenFallback::new(Arc::clone(locator)));
+        let pipelines = Arc::new(PipelinesService::new(
+            PipelinesPorts {
+                clients: vec![
+                    Arc::new(GitHubActions::default()),
+                    Arc::new(GitLabCi::default()),
+                    Arc::new(BitbucketPipelines::default()),
+                ],
+                tokens: Arc::clone(&host_tokens),
+                fallback: Arc::clone(&gh),
+                branches: Arc::new(git.clone()),
+                terminals: Arc::clone(&terminals) as _,
+            },
+            PipelinesTiming::default(),
+            workspace.watch(),
+        ));
+        let pulls = Arc::new(PullRequestService::new(
+            PullRequestPorts {
+                clients: vec![
+                    Arc::new(GitHubPulls::default()),
+                    Arc::new(GitLabPulls::default()),
+                    Arc::new(BitbucketPulls::default()),
+                ],
+                tokens: Arc::clone(&host_tokens),
+                fallback: gh,
+                branches: Arc::new(git.clone()),
+            },
+            workspace.watch(),
+            std::time::Duration::from_secs(60),
+        ));
+
+        let git_env = GitEnvironment::start(
+            env,
+            profile.clone(),
+            home.clone(),
+            self.helper.clone(),
+            workspace.watch(),
+            Arc::clone(&pipelines),
+        )
+        .await;
+
+        // CLIs whose sign-in can be kept apart get a folder of the profile's
+        // own; the default profile keeps the user's (~/.claude, ~/.codex).
+        let (homes, claude_dir, codex_dir): (Arc<dyn CliHomes>, _, _) = if profile.is_default() {
+            (
+                Arc::new(SharedCliHomes),
+                claude_config_dir(home),
+                codex_home(home),
+            )
+        } else {
+            let homes = ProfileCliHomes::new(&dir.join("cli"));
+            let (claude, codex) = (homes.dir("claude"), homes.dir("codex"));
+            (Arc::new(homes), claude, codex)
+        };
+
+        let agent_store = Arc::new(SqliteAgentStore::open(&db)?);
+        let agents = Arc::new(AgentService::new(
+            AgentPorts {
+                store: agent_store.clone(),
+                locator: Arc::clone(locator),
+                // Plan limits and context windows, as the CLIs report them.
+                usage: vec![
+                    Arc::new(ClaudeStatusLine::new(&dir.join("agents"), &claude_dir)),
+                    Arc::new(CodexRollouts::new(&codex_dir)),
+                ],
+                plans: agent_store,
+                homes,
+            },
+            Arc::clone(&terminals),
+            Arc::clone(&workspace),
+        ));
+        let changes = Arc::new(ChangesService::new(
+            ChangesPorts {
+                git: Arc::new(git.clone()),
+                files: Arc::new(LocalFileStore),
+                watcher: Arc::new(NotifyWatcher),
+            },
+            Arc::clone(&workspace),
+        ));
+        let tests = Arc::new(TestService::new(
+            TestPorts {
+                files: Arc::new(LocalProjectReader),
+                locator: Arc::clone(locator),
+            },
+            Arc::clone(&terminals),
+            Arc::clone(&workspace),
+        ));
+        Ok(ProfileServices {
+            home: home.clone(),
+            workspace,
+            changes,
+            agents,
+            tasks,
+            pipelines,
+            pulls,
+            docs,
+            tests,
+            terminals,
+            git: git_env,
+        })
+    }
+}

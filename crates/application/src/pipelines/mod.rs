@@ -4,7 +4,9 @@
 
 mod service;
 
-pub use service::{PipelinesPorts, PipelinesService, PipelinesTiming, TerminalLauncher};
+pub use service::{
+    GitCredential, PipelinesPorts, PipelinesService, PipelinesTiming, TerminalLauncher,
+};
 
 #[cfg(test)]
 mod tests;

@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use crate::profiles::GhAccount;
 use crate::terminal::LaunchSpec;
 
 use super::{CiHost, CiProblem, CiProvider, CiRun, CiTarget, PipelinesError};
@@ -45,6 +46,18 @@ pub trait TokenFallback: Send + Sync + 'static {
 
     /// Drops what it remembers about `host` (it's being signed in).
     fn forget(&self, _host: &CiHost) {}
+
+    /// Uses these accounts on their hosts, whichever account the CLI has
+    /// active; other hosts keep the active one.
+    fn use_accounts(&self, _accounts: &[GhAccount]) {}
+
+    /// After [`Self::sign_in`]: the account it signed in to `host`, once
+    /// it's done; None while it isn't.
+    fn signed_in(&self, host: &CiHost) -> Option<String> {
+        self.forget(host);
+        self.token(host)?;
+        Some(self.account(host).unwrap_or_default())
+    }
 }
 
 /// The branch checked out in a worktree, as git sees it locally.

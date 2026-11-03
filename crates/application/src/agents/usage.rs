@@ -249,6 +249,7 @@ mod tests {
                 ..AgentProvider::from_preset(AgentPreset::find(id).unwrap())
             },
             resolved: None,
+            own_sign_in: false,
         }
     }
 

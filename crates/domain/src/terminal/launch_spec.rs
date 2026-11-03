@@ -49,6 +49,14 @@ impl LaunchSpec {
         self
     }
 
+    /// Adds the variables it doesn't set already.
+    pub fn with_default_env(mut self, env: impl IntoIterator<Item = (String, String)>) -> Self {
+        for (key, value) in env {
+            self.env.entry(key).or_insert(value);
+        }
+        self
+    }
+
     pub fn with_size(mut self, size: TerminalSize) -> Self {
         self.size = size;
         self

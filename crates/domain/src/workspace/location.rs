@@ -7,13 +7,26 @@ use super::{BranchName, WorkspaceError};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorktreeLocation {
     home: PathBuf,
+    /// Where `<repo>/<branch>` folders go when no path is requested.
+    root: PathBuf,
 }
 
 impl WorktreeLocation {
     pub const DEFAULT_ROOT: &'static str = "wt";
 
+    /// Worktrees under `~/wt`.
     pub fn new(home: impl Into<PathBuf>) -> Self {
-        Self { home: home.into() }
+        let home = home.into();
+        Self {
+            root: home.join(Self::DEFAULT_ROOT),
+            home,
+        }
+    }
+
+    /// Worktrees under `root` (`~/…` or absolute) instead of `~/wt`.
+    pub fn with_root(mut self, root: &str) -> Result<Self, WorkspaceError> {
+        self.root = self.expand(root)?;
+        Ok(self)
     }
 
     pub fn resolve(
@@ -24,12 +37,14 @@ impl WorktreeLocation {
     ) -> Result<PathBuf, WorkspaceError> {
         let requested = requested.trim();
         if requested.is_empty() {
-            return Ok(self
-                .home
-                .join(Self::DEFAULT_ROOT)
-                .join(repo_name)
-                .join(branch.slug()));
+            return Ok(self.root.join(repo_name).join(branch.slug()));
         }
+        self.expand(requested)
+    }
+
+    /// `~`, `~/…` or an absolute path.
+    fn expand(&self, requested: &str) -> Result<PathBuf, WorkspaceError> {
+        let requested = requested.trim();
         if requested == "~" {
             return Ok(self.home.clone());
         }
@@ -58,6 +73,22 @@ mod tests {
             .resolve("", "price-admin", &branch("feat/PRC-1"))
             .unwrap();
         assert_eq!(path, PathBuf::from("/home/me/wt/price-admin/feat-PRC-1"));
+    }
+
+    #[test]
+    fn a_root_moves_the_default_folder_but_not_requested_paths() {
+        let location = WorktreeLocation::new("/home/me")
+            .with_root("~/wt/workspace-1")
+            .unwrap();
+        assert_eq!(
+            location.resolve("", "api", &branch("main")).unwrap(),
+            PathBuf::from("/home/me/wt/workspace-1/api/main")
+        );
+        assert_eq!(
+            location.resolve("~/x", "api", &branch("main")).unwrap(),
+            PathBuf::from("/home/me/x")
+        );
+        assert!(WorktreeLocation::new("/home/me").with_root("rel").is_err());
     }
 
     #[test]

@@ -30,7 +30,9 @@ const KEEP_FOR: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 #[derive(Debug)]
 pub struct ClaudeStatusLine {
     root: PathBuf,
-    home: PathBuf,
+    /// Claude Code's user folder: `~/.claude`, or the profile's
+    /// `CLAUDE_CONFIG_DIR`.
+    config_dir: PathBuf,
     /// When each session's `status.json` was last read.
     seen: Mutex<HashMap<AgentSessionId, SystemTime>>,
 }
@@ -38,11 +40,13 @@ pub struct ClaudeStatusLine {
 impl ClaudeStatusLine {
     /// `root`: e.g. `<data_dir>/agents`. Folders nothing wrote to for
     /// [`KEEP_FOR`] are removed; recent ones stay, whatever ran them.
-    pub fn new(root: &Path, home: &Path) -> Self {
+    /// `config_dir`: where the user's settings are (see
+    /// [`claude_config_dir`]).
+    pub fn new(root: &Path, config_dir: &Path) -> Self {
         prune(root, SystemTime::now());
         Self {
             root: root.to_owned(),
-            home: home.to_owned(),
+            config_dir: config_dir.to_owned(),
             seen: Mutex::default(),
         }
     }
@@ -66,7 +70,7 @@ impl UsageSource for ClaudeStatusLine {
         }
         let dir = self.dir(&target.session_id);
         std::fs::create_dir_all(&dir).map_err(io_error)?;
-        let theirs = user_status_line(&target.worktree, &self.home);
+        let theirs = user_status_line(&target.worktree, &self.config_dir);
         let settings = settings_for(&dir, theirs);
         let path = dir.join(SETTINGS);
         std::fs::write(&path, settings.to_string()).map_err(io_error)?;
@@ -116,13 +120,22 @@ fn prune(root: &Path, now: SystemTime) {
     }
 }
 
+/// Claude Code's user folder outside profiles: `$CLAUDE_CONFIG_DIR`, else
+/// `~/.claude`.
+pub fn claude_config_dir(home: &Path) -> PathBuf {
+    std::env::var_os("CLAUDE_CONFIG_DIR")
+        .filter(|v| !v.is_empty())
+        .map_or_else(|| home.join(".claude"), PathBuf::from)
+}
+
 /// The user's own `statusLine`, from the file that wins for the project:
-/// project local, then shared project, then user settings.
-pub fn user_status_line(project: &Path, home: &Path) -> Option<Map<String, Value>> {
+/// project local, then shared project, then user settings (in
+/// `config_dir`, Claude Code's user folder).
+pub fn user_status_line(project: &Path, config_dir: &Path) -> Option<Map<String, Value>> {
     [
         project.join(".claude/settings.local.json"),
         project.join(".claude/settings.json"),
-        home.join(".claude/settings.json"),
+        config_dir.join("settings.json"),
     ]
     .iter()
     .find_map(|file| {
@@ -481,7 +494,10 @@ mod tests {
     fn keeps_the_user_s_status_line_from_the_winning_settings_file() {
         let home = tempfile::tempdir().unwrap();
         let project = tempfile::tempdir().unwrap();
-        assert_eq!(user_status_line(project.path(), home.path()), None);
+        assert_eq!(
+            user_status_line(project.path(), &home.path().join(".claude")),
+            None
+        );
 
         std::fs::create_dir_all(home.path().join(".claude")).unwrap();
         std::fs::write(
@@ -489,7 +505,7 @@ mod tests {
             r#"{"statusLine":{"type":"command","command":"~/.claude/statusline.sh","padding":2}}"#,
         )
         .unwrap();
-        let theirs = user_status_line(project.path(), home.path()).unwrap();
+        let theirs = user_status_line(project.path(), &home.path().join(".claude")).unwrap();
         assert_eq!(theirs["command"], "~/.claude/statusline.sh");
 
         std::fs::create_dir_all(project.path().join(".claude")).unwrap();
@@ -499,7 +515,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            user_status_line(project.path(), home.path()).unwrap()["command"],
+            user_status_line(project.path(), &home.path().join(".claude")).unwrap()["command"],
             "project-line"
         );
 
@@ -545,6 +561,29 @@ mod tests {
         assert!(!root.path().join("s1").exists());
         assert!(root.path().join("stray-file").exists());
         prune(&root.path().join("missing"), SystemTime::now());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_profiles_sessions_run_its_own_status_line() {
+        let data = tempfile::tempdir().unwrap();
+        let profile = tempfile::tempdir().unwrap();
+        let config = profile.path().join("cli/claude");
+        std::fs::create_dir_all(&config).unwrap();
+        std::fs::write(
+            config.join("settings.json"),
+            r#"{"statusLine":{"type":"command","command":"workspace-1-line"}}"#,
+        )
+        .unwrap();
+        let source = ClaudeStatusLine::new(&data.path().join("agents"), &config);
+        let target = UsageTarget {
+            session_id: AgentSessionId::parse("s1").unwrap(),
+            worktree: data.path().to_owned(),
+            started_at: Timestamp::now(),
+        };
+        let args = source.launch_args(&target).unwrap();
+        let settings = std::fs::read_to_string(&args[1]).unwrap();
+        assert!(settings.contains("workspace-1-line"), "{settings}");
     }
 
     #[cfg(unix)]
