@@ -15,7 +15,8 @@ enum EngineStatus { connecting, ready, failed }
 /// An authenticated connection to `kumod`.
 class EngineConnection {
   EngineConnection._(this.channel, this.endpoint, this.serverVersion, CallOptions auth, {this.outdated = false})
-      : core = CoreClient(channel, options: auth),
+      : options = auth,
+        core = CoreClient(channel, options: auth),
         terminals = TerminalsClient(channel, options: auth),
         workspace = WorkspaceClient(channel, options: auth),
         git = GitClient(channel, options: auth),
@@ -24,10 +25,18 @@ class EngineConnection {
         pipelines = PipelinesClient(channel, options: auth),
         pulls = PullRequestsClient(channel, options: auth),
         docs = DocsClient(channel, options: auth),
-        tests = TestsClient(channel, options: auth);
+        tests = TestsClient(channel, options: auth),
+        profiles = ProfilesClient(channel, options: auth);
 
   final ClientChannel channel;
   final DaemonEndpoint endpoint;
+
+  /// What every call carries (auth, and a workspace's `kumo-profile`).
+  final CallOptions options;
+
+  /// The same daemon and channel, every call on workspace [profile].
+  EngineConnection forProfile(String profile) =>
+      EngineConnection._(channel, endpoint, serverVersion, options.mergedWith(CallOptions(metadata: {'kumo-profile': profile})), outdated: outdated);
   final String serverVersion;
 
   /// The daemon's program was replaced on disk (an update or a rebuild):
@@ -43,35 +52,58 @@ class EngineConnection {
   final PullRequestsClient pulls;
   final DocsClient docs;
   final TestsClient tests;
+  final ProfilesClient profiles;
 }
 
 /// Discovers or launches the daemon, handshakes and hands out the
 /// connection. The UI never blocks on it: callers await [connection].
 class KumoEngine extends ChangeNotifier {
-  KumoEngine({DaemonDiscovery? discovery, this.launcher = const DaemonLauncher()}) : discovery = discovery ?? DaemonDiscovery();
+  KumoEngine({DaemonDiscovery? discovery, this.launcher = const DaemonLauncher()})
+      : discovery = discovery ?? DaemonDiscovery(),
+        profile = null,
+        _parent = null;
+
+  /// Workspace [profile] through [parent]'s daemon and channel: every call
+  /// carries `kumo-profile`, and it follows the parent's status, restarts
+  /// and updates (it never discovers or launches a daemon itself).
+  KumoEngine.scoped(KumoEngine parent, String this.profile)
+      : discovery = parent.discovery,
+        launcher = parent.launcher,
+        _parent = parent {
+    parent.addListener(notifyListeners);
+  }
+
+  final KumoEngine? _parent;
+  EngineConnection? _scopedFrom;
+  EngineConnection? _scoped;
 
   final DaemonDiscovery discovery;
   final DaemonLauncher launcher;
 
+  /// The workspace (daemon profile) every call acts on, sent as
+  /// `kumo-profile`; null: the default one. Each workspace a window shows
+  /// gets its own engine, so calls of one never carry another's id.
+  final String? profile;
+
   EngineStatus _status = EngineStatus.connecting;
-  EngineStatus get status => _status;
+  EngineStatus get status => _parent?.status ?? _status;
 
   String? _error;
-  String? get error => _error;
+  String? get error => _parent != null ? _parent.error : _error;
 
   EngineConnection? _connection;
-  EngineConnection? get current => _connection;
+  EngineConnection? get current => _parent != null ? _scopedOf(_parent.current) : _connection;
 
   /// The daemon runs an old program (see [EngineConnection.outdated]). It
   /// restarts on its own once no terminal runs; [restartDaemon] does it now.
-  bool get outdated => _connection?.outdated ?? false;
+  bool get outdated => _parent?.outdated ?? _connection?.outdated ?? false;
 
   /// Terminals running in an [outdated] daemon: they end with it.
-  int get runningInOutdated => _running;
+  int get runningInOutdated => _parent?.runningInOutdated ?? _running;
   int _running = 0;
 
   /// The daemon is restarting: its streams end, and that's no error.
-  bool get restarting => _restarting;
+  bool get restarting => _parent?.restarting ?? _restarting;
   bool _restarting = false;
   Timer? _idleCheck;
 
@@ -83,6 +115,8 @@ class KumoEngine extends ChangeNotifier {
   /// The live connection, connecting (and launching `kumod`) if needed.
   /// After a failure, the next call tries again.
   Future<EngineConnection> connection() {
+    final parent = _parent;
+    if (parent != null) return parent.connection().then((c) => _scopedOf(c)!);
     if (_stopped) return Future.error(StateError('kumod stopped: Kumo is restarting'));
     final ready = _connection;
     if (ready != null) return Future.value(ready);
@@ -94,6 +128,7 @@ class KumoEngine extends ChangeNotifier {
   /// instead of finding the old one running. Nothing reconnects afterwards,
   /// which would launch the old program again.
   Future<void> stopForUpdate() async {
+    if (_parent != null) return _parent.stopForUpdate();
     if (_stopped) return;
     _stopped = true;
     _restarting = true;
@@ -201,6 +236,7 @@ class KumoEngine extends ChangeNotifier {
   /// ends its running terminals; without it the daemon refuses while one
   /// runs. Calls for the connection meanwhile get the new daemon's.
   Future<void> restartDaemon({bool force = false}) async {
+    if (_parent != null) return _parent.restartDaemon(force: force);
     final old = _connection;
     if (old == null || _restarting) return;
     _restarting = true;
@@ -242,8 +278,26 @@ class KumoEngine extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// [c] with this engine's workspace, made once per parent connection.
+  EngineConnection? _scopedOf(EngineConnection? c) {
+    final id = profile;
+    if (c == null || id == null) return c;
+    if (!identical(c, _scopedFrom)) {
+      _scopedFrom = c;
+      _scoped = c.forProfile(id);
+    }
+    return _scoped;
+  }
+
   @override
   void dispose() {
+    final parent = _parent;
+    if (parent != null) {
+      // The channel is the parent's.
+      parent.removeListener(notifyListeners);
+      super.dispose();
+      return;
+    }
     _idleCheck?.cancel();
     _connection?.channel.shutdown();
     super.dispose();

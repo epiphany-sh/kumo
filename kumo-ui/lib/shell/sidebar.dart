@@ -8,11 +8,14 @@ import 'package:flutter/services.dart';
 import '../app/app_state.dart';
 import '../data/agents_source.dart';
 import '../data/ai_usage_source.dart';
+import '../data/profiles_source.dart';
 import '../data/models.dart';
 import '../overlays/namespace_dialog.dart';
+import '../overlays/new_workspace_dialog.dart';
 import '../overlays/new_worktree_popover.dart';
 import '../overlays/settings_dialog.dart';
 import '../platform/git_user.dart';
+import '../platform/new_window.dart';
 import '../platform/window_effects.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/anchored_popover.dart';
@@ -20,6 +23,7 @@ import '../widgets/context_menu.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
+import '../widgets/profile_tile.dart';
 import '../widgets/usage_meter.dart';
 
 Color toneColor(BuildContext context, WorktreeTone t) {
@@ -142,70 +146,116 @@ class Sidebar extends StatelessWidget {
 
 /// The namespace being worked in (the selected worktree's), with its real
 /// counts; the menu jumps to another namespace or creates one.
+/// The workspace this window shows, and the way to another: each keeps
+/// its own accounts, tokens, namespaces and agents. A dot when an agent of
+/// another workspace needs you. ⌃⌘1…9 switch without the menu.
 class _WorkspaceSwitcher extends StatelessWidget {
   const _WorkspaceSwitcher();
 
-  /// Selects the namespace's first repository's main checkout.
-  static void _enter(AppState s, Namespace ns) {
-    for (final id in ns.repos) {
-      final main = s.workspace.repo(id)?.worktrees.where((w) => w.isMain).firstOrNull;
-      if (main != null) return s.selectWorktree(main.branch, path: main.path);
-    }
+  static String _key(int i) => i < 9 ? '⌃⌘${i + 1}' : '';
+
+  void _menu(BuildContext anchor, AppState s) {
+    final width = ((anchor.findRenderObject() as RenderBox?)?.size.width ?? 260.0).clamp(240.0, 320.0);
+    showKMenu(
+      anchor,
+      position: belowOf(anchor, right: false),
+      builder: (context, close) {
+        final c = context.c;
+        final all = s.profiles.profiles;
+        return KMenuPanel(width: width, children: [
+          Padding(padding: const EdgeInsets.fromLTRB(8, 4, 8, 4), child: Text('WORKSPACES', style: microLabel(c))),
+          for (var i = 0; i < all.length; i++)
+            _ProfileRow(
+              key: ValueKey('profile-${all[i].id}'),
+              profile: all[i],
+              current: all[i].id == s.profile.id,
+              shortcut: s.profiles.canManage ? _key(i) : '',
+              onTap: () {
+                close();
+                s.switchProfile(all[i].id);
+              },
+              onNewWindow: s.profiles.canManage && all[i].id != s.profile.id
+                  ? () async {
+                      close();
+                      final why = await openWorkspaceWindow(all[i].id);
+                      if (why != null) s.reportWorkspaceError(why);
+                    }
+                  : null,
+            ),
+          const KMenuDivider(),
+          KMenuItem(
+            icon: KIcons.add,
+            label: 'New workspace…',
+            note: s.profiles.canManage ? null : (s.profiles.loading ? 'Loading workspaces…' : 'Update kumod to keep workspaces apart'),
+            onTap: s.profiles.canManage
+                ? () {
+                    close();
+                    showNewWorkspaceDialog(anchor);
+                  }
+                : null,
+          ),
+          KMenuItem(
+            icon: KIcons.settings,
+            label: 'Manage workspaces…',
+            onTap: () {
+              close();
+              showSettingsDialog(anchor, initial: SettingsTab.workspaces);
+            },
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+            child: Text(
+              'Each workspace has its own accounts, tokens, namespaces and agents. The others keep running while you’re away.',
+              style: sans(11, color: c.text3, height: 1.4),
+            ),
+          ),
+        ]);
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final s = AppScope.of(context);
-    final active = s.activeRepo;
-    final ns = s.namespaces.where((n) => active != null && n.repos.contains(active.id)).firstOrNull ?? s.namespaces.firstOrNull;
-    final repos = [for (final id in ns?.repos ?? const <String>[]) s.workspace.repo(id)].whereType<Repo>().toList();
-    final worktrees = repos.fold<int>(0, (n, r) => n + s.worktreesOf(r).length);
-    final name = ns?.name ?? 'Kumo';
-    final detail = ns == null ? 'No namespaces yet' : '${repos.length} ${repos.length == 1 ? 'repo' : 'repos'} · $worktrees ${worktrees == 1 ? 'worktree' : 'worktrees'}';
+    final p = s.profile;
+    final repos = s.workspace.repos.length;
+    final ns = s.namespaces.length;
+    final detail = ns == 0 ? 'No namespaces yet' : '$ns ${ns == 1 ? 'namespace' : 'namespaces'} · $repos ${repos == 1 ? 'repo' : 'repos'}';
+    final waiting = [for (final o in s.profiles.profiles) if (o.id != p.id && o.agentsWaiting > 0) o];
+    final count = s.profiles.profiles.length;
+    final tip = [
+      p.displayName,
+      for (final o in waiting) '${o.displayName}: ${o.activity}',
+      if (count > 1) 'Switch with ⌃⌘1…⌃⌘${count.clamp(1, 9)}',
+    ].join('\n');
     return Builder(
       builder: (anchor) => KPressable(
-        onTap: () => showKMenu(
-          anchor,
-          position: belowOf(anchor, right: false),
-          builder: (context, close) => KMenuPanel(width: 240, children: [
-            for (final n in s.namespaces)
-              KMenuItem(
-                icon: n.id == ns?.id ? KIcons.check : KIcons.namespace,
-                label: n.name,
-                note: '${n.repos.length} ${n.repos.length == 1 ? 'repo' : 'repos'}',
-                onTap: () {
-                  close();
-                  _enter(s, n);
-                },
-              ),
-            if (s.namespaces.isNotEmpty) const KMenuDivider(),
-            KMenuItem(
-              icon: KIcons.add,
-              label: 'New namespace',
-              onTap: () {
-                close();
-                showNamespaceDialog(context);
-              },
-            ),
-          ]),
-        ),
-        semanticLabel: 'Switch namespace, current: $name',
+        key: const ValueKey('workspace-switcher'),
+        onTap: () => _menu(anchor, s),
+        semanticLabel: 'Workspace: ${p.displayName}${waiting.isEmpty ? '' : '. ${waiting.map((o) => '${o.displayName}: ${o.activity}').join('. ')}'}. Switch workspace',
+        tooltip: tip,
         builder: (context, hover, focus) => Container(
           padding: const EdgeInsets.all(8),
-          decoration: chipDecoration(c, radius: 14, fill: hover ? c.tabActive : null),
+          decoration: chipDecoration(c, radius: 14, fill: hover || focus ? c.tabActive : null),
           child: Row(children: [
-            Container(
-              width: 30,
-              height: 30,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: c.accFill, borderRadius: BorderRadius.circular(9)),
-              child: Text(_initial(name), style: sans(14, weight: FontWeight.w700, color: c.accText)),
-            ),
+            Stack(clipBehavior: Clip.none, children: [
+              ProfileTile(profile: p, size: 30),
+              if (waiting.isNotEmpty)
+                Positioned(
+                  top: -3,
+                  right: -3,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(color: c.warn, shape: BoxShape.circle, border: Border.all(color: c.panelStrong, width: 2)),
+                  ),
+                ),
+            ]),
             const SizedBox(width: 10),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, weight: FontWeight.w600, color: c.text)),
+                Text(p.displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, weight: FontWeight.w600, color: c.text)),
                 Text(detail, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, color: c.text3)),
               ]),
             ),
@@ -214,6 +264,51 @@ class _WorkspaceSwitcher extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// One workspace in the switcher: what's running there, its shortcut, and
+/// a button that opens it in a new window.
+class _ProfileRow extends StatelessWidget {
+  const _ProfileRow({super.key, required this.profile, required this.current, required this.shortcut, required this.onTap, this.onNewWindow});
+  final AppProfile profile;
+  final bool current;
+  final String shortcut;
+  final VoidCallback onTap;
+  final VoidCallback? onNewWindow;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final p = profile;
+    return Row(children: [
+      Expanded(
+        child: KPressable(
+          onTap: onTap,
+          selected: current,
+          semanticLabel: '${p.displayName}, ${p.activity}${current ? ', this window' : ''}',
+          tooltip: [p.summary, if (shortcut.isNotEmpty) shortcut].join(' · '),
+          builder: (context, hover, focus) => Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(color: current ? c.navActive : (hover || focus ? c.tile : null), borderRadius: BorderRadius.circular(9)),
+            child: Row(children: [
+              ProfileTile(profile: p, size: 24),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(p.displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, weight: current ? FontWeight.w600 : FontWeight.w500, color: c.text)),
+                  Text(p.activity, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11, color: p.agentsWaiting > 0 ? c.warn : c.text3)),
+                ]),
+              ),
+              if (shortcut.isNotEmpty) ...[const SizedBox(width: 6), Text(shortcut, style: sans(10.5, color: c.text3))],
+              SizedBox(width: 18, child: current ? Icon(KIcons.check, size: 14, color: c.acc) : null),
+            ]),
+          ),
+        ),
+      ),
+      if (onNewWindow != null)
+        KIconButton(icon: KIcons.external, label: 'Open ${p.displayName} in a new window', size: 28, iconSize: 14, color: c.text3, onTap: onNewWindow),
+    ]);
   }
 }
 
