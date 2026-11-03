@@ -1,7 +1,8 @@
 name: release
 
-# Publishes Kumo X.Y.Z: the GitHub release (zip, appcast, install.sh) and
-# the Homebrew cask. A release/X.Y.Z branch merged into main (the only kind
+# Publishes Kumo X.Y.Z: the GitHub release (the macOS zip, appcast and
+# install.sh; the Windows zip and install.ps1) and the Homebrew cask. Both
+# builds finish before anything is published: a release is never half there. A release/X.Y.Z branch merged into main (the only kind
 # `ci` lets in) publishes X.Y.Z; so does a tag vX.Y.Z pushed by hand.
 # One-time setup: docs/releasing.md.
 
@@ -59,7 +60,6 @@ jobs:
     runs-on: macos-latest
     env:
       VERSION: ${{ needs.version.outputs.version }}
-      SHA: ${{ needs.version.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -97,6 +97,55 @@ jobs:
             make release VERSION="$VERSION" RELEASE_ORG="${{ github.repository_owner }}"
           rm "$RUNNER_TEMP/sparkle-key"
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/
+          if-no-files-found: error
+
+  windows:
+    needs: version
+    if: needs.version.outputs.version != ''
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          fetch-depth: 0 # the build number counts commits
+
+      - run: rustup show active-toolchain
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+
+      - name: Build and package
+        run: RELEASE_REPO="${{ github.repository }}" packaging/windows-zip.sh "$VERSION"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: [version, macos, windows]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      SHA: ${{ needs.version.outputs.sha }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
       # Tags the commit (for a merge) only once it's built: a failed build
       # leaves no tag, and its number is used again. A tag made with this
       # token doesn't start another run. A release made by hand on GitHub
@@ -104,8 +153,10 @@ jobs:
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          files=("dist/Kumo-$VERSION.zip" dist/Kumo.zip dist/appcast.xml dist/install.sh)
+          files=("dist/Kumo-$VERSION.zip" dist/Kumo.zip dist/appcast.xml dist/install.sh
+            "dist/Kumo-$VERSION-windows-x64.zip" dist/Kumo-windows-x64.zip dist/install.ps1)
           if gh release view "v$VERSION" >/dev/null 2>&1; then
             gh release upload "v$VERSION" "${files[@]}" --clobber
           else

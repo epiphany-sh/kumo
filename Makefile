@@ -122,7 +122,7 @@ run: app stop ## Build everything, restart the daemon and open the app
 ifeq ($(PLATFORM),macos)
 	open "$(APP)"
 else
-	"$(APP_BIN)/kumo_ui.exe"
+	"$(APP_BIN)/Kumo.exe"
 endif
 
 dev: engine ## kumod (release) + Flutter in debug mode with hot reload

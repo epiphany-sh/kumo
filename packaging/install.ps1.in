@@ -1,0 +1,56 @@
+# Installs Kumo on Windows, or updates it (run it again), from PowerShell:
+#
+#   irm https://github.com/@RELEASE_REPO@/releases/latest/download/install.ps1 | iex
+#
+# Kumo isn't signed: the files are unblocked so SmartScreen doesn't stop it.
+# It goes to %LOCALAPPDATA%\Programs\Kumo, with a Start menu shortcut.
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue' # Invoke-WebRequest is much slower with the bar
+
+$repo = '@RELEASE_REPO@'
+$dest = Join-Path $env:LOCALAPPDATA 'Programs\Kumo'
+
+if (-not [Environment]::Is64BitOperatingSystem) {
+    throw 'Kumo runs on 64-bit Windows.'
+}
+
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ("kumo-" + [Guid]::NewGuid())
+New-Item -ItemType Directory -Path $tmp | Out-Null
+try {
+    Write-Host 'Downloading Kumo...'
+    $zip = Join-Path $tmp 'Kumo.zip'
+    Invoke-WebRequest "https://github.com/$repo/releases/latest/download/Kumo-windows-x64.zip" -OutFile $zip -UseBasicParsing
+    Expand-Archive $zip -DestinationPath $tmp
+
+    $ui = Get-Process -Name Kumo -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$dest\*" }
+    if ($ui) {
+        Write-Host 'Closing Kumo to replace it (your terminals keep running)...'
+        $ui | ForEach-Object { [void]$_.CloseMainWindow() }
+        $ui | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue
+        $ui | Stop-Process -Force -ErrorAction SilentlyContinue
+    }
+
+    New-Item -ItemType Directory -Path $dest -Force | Out-Null
+    # A running kumod.exe can't be overwritten, but it can be renamed: it
+    # keeps running from the old file, and Kumo restarts it on the new one
+    # once no terminals are open. Old ones go when they're no longer running.
+    Get-ChildItem $dest -Filter '*.old' | Remove-Item -Force -ErrorAction SilentlyContinue
+    $kumod = Join-Path $dest 'kumod.exe'
+    if (Test-Path $kumod) {
+        Rename-Item $kumod ("kumod.exe." + [Guid]::NewGuid() + ".old")
+    }
+    Get-ChildItem $dest -Exclude '*.old' | Remove-Item -Recurse -Force
+    Copy-Item (Join-Path $tmp 'Kumo\*') $dest -Recurse -Force
+    Get-ChildItem $dest -Recurse -File | Unblock-File
+
+    $programs = [Environment]::GetFolderPath('Programs')
+    $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $programs 'Kumo.lnk'))
+    $shortcut.TargetPath = Join-Path $dest 'Kumo.exe'
+    $shortcut.WorkingDirectory = $dest
+    $shortcut.Save()
+} finally {
+    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "Kumo is in $dest (and in the Start menu)"
+Start-Process (Join-Path $dest 'Kumo.exe')
