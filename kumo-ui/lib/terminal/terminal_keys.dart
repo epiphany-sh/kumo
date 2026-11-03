@@ -73,6 +73,13 @@ List<int> terminalPaste(String text, {bool bracketed = false}) {
   return utf8.encode(bracketed ? '\x1b[200~$normalized\x1b[201~' : normalized);
 }
 
+/// File paths as a shell takes them: backslash before blanks and
+/// metacharacters, separated by spaces, as Terminal and iTerm2 drop them.
+/// Claude Code and the like turn an image's path into an attachment.
+String terminalPaths(List<String> paths) => paths.map((p) => p.replaceAllMapped(_shellSpecial, (m) => '\\${m[0]}')).join(' ');
+
+final _shellSpecial = RegExp(r'''[\s\\'"`$!&;|<>()\[\]{}*?#~^]''');
+
 final _arrows = {
   LogicalKeyboardKey.arrowUp: 'A',
   LogicalKeyboardKey.arrowDown: 'B',

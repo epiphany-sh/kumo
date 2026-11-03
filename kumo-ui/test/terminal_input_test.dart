@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/terminal/ansi_screen.dart';
+import 'package:kumo_ui/terminal/terminal_keys.dart';
 import 'package:kumo_ui/terminal/terminal_surface.dart';
 import 'package:kumo_ui/terminal/terminal_view.dart';
 import 'package:kumo_ui/theme/kumo_theme.dart';
@@ -247,5 +248,66 @@ void main() {
     shell.feed('\x1b[?1049h');
     await holding(tester, [shift], LogicalKeyboardKey.arrowLeft);
     expect(shell.sent.map(utf8.decode).toList(), ['\x1b[1;2D']);
+  });
+
+  group('pasting and dropping files', () {
+    const channel = MethodChannel('kumo/pasteboard');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    List<String>? onClipboard;
+    setUp(() {
+      onClipboard = null;
+      messenger.setMockMethodCallHandler(channel, (call) async => call.method == 'paths' ? onClipboard : null);
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => call.method == 'Clipboard.getData' ? {'text': 'plain text'} : null);
+    });
+    tearDown(() {
+      messenger.setMockMethodCallHandler(channel, null);
+      messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    Future<void> drop(List<String> paths, Offset at) => messenger.handlePlatformMessage(
+          channel.name,
+          const StandardMethodCodec().encodeMethodCall(MethodCall('drop', {'paths': paths, 'x': at.dx, 'y': at.dy})),
+          (_) {},
+        );
+
+    test('paths are escaped as a shell takes them', () {
+      expect(terminalPaths(['/tmp/a b/Screenshot (1).png', r"/x/it's $HOME"]), r"/tmp/a\ b/Screenshot\ \(1\).png /x/it\'s\ \$HOME");
+    });
+
+    testWidgets('⌘V pastes copied files or a screenshot as paths, and text otherwise', (tester) async {
+      final shell = await _pumpShell(tester);
+      shell.feed('\x1b[?2004h');
+      onClipboard = ['/Users/me/Desktop/Screen Shot.png'];
+      await holding(tester, [meta], LogicalKeyboardKey.keyV);
+      await tester.pump();
+      onClipboard = null;
+      await holding(tester, [meta], LogicalKeyboardKey.keyV);
+      await tester.pump();
+      expect(shell.sent.map(utf8.decode).toList(), ['\x1b[200~/Users/me/Desktop/Screen\\ Shot.png\x1b[201~', '\x1b[200~plain text\x1b[201~']);
+    }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+    testWidgets('files dropped go to the pane under the pointer, not one offstage', (tester) async {
+      final shown = _FakeShell();
+      final hidden = _FakeShell();
+      await tester.pumpWidget(KumoTheme(
+        mode: KumoThemeMode.dark,
+        palette: KumoPalette.dark,
+        terminalPalette: KumoPalette.dark,
+        child: MaterialApp(
+          home: Scaffold(
+            body: IndexedStack(index: 0, children: [TerminalCanvas(surface: shown), TerminalCanvas(surface: hidden)]),
+          ),
+        ),
+      ));
+      await tester.pump();
+      final at = tester.getCenter(find.byType(TerminalCanvas).first);
+      await drop(['/a/one.png', '/a/two.txt'], at);
+      await tester.pump();
+      expect(shown.sent.map(utf8.decode).toList(), ['/a/one.png /a/two.txt']);
+      expect(hidden.sent, isEmpty);
+
+      await drop(['/a/one.png'], const Offset(-10, -10));
+      expect(shown.sent, hasLength(1), reason: 'off the pane nothing goes in');
+    });
   });
 }

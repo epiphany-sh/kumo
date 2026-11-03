@@ -4,13 +4,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart'
-    show GestureBinding, PointerPanZoomEndEvent, PointerPanZoomStartEvent, PointerPanZoomUpdateEvent, PointerScrollEvent, PointerSignalEvent, kPrimaryButton, kSecondaryButton;
+    show GestureBinding, HitTestResult, PointerPanZoomEndEvent, PointerPanZoomStartEvent, PointerPanZoomUpdateEvent, PointerScrollEvent, PointerSignalEvent, kPrimaryButton, kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter/services.dart';
 
 import '../engine/grpc_terminal_surface.dart';
 import '../platform/open_url.dart';
+import '../platform/pasteboard.dart';
 
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
@@ -577,22 +578,49 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     if (text.isNotEmpty) Clipboard.setData(ClipboardData(text: text));
   }
 
-  void _paste() {
+  /// ⌘V: the clipboard's text, or the paths of the files (or the
+  /// screenshot) on it.
+  Future<void> _paste() async {
     final surface = widget.surface;
     if (!surface.interactive) return;
+    final paths = await Pasteboard.paths();
+    final text = paths != null ? terminalPaths(paths) : (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+    if (text == null || text.isEmpty || !mounted || widget.surface != surface) return;
+    _pasteText(text);
+  }
+
+  /// [text] in as a paste, over the keyboard selection if there is one.
+  void _pasteText(String text) {
+    final surface = widget.surface;
     final modes = surface is TerminalModes ? surface : null;
-    Clipboard.getData(Clipboard.kTextPlain).then((data) {
-      final text = data?.text;
-      if (text != null && text.isNotEmpty) {
-        _toBottom();
-        final delete = _kbDelete();
-        if (delete != null) {
-          surface.sendBytes(delete);
-          setState(() => _sel = _kbSel = null);
-        }
-        surface.sendBytes(terminalPaste(text, bracketed: modes?.bracketedPaste ?? false));
-      }
-    });
+    _toBottom();
+    final delete = _kbDelete();
+    if (delete != null) {
+      surface.sendBytes(delete);
+      setState(() => _sel = _kbSel = null);
+    }
+    surface.sendBytes(terminalPaste(text, bracketed: modes?.bracketedPaste ?? false));
+  }
+
+  // ---- Files dropped from Finder go in as their paths, on the pane under
+  // the pointer.
+
+  StreamSubscription<FileDrop>? _drops;
+
+  void _onDrop(FileDrop drop) {
+    if (!mounted || !widget.surface.interactive || drop.paths.isEmpty || !_shownAt(drop.position)) return;
+    _pasteText(terminalPaths(drop.paths));
+    _focus.requestFocus();
+  }
+
+  /// Whether this pane is what shows at [global]: not offstage (another
+  /// screen of the IndexedStack) nor under something else.
+  bool _shownAt(Offset global) {
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return false;
+    final result = HitTestResult();
+    WidgetsBinding.instance.hitTestInView(result, global, View.of(context).viewId);
+    return result.path.any((e) => e.target == box);
   }
 
   void _selectAll() {
@@ -639,6 +667,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   void initState() {
     super.initState();
     _fling = createTicker(_coast);
+    _drops = Pasteboard.drops.listen(_onDrop);
     HardwareKeyboard.instance.addHandler(_modifierChanged);
     widget.surface.buffer.addListener(_onBuffer);
     _focus.addListener(() => setState(() => _hasFocus = _focus.hasFocus));
@@ -660,6 +689,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_modifierChanged);
+    _drops?.cancel();
     widget.surface.buffer.removeListener(_onBuffer);
     _barTimer?.cancel();
     _stopAutoScroll();
