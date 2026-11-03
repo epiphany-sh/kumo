@@ -86,9 +86,10 @@ jobs:
   # The platform Kumo ships for, in one job instead of three: GitHub's
   # macOS arm64 runners have gone days without capacity (jobs cancelled,
   # never started), so it isn't required. The release build in
-  # `release.yml` still runs on macOS.
+  # `release.yml` still runs on macOS. Pinned to macos-15 to see whether
+  # it gets a runner sooner than macos-latest (macos-26).
   macos:
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
