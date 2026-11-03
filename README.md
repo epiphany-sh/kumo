@@ -13,8 +13,22 @@ curl -fsSL https://github.com/epiphany-sh/kumo/releases/latest/download/install.
 ```
 
 O con Homebrew: `brew install epiphany-sh/kumo/kumo`. Después Kumo se
-actualiza solo (Sparkle). Cómo se publica una versión:
-[`docs/releasing.md`](docs/releasing.md).
+actualiza solo (Sparkle).
+
+En Windows 10 u 11 de 64 bits, desde PowerShell:
+
+```powershell
+irm https://github.com/epiphany-sh/kumo/releases/latest/download/install.ps1 | iex
+```
+
+Lo instala en `%LOCALAPPDATA%\Programs\Kumo`, con acceso en el menú Inicio.
+En Windows no se actualiza solo: para actualizar, volvé a correr el mismo
+comando. También está el zip suelto en cada release
+(`Kumo-X.Y.Z-windows-x64.zip`): descomprimilo y abrí `Kumo.exe`. Como no
+está firmado, SmartScreen avisa la primera vez ("Más información" →
+"Ejecutar de todas formas").
+
+Cómo se publica una versión: [`docs/releasing.md`](docs/releasing.md).
 
 ## Requisitos
 
@@ -29,7 +43,8 @@ make run
 ```
 
 Compila `kumod` y la app Flutter en release, mete `kumod` adentro del bundle
-(`Kumo.app/Contents/MacOS/kumod`), reinicia el daemon y abre la app. La app
+(`Kumo.app/Contents/MacOS/kumod`; en Windows, al lado de `Kumo.exe`),
+reinicia el daemon y abre la app. En Windows, `make` corre desde Git Bash. La app
 descubre el daemon por `daemon.json` o lo lanza desacoplado si no está corriendo.
 
 | Comando | Qué hace |

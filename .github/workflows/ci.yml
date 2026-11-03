@@ -105,3 +105,30 @@ jobs:
         working-directory: kumo-ui
       - run: flutter test
         working-directory: kumo-ui
+
+  # The Windows download, built as `release.yml` builds it, so a change that
+  # breaks it shows up here. Not required (yet); the app is kept a week to
+  # try the change on Windows.
+  windows-app:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the build number counts commits
+      - run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@v2
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5 # as in release.yml
+          channel: stable
+          cache: true
+      - run: packaging/windows-zip.sh 0.0.0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kumo-windows-x64
+          path: kumo-ui/build/windows/x64/runner/Release/
+          retention-days: 7

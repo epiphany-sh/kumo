@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/terminal/ansi_screen.dart';
+import 'package:kumo_ui/terminal/terminal_keys.dart';
 import 'package:kumo_ui/terminal/terminal_surface.dart';
 import 'package:kumo_ui/terminal/terminal_view.dart';
 import 'package:kumo_ui/theme/kumo_theme.dart';
@@ -160,5 +161,153 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
     expect(shell.sent, isEmpty);
+  });
+
+  Future<void> holding(WidgetTester tester, List<LogicalKeyboardKey> modifiers, LogicalKeyboardKey key) async {
+    for (final m in modifiers) {
+      await tester.sendKeyDownEvent(m);
+    }
+    await tester.sendKeyEvent(key);
+    for (final m in modifiers.reversed) {
+      await tester.sendKeyUpEvent(m);
+    }
+  }
+
+  const shift = LogicalKeyboardKey.shiftLeft;
+  const alt = LogicalKeyboardKey.altLeft;
+  const ctrl = LogicalKeyboardKey.controlLeft;
+  const meta = LogicalKeyboardKey.metaLeft;
+
+  testWidgets('⇧↩ and ⌥↩ break the line; ⌥⌫ ⌥⌦ and Ctrl+⌫ delete words', (tester) async {
+    final shell = await _pumpShell(tester);
+    await holding(tester, [shift], LogicalKeyboardKey.enter);
+    await holding(tester, [alt], LogicalKeyboardKey.enter);
+    await holding(tester, [alt], LogicalKeyboardKey.backspace);
+    await holding(tester, [alt], LogicalKeyboardKey.delete);
+    await holding(tester, [ctrl], LogicalKeyboardKey.backspace);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x1b\r', '\x1b\r', '\x1b\x7f', '\x1bd', '\x17', '\r']);
+  });
+
+  testWidgets('on macOS ⌘← ⌘→ go to the line ends and ⌘⌫ deletes to its start', (tester) async {
+    final shell = await _pumpShell(tester);
+    await holding(tester, [meta], LogicalKeyboardKey.arrowLeft);
+    await holding(tester, [meta], LogicalKeyboardKey.arrowRight);
+    await holding(tester, [meta], LogicalKeyboardKey.backspace);
+    expect(shell.sent, [
+      [0x01],
+      [0x05],
+      [0x15],
+    ]);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('⇧← selects from the cursor; ⌫ deletes the selection and typing replaces it', (tester) async {
+    final shell = await _pumpShell(tester);
+    shell.feed('hello');
+    await tester.pump();
+
+    // Leftward: two characters, echoed as the shell would.
+    await holding(tester, [shift], LogicalKeyboardKey.arrowLeft);
+    shell.feed('\b');
+    await holding(tester, [shift], LogicalKeyboardKey.arrowLeft);
+    shell.feed('\b');
+    expect(shell.sent.map(utf8.decode).toList(), ['\x1b[D', '\x1b[D']);
+    shell.sent.clear();
+
+    // ⌫ goes back to the end of the selection and deletes it.
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x1b[C\x1b[C\x7f\x7f']);
+    shell.sent.clear();
+
+    // Rightward by words, then a character replaces it.
+    shell.feed("\x1b[2D"); // the cursor somewhere else in the line
+    await holding(tester, [shift, alt], LogicalKeyboardKey.arrowRight);
+    shell.feed('\x1b[2C');
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyX);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x1bf', '\x7f\x7f', 'x']);
+    shell.sent.clear();
+
+    // With nothing selected the keys go through untouched.
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x7f']);
+  });
+
+  testWidgets('a cursor move nobody asked for ends the keyboard selection', (tester) async {
+    final shell = await _pumpShell(tester);
+    shell.feed('hello');
+    await holding(tester, [shift], LogicalKeyboardKey.arrowLeft);
+    shell.feed('\b');
+    shell.feed('\x1b[1;1H'); // the program redraws elsewhere
+    shell.sent.clear();
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x7f']);
+  });
+
+  testWidgets('full-screen programs get ⇧← as is', (tester) async {
+    final shell = await _pumpShell(tester);
+    shell.feed('\x1b[?1049h');
+    await holding(tester, [shift], LogicalKeyboardKey.arrowLeft);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x1b[1;2D']);
+  });
+
+  group('pasting and dropping files', () {
+    const channel = MethodChannel('kumo/pasteboard');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    List<String>? onClipboard;
+    setUp(() {
+      onClipboard = null;
+      messenger.setMockMethodCallHandler(channel, (call) async => call.method == 'paths' ? onClipboard : null);
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => call.method == 'Clipboard.getData' ? {'text': 'plain text'} : null);
+    });
+    tearDown(() {
+      messenger.setMockMethodCallHandler(channel, null);
+      messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    Future<void> drop(List<String> paths, Offset at) => messenger.handlePlatformMessage(
+          channel.name,
+          const StandardMethodCodec().encodeMethodCall(MethodCall('drop', {'paths': paths, 'x': at.dx, 'y': at.dy})),
+          (_) {},
+        );
+
+    test('paths are escaped as a shell takes them', () {
+      expect(terminalPaths(['/tmp/a b/Screenshot (1).png', r"/x/it's $HOME"]), r"/tmp/a\ b/Screenshot\ \(1\).png /x/it\'s\ \$HOME");
+    });
+
+    testWidgets('⌘V pastes copied files or a screenshot as paths, and text otherwise', (tester) async {
+      final shell = await _pumpShell(tester);
+      shell.feed('\x1b[?2004h');
+      onClipboard = ['/Users/me/Desktop/Screen Shot.png'];
+      await holding(tester, [meta], LogicalKeyboardKey.keyV);
+      await tester.pump();
+      onClipboard = null;
+      await holding(tester, [meta], LogicalKeyboardKey.keyV);
+      await tester.pump();
+      expect(shell.sent.map(utf8.decode).toList(), ['\x1b[200~/Users/me/Desktop/Screen\\ Shot.png\x1b[201~', '\x1b[200~plain text\x1b[201~']);
+    }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+    testWidgets('files dropped go to the pane under the pointer, not one offstage', (tester) async {
+      final shown = _FakeShell();
+      final hidden = _FakeShell();
+      await tester.pumpWidget(KumoTheme(
+        mode: KumoThemeMode.dark,
+        palette: KumoPalette.dark,
+        terminalPalette: KumoPalette.dark,
+        child: MaterialApp(
+          home: Scaffold(
+            body: IndexedStack(index: 0, children: [TerminalCanvas(surface: shown), TerminalCanvas(surface: hidden)]),
+          ),
+        ),
+      ));
+      await tester.pump();
+      final at = tester.getCenter(find.byType(TerminalCanvas).first);
+      await drop(['/a/one.png', '/a/two.txt'], at);
+      await tester.pump();
+      expect(shown.sent.map(utf8.decode).toList(), ['/a/one.png /a/two.txt']);
+      expect(hidden.sent, isEmpty);
+
+      await drop(['/a/one.png'], const Offset(-10, -10));
+      expect(shown.sent, hasLength(1), reason: 'off the pane nothing goes in');
+    });
   });
 }
