@@ -10,8 +10,6 @@ Requisitos: Flutter estable (3.24 o más nuevo) con soporte desktop, Xcode en ma
 
 ```bash
 cd kumo/kumo-ui
-# Genera los runners nativos (macos/ y windows/). No pisa lib/, test/ ni pubspec.yaml.
-flutter create --platforms=macos,windows --org dev.kumo --project-name kumo_ui .
 flutter pub get
 flutter run -d macos      # o: flutter run -d windows
 flutter test

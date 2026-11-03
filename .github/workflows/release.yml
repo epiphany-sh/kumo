@@ -1,7 +1,10 @@
 name: release
 
-# Publishes Kumo X.Y.Z: the GitHub release (zip, appcast, install.sh) and
-# the Homebrew cask. A release/X.Y.Z branch merged into main (the only kind
+# Publishes Kumo X.Y.Z: the GitHub release (the macOS zip, appcast and
+# install.sh; the Windows zip and install.ps1) and the Homebrew cask. macOS
+# and Windows publish on their own (GitHub's macOS runners can go days
+# without capacity): only macOS makes the release "Latest", which is what
+# Sparkle, install.sh and brew download from (packaging/github-release.sh). A release/X.Y.Z branch merged into main (the only kind
 # `ci` lets in) publishes X.Y.Z; so does a tag vX.Y.Z pushed by hand.
 # One-time setup: docs/releasing.md.
 
@@ -98,19 +101,17 @@ jobs:
           rm "$RUNNER_TEMP/sparkle-key"
 
       # Tags the commit (for a merge) only once it's built: a failed build
-      # leaves no tag, and its number is used again. A tag made with this
-      # token doesn't start another run. A release made by hand on GitHub
-      # (which tags it) gets the files instead.
+      # leaves no tag, and its number is used again (unless Windows already
+      # published it: then re-run this job from Actions). A tag made with
+      # this token doesn't start another run. A release made by hand on
+      # GitHub (which tags it) gets the files instead.
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          files=("dist/Kumo-$VERSION.zip" dist/Kumo.zip dist/appcast.xml dist/install.sh)
-          if gh release view "v$VERSION" >/dev/null 2>&1; then
-            gh release upload "v$VERSION" "${files[@]}" --clobber
-          else
-            gh release create "v$VERSION" --target "$SHA" --title "Kumo $VERSION" --generate-notes "${files[@]}"
-          fi
+          packaging/github-release.sh --latest "$VERSION" "$SHA" \
+            "dist/Kumo-$VERSION.zip" dist/Kumo.zip dist/appcast.xml dist/install.sh dist/install.ps1
 
       - name: Homebrew cask
         env:
@@ -126,3 +127,37 @@ jobs:
           git add Casks/kumo.rb
           git commit -m "kumo $VERSION"
           git push origin HEAD:main
+
+  windows:
+    needs: version
+    if: needs.version.outputs.version != ''
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      SHA: ${{ needs.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          fetch-depth: 0 # the build number counts commits
+
+      - run: rustup show active-toolchain
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+
+      - name: Build and package
+        run: RELEASE_REPO="${{ github.repository }}" packaging/windows-zip.sh "$VERSION"
+
+      # Doesn't wait for macOS, and doesn't make the release "Latest":
+      # install.ps1 finds the newest release with a Windows zip.
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: packaging/github-release.sh "$VERSION" "$SHA" "dist/Kumo-$VERSION-windows-x64.zip" dist/install.ps1

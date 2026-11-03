@@ -18,6 +18,20 @@ un comando y se actualiza con un click:
 Los builds locales (`make app`, `make run`, `make dev`) no tienen feed: nunca
 se reemplazan solos por la versión publicada.
 
+**Windows** sale en el mismo release, sin firmar y sin auto-update:
+
+- **Instalación y updates**: `install.ps1` baja el zip de Windows del release
+  más nuevo que lo tenga (no de "Latest", ver abajo), lo copia a
+  `%LOCALAPPDATA%\Programs\Kumo`, le saca la marca de "bajado de
+  internet" (así SmartScreen no frena) y crea el acceso en el menú Inicio.
+  Para actualizar se vuelve a correr.
+- **El daemon**: un `kumod.exe` corriendo no se puede pisar, pero sí
+  renombrar. `install.ps1` lo renombra a `kumod.exe.<id>.old` y pone el nuevo;
+  el viejo sigue corriendo y la UI lo reinicia sobre el nuevo como en macOS.
+  Los `.old` se borran en la próxima instalación, si ya no corren.
+- **El zip** (`packaging/windows-zip.sh`) trae `Kumo.exe`, `kumod.exe` y el
+  runtime de VC++ que necesitan los dos.
+
 ## Dónde vive todo
 
 `RELEASE_ORG` en el `Makefile` (hoy `epiphany-sh`) es la única fuente:
@@ -28,6 +42,7 @@ se reemplazan solos por la versión publicada.
 | Appcast (lo que lee Sparkle) | `…/releases/latest/download/appcast.xml` |
 | Instalador | `curl -fsSL https://github.com/epiphany-sh/kumo/releases/latest/download/install.sh \| sh` |
 | Homebrew | `github.com/epiphany-sh/homebrew-kumo` → `brew install epiphany-sh/kumo/kumo` |
+| Instalador de Windows | `irm https://github.com/epiphany-sh/kumo/releases/latest/download/install.ps1 \| iex` |
 
 ## Setup (una sola vez)
 
@@ -78,11 +93,23 @@ fix/…      ─┴─▶  release/X.Y.Z  ──▶  main  ──▶  vX.Y.Z pub
    pasan días sin capacidad.
 3. **Mergeá la release a `main`** con un PR (`release/0.3.0` → `main`). Es lo
    único que entra a `main`. Con el merge, el workflow `release` publica
-   `0.3.0`: buildea, firma, arma el zip, el appcast y el `install.sh`, crea el
-   release (y su tag) en GitHub y actualiza el cask del tap.
+   `0.3.0`: buildea, firma, arma el zip, el appcast y el `install.sh` en
+   macOS; el zip y el `install.ps1` en Windows. Cada uno sube lo suyo al release
+   (el primero que termina lo crea, con su tag); macOS además actualiza el
+   cask del tap.
 
-Los releases van de a uno. Si el build falla, no queda tag: re-correlo desde
-Actions.
+   **Windows no espera a macOS**, porque los runners macOS de GitHub a veces
+   pasan días sin capacidad. Por eso solo macOS marca el release como
+   "Latest", que es de donde bajan Sparkle, `install.sh` y brew: si Windows
+   publica primero, el release queda sin "Latest" hasta que termina macOS, y
+   las Macs siguen viendo la versión anterior. `install.ps1` viaja con los
+   dos y busca el zip de Windows más nuevo, esté o no en "Latest"
+   (`packaging/github-release.sh`).
+
+Los releases van de a uno. Si fallan los dos builds, no queda tag:
+re-correlo desde Actions. Si falla uno solo, el otro ya creó el tag y el
+número quedó usado: re-corré el job que falló (no el workflow entero, que
+vería el tag y no haría nada).
 
 **A mano**, con el número que quieras:
 
@@ -92,7 +119,7 @@ git push origin v0.2.0
 ```
 
 También se puede crear el release desde la web de GitHub: el workflow le
-sube los archivos (zip, appcast, `install.sh`) y actualiza el cask. Mientras
+sube los archivos (zips, appcast, `install.sh`, `install.ps1`) y actualiza el cask. Mientras
 corre (unos minutos), ese release queda como "Latest" sin appcast, y las apps
 instaladas no encuentran updates hasta que termina.
 
@@ -100,4 +127,7 @@ El número de build (`CFBundleVersion`, lo que compara Sparkle) es la cantidad
 de commits: siempre crece.
 
 Para probarlo local sin publicar: `make release VERSION=0.2.0` deja todo en
-`dist/` (firma el appcast con la clave de tu Keychain).
+`dist/` (firma el appcast con la clave de tu Keychain). En Windows, desde Git
+Bash: `packaging/windows-zip.sh 0.2.0`. Cada PR también buildea la app de
+Windows (job `windows-app` de `ci`, no obligatorio) y la deja como artifact
+una semana, para probarla sin publicar.
