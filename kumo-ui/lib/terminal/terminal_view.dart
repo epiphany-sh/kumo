@@ -32,6 +32,7 @@ class TerminalCanvas extends StatefulWidget {
   final TerminalSurface surface;
   final bool active;
   final double fontSize;
+
   /// Null: terminal spacing (1.25) for real shells, the airier 1.7 of the
   /// design mocks otherwise.
   final double? lineHeight;
@@ -74,6 +75,17 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   int _clicks = 0;
   Duration _lastDown = Duration.zero;
   Offset _lastPos = Offset.zero;
+
+  // ---- Keyboard selection: ⇧← ⇧→ (⌥ by words) select from the cursor, as
+  // in a text field. The program moves its cursor and the selection follows
+  // it; typing, ⌫ or a paste then replace the selected text.
+  TermSelection? _kbSel; // the [_sel] it made: any other selection ends it
+  (int, int) _kbAnchor = (0, 0); // (session line, col) where it started
+  (int, int) _kbCursor = (0, 0); // the cursor as last seen
+  int? _kbChars; // characters from the anchor to the cursor; null: unknown
+  int _kbSteps = 0; // moves sent that the cursor hasn't shown yet
+  bool _kbWord = false;
+  DateTime _kbSent = DateTime(0);
 
   // ---- Scrollback: where the view is (a line and the fraction of it
   // scrolled past, so the wheel and trackpad move by pixels), the wheel's
@@ -155,6 +167,90 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     final width = lineWidth(b.lines[line]);
     final col = cell ? x.floor() : x.round();
     return TermPoint(line, col.clamp(0, cell ? 1 << 20 : width));
+  }
+
+  bool get _kbActive => _kbSel != null && identical(_sel, _kbSel);
+
+  void _showKbSel(TermBuffer b) {
+    _setSel(TermSelection(TermPoint(_kbAnchor.$1 - b.dropped, _kbAnchor.$2), TermPoint(_kbCursor.$1 - b.dropped, _kbCursor.$2)), b);
+    _kbSel = _sel;
+  }
+
+  /// ⇧← ⇧→ and ⇧⌥← ⇧⌥→ on the main screen: the move goes to the program
+  /// and the selection starts (or grows) at its cursor.
+  bool _selectKey(KeyEvent event, TerminalModes? modes) {
+    if (event is KeyUpEvent) return false;
+    final keys = HardwareKeyboard.instance;
+    final key = event.logicalKey;
+    final left = key == LogicalKeyboardKey.arrowLeft;
+    if (!keys.isShiftPressed || keys.isMetaPressed || keys.isControlPressed || !(left || key == LogicalKeyboardKey.arrowRight)) return false;
+    final b = _buffer;
+    final cursor = b.cursor;
+    if (b.altScreen || cursor == null || cursor.$1 >= b.lines.length) return false;
+    if (!_kbActive) {
+      _kbAnchor = (b.dropped + cursor.$1, cursor.$2);
+      _kbCursor = _kbAnchor;
+      _kbChars = 0;
+      _kbSteps = 0;
+    }
+    _kbWord = keys.isAltPressed;
+    _kbSteps++;
+    _kbSent = DateTime.now();
+    final arrow = left ? 'D' : 'C';
+    widget.surface.sendBytes(_kbWord ? [0x1b, left ? 0x62 : 0x66] : utf8.encode(modes?.applicationCursorKeys ?? false ? '\x1bO$arrow' : '\x1b[$arrow'));
+    setState(() {
+      _top = null;
+      _showKbSel(b);
+    });
+    return true;
+  }
+
+  /// The cursor moved: the selection follows it, counting the characters
+  /// crossed so a replace deletes exactly those.
+  void _onBuffer() {
+    if (!_kbActive) return;
+    final b = _buffer;
+    final cursor = b.cursor;
+    if (cursor == null || b.altScreen || b.reflows != _selReflows) {
+      setState(() => _sel = _kbSel = null);
+      return;
+    }
+    final now = (b.dropped + cursor.$1, cursor.$2);
+    final was = _kbCursor;
+    if (now == was) return;
+    // A move we didn't ask for (output, a redraw): the count is lost.
+    if (_kbSteps == 0) {
+      setState(() => _sel = _kbSel = null);
+      return;
+    }
+    final chars = _kbChars;
+    final line = was.$1 - b.dropped;
+    if (chars != null && now.$1 == was.$1 && line >= 0 && line < b.lines.length) {
+      _kbChars = chars + runesBetween(b.lines[line], was.$2, now.$2);
+    } else if (chars != null && !_kbWord && _kbSteps == 1) {
+      // One character across a wrap or a line break.
+      _kbChars = chars + (now.$1 > was.$1 ? 1 : -1);
+    } else {
+      _kbChars = null;
+    }
+    _kbCursor = now;
+    _kbSteps = 0;
+    setState(() => _showKbSel(b));
+  }
+
+  /// Bytes that delete the keyboard selection, null when it can't be done
+  /// exactly. Selected leftward, the cursor first goes back to its end.
+  List<int>? _kbDelete() {
+    // A move still unanswered after a moment hit the edge of the line.
+    if (_kbSteps > 0 && DateTime.now().difference(_kbSent) > const Duration(milliseconds: 150)) _kbSteps = 0;
+    final n = _kbChars;
+    if (!_kbActive || n == null || n == 0 || _kbSteps > 0) return null;
+    final surface = widget.surface;
+    final right = utf8.encode(surface is TerminalModes && surface.applicationCursorKeys ? '\x1bOC' : '\x1b[C');
+    return [
+      for (var i = 0; i < -n; i++) ...right,
+      for (var i = 0; i < n.abs(); i++) 0x7f,
+    ];
   }
 
   // ---- Scrolling
@@ -489,6 +585,11 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
       final text = data?.text;
       if (text != null && text.isNotEmpty) {
         _toBottom();
+        final delete = _kbDelete();
+        if (delete != null) {
+          surface.sendBytes(delete);
+          setState(() => _sel = _kbSel = null);
+        }
         surface.sendBytes(terminalPaste(text, bracketed: modes?.bracketedPaste ?? false));
       }
     });
@@ -539,6 +640,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     super.initState();
     _fling = createTicker(_coast);
     HardwareKeyboard.instance.addHandler(_modifierChanged);
+    widget.surface.buffer.addListener(_onBuffer);
     _focus.addListener(() => setState(() => _hasFocus = _focus.hasFocus));
     if (widget.active) _grabKeyboard();
   }
@@ -548,14 +650,17 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     super.didUpdateWidget(old);
     if (widget.active && !old.active) _grabKeyboard();
     if (widget.surface != old.surface) {
+      old.surface.buffer.removeListener(_onBuffer);
+      widget.surface.buffer.addListener(_onBuffer);
       _top = null;
-      _sel = null;
+      _sel = _kbSel = null;
     }
   }
 
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_modifierChanged);
+    widget.surface.buffer.removeListener(_onBuffer);
     _barTimer?.cancel();
     _stopAutoScroll();
     _fling.dispose();
@@ -640,13 +745,27 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
       }
     }
     if (!surface.interactive) return KeyEventResult.ignored;
+    if (_selectKey(event, modes)) return KeyEventResult.handled;
     final bytes = terminalInputFor(event, applicationCursorKeys: modes?.applicationCursorKeys ?? false);
     if (bytes == null) return KeyEventResult.ignored;
+    // Over a keyboard selection ⌫ / ⌦ delete it and a character replaces it.
+    final delete = _kbDelete();
+    if (delete != null) {
+      final key = event.logicalKey;
+      final erase = (key == LogicalKeyboardKey.backspace || key == LogicalKeyboardKey.delete) && !keys.isAltPressed && !keys.isControlPressed && !keys.isMetaPressed;
+      final char = event.character;
+      final typed = char != null && char.isNotEmpty && char.codeUnitAt(0) >= 0x20 && char.codeUnitAt(0) != 0x7f && !keys.isControlPressed && !keys.isMetaPressed;
+      if (erase || typed) surface.sendBytes(delete);
+      if (erase) {
+        setState(() => _sel = _kbSel = null);
+        return KeyEventResult.handled;
+      }
+    }
     // Typing drops the selection and goes back to the prompt, like any
     // terminal.
     if (_sel != null || _top != null) {
       setState(() {
-        _sel = null;
+        _sel = _kbSel = null;
         _top = null;
       });
     }

@@ -84,6 +84,15 @@ int lineWidth(TermLine line) {
   return width;
 }
 
+/// Code points of [line] from cell [from] to cell [to], negative when [to]
+/// is left of [from]: how many ← or → a line editor takes between them.
+int runesBetween(TermLine line, int from, int to) {
+  final lo = from < to ? from : to;
+  final hi = from < to ? to : from;
+  final n = _cells(line).where((c) => c.$2 >= lo && c.$2 < hi).length;
+  return to < from ? -n : n;
+}
+
 /// The selected text: lines joined with \n, trailing blanks trimmed.
 String selectedText(List<TermLine> lines, TermSelection sel) {
   if (sel.isEmpty) return '';

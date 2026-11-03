@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// Bytes a key press sends to the PTY (xterm conventions), or null when the
@@ -7,8 +8,8 @@ import 'package:flutter/services.dart';
 List<int>? terminalInputFor(KeyEvent event, {bool applicationCursorKeys = false}) {
   if (event is KeyUpEvent) return null;
   final keys = HardwareKeyboard.instance;
-  if (keys.isMetaPressed) return null;
   final key = event.logicalKey;
+  if (keys.isMetaPressed) return _macLineEdit(key, keys);
 
   final arrow = _arrows[key];
   if (arrow != null) {
@@ -23,6 +24,18 @@ List<int>? terminalInputFor(KeyEvent event, {bool applicationCursorKeys = false}
     return utf8.encode(applicationCursorKeys ? '\x1bO$arrow' : '\x1b[$arrow');
   }
   if (key == LogicalKeyboardKey.tab && keys.isShiftPressed) return utf8.encode('\x1b[Z');
+  // ⇧↩ / ⌥↩ start a new line instead of submitting: ESC CR is what Claude
+  // Code, Codex and zsh (self-insert-unmeta) read as a line break.
+  if ((key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter) && (keys.isShiftPressed || keys.isAltPressed) && !keys.isControlPressed) {
+    return [0x1b, 0x0d];
+  }
+  // ⌥⌫ deletes the word before the cursor and ⌥⌦ the one after (readline's
+  // backward-kill-word and kill-word); Ctrl+⌫ is ^W, as on Linux and Windows.
+  if (key == LogicalKeyboardKey.backspace) {
+    if (keys.isAltPressed) return [0x1b, 0x7f];
+    if (keys.isControlPressed) return [0x17];
+  }
+  if (key == LogicalKeyboardKey.delete && keys.isAltPressed) return [0x1b, 0x64];
   final special = _special[key];
   if (special != null) return utf8.encode(special);
 
@@ -41,6 +54,17 @@ List<int>? terminalInputFor(KeyEvent event, {bool applicationCursorKeys = false}
   final char = event.character;
   if (char == null || char.isEmpty) return null;
   return utf8.encode(char);
+}
+
+/// ⌘ on macOS edits the line like a text field: ⌘← / ⌘→ to its start and
+/// end (^A, ^E) and ⌘⌫ deletes back to the start (^U). Other ⌘ keys are
+/// the app's.
+List<int>? _macLineEdit(LogicalKeyboardKey key, HardwareKeyboard keys) {
+  if (defaultTargetPlatform != TargetPlatform.macOS || keys.isShiftPressed || keys.isAltPressed || keys.isControlPressed) return null;
+  if (key == LogicalKeyboardKey.arrowLeft) return [0x01];
+  if (key == LogicalKeyboardKey.arrowRight) return [0x05];
+  if (key == LogicalKeyboardKey.backspace) return [0x15];
+  return null;
 }
 
 /// Text from the clipboard, wrapped when the program asked for it.

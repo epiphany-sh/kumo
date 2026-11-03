@@ -161,4 +161,91 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
     expect(shell.sent, isEmpty);
   });
+
+  Future<void> holding(WidgetTester tester, List<LogicalKeyboardKey> modifiers, LogicalKeyboardKey key) async {
+    for (final m in modifiers) {
+      await tester.sendKeyDownEvent(m);
+    }
+    await tester.sendKeyEvent(key);
+    for (final m in modifiers.reversed) {
+      await tester.sendKeyUpEvent(m);
+    }
+  }
+
+  const shift = LogicalKeyboardKey.shiftLeft;
+  const alt = LogicalKeyboardKey.altLeft;
+  const ctrl = LogicalKeyboardKey.controlLeft;
+  const meta = LogicalKeyboardKey.metaLeft;
+
+  testWidgets('⇧↩ and ⌥↩ break the line; ⌥⌫ ⌥⌦ and Ctrl+⌫ delete words', (tester) async {
+    final shell = await _pumpShell(tester);
+    await holding(tester, [shift], LogicalKeyboardKey.enter);
+    await holding(tester, [alt], LogicalKeyboardKey.enter);
+    await holding(tester, [alt], LogicalKeyboardKey.backspace);
+    await holding(tester, [alt], LogicalKeyboardKey.delete);
+    await holding(tester, [ctrl], LogicalKeyboardKey.backspace);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x1b\r', '\x1b\r', '\x1b\x7f', '\x1bd', '\x17', '\r']);
+  });
+
+  testWidgets('on macOS ⌘← ⌘→ go to the line ends and ⌘⌫ deletes to its start', (tester) async {
+    final shell = await _pumpShell(tester);
+    await holding(tester, [meta], LogicalKeyboardKey.arrowLeft);
+    await holding(tester, [meta], LogicalKeyboardKey.arrowRight);
+    await holding(tester, [meta], LogicalKeyboardKey.backspace);
+    expect(shell.sent, [
+      [0x01],
+      [0x05],
+      [0x15],
+    ]);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('⇧← selects from the cursor; ⌫ deletes the selection and typing replaces it', (tester) async {
+    final shell = await _pumpShell(tester);
+    shell.feed('hello');
+    await tester.pump();
+
+    // Leftward: two characters, echoed as the shell would.
+    await holding(tester, [shift], LogicalKeyboardKey.arrowLeft);
+    shell.feed('\b');
+    await holding(tester, [shift], LogicalKeyboardKey.arrowLeft);
+    shell.feed('\b');
+    expect(shell.sent.map(utf8.decode).toList(), ['\x1b[D', '\x1b[D']);
+    shell.sent.clear();
+
+    // ⌫ goes back to the end of the selection and deletes it.
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x1b[C\x1b[C\x7f\x7f']);
+    shell.sent.clear();
+
+    // Rightward by words, then a character replaces it.
+    shell.feed("\x1b[2D"); // the cursor somewhere else in the line
+    await holding(tester, [shift, alt], LogicalKeyboardKey.arrowRight);
+    shell.feed('\x1b[2C');
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyX);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x1bf', '\x7f\x7f', 'x']);
+    shell.sent.clear();
+
+    // With nothing selected the keys go through untouched.
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x7f']);
+  });
+
+  testWidgets('a cursor move nobody asked for ends the keyboard selection', (tester) async {
+    final shell = await _pumpShell(tester);
+    shell.feed('hello');
+    await holding(tester, [shift], LogicalKeyboardKey.arrowLeft);
+    shell.feed('\b');
+    shell.feed('\x1b[1;1H'); // the program redraws elsewhere
+    shell.sent.clear();
+    await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x7f']);
+  });
+
+  testWidgets('full-screen programs get ⇧← as is', (tester) async {
+    final shell = await _pumpShell(tester);
+    shell.feed('\x1b[?1049h');
+    await holding(tester, [shift], LogicalKeyboardKey.arrowLeft);
+    expect(shell.sent.map(utf8.decode).toList(), ['\x1b[1;2D']);
+  });
 }
