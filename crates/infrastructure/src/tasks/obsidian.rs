@@ -48,14 +48,7 @@ impl ObsidianConnector {
 
     /// Obsidian's list of vaults (`obsidian.json`).
     fn settings_file(&self) -> PathBuf {
-        if cfg!(target_os = "macos") {
-            self.home
-                .join("Library/Application Support/obsidian/obsidian.json")
-        } else if cfg!(windows) {
-            self.home.join("AppData/Roaming/obsidian/obsidian.json")
-        } else {
-            self.home.join(".config/obsidian/obsidian.json")
-        }
+        crate::platform::obsidian_settings(&self.home)
     }
 }
 

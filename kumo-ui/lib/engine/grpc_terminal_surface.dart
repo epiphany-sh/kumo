@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:grpc/grpc.dart';
 
+import '../platform/os/host_os.dart';
 import '../terminal/ansi_screen.dart';
 import '../terminal/terminal_surface.dart';
 import 'generated/kumo/v1/kumo.pbgrpc.dart';
@@ -105,12 +106,11 @@ class GrpcTerminalSurface implements TerminalModes {
     _render();
   }
 
-  static String get _shellPath =>
-      Platform.environment['SHELL'] ?? (Platform.isWindows ? (Platform.environment['COMSPEC'] ?? 'cmd.exe') : '/bin/zsh');
+  static String get _shellPath => hostOs.shell;
 
   static String get _shellName => _shellPath.split(Platform.pathSeparator).last;
 
-  static String get _home => Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+  static String get _home => hostOs.home ?? '';
 
   /// `/Users/ana/wt/x` → `~/wt/x`, for the pane header.
   static String _shorten(String? directory) {
@@ -161,7 +161,7 @@ class GrpcTerminalSurface implements TerminalModes {
     final directory = _directory;
     return OpenRequest(
       program: _shellPath,
-      args: Platform.isWindows ? const [] : const ['-l'],
+      args: hostOs.shellArgs,
       cwd: directory == null || directory.isEmpty ? _home : directory,
       env: {
         'TERM_PROGRAM': 'kumo',

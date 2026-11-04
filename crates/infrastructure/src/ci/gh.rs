@@ -308,6 +308,9 @@ mod tests {
         fn home(&self) -> PathBuf {
             PathBuf::from("/")
         }
+        fn script(&self, command: &str) -> (String, Vec<String>) {
+            crate::platform::script(command)
+        }
     }
 
     #[cfg(unix)]
@@ -326,6 +329,9 @@ mod tests {
         }
         fn home(&self) -> PathBuf {
             PathBuf::from("/")
+        }
+        fn script(&self, command: &str) -> (String, Vec<String>) {
+            crate::platform::script(command)
         }
     }
 

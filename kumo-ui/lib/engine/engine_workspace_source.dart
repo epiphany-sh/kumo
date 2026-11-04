@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/widgets.dart';
@@ -8,6 +7,7 @@ import 'package:grpc/grpc.dart';
 import '../data/models.dart' as ui;
 import '../data/workspace_source.dart';
 import '../data/worktree_arrivals.dart';
+import '../platform/os/host_os.dart';
 import 'generated/kumo/v1/kumo.pbgrpc.dart';
 import 'kumo_engine.dart';
 
@@ -33,7 +33,7 @@ class EngineWorkspaceSource extends WorkspaceSource {
   /// Displayed worktree path (`~/…`) → absolute path, for daemon calls.
   final Map<String, String> _absolute = {};
 
-  static final String _home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
+  static final String _home = hostOs.home ?? '';
 
   @override
   List<ui.Namespace> get namespaces => _namespaces;

@@ -1,14 +1,12 @@
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use kumo_domain::agents::{AgentError, ProgramLocator};
 
-#[cfg(unix)]
-const MARK: &str = "__KUMO_PATH__";
-#[cfg(unix)]
-const SHELL_TIMEOUT: Duration = Duration::from_secs(5);
+use crate::platform::{self, executable_names, install_dirs, is_executable, login_shell_path};
+use crate::process::run_with_timeout;
+
 const VERSION_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// [`ProgramLocator`] that searches the PATH of the user's login shell.
@@ -74,7 +72,7 @@ impl ProgramLocator for ShellPathLocator {
     }
 
     fn version(&self, program: &Path) -> Result<String, AgentError> {
-        let mut command = crate::platform::background(program);
+        let mut command = platform::background(program);
         command.arg("--version").env("PATH", self.path());
         let output = run_with_timeout(command, VERSION_TIMEOUT).map_err(AgentError::Test)?;
         let text = if output.0.trim().is_empty() {
@@ -93,6 +91,10 @@ impl ProgramLocator for ShellPathLocator {
 
     fn home(&self) -> PathBuf {
         self.home.clone()
+    }
+
+    fn script(&self, command: &str) -> (String, Vec<String>) {
+        platform::script(command)
     }
 }
 
@@ -120,40 +122,10 @@ fn merged_path(home: &Path) -> String {
     ] {
         add(home.join(dir));
     }
-    for dir in ["/opt/homebrew/bin", "/usr/local/bin"] {
-        add(PathBuf::from(dir));
-    }
+    install_dirs().into_iter().for_each(&mut add);
     std::env::join_paths(dirs)
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_default()
-}
-
-#[cfg(unix)]
-fn login_shell_path() -> Option<String> {
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
-    let mut command = Command::new(shell);
-    // Interactive too: many people set PATH in .zshrc / .bashrc.
-    command.args(["-ilc", &format!("printf '{MARK}%s{MARK}' \"$PATH\"")]);
-    let (stdout, _) = run_with_timeout(command, SHELL_TIMEOUT).ok()?;
-    let start = stdout.find(MARK)? + MARK.len();
-    let end = stdout[start..].find(MARK)? + start;
-    Some(stdout[start..end].to_owned())
-}
-
-#[cfg(not(unix))]
-fn login_shell_path() -> Option<String> {
-    None
-}
-
-fn executable_names(program: &str) -> Vec<String> {
-    if cfg!(windows) {
-        ["", ".exe", ".cmd", ".bat"]
-            .iter()
-            .map(|ext| format!("{program}{ext}"))
-            .collect()
-    } else {
-        vec![program.to_owned()]
-    }
 }
 
 fn expand_home(raw: &str, home: &Path) -> PathBuf {
@@ -161,61 +133,6 @@ fn expand_home(raw: &str, home: &Path) -> PathBuf {
         Some(rest) => home.join(rest),
         None => PathBuf::from(raw),
     }
-}
-
-fn is_executable(path: &Path) -> bool {
-    let Ok(meta) = std::fs::metadata(path) else {
-        return false;
-    };
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        meta.is_file() && meta.permissions().mode() & 0o111 != 0
-    }
-    #[cfg(not(unix))]
-    {
-        meta.is_file()
-    }
-}
-
-/// Runs `command` with no stdin, killing it after `timeout`.
-/// Returns (stdout, stderr).
-fn run_with_timeout(mut command: Command, timeout: Duration) -> Result<(String, String), String> {
-    let mut child = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("can't run {:?}: {e}", command.get_program()))?;
-    let deadline = Instant::now() + timeout;
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!(
-                    "{:?} did not answer within {} s",
-                    command.get_program(),
-                    timeout.as_secs()
-                ));
-            }
-            Err(e) => return Err(e.to_string()),
-        }
-    }
-    let output = child.wait_with_output().map_err(|e| e.to_string())?;
-    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-    if !output.status.success() {
-        let message = if stderr.trim().is_empty() {
-            &stdout
-        } else {
-            &stderr
-        };
-        return Err(message.trim().lines().next().unwrap_or("failed").to_owned());
-    }
-    Ok((stdout, stderr))
 }
 
 #[cfg(all(test, unix))]

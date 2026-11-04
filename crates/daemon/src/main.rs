@@ -98,25 +98,8 @@ async fn run(args: Args) -> anyhow::Result<()> {
         data_dir: args.data_dir,
         ..DaemonConfig::default()
     };
-    Daemon::start(config).await?.run(shutdown_signal()).await
-}
-
-/// Ctrl-C everywhere, plus SIGTERM on Unix.
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        let _ = tokio::signal::ctrl_c().await;
-    };
-    #[cfg(unix)]
-    {
-        use tokio::signal::unix::{SignalKind, signal};
-        match signal(SignalKind::terminate()) {
-            Ok(mut term) => tokio::select! {
-                _ = ctrl_c => {}
-                _ = term.recv() => {}
-            },
-            Err(_) => ctrl_c.await,
-        }
-    }
-    #[cfg(not(unix))]
-    ctrl_c.await;
+    Daemon::start(config)
+        .await?
+        .run(kumo_infrastructure::platform::shutdown_signal())
+        .await
 }
