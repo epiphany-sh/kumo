@@ -78,7 +78,7 @@ impl std::fmt::Debug for KeychainSecretStore {
 impl KeychainSecretStore {
     /// The default profile's tokens.
     pub fn new() -> Self {
-        let store = native_store();
+        let store = crate::platform::native_keychain();
         if let Err(error) = &store {
             tracing::warn!(%error, "no keychain: API tokens can't be stored");
         }
@@ -103,7 +103,9 @@ impl KeychainSecretStore {
         let Some(store) = &self.store else {
             return Ok(0);
         };
-        let entries = store.search(&search_spec()).map_err(|e| e.to_string())?;
+        let entries = store
+            .search(&crate::platform::keychain_search(SERVICE))
+            .map_err(|e| e.to_string())?;
         let mut deleted = 0;
         for entry in entries {
             let Some((service, account)) = entry.get_specifiers() else {
@@ -144,35 +146,6 @@ impl Default for KeychainSecretStore {
     fn default() -> Self {
         Self::new()
     }
-}
-
-#[cfg(target_os = "macos")]
-fn native_store() -> Result<Arc<CredentialStore>, KeyringError> {
-    Ok(apple_native_keyring_store::keychain::Store::new()?)
-}
-
-#[cfg(windows)]
-fn native_store() -> Result<Arc<CredentialStore>, KeyringError> {
-    Ok(windows_native_keyring_store::Store::new()?)
-}
-
-#[cfg(not(any(target_os = "macos", windows)))]
-fn native_store() -> Result<Arc<CredentialStore>, KeyringError> {
-    Err(KeyringError::NotSupportedByStore(
-        "Linux keychains aren't supported yet".into(),
-    ))
-}
-
-/// Kumo's keychain items, as each store searches them. The results are
-/// still checked one by one.
-#[cfg(target_os = "macos")]
-fn search_spec() -> HashMap<&'static str, &'static str> {
-    HashMap::from([("service", SERVICE)])
-}
-
-#[cfg(not(target_os = "macos"))]
-fn search_spec() -> HashMap<&'static str, &'static str> {
-    HashMap::from([("pattern", SERVICE)])
 }
 
 impl SecretStore for KeychainSecretStore {

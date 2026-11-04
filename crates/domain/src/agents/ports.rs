@@ -36,6 +36,9 @@ pub trait ProgramLocator: Send + Sync + 'static {
     fn version(&self, program: &Path) -> Result<String, AgentError>;
     /// Where sign-in flows start.
     fn home(&self) -> PathBuf;
+    /// The program and arguments that run `command`, a command line the
+    /// user wrote (a project's test command), with the OS's shell.
+    fn script(&self, command: &str) -> (String, Vec<String>);
 }
 
 /// The CLIs' own folders in a profile (see [`super::CLI_HOMES`]).

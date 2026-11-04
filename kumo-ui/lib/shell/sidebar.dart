@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -16,6 +15,7 @@ import '../overlays/new_worktree_popover.dart';
 import '../overlays/settings_dialog.dart';
 import '../platform/git_user.dart';
 import '../platform/new_window.dart';
+import '../platform/os/host_os.dart';
 import '../platform/window_effects.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/anchored_popover.dart';
@@ -67,7 +67,7 @@ class Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final c = context.c;
-    final nativeLights = !kIsWeb && Platform.isMacOS && WindowEffects.nativeBackdrop;
+    final nativeLights = !kIsWeb && hostOs.windowButtonsInContent && WindowEffects.nativeBackdrop;
     final signal = _signalTarget(s);
 
     return SizedBox(

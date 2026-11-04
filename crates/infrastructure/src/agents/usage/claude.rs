@@ -62,10 +62,8 @@ impl UsageSource for ClaudeStatusLine {
     }
 
     fn launch_args(&self, target: &UsageTarget) -> Result<Vec<String>, AgentError> {
-        // The hook is POSIX sh. On Windows, Claude Code runs status lines
-        // through Git Bash or PowerShell, whichever it finds: no way to
-        // know which, so nothing is read there.
-        if cfg!(windows) {
+        // The hook is POSIX sh (see [`crate::platform::AgentHooks`]).
+        if !crate::platform::sh_status_line() {
             return Ok(Vec::new());
         }
         let dir = self.dir(&target.session_id);

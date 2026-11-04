@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'os/host_os.dart';
+
 /// Schemes Kumo hands to the OS: web pages and the task apps' own links.
 const _schemes = {'https', 'http', 'obsidian', 'bear', 'todoist'};
 
@@ -8,11 +10,7 @@ const _schemes = {'https', 'http', 'obsidian', 'bear', 'todoist'};
 Future<bool> openUrl(String url) async {
   final uri = Uri.tryParse(url);
   if (uri == null || !_schemes.contains(uri.scheme)) return false;
-  final (program, args) = Platform.isMacOS
-      ? ('open', [url])
-      : Platform.isWindows
-          ? ('rundll32', ['url.dll,FileProtocolHandler', url])
-          : ('xdg-open', [url]);
+  final (program, args) = hostOs.openUrlCommand(url);
   try {
     final result = await Process.run(program, args);
     return result.exitCode == 0;

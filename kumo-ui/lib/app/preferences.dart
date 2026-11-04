@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../platform/os/host_os.dart';
+
 /// The user's settings, as a small JSON file next to the app's data:
 /// `~/Library/Application Support/Kumo/ui.json` on macOS (inside the app
 /// container when sandboxed), `%APPDATA%\Kumo\ui.json` on Windows.
@@ -19,17 +21,8 @@ class Preferences {
   Timer? _pending;
 
   static File? defaultFile() {
-    final env = Platform.environment;
-    if (Platform.isMacOS) {
-      final home = env['HOME'];
-      return home == null ? null : File('$home/Library/Application Support/Kumo/ui.json');
-    }
-    if (Platform.isWindows) {
-      final appData = env['APPDATA'];
-      return appData == null ? null : File('$appData\\Kumo\\ui.json');
-    }
-    final home = env['HOME'];
-    return home == null ? null : File('$home/.config/kumo/ui.json');
+    final path = hostOs.preferencesPath;
+    return path == null ? null : File(path);
   }
 
   /// Reads the file synchronously (it is tiny) so the first frame already

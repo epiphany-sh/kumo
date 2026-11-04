@@ -8,7 +8,7 @@
 
 use std::io::Read;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -73,7 +73,7 @@ impl GitHubConnector {
                 "the GitHub CLI (gh) isn't installed: get it from cli.github.com".into(),
             )
         })?;
-        let mut child = Command::new(program)
+        let mut child = crate::platform::background(program)
             .args(args)
             .env("PATH", self.locator.search_path())
             .env("GH_PROMPT_DISABLED", "1")

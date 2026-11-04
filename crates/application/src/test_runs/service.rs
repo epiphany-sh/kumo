@@ -110,9 +110,10 @@ impl TestService {
         if let Some(previous) = self.lock().run_of(&worktree) {
             let _ = self.terminals.close(&previous.terminal);
         }
-        let spec = LaunchSpec::new("/bin/sh")
+        let (shell, args) = self.ports.locator.script(&command);
+        let spec = LaunchSpec::new(shell)
             .map_err(launch_error)?
-            .with_args(["-c".to_owned(), command.clone()])
+            .with_args(args)
             .with_cwd(Some(worktree.clone()))
             .with_env([("PATH".to_owned(), self.ports.locator.search_path())])
             .with_size(size);

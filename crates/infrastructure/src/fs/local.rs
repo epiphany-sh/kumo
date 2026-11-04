@@ -91,7 +91,7 @@ impl FileStore for LocalFileStore {
         // On case-insensitive disks `Foo.rs` → `foo.rs` finds the file
         // itself: that's a rename, not an overwrite.
         if let Ok(existing) = std::fs::symlink_metadata(&target)
-            && !same_file(&source, &target, &existing)
+            && !crate::platform::same_file(&source, &target, &existing)
         {
             return Err(ChangesError::Io(format!("{to} already exists")));
         }
@@ -113,22 +113,6 @@ impl FileStore for LocalFileStore {
         }
         .map_err(|e| io_error(&target, e))
     }
-}
-
-/// `existing` (metadata of the target) is `source` itself.
-#[cfg(unix)]
-fn same_file(source: &Path, _target: &Path, existing: &std::fs::Metadata) -> bool {
-    use std::os::unix::fs::MetadataExt;
-    std::fs::symlink_metadata(source)
-        .is_ok_and(|s| s.dev() == existing.dev() && s.ino() == existing.ino())
-}
-
-/// Without inodes: the same path but for its case (Windows disks ignore case).
-#[cfg(not(unix))]
-fn same_file(source: &Path, target: &Path, _existing: &std::fs::Metadata) -> bool {
-    source
-        .to_string_lossy()
-        .eq_ignore_ascii_case(&target.to_string_lossy())
 }
 
 fn io_error(path: &Path, error: std::io::Error) -> ChangesError {

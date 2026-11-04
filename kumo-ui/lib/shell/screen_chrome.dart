@@ -1,9 +1,8 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
+import '../platform/os/host_os.dart';
 import '../platform/window_effects.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
@@ -44,7 +43,7 @@ class ScreenToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final c = context.c;
-    final hiddenSidebarInset = (!s.sidebarVisible && !kIsWeb && Platform.isMacOS && WindowEffects.nativeBackdrop) ? 76.0 : 0.0;
+    final hiddenSidebarInset = (!s.sidebarVisible && !kIsWeb && hostOs.windowButtonsInContent && WindowEffects.nativeBackdrop) ? 76.0 : 0.0;
     final (themeIcon, themeName) = switch (s.mode) {
       KumoThemeMode.dark => (KIcons.moon, 'Dark'),
       KumoThemeMode.light => (KIcons.sun, 'Light'),

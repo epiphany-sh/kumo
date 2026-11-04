@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../platform/os/host_os.dart';
+
 /// What the daemon advertises in its discovery file (`daemon.json`).
 class DaemonEndpoint {
   const DaemonEndpoint({required this.apiVersion, required this.pid, required this.host, required this.port, required this.token});
@@ -35,19 +37,7 @@ class DaemonDiscovery {
 
   final File file;
 
-  static String defaultPath() {
-    final env = Platform.environment;
-    final sep = Platform.pathSeparator;
-    final String dataDir;
-    if (Platform.isMacOS) {
-      dataDir = '${env['HOME']}/Library/Application Support';
-    } else if (Platform.isWindows) {
-      dataDir = env['LOCALAPPDATA'] ?? '${env['USERPROFILE']}\\AppData\\Local';
-    } else {
-      dataDir = env['XDG_DATA_HOME'] ?? '${env['HOME']}/.local/share';
-    }
-    return '$dataDir${sep}kumo${sep}daemon.json';
-  }
+  static String defaultPath() => hostOs.daemonDiscoveryPath;
 
   /// The advertised endpoint, or null if there is none (or it is unreadable).
   Future<DaemonEndpoint?> read() async {

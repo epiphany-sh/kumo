@@ -1,11 +1,13 @@
 import 'dart:io';
 
+import '../platform/os/host_os.dart';
+
 /// Finds and starts `kumod` as a detached process, so it outlives the UI
 /// (kumo.md §3, §7).
 class DaemonLauncher {
   const DaemonLauncher();
 
-  static String get _exe => Platform.isWindows ? 'kumod.exe' : 'kumod';
+  static String get _exe => hostOs.daemonExecutable;
 
   /// Where to look, in order:
   /// 1. `KUMOD_PATH`.
@@ -43,7 +45,7 @@ class DaemonLauncher {
       path,
       const [],
       mode: ProcessStartMode.detached,
-      workingDirectory: Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'],
+      workingDirectory: hostOs.home,
     );
   }
 }
