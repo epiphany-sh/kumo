@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 use std::io::Read;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -103,7 +103,7 @@ impl GhTokenFallback {
     /// missing or slow.
     fn gh(&self, args: &[&str]) -> Option<(bool, String)> {
         let program = self.locator.locate("gh")?;
-        let mut child = Command::new(program)
+        let mut child = crate::platform::background(program)
             .args(args)
             .env("PATH", self.locator.search_path())
             .env("GH_PROMPT_DISABLED", "1")

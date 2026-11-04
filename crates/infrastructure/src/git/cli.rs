@@ -1,6 +1,5 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use kumo_domain::profiles::ProfileEnv;
 use kumo_domain::workspace::{
@@ -55,7 +54,7 @@ impl GitCli {
         S: AsRef<OsStr>,
     {
         let (vars, ssh) = self.profile_env();
-        let output = Command::new(&self.program)
+        let output = crate::platform::background(&self.program)
             .arg("-C")
             .arg(dir)
             .args(args)

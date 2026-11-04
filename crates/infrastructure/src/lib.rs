@@ -1,5 +1,6 @@
 //! Kumo infrastructure layer: OS-facing implementations of domain ports.
 //!
+//! - [`platform`]: what each OS does its own way, one file per OS.
 //! - [`pty`]: pseudo-terminals via `portable-pty` (ConPTY on Windows).
 //! - [`agents`]: finding coding-agent CLIs on the user's PATH.
 //! - [`discovery`]: the `daemon.json` discovery file.
@@ -19,6 +20,7 @@ pub mod docs;
 pub mod executable;
 pub mod fs;
 pub mod git;
+pub mod platform;
 pub mod profiles;
 pub mod pty;
 pub mod secrets;

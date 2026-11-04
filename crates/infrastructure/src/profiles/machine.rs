@@ -3,7 +3,7 @@
 //! never opened.
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::Arc;
 
 use kumo_domain::agents::ProgramLocator;
@@ -41,7 +41,7 @@ impl LocalMachineAccounts {
             .locator
             .locate("ssh-keygen")
             .unwrap_or_else(|| PathBuf::from("ssh-keygen"));
-        let output = Command::new(program)
+        let output = crate::platform::background(program)
             .arg("-l")
             .arg("-f")
             .arg(public)
@@ -149,7 +149,7 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         let ssh = home.path().join(".ssh");
         std::fs::create_dir(&ssh).unwrap();
-        let made = Command::new(keygen)
+        let made = std::process::Command::new(keygen)
             .args([
                 "-q",
                 "-t",

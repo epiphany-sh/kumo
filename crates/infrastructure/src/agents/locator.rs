@@ -74,7 +74,7 @@ impl ProgramLocator for ShellPathLocator {
     }
 
     fn version(&self, program: &Path) -> Result<String, AgentError> {
-        let mut command = Command::new(program);
+        let mut command = crate::platform::background(program);
         command.arg("--version").env("PATH", self.path());
         let output = run_with_timeout(command, VERSION_TIMEOUT).map_err(AgentError::Test)?;
         let text = if output.0.trim().is_empty() {
