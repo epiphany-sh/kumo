@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
+import '../platform/os/host_os.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/profile_tile.dart';
@@ -233,7 +234,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       case SettingsTab.terminal:
         return _Page('Terminal', 'Shell, font and keyboard behaviour of every terminal pane.', sections: [
           ('Shell', [
-            _select(s, 'terminal.shell', 'Shell', 'Login shell for new tabs (⌘T) and splits.', const ['/bin/zsh', '/bin/bash', '/opt/homebrew/bin/fish'], '/bin/zsh'),
+            _select(s, 'terminal.shell', 'Shell', 'Login shell for new tabs (⌘T) and splits.', hostOs.shellChoices, hostOs.defaultShellChoice),
             _text(s, 'terminal.cwd', 'Start in', 'For tabs opened outside a worktree.', '~', mono: true),
             _select(s, 'terminal.scrollback', 'Scrollback', null, const ['5,000 lines', '10,000 lines', '50,000 lines', 'Unlimited'], '10,000 lines'),
           ]),
