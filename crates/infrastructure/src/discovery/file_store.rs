@@ -97,15 +97,11 @@ impl DiscoveryStore for FileDiscoveryStore {
     }
 }
 
-/// Creates a file readable and writable only by its owner (Unix `0600`).
+/// Creates a file readable and writable only by its owner (see [`crate::platform::PrivateFiles`]).
 fn create_private(path: &Path) -> std::io::Result<File> {
     let mut options = OpenOptions::new();
     options.write(true).create(true).truncate(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
+    crate::platform::owner_only(&mut options);
     options.open(path)
 }
 

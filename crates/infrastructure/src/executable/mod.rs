@@ -10,8 +10,8 @@ use kumo_domain::daemon::Executable;
 struct Fingerprint {
     len: u64,
     modified: Option<SystemTime>,
-    #[cfg(unix)]
-    inode: u64,
+    /// The inode where there is one.
+    id: Option<u64>,
 }
 
 impl Fingerprint {
@@ -20,8 +20,7 @@ impl Fingerprint {
         Some(Self {
             len: meta.len(),
             modified: meta.modified().ok(),
-            #[cfg(unix)]
-            inode: std::os::unix::fs::MetadataExt::ino(&meta),
+            id: crate::platform::file_id(&meta),
         })
     }
 }

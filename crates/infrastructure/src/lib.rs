@@ -21,6 +21,7 @@ pub mod executable;
 pub mod fs;
 pub mod git;
 pub mod platform;
+mod process;
 pub mod profiles;
 pub mod pty;
 pub mod secrets;
