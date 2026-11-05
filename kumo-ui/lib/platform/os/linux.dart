@@ -1,3 +1,4 @@
+import '../channel.dart';
 import 'host_os.dart';
 
 /// Linux (and any other desktop OS).
@@ -11,14 +12,14 @@ class LinuxOs extends HostOs {
   @override
   String? get preferencesPath {
     final home = env['HOME'];
-    return home == null ? null : '$home/.config/kumo/ui.json';
+    return home == null ? null : '$home/.config/$engineDirName/ui.json';
   }
 
   /// `$XDG_DATA_HOME/kumo/daemon.json`, else `~/.local/share/kumo/daemon.json`.
   @override
   String get daemonDiscoveryPath {
     final dataDir = env['XDG_DATA_HOME'] ?? '${env['HOME']}/.local/share';
-    return '$dataDir/kumo/daemon.json';
+    return '$dataDir/$engineDirName/daemon.json';
   }
 
   @override

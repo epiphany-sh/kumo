@@ -2,6 +2,7 @@
 //!
 //! - [`platform`]: what each OS does its own way, one file per OS.
 //! - [`pty`]: pseudo-terminals via `portable-pty` (ConPTY on Windows).
+//! - [`channel`]: the release channel a build belongs to (stable, beta).
 //! - [`agents`]: finding coding-agent CLIs on the user's PATH.
 //! - [`discovery`]: the `daemon.json` discovery file.
 //! - [`security`]: secure randomness for auth tokens.
@@ -14,6 +15,7 @@
 //! - [`secrets`]: API tokens in the OS keychain.
 
 pub mod agents;
+pub mod channel;
 pub mod ci;
 pub mod discovery;
 pub mod docs;

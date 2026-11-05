@@ -2,6 +2,7 @@
 #
 #   make run     release build of kumod + Flutter app, kumod bundled inside, launched
 #   make dev     kumod (release) + `flutter run` in debug with hot reload
+#   make sandbox beta build next to the installed Kumo, with its own daemon and data
 #   make help    everything else
 
 .DEFAULT_GOAL := help
@@ -30,6 +31,23 @@ endif
 
 KUMOD := target/release/kumod$(EXE)
 
+# Release channel (empty: stable). Baked into kumod (KUMO_CHANNEL) and the
+# UI (--dart-define): a channel build has its own data directory
+# (kumo-<channel>), daemon, settings, keychain items and bundle id, so it
+# runs next to the installed app without touching it. `make sandbox` sets it.
+CHANNEL ?=
+CHANNEL_ID   := $(if $(CHANNEL),.$(CHANNEL))
+CHANNEL_NAME := $(if $(CHANNEL),Kumo $(CHANNEL),Kumo)
+
+# The sandbox: a beta build of this checkout, copied to a fixed place. Its
+# version is the last tag plus the commits since (v0.4.3 + 5 → 0.4.3-beta.5).
+SANDBOX_VERSION ?= $(shell git describe --tags --match 'v[0-9]*' --long 2>/dev/null | sed -E 's/^v([0-9.]+)-([0-9]+)-g.*/\1-beta.\2/')
+ifeq ($(OS),Windows_NT)
+  SANDBOX_DISCOVERY := $(LOCALAPPDATA)/kumo-beta/daemon.json
+else
+  SANDBOX_DISCOVERY := $(HOME)/Library/Application Support/kumo-beta/daemon.json
+endif
+
 # macOS ties permissions ("Always Allow" on Keychain items, folder access)
 # to the code signature. Ad-hoc signatures change with every build, so each
 # rebuild looks like a new app and asks again. With a stable identity (make
@@ -52,7 +70,7 @@ BUILD ?= $(shell git rev-list --count HEAD 2>/dev/null)
 # protoc: the one vendored by Cargo (crates/proto) if present, else the system one.
 PROTOC ?= $(firstword $(wildcard $(HOME)/.cargo/registry/src/*/protoc-bin-vendored-macos-*/bin/protoc) protoc)
 
-.PHONY: help all engine ui app release sparkle-keys run dev stop status test check bench bench-ui proto clean signing-cert
+.PHONY: help all engine ui app release sparkle-keys run dev stop status sandbox sandbox-stop test check bench bench-ui proto clean signing-cert
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-8s\033[0m %s\n", $$1, $$2}'
@@ -60,15 +78,15 @@ help: ## Show this help
 all: app ## Same as `app`
 
 engine: ## Build kumod (release)
-	$(if $(VERSION),KUMO_VERSION=$(VERSION)) $(CARGO) build --release -p kumod
+	$(if $(VERSION),KUMO_VERSION=$(VERSION)) KUMO_CHANNEL=$(CHANNEL) $(CARGO) build --release -p kumod
 ifeq ($(PLATFORM),macos)
 	@# `make dev` runs this binary: with the stable identity, the keychain's
 	@# "Always Allow" survives rebuilds (ad-hoc it would be a new program).
-	$(if $(SIGN_ID),codesign --force --sign "$(SIGN_ID)" --identifier dev.kumo.kumod "$(KUMOD)")
+	$(if $(SIGN_ID),codesign --force --sign "$(SIGN_ID)" --identifier dev.kumo.kumod$(CHANNEL_ID) "$(KUMOD)")
 endif
 
 ui: ## Build the Flutter app (release)
-	cd $(UI) && $(FLUTTER) pub get && $(FLUTTER) build $(PLATFORM) --release $(if $(VERSION),--build-name=$(VERSION) --build-number=$(BUILD))
+	cd $(UI) && $(FLUTTER) pub get && $(FLUTTER) build $(PLATFORM) --release $(if $(VERSION),--build-name=$(VERSION) --build-number=$(BUILD)) --dart-define=KUMO_CHANNEL=$(CHANNEL)
 
 app: engine ui ## Release app with kumod bundled next to the UI executable
 	cp "$(KUMOD)" "$(APP_BIN)/"
@@ -76,6 +94,11 @@ ifeq ($(PLATFORM),macos)
 	@# Only release builds know where updates are (FEED): a local build
 	@# never replaces itself with the published one.
 	$(if $(FEED),/usr/libexec/PlistBuddy -c "Add :SUFeedURL string $(FEED)" -c "Add :SUPublicEDKey string $(SPARKLE_KEY)" "$(APP)/Contents/Info.plist")
+	@# A channel build is another app to macOS: its own bundle id (so it
+	@# opens next to the stable one, with its own defaults) and name. Flutter
+	@# keeps only the digits of the version: the full one goes in here.
+	$(if $(CHANNEL),/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier dev.kumo.kumoUi$(CHANNEL_ID)" -c "Set :CFBundleName $(CHANNEL_NAME)" \
+		$(if $(VERSION),-c "Set :CFBundleShortVersionString $(VERSION)") "$(APP)/Contents/Info.plist")
 	@# Sparkle's helpers carry the app's identity, inside out.
 	@set -e; S="$(APP)/Contents/Frameworks/Sparkle.framework"; if [ -d "$$S" ]; then \
 		for p in Versions/B/XPCServices/Installer.xpc Versions/B/XPCServices/Downloader.xpc Versions/B/Autoupdate Versions/B/Updater.app; do \
@@ -83,7 +106,7 @@ ifeq ($(PLATFORM),macos)
 		codesign --force --sign "$(SIGN)" "$$S"; fi
 	@# Adding a binary breaks the bundle seal: sign kumod (a fixed identifier,
 	@# so macOS knows it's the same program), then re-seal the app.
-	codesign --force --sign "$(SIGN)" --identifier dev.kumo.kumod "$(APP_BIN)/kumod"
+	codesign --force --sign "$(SIGN)" --identifier dev.kumo.kumod$(CHANNEL_ID) "$(APP_BIN)/kumod"
 	codesign --force --sign "$(SIGN)" --preserve-metadata=entitlements,requirements,flags,runtime "$(APP)"
 	@$(if $(SIGN_ID),,echo "  (signed ad-hoc: macOS asks for permissions again after every build; run 'make signing-cert' once to stop that)")
 endif
@@ -148,6 +171,30 @@ status: ## Show the daemon discovery file and whether it is alive
 		if kill -0 $$pid 2>/dev/null; then echo "kumod running · pid $$pid · $$addr"; \
 		else echo "stale discovery file (pid $$pid is gone)"; fi; \
 	else echo "kumod is not running"; fi
+
+sandbox: ## Beta build of this checkout next to the installed Kumo (own daemon, data, keychain)
+	@test -n "$(SANDBOX_VERSION)" || { echo "no v* tag to version the sandbox from: git fetch origin --tags"; exit 1; }
+	$(MAKE) app CHANNEL=beta VERSION=$(SANDBOX_VERSION)
+	@# The daemon outlives the app: stop the old one so the new kumod runs.
+	@$(MAKE) --no-print-directory sandbox-stop
+	@# A copy out of build/, which the next `make run` rebuilds as stable.
+ifeq ($(PLATFORM),macos)
+	mkdir -p "target/sandbox/Kumo beta.app"
+	ditto "$(APP)" "target/sandbox/Kumo beta.app"
+	open "target/sandbox/Kumo beta.app"
+else
+	mkdir -p target/sandbox/kumo-beta
+	cp -r "$(APP)/." target/sandbox/kumo-beta/
+	target/sandbox/kumo-beta/Kumo.exe
+endif
+	@echo "✓ sandbox $(SANDBOX_VERSION)"
+
+sandbox-stop: ## Stop the sandbox's daemon (the installed Kumo's keeps running)
+	@pid=$$(sed -n 's/.*"pid": *\([0-9]*\).*/\1/p' "$(SANDBOX_DISCOVERY)" 2>/dev/null); \
+	if [ -z "$$pid" ]; then echo "sandbox kumod is not running"; \
+	elif [ "$(PLATFORM)" = windows ]; then taskkill //PID $$pid //F >/dev/null 2>&1 && echo "✓ sandbox kumod (pid $$pid) stopped" || echo "sandbox kumod is not running"; \
+	elif kill -0 $$pid 2>/dev/null; then kill $$pid && echo "✓ sandbox kumod (pid $$pid) stopped"; \
+	else echo "sandbox kumod is not running"; fi
 
 test: ## Rust and Flutter tests
 	$(CARGO) test --workspace

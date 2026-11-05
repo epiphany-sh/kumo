@@ -8,7 +8,8 @@ use kumo_domain::daemon::ListenAddress;
 pub struct DaemonConfig {
     pub listen: ListenAddress,
     /// Directory for `daemon.json` and `kumo.db`. `None` uses the per-user
-    /// default (`<data_local_dir>/kumo`).
+    /// default (`<data_local_dir>/kumo`, `kumo-<channel>` for a channel
+    /// build).
     pub data_dir: Option<PathBuf>,
     /// The user's home: default worktree location (`~/wt`) and the usual
     /// folders scanned for repositories. `None` uses the real one.
