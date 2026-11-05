@@ -13,11 +13,15 @@ import '../widgets/controls.dart';
 import '../widgets/kicons.dart';
 import 'ask_agent.dart';
 import 'code_editor.dart';
+import 'comment.dart';
 import 'diff_colors.dart';
+import 'find.dart';
+import 'markdown_preview.dart';
 import 'syntax.dart';
 
-/// How a [FileView] shows its file.
-enum FileViewMode { edit, diff, changesOnly }
+/// How a [FileView] shows its file. Preview is for Markdown: the document,
+/// rendered.
+enum FileViewMode { preview, edit, diff, changesOnly }
 
 /// A file of the worktree: editable (Edit), or the whole file with its
 /// changes inline (Diff) or only the changed hunks, numbered old/new like
@@ -40,8 +44,20 @@ class _FileViewState extends State<FileView> {
   static const _gutter = 3.0 + 34 + 42 + 16;
   static const _editFont = 12.5;
 
-  late FileViewMode _mode = widget.startEditing ? FileViewMode.edit : FileViewMode.diff;
+  /// Preview or Edit, as last picked for each Markdown file (this session).
+  static final _mdModes = <String, FileViewMode>{};
+
+  bool get _markdown => langOf(widget.path).lang == Lang.markdown;
+
+  late FileViewMode _mode = !widget.startEditing ? FileViewMode.diff : (_markdown ? (_mdModes[widget.path] ?? FileViewMode.preview) : FileViewMode.edit);
   bool get _changesOnly => _mode == FileViewMode.changesOnly;
+
+  /// The mode on screen (what [_mode] asks for, when the file allows it).
+  FileViewMode _shown = FileViewMode.edit;
+
+  /// ⌘F: find and replace in Edit.
+  final _find = EditorFind();
+  AppState? _app;
   int _hunk = 0;
   String? _saveError;
 
@@ -97,13 +113,80 @@ class _FileViewState extends State<FileView> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final app = AppScope.read(context);
+    if (!identical(app, _app)) {
+      _app?.unregisterFileHandler(KumoView.terminal, _onCommand);
+      _app = app..registerFileHandler(KumoView.terminal, _onCommand);
+    }
+  }
+
+  @override
   void dispose() {
+    _app?.unregisterFileHandler(KumoView.terminal, _onCommand);
+    _find.dispose();
     _scroll.dispose();
     _hScroll.dispose();
     _editScroll.dispose();
     _ask.dispose();
     _editFocus.dispose();
     super.dispose();
+  }
+
+  void _setMode(FileViewMode m) {
+    setState(() {
+      _mode = m;
+      _hunk = 0;
+    });
+    if (_markdown && (m == FileViewMode.preview || m == FileViewMode.edit)) _mdModes[widget.path] = m;
+    if (m != FileViewMode.edit) _find.close();
+  }
+
+  /// The window's file shortcuts, while this file shows.
+  bool _onCommand(FileCommand cmd) {
+    final s = AppScope.read(context);
+    final canEdit = s.changes.statusOf(widget.path) != GitStatus.deleted && _file?.kind != 'D';
+    switch (cmd) {
+      case FileCommand.save:
+        _save();
+        return true;
+      case FileCommand.find || FileCommand.replace:
+        if (!canEdit && _shown != FileViewMode.edit) return false;
+        // Find works on the text: from the preview or a diff, to Edit.
+        if (_shown != FileViewMode.edit) _setMode(FileViewMode.edit);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _find.open(replace: cmd == FileCommand.replace);
+        });
+        return true;
+      case FileCommand.findNext || FileCommand.findPrevious:
+        if (_shown != FileViewMode.edit) return false;
+        cmd == FileCommand.findNext ? _find.next() : _find.previous();
+        return true;
+      case FileCommand.togglePreview:
+        if (!_markdown) return false;
+        _setMode(_shown == FileViewMode.preview ? FileViewMode.edit : FileViewMode.preview);
+        if (_shown != FileViewMode.preview) WidgetsBinding.instance.addPostFrameCallback((_) => _editFocus.requestFocus());
+        return true;
+      case FileCommand.nextTab || FileCommand.previousTab:
+        if (s.activeContext != ContextTab.files) return false;
+        s.cycleContextFile(cmd == FileCommand.nextTab ? 1 : -1);
+        return true;
+      case FileCommand.toggleComment:
+        if (_shown != FileViewMode.edit || s.buffers.readOnlyReason(widget.path) != null) return false;
+        final ctrl = s.buffers.of(widget.path);
+        final next = toggleLineComment(ctrl.value, ctrl.lang);
+        if (next != null) ctrl.value = next;
+        _editFocus.requestFocus();
+        return true;
+      case FileCommand.close:
+        return false;
+    }
+  }
+
+  void _closeFind() {
+    _find.close();
+    _editFocus.requestFocus();
   }
 
   /// First line of each run of changed lines, for previous / next in Edit.
@@ -148,15 +231,24 @@ class _FileViewState extends State<FileView> {
     _load(s.changes);
     final file = _file;
     final deleted = s.changes.statusOf(widget.path) == GitStatus.deleted || file?.kind == 'D';
-    // Unchanged files only have the editor; deleted ones only the diff.
-    final mode = file == null ? FileViewMode.edit : (deleted && _mode == FileViewMode.edit ? FileViewMode.diff : _mode);
+    // Unchanged files only have the editor (and Markdown its preview);
+    // deleted ones only the diff.
+    final wanted = _mode == FileViewMode.preview && !_markdown ? FileViewMode.edit : _mode;
+    final mode = file == null
+        ? (wanted == FileViewMode.preview ? FileViewMode.preview : FileViewMode.edit)
+        : (deleted && (wanted == FileViewMode.edit || wanted == FileViewMode.preview) ? FileViewMode.diff : wanted);
+    _shown = mode;
     _editing = mode == FileViewMode.edit && _diffLoaded;
+    final buffer = s.buffers.of(widget.path);
+    _find
+      ..readOnly = s.buffers.readOnlyReason(widget.path) != null
+      ..attach(mode == FileViewMode.edit ? buffer : null);
     if (mode == FileViewMode.edit) _loadMarks(s.changes);
     final dirty = s.buffers.isDirty(widget.path);
     final asking = s.closeAsk?.$1 == widget.path;
     final name = widget.path.substring(widget.path.lastIndexOf('/') + 1);
     final dir = widget.path.substring(0, widget.path.lastIndexOf('/') + 1);
-    final count = mode == FileViewMode.edit ? _runs.length : (file == null ? 0 : hunkCount(file));
+    final count = mode == FileViewMode.preview ? 0 : (mode == FileViewMode.edit ? _runs.length : (file == null ? 0 : hunkCount(file)));
     final rows = file == null || mode == FileViewMode.edit ? const <DiffRow>[] : diffRows(file, changesOnly: _changesOnly);
     final kindColor = file == null ? c.text3 : (file.kind == 'A' ? c.ok : c.warn);
     final kindSoft = file == null ? c.tile : (file.kind == 'A' ? c.okSoft : c.warnSoft);
@@ -218,24 +310,24 @@ class _FileViewState extends State<FileView> {
                   Tooltip(message: 'Save (⌘S)', child: KButton(label: 'Save', height: 24, fontSize: 11.5, onTap: _save)),
                   const SizedBox(width: 8),
                 ],
-                if (file != null) ...[
+                if (file != null || (_markdown && !deleted)) ...[
                   KSegmented<FileViewMode>(
                     label: 'Show',
                     height: 24,
                     value: mode,
-                    onChanged: (v) => setState(() {
-                      _mode = v;
-                      _hunk = 0;
-                    }),
+                    onChanged: _setMode,
                     items: [
+                      if (_markdown && !deleted) (FileViewMode.preview, 'Preview', null),
                       if (!deleted) (FileViewMode.edit, 'Edit', null),
-                      (FileViewMode.diff, 'Diff', null),
-                      (FileViewMode.changesOnly, compact ? 'Changes' : 'Changes only', null),
+                      if (file != null) ...[
+                        (FileViewMode.diff, 'Diff', null),
+                        (FileViewMode.changesOnly, compact ? 'Changes' : 'Changes only', null),
+                      ],
                     ],
                   ),
                   const SizedBox(width: 8),
                 ],
-                if (count > 0 || file != null) ...[
+                if (mode != FileViewMode.preview && (count > 0 || file != null)) ...[
                   KIconButton(icon: KIcons.chevronUp, label: 'Previous change', size: 24, iconSize: 16, onTap: () => _jump(-1, rows, count, mode)),
                   if (!compact) SizedBox(width: 82, child: Text(hunkLabel, textAlign: TextAlign.center, style: sans(11.5, color: c.text2))),
                   KIconButton(icon: KIcons.chevronDown, label: 'Next change', size: 24, iconSize: 16, onTap: () => _jump(1, rows, count, mode)),
@@ -265,7 +357,11 @@ class _FileViewState extends State<FileView> {
           Expanded(
             child: !_diffLoaded
                 ? const SizedBox.shrink()
-                : (mode == FileViewMode.edit || file == null ? _editor(context) : _body(context, file, rows)),
+                : switch (mode) {
+                    FileViewMode.preview => _preview(context),
+                    _ when mode == FileViewMode.edit || file == null => _editor(context),
+                    _ => SelectionArea(child: _body(context, file, rows)),
+                  },
           ),
         ]),
       ),
@@ -334,6 +430,11 @@ class _FileViewState extends State<FileView> {
               ],
             ),
           ),
+          // ⌘F: find (and replace) over the top right of the code.
+          ListenableBuilder(
+            listenable: _find,
+            builder: (context, _) => _find.visible ? Positioned(top: 8, right: 18, child: FindBar(find: _find, onClose: _closeFind)) : const SizedBox.shrink(),
+          ),
           // Select code: ask an agent about it, with where it is.
           Positioned.fill(
             child: AskAgentLayer(
@@ -350,6 +451,25 @@ class _FileViewState extends State<FileView> {
         ]),
       ),
     ]);
+  }
+
+  /// Preview: the Markdown as a document, live with unsaved edits.
+  Widget _preview(BuildContext context) {
+    final s = AppScope.of(context);
+    final buffers = s.buffers;
+    final ctrl = buffers.of(widget.path);
+    if (!buffers.isLoaded(widget.path)) return const SizedBox.shrink();
+    return ListenableBuilder(
+      listenable: ctrl,
+      builder: (context, _) => MarkdownPreview(
+        key: ValueKey('preview:${widget.path}'),
+        source: ctrl.text,
+        path: widget.path,
+        root: s.activeWorktreeEntry?.path ?? '',
+        files: s.visibleFiles,
+        onOpenFile: (p) => s.activeContext == ContextTab.files ? s.showContextFile(p) : s.openFile(p),
+      ),
+    );
   }
 
   Widget _body(BuildContext context, ChangedFile file, List<DiffRow> rows) {

@@ -1407,6 +1407,33 @@ class AppState extends ChangeNotifier {
     if (_view == KumoView.terminal) terminalHandler?.call(command);
   }
 
+  // ---- File commands (⌘S / ⌘W / ⌘F / ⌘G…) ----
+
+  /// What handles the file shortcuts in each view: the file showing in the
+  /// Terminal view (its Files tab or a file tab), the full editor in Files.
+  final _fileHandlers = <KumoView, bool Function(FileCommand command)>{};
+
+  void registerFileHandler(KumoView view, bool Function(FileCommand command) handler) => _fileHandlers[view] = handler;
+
+  void unregisterFileHandler(KumoView view, bool Function(FileCommand command) handler) {
+    if (_fileHandlers[view] == handler) _fileHandlers.remove(view);
+  }
+
+  /// A file is showing in the current view (so its shortcuts apply).
+  bool get fileShowing => _fileHandlers.containsKey(_view);
+
+  /// Runs [command] on the file showing; false when none took it.
+  bool sendFileCommand(FileCommand command) => _fileHandlers[_view]?.call(command) ?? false;
+
+  /// Shows the next (or previous) file of the Files tab, wrapping around.
+  void cycleContextFile(int delta) {
+    final files = _tabs.contextFiles;
+    final cur = _tabs.contextFile;
+    if (files.length < 2 || cur == null) return;
+    final i = files.indexOf(cur);
+    showContextFile(files[(i + delta) % files.length]);
+  }
+
   @override
   void dispose() {
     _disposed = true;
@@ -1446,6 +1473,9 @@ class AppState extends ChangeNotifier {
 }
 
 enum TerminalCommand { splitRight, splitDown, closePane, newTerminal }
+
+/// The editor's shortcuts, sent to the file showing.
+enum FileCommand { save, close, find, replace, findNext, findPrevious, nextTab, previousTab, togglePreview, toggleComment }
 
 enum InspectorWidget {
   agent('Agent', 'What this worktree’s agent is doing, its diff and terminal'),

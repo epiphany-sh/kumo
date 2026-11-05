@@ -32,12 +32,16 @@ class ScreenFrame extends StatelessWidget {
 
 /// Toolbar: breadcrumb capsule, search, theme cycle, primary action.
 class ScreenToolbar extends StatelessWidget {
-  const ScreenToolbar({super.key, required this.breadcrumb, this.primary, this.searchHint = 'Search commands, tickets, docs…', this.searchKey = '⌘K'});
+  const ScreenToolbar({super.key, required this.breadcrumb, this.primary, this.searchHint = 'Search commands, tickets, docs…', this.searchKey = '⌘K', this.onSearch});
 
   final Widget breadcrumb;
   final Widget? primary;
   final String searchHint;
   final String searchKey;
+
+  /// The search field opens this (a picker of its own) instead of taking
+  /// text.
+  final VoidCallback? onSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +64,7 @@ class ScreenToolbar extends StatelessWidget {
         const Spacer(),
         const SizedBox(width: 8),
         // An update waiting takes some of the search field's room.
-        SizedBox(width: s.updates.ready == null ? 300 : 220, child: _SearchField(hint: searchHint, shortcut: searchKey)),
+        SizedBox(width: s.updates.ready == null ? 300 : 220, child: _SearchField(hint: searchHint, shortcut: searchKey, onTap: onSearch)),
         const SizedBox(width: 8),
         if (s.updates.ready case final version?) ...[
           Tooltip(
@@ -77,13 +81,30 @@ class ScreenToolbar extends StatelessWidget {
 }
 
 class _SearchField extends StatelessWidget {
-  const _SearchField({required this.hint, required this.shortcut});
+  const _SearchField({required this.hint, required this.shortcut, this.onTap});
   final String hint;
   final String shortcut;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final tap = onTap;
+    if (tap != null) {
+      return KPressable(
+        onTap: tap,
+        semanticLabel: hint,
+        builder: (context, hover, focus) => Capsule(
+          padding: const EdgeInsets.only(left: 12, right: 8),
+          child: Row(children: [
+            Icon(KIcons.search, size: 16, color: hover ? c.text2 : c.text3),
+            const SizedBox(width: 8),
+            Expanded(child: Text(hint, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, color: hover ? c.text2 : c.text3))),
+            Kbd(shortcut),
+          ]),
+        ),
+      );
+    }
     return Capsule(
       padding: const EdgeInsets.only(left: 12, right: 8),
       child: Row(children: [

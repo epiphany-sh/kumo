@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -5,6 +6,10 @@ import '../app/app_state.dart';
 import '../data/mock_project.dart';
 import '../data/worktree_changes.dart';
 import '../editor/code_editor.dart';
+import '../editor/comment.dart';
+import '../editor/find.dart';
+import '../editor/markdown_preview.dart';
+import '../editor/quick_open.dart';
 import '../editor/syntax.dart';
 import '../overlays/new_agent_dialog.dart';
 import '../shell/screen_chrome.dart';
@@ -71,14 +76,89 @@ class _FilesScreenState extends State<FilesScreen> {
   bool _changedOnly = false;
   bool _asked = false;
 
+  /// Markdown files showing their code instead of the preview.
+  final _mdCode = <String>{};
+  final _find = EditorFind();
+  final _editorFocus = FocusNode(debugLabel: 'full editor');
+  AppState? _app;
+
+  bool _previewing(String path) => langOf(path).lang == Lang.markdown && !_mdCode.contains(path);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final app = AppScope.read(context);
+    if (!identical(app, _app)) {
+      _app?.unregisterFileHandler(KumoView.files, _onCommand);
+      _app = app..registerFileHandler(KumoView.files, _onCommand);
+    }
+  }
+
   @override
   void dispose() {
+    _app?.unregisterFileHandler(KumoView.files, _onCommand);
+    _find.dispose();
+    _editorFocus.dispose();
     for (final c in _controllers.values) {
       c.dispose();
     }
     _caret.dispose();
     _commitMsg.dispose();
     super.dispose();
+  }
+
+  /// The window's file shortcuts, while this view shows.
+  bool _onCommand(FileCommand cmd) {
+    final active = _active;
+    switch (cmd) {
+      case FileCommand.save:
+        _save();
+        return active != null;
+      case FileCommand.close:
+        if (active != null) _close(active);
+        return active != null;
+      case FileCommand.find || FileCommand.replace:
+        if (active == null) return false;
+        if (_previewing(active)) setState(() => _mdCode.add(active));
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _find.open(replace: cmd == FileCommand.replace);
+        });
+        return true;
+      case FileCommand.findNext || FileCommand.findPrevious:
+        if (active == null || _previewing(active)) return false;
+        cmd == FileCommand.findNext ? _find.next() : _find.previous();
+        return true;
+      case FileCommand.togglePreview:
+        if (active == null || langOf(active).lang != Lang.markdown) return false;
+        _togglePreview(active);
+        return true;
+      case FileCommand.toggleComment:
+        if (active == null || _previewing(active) || _git.statusOf(active) == GitStatus.deleted) return false;
+        final ctrl = _ctrl(active);
+        final next = toggleLineComment(ctrl.value, ctrl.lang);
+        if (next != null) ctrl.value = next;
+        _editorFocus.requestFocus();
+        return true;
+      case FileCommand.nextTab || FileCommand.previousTab:
+        if (active == null || _tabs.length < 2) return false;
+        final i = _tabs.indexOf(active) + (cmd == FileCommand.nextTab ? 1 : -1);
+        setState(() => _active = _tabs[i % _tabs.length]);
+        return true;
+    }
+  }
+
+  void _togglePreview(String path) {
+    setState(() => _mdCode.contains(path) ? _mdCode.remove(path) : _mdCode.add(path));
+    if (_previewing(path)) {
+      _find.close();
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _editorFocus.requestFocus());
+    }
+  }
+
+  void _closeFind() {
+    _find.close();
+    _editorFocus.requestFocus();
   }
 
   /// A new worktree was selected: start over with its files.
@@ -206,6 +286,7 @@ class _FilesScreenState extends State<FilesScreen> {
 
   void _close(String path) => setState(() {
         final idx = _tabs.indexOf(path);
+        if (idx < 0) return;
         _tabs = [..._tabs]..remove(path);
         if (_active == path) _active = _tabs.isEmpty ? null : _tabs[idx < _tabs.length ? idx : _tabs.length - 1];
       });
@@ -262,8 +343,9 @@ class _FilesScreenState extends State<FilesScreen> {
     return ScreenFrame(
       toolbar: ScreenToolbar(
         breadcrumb: Breadcrumb(icon: KIcons.branch, parts: [s.activeRepo?.name ?? 'No repository', if (_git.branch.isNotEmpty) _git.branch]),
-        searchHint: 'Go to file or symbol…',
-        searchKey: '⌘P',
+        searchHint: 'Go to file…',
+        searchKey: defaultTargetPlatform == TargetPlatform.macOS ? '⌘P' : 'Ctrl+P',
+        onSearch: () => goToFile(context, AppScope.read(context)),
         primary: KButton.primary(
           label: 'Ask agent about file',
           icon: KIcons.agent,
@@ -287,7 +369,8 @@ class _FilesScreenState extends State<FilesScreen> {
         if (info != null) ...[
           ValueListenableBuilder<(int, int)>(valueListenable: _caret, builder: (context, v, _) => StatusText('Ln ${v.$1}, Col ${v.$2}')),
           StatusText('${info.indent} · UTF-8 · LF'),
-          if (info.server.isNotEmpty) StatusText(info.server),
+          // Last, and the one that gives way when the row is short of room.
+          if (info.server.isNotEmpty) Flexible(child: StatusText(info.server, flexible: true)),
         ],
       ],
     );
@@ -457,16 +540,49 @@ class _FilesScreenState extends State<FilesScreen> {
         else ...[
           _breadcrumbRow(context, active),
           ..._banners(context, active),
-          Expanded(
-            child: CodeEditor(
-              key: ValueKey(active),
-              controller: _ctrl(active),
-              readOnly: _git.statusOf(active) == GitStatus.deleted,
-              decorate: (lines) => _decorate(c, active, lines),
-            ),
-          ),
+          Expanded(child: _previewing(active) ? _preview(context, active) : _code(context, active)),
         ],
       ]),
+    );
+  }
+
+  Widget _code(BuildContext context, String active) {
+    final c = context.c;
+    final readOnly = _git.statusOf(active) == GitStatus.deleted;
+    _find
+      ..readOnly = readOnly
+      ..attach(_ctrl(active));
+    return Stack(children: [
+      Positioned.fill(
+        child: CodeEditor(
+          key: ValueKey(active),
+          controller: _ctrl(active),
+          focusNode: _editorFocus,
+          readOnly: readOnly,
+          decorate: (lines) => _decorate(c, active, lines),
+        ),
+      ),
+      ListenableBuilder(
+        listenable: _find,
+        builder: (context, _) => _find.visible ? Positioned(top: 8, right: 18, child: FindBar(find: _find, onClose: _closeFind)) : const SizedBox.shrink(),
+      ),
+    ]);
+  }
+
+  Widget _preview(BuildContext context, String active) {
+    _find.attach(null);
+    final ctrl = _ctrl(active);
+    final s = AppScope.of(context);
+    return ListenableBuilder(
+      listenable: ctrl,
+      builder: (context, _) => MarkdownPreview(
+        key: ValueKey('preview:$active'),
+        source: ctrl.text,
+        path: active,
+        root: s.activeWorktreeEntry?.path ?? '',
+        files: s.visibleFiles,
+        onOpenFile: _open,
+      ),
     );
   }
 
@@ -522,6 +638,21 @@ class _FilesScreenState extends State<FilesScreen> {
         Flexible(child: Text(crumbs, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11.5, color: c.text3))),
         Text(parts.last, style: mono(11.5, weight: FontWeight.w600, color: c.text)),
         const Spacer(),
+        if (info.lang == Lang.markdown) ...[
+          Tooltip(
+            message: 'Preview or code (⇧⌘V)',
+            child: KSegmented<bool>(
+              label: 'Show',
+              height: 24,
+              value: _previewing(path),
+              onChanged: (v) {
+                if (v != _previewing(path)) _togglePreview(path);
+              },
+              items: const [(true, 'Preview', null), (false, 'Edit', null)],
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
         Kbd(info.label),
         if (_dirty.contains(path)) ...[
           const SizedBox(width: 8),
