@@ -1,5 +1,6 @@
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 
+import '../channel.dart';
 import 'host_os.dart';
 
 /// Windows.
@@ -13,14 +14,14 @@ class WindowsOs extends HostOs {
   @override
   String? get preferencesPath {
     final appData = env['APPDATA'];
-    return appData == null ? null : '$appData\\Kumo\\ui.json';
+    return appData == null ? null : '$appData\\$settingsDirName\\ui.json';
   }
 
   /// `%LOCALAPPDATA%\kumo\daemon.json`.
   @override
   String get daemonDiscoveryPath {
     final dataDir = env['LOCALAPPDATA'] ?? '${env['USERPROFILE']}\\AppData\\Local';
-    return '$dataDir\\kumo\\daemon.json';
+    return '$dataDir\\$engineDirName\\daemon.json';
   }
 
   @override

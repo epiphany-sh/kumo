@@ -60,10 +60,9 @@ fn main() -> ExitCode {
 async fn async_main(args: Args) -> ExitCode {
     if let Some(Tool::GitCredential { operation }) = &args.command {
         // Git reads stdout: nothing else may go there.
-        let data_dir = args
-            .data_dir
-            .clone()
-            .or_else(|| dirs::data_local_dir().map(|d| d.join("kumo")));
+        let data_dir = args.data_dir.clone().or_else(|| {
+            dirs::data_local_dir().map(|d| d.join(kumo_infrastructure::channel::app_name()))
+        });
         if let Some(data_dir) = data_dir {
             kumod::git_credential::run(&data_dir, operation).await;
         }
