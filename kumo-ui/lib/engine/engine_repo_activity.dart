@@ -60,6 +60,15 @@ class EngineRepoActivity extends RepoActivitySource {
   }
 
   @override
+  bool get prsEditable => _pulls.canEdit;
+
+  @override
+  Future<void> editPr(RepoPullRequest pr, {String? title, String? body, bool? draft}) async {
+    await _pulls.edit(repoPath: repo.path ?? repo.id, number: pr.id, title: title, body: body, draft: draft);
+    if (!_disposed) await _loadPrs(refresh: true);
+  }
+
+  @override
   final Repo repo;
   @override
   final CiProvider? provider;

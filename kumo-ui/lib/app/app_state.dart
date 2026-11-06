@@ -590,6 +590,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// A short note in the toast (“Copied the link to #521”), with an
+  /// optional button: [action] labels it and [onAction] runs on tap.
+  void notify(String message, {String? action, VoidCallback? onAction}) =>
+      _offerUndo(message, onAction ?? () {}, action: onAction == null ? null : action);
+
   // ---- Side panel (Files / Widgets / Source control) ----
 
   bool _sidePanelOpen = true;

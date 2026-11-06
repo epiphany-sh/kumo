@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
 import '../data/models.dart';
 import '../data/pipelines_source.dart';
 import '../data/repo_activity.dart';
 import '../engine/engine_repo_activity.dart';
+import '../data/pr_agent_prompts.dart';
 import '../engine/engine_scope.dart';
+import '../overlays/pr_description_dialog.dart';
 import '../overlays/settings_dialog.dart';
+import '../platform/open_url.dart';
 import '../shell/screen_chrome.dart';
 import '../shell/sidebar.dart' show toneColor;
 import '../theme/kumo_theme.dart';
@@ -980,7 +984,7 @@ class _PullRequestsSection extends StatelessWidget {
         ],
       ),
       child: ListView(padding: EdgeInsets.zero, children: [
-        for (final p in shown) _PrRow(pr: p),
+        for (final p in shown) _PrRow(pr: p, source: source),
         if (shown.isEmpty) _Note(source.prsLoading ? 'Loading ${terms.prs}…' : empty, icon: KIcons.check),
       ]),
     );
@@ -1036,9 +1040,146 @@ class _PrProblem extends StatelessWidget {
   }
 }
 
-class _PrRow extends StatelessWidget {
-  const _PrRow({required this.pr});
+/// Hands [pr] to a new agent session for [job], in the PR's worktree (or
+/// the main checkout), and shows its terminal.
+Future<void> _startPrAgent(BuildContext context, RepoActivitySource source, RepoPullRequest pr, PrAgentJob job) async {
+  final s = AppScope.read(context);
+  if (!s.agents.live) {
+    s.notify('Agents run once Kumo’s engine is connected');
+    return;
+  }
+  if (s.agents.connected.isEmpty) {
+    s.notify('Connect an agent in Settings › AI agents');
+    return;
+  }
+  final home = prAgentHome(s, source.repo, pr);
+  if (home == null) {
+    s.notify('${source.repo.name} has no checkout on this Mac');
+    return;
+  }
+  final run = await s.agents.start(
+    worktreePath: home.$1,
+    prompt: prAgentPrompt(job, prAgentTarget(source, pr, home.$2)),
+    title: '${pr.number} · ${job.label}',
+  );
+  if (run == null) {
+    s.notify(s.agents.error ?? 'The agent didn’t start');
+    return;
+  }
+  s.openTerminal(run.terminalId, title: run.title, agent: true, directory: run.worktreePath);
+}
+
+/// The ⋯ menu of a pull request: agents first, then where it lives, then
+/// (yours, when Kumo can edit it) its draft state.
+void _openPrMenu(BuildContext anchor, RepoActivitySource source, RepoPullRequest pr, VoidCallback onClosed) {
+  final s = AppScope.read(anchor);
+  final host = _hostName(source.repo.host);
+  final tree = s.worktreesOf(source.repo).where((w) => w.branch == pr.branch).firstOrNull;
+  final review = source.repo.host == 'GL' ? 'merge request' : 'pull request';
+  showKMenu(
+    anchor,
+    position: belowOf(anchor),
+    alignRight: true,
+    onClosed: onClosed,
+    builder: (ctx, close) {
+      void agent(PrAgentJob job) {
+        close();
+        _startPrAgent(anchor, source, pr, job);
+      }
+
+      return KMenuPanel(width: 272, children: [
+        Padding(padding: const EdgeInsets.fromLTRB(8, 5, 8, 4), child: Text('WITH AN AGENT', style: microLabel(ctx.c))),
+        if (pr.mine)
+          KMenuItem(
+            icon: KIcons.sparkle,
+            label: 'Write the description…',
+            onTap: () {
+              close();
+              showPrDescriptionDialog(anchor, source: source, pr: pr);
+            },
+          )
+        else
+          KMenuItem(icon: KIcons.agent, label: 'Review it…', onTap: () => agent(PrAgentJob.review)),
+        KMenuItem(icon: KIcons.info, label: 'Explain the changes', onTap: () => agent(PrAgentJob.explain)),
+        if (pr.checksState == CiState.failed) KMenuItem(icon: KIcons.warning, label: 'Fix the failing checks…', onTap: () => agent(PrAgentJob.fixChecks)),
+        if (pr.mine && pr.state == RepoPrState.changesRequested)
+          KMenuItem(icon: KIcons.rename, label: 'Address the review comments…', onTap: () => agent(PrAgentJob.addressComments)),
+        const KMenuDivider(),
+        KMenuItem(
+          icon: KIcons.external,
+          label: 'Open on $host',
+          note: pr.url.isEmpty ? '$host didn’t give its address' : null,
+          onTap: pr.url.isEmpty
+              ? null
+              : () {
+                  close();
+                  openUrl(pr.url);
+                },
+        ),
+        KMenuItem(
+          icon: KIcons.link,
+          label: 'Copy link',
+          onTap: pr.url.isEmpty
+              ? null
+              : () {
+                  close();
+                  Clipboard.setData(ClipboardData(text: pr.url));
+                  s.notify('Copied the link to ${pr.number}');
+                },
+        ),
+        if (tree != null)
+          KMenuItem(
+            icon: KIcons.terminal,
+            label: 'Open its worktree',
+            onTap: () {
+              close();
+              s.openWorktree(tree);
+            },
+          )
+        else
+          KMenuItem(
+            icon: KIcons.add,
+            label: 'Check out in a new worktree…',
+            onTap: () {
+              close();
+              s.requestNewWorktree();
+            },
+          ),
+        if (pr.mine && source.prsEditable) ...[
+          const KMenuDivider(),
+          KMenuItem(
+            icon: pr.state == RepoPrState.draft ? KIcons.check : KIcons.pause,
+            label: pr.state == RepoPrState.draft ? 'Mark ready for review' : 'Convert to draft',
+            onTap: () async {
+              close();
+              final ready = pr.state == RepoPrState.draft;
+              try {
+                await source.editPr(pr, draft: !ready);
+                s.notify(ready ? '${pr.number} is ready for review' : '${pr.number} is a draft again');
+              } on Object catch (e) {
+                s.notify('Couldn’t change the $review: $e');
+              }
+            },
+          ),
+        ],
+      ]);
+    },
+  );
+}
+
+class _PrRow extends StatefulWidget {
+  const _PrRow({required this.pr, required this.source});
   final RepoPullRequest pr;
+  final RepoActivitySource source;
+
+  @override
+  State<_PrRow> createState() => _PrRowState();
+}
+
+class _PrRowState extends State<_PrRow> {
+  bool _menuOpen = false;
+
+  RepoPullRequest get pr => widget.pr;
 
   @override
   Widget build(BuildContext context) {
@@ -1078,6 +1219,30 @@ class _PrRow extends StatelessWidget {
           Dot(color, size: 6),
           const SizedBox(width: 5),
           Text(pr.state.label, style: sans(11.5, weight: FontWeight.w600, color: color)),
+          const SizedBox(width: 4),
+          KIconButton(
+            icon: KIcons.external,
+            label: pr.url.isEmpty ? 'No address for ${pr.number}' : 'Open ${pr.number} on ${_hostName(widget.source.repo.host)}',
+            size: 24,
+            iconSize: 13,
+            color: c.text3,
+            onTap: pr.url.isEmpty ? null : () => openUrl(pr.url),
+          ),
+          Builder(
+            builder: (anchor) => KIconButton(
+              icon: KIcons.more,
+              label: 'Actions for ${pr.number}',
+              size: 24,
+              iconSize: 15,
+              filled: _menuOpen,
+              onTap: () {
+                setState(() => _menuOpen = true);
+                _openPrMenu(anchor, widget.source, pr, () {
+                  if (mounted) setState(() => _menuOpen = false);
+                });
+              },
+            ),
+          ),
         ]),
         const SizedBox(height: 4),
         Row(children: [
