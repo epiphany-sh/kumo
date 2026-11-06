@@ -87,7 +87,7 @@ void main() {
       expect(p, isNot(contains('The ticket')));
       expect(p, isNot(contains('git log')));
       expect(p, isNot(contains('current description')), reason: 'Bitbucket has no CLI to read it');
-      expect(p, isNot(contains('title')));
+      expect(p, isNot(contains('better title')));
     });
 
     test('a revision rewrites the same file', () {
@@ -139,7 +139,7 @@ void main() {
     await tester.pump();
     expect(find.descendant(of: find.byType(KMenuPanel), matching: find.text('Review it…')), findsOneWidget);
     expect(find.descendant(of: find.byType(KMenuPanel), matching: find.text('Write the description…')), findsNothing);
-    expect(find.descendant(of: find.byType(KMenuPanel), matching: find.text('Check out in a new worktree…')), findsOneWidget);
+    expect(find.descendant(of: find.byType(KMenuPanel), matching: find.text('New worktree…')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

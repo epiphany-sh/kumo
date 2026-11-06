@@ -120,6 +120,7 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
   Timer? _poll;
   DateTime? _baseline;
   int _lastLength = -1;
+  int _titleWaits = 0;
   int _revisions = 0;
 
   /// Found once: the PR template and the ticket its branch names.
@@ -217,6 +218,7 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
         } on Object {
           detail = null;
         }
+        if (!mounted) return;
       }
       ticket = AppState.taskPrompt(task, detail: detail);
     }
@@ -238,7 +240,11 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
       title: '${pr.number} · ${PrAgentJob.describe.label}',
       context: [if (_ticket && task != null) s.taskContext(task)],
     );
-    if (!mounted) return;
+    if (!mounted) {
+      // Closed while it started: nobody would read its draft.
+      if (run != null) s.agents.stop(run.id).ignore();
+      return;
+    }
     if (run == null) return _fail(s.agents.error ?? 'The agent didn’t start.');
     _runId = run.id;
     _watch();
@@ -274,8 +280,17 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
     final baseline = _baseline;
     final size = stat?.size ?? 0;
     final fresh = stat != null && size > 0 && (baseline == null || stat.modified.isAfter(baseline));
+    final tp0 = _titlePath;
+    final titleMissing = tp0 != null && _suggested == null && !File(tp0).existsSync();
+    if (fresh && size == _lastLength && titleMissing && _titleWaits < 6) {
+      // The title comes first in the prompt, but agents don't always obey:
+      // give it a few more seconds.
+      _titleWaits++;
+      return;
+    }
     if (fresh && size == _lastLength) {
       _poll?.cancel();
+      _titleWaits = 0;
       String text;
       try {
         text = file.readAsStringSync();
@@ -376,8 +391,10 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
     final s = AppScope.read(context);
     final body = _md.text.trim();
     final navigator = Navigator.of(context);
+    if (_applying) return;
     if (!widget.source.prsEditable) {
       // Until the daemon can edit pull requests: copy it and open the page.
+      _applying = true;
       await Clipboard.setData(ClipboardData(text: body));
       await openUrl(pr.url);
       navigator.maybePop();
@@ -449,11 +466,18 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
             KIconButton(icon: KIcons.close, label: 'Close', onTap: () => Navigator.of(context).maybePop()),
           ]),
           const SizedBox(height: 14),
-          ...switch (_phase) {
-            _Phase.setup => _setup(context, s),
-            _Phase.writing => _writing(context, s),
-            _Phase.draft => _draft(context, s),
-          },
+          // Scrolls instead of overflowing a short window.
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+                ...switch (_phase) {
+                  _Phase.setup => _setup(context, s),
+                  _Phase.writing => _writing(context, s),
+                  _Phase.draft => _draft(context, s),
+                },
+              ]),
+            ),
+          ),
         ]),
       ),
     );
@@ -596,6 +620,9 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
           KButton(
             label: 'Open its tab',
             onTap: () {
+              // The session is the user's from here on: closing doesn't stop it.
+              _poll?.cancel();
+              _runId = null;
               Navigator.of(context).maybePop();
               s.openTerminal(run.terminalId, title: run.title, agent: true, directory: run.worktreePath);
             },

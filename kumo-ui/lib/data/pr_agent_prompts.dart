@@ -147,8 +147,8 @@ String prDescriptionPrompt(
     'Length: ${length.hint}',
     if (extra.trim().isNotEmpty) 'Also: ${extra.trim()}',
     'Write it for reviewers, in the language of the commits and the ticket. Name files and identifiers in backticks. Don’t invent anything you didn’t read: no test results you didn’t see, no ticket you weren’t given.',
-    'Save the description, in Markdown, to `$draftPath`: only the description, no title line and no preamble.'
-        '${titlePath == null ? '' : ' Then save a better title for it, one line, in the style of the repository’s commits, to `$titlePath`.'}',
+    '${titlePath == null ? 'Save the description' : 'First save a better title for it, one line, in the style of the repository’s commits, to `$titlePath`. Then save the description'}'
+        ', in Markdown, to `$draftPath`: only the description, no title line and no preamble.',
     'Don’t change any other file, don’t commit, and don’t edit the ${t.host == 'GL' ? 'merge request' : 'pull request'}: I’ll check the draft in Kumo and update it from there. When the file is written, say “Done”.',
     if (ticket != null) '## The ticket\n\n${ticket.trim()}',
   ].join('\n\n');

@@ -984,7 +984,7 @@ class _PullRequestsSection extends StatelessWidget {
         ],
       ),
       child: ListView(padding: EdgeInsets.zero, children: [
-        for (final p in shown) _PrRow(pr: p, source: source),
+        for (final p in shown) _PrRow(key: ValueKey(p.number), pr: p, source: source),
         if (shown.isEmpty) _Note(source.prsLoading ? 'Loading ${terms.prs}…' : empty, icon: KIcons.check),
       ]),
     );
@@ -1139,7 +1139,8 @@ void _openPrMenu(BuildContext anchor, RepoActivitySource source, RepoPullRequest
         else
           KMenuItem(
             icon: KIcons.add,
-            label: 'Check out in a new worktree…',
+            label: 'New worktree…',
+            note: 'Pick “Existing” → ${pr.branch}',
             onTap: () {
               close();
               s.requestNewWorktree();
@@ -1168,7 +1169,7 @@ void _openPrMenu(BuildContext anchor, RepoActivitySource source, RepoPullRequest
 }
 
 class _PrRow extends StatefulWidget {
-  const _PrRow({required this.pr, required this.source});
+  const _PrRow({super.key, required this.pr, required this.source});
   final RepoPullRequest pr;
   final RepoActivitySource source;
 
