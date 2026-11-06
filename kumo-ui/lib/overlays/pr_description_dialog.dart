@@ -733,28 +733,30 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
       ],
       _errorLine(context),
       const SizedBox(height: 14),
-      Row(children: [
-        Expanded(
-          child: Text(
-            editable
-                ? 'Replaces the current description of ${pr.number} on $_host.'
-                : 'Kumo can’t edit ${pr.number} yet: this copies the description and opens it on $_host to paste.',
-            style: sans(11, color: c.text3, height: 1.4),
+      // The note goes above the buttons: side by side, a long label on the
+      // primary button left the note no room and overflowed the row.
+      Text(
+        editable
+            ? 'Replaces the current description of ${pr.number} on $_host.'
+            : 'Kumo can’t edit ${pr.number} yet: this copies the description and opens it on $_host to paste.',
+        style: sans(11, color: c.text3, height: 1.4),
+      ),
+      const SizedBox(height: 10),
+      Align(
+        alignment: Alignment.centerRight,
+        child: Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 8, children: [
+          KButton(label: _copied ? 'Copied' : 'Copy Markdown', icon: _copied ? KIcons.check : KIcons.copy, onTap: _copy),
+          KButton.primary(
+            label: !editable
+                ? 'Copy and open on $_host'
+                : _applying
+                    ? 'Updating…'
+                    : 'Update ${pr.number}${_useTitle && suggested != null ? ' and its title' : ''}',
+            icon: editable ? KIcons.upload : KIcons.external,
+            onTap: _applying || _md.text.trim().isEmpty || (!editable && pr.url.isEmpty) ? null : _apply,
           ),
-        ),
-        const SizedBox(width: 10),
-        KButton(label: _copied ? 'Copied' : 'Copy Markdown', icon: _copied ? KIcons.check : KIcons.copy, onTap: _copy),
-        const SizedBox(width: 8),
-        KButton.primary(
-          label: !editable
-              ? 'Copy and open on $_host'
-              : _applying
-                  ? 'Updating…'
-                  : 'Update ${pr.number}${_useTitle && suggested != null ? ' and its title' : ''}',
-          icon: editable ? KIcons.upload : KIcons.external,
-          onTap: _applying || _md.text.trim().isEmpty || (!editable && pr.url.isEmpty) ? null : _apply,
-        ),
-      ]),
+        ]),
+      ),
     ];
   }
 }
