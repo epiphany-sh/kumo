@@ -2,6 +2,7 @@ import 'dart:io' show Platform, Process, ProcessException;
 
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 
+import '../channel.dart';
 import 'host_os.dart';
 
 /// macOS.
@@ -16,11 +17,11 @@ class MacOs extends HostOs {
   @override
   String? get preferencesPath {
     final home = env['HOME'];
-    return home == null ? null : '$home/Library/Application Support/Kumo/ui.json';
+    return home == null ? null : '$home/Library/Application Support/$settingsDirName/ui.json';
   }
 
   @override
-  String get daemonDiscoveryPath => '${env['HOME']}/Library/Application Support/kumo/daemon.json';
+  String get daemonDiscoveryPath => '${env['HOME']}/Library/Application Support/$engineDirName/daemon.json';
 
   @override
   String get daemonExecutable => 'kumod';

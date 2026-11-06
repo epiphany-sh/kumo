@@ -16,7 +16,10 @@ use kumo_domain::pipelines::{HostTokens, PipelinesError};
 use kumo_domain::profiles::ProfileId;
 use kumo_domain::tasks::{SecretStore, SourceId, TaskError};
 
-const SERVICE: &str = "kumo";
+/// The keychain service: `kumo`, `kumo-<channel>` for a channel build.
+fn keychain_service() -> &'static str {
+    crate::channel::app_name()
+}
 
 /// The keychain account names of one profile.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -103,15 +106,16 @@ impl KeychainSecretStore {
         let Some(store) = &self.store else {
             return Ok(0);
         };
+        let name = keychain_service();
         let entries = store
-            .search(&crate::platform::keychain_search(SERVICE))
+            .search(&crate::platform::keychain_search(name))
             .map_err(|e| e.to_string())?;
         let mut deleted = 0;
         for entry in entries {
             let Some((service, account)) = entry.get_specifiers() else {
                 continue;
             };
-            if service != SERVICE || !accounts.owns(&account) {
+            if service != name || !accounts.owns(&account) {
                 continue;
             }
             match entry.delete_credential() {
@@ -133,7 +137,9 @@ impl KeychainSecretStore {
             .store
             .as_ref()
             .ok_or_else(|| "no keychain on this system".to_owned())?;
-        store.build(SERVICE, user, None).map_err(|e| e.to_string())
+        store
+            .build(keychain_service(), user, None)
+            .map_err(|e| e.to_string())
     }
 
     fn host_entry(&self, host: &str) -> Result<keyring_core::Entry, PipelinesError> {

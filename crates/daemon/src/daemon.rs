@@ -44,7 +44,7 @@ impl Daemon {
             Some(dir) => dir,
             None => dirs::data_local_dir()
                 .context("no local data directory")?
-                .join("kumo"),
+                .join(kumo_infrastructure::channel::app_name()),
         };
         let home = match config.home {
             Some(home) => home,

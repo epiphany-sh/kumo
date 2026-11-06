@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
+import '../editor/comment.dart';
+import '../editor/quick_open.dart';
 import '../overlays/settings_dialog.dart';
 import '../platform/window_effects.dart';
 import '../theme/kumo_theme.dart';
@@ -65,13 +68,41 @@ class AppShell extends StatelessWidget {
         map[SingleActivator(LogicalKeyboardKey.keyB, meta: mod, control: !mod, alt: true)] = s.toggleSidePanel;
       }
       // Terminal panes, iTerm-style (forwarded only while the Terminal view
-      // is showing): ⌘D split right, ⇧⌘D split down, ⌘W close, ⌘T new.
+      // is showing): ⌘D split right, ⇧⌘D split down, ⌘W close, ⌘T new. In
+      // the full editor ⌘W closes its file instead.
+      void close() => s.view == KumoView.files ? s.sendFileCommand(FileCommand.close) : s.sendTerminalCommand(TerminalCommand.closePane);
       map[const SingleActivator(LogicalKeyboardKey.keyD, meta: true)] = () => s.sendTerminalCommand(TerminalCommand.splitRight);
       map[const SingleActivator(LogicalKeyboardKey.keyD, meta: true, shift: true)] = () => s.sendTerminalCommand(TerminalCommand.splitDown);
-      map[const SingleActivator(LogicalKeyboardKey.keyW, meta: true)] = () => s.sendTerminalCommand(TerminalCommand.closePane);
+      map[const SingleActivator(LogicalKeyboardKey.keyW, meta: true)] = close;
       map[const SingleActivator(LogicalKeyboardKey.keyT, meta: true)] = () => s.sendTerminalCommand(TerminalCommand.newTerminal);
       map[const SingleActivator(LogicalKeyboardKey.comma, meta: true)] = () => showSettingsDialog(context);
       map[const SingleActivator(LogicalKeyboardKey.comma, control: true)] = () => showSettingsDialog(context);
+
+      // The editor's keys: ⌘ on macOS, Ctrl elsewhere. Off macOS they only
+      // exist while a file shows, so a terminal keeps Ctrl+F, Ctrl+P, Ctrl+W
+      // (its shell's).
+      final mac = defaultTargetPlatform == TargetPlatform.macOS;
+      final fileShows = s.view == KumoView.files || (s.view == KumoView.terminal && ((s.activeContext == ContextTab.files && s.contextFile != null) || s.activeFile != null));
+      SingleActivator primary(LogicalKeyboardKey key, {bool shift = false, bool alt = false}) => SingleActivator(key, meta: mac, control: !mac, shift: shift, alt: alt);
+      VoidCallback file(FileCommand command) => () => s.sendFileCommand(command);
+      if (mac || s.view == KumoView.files || s.activeContext == ContextTab.files) {
+        // ⌘P from anywhere: the Files tab (or the full editor) with the file.
+        map[primary(LogicalKeyboardKey.keyP)] = () => goToFile(context, s);
+      }
+      if (fileShows) {
+        if (!mac) map[const SingleActivator(LogicalKeyboardKey.keyW, control: true)] = close;
+        map[primary(LogicalKeyboardKey.keyS)] = file(FileCommand.save);
+        map[primary(LogicalKeyboardKey.keyF)] = file(FileCommand.find);
+        map[mac ? const SingleActivator(LogicalKeyboardKey.keyF, meta: true, alt: true) : const SingleActivator(LogicalKeyboardKey.keyH, control: true)] = file(FileCommand.replace);
+        map[primary(LogicalKeyboardKey.keyG)] = file(FileCommand.findNext);
+        map[primary(LogicalKeyboardKey.keyG, shift: true)] = file(FileCommand.findPrevious);
+        map[primary(LogicalKeyboardKey.keyV, shift: true)] = file(FileCommand.togglePreview);
+        map[CommentKeyActivator(meta: mac)] = file(FileCommand.toggleComment);
+        map[primary(LogicalKeyboardKey.bracketRight, shift: true)] = file(FileCommand.nextTab);
+        map[primary(LogicalKeyboardKey.bracketLeft, shift: true)] = file(FileCommand.previousTab);
+        map[const SingleActivator(LogicalKeyboardKey.tab, control: true)] = file(FileCommand.nextTab);
+        map[const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true)] = file(FileCommand.previousTab);
+      }
       return map;
     }
 
@@ -79,7 +110,11 @@ class AppShell extends StatelessWidget {
       type: MaterialType.transparency,
       child: CallbackShortcuts(
         bindings: bindings(),
-        child: Focus(
+        // A scope, not a plain Focus: when the focused widget goes away or
+        // lets go (a text field unfocuses on a click elsewhere), the focus
+        // falls back here, under these shortcuts. On the route's scope,
+        // above them, every one of them stopped working.
+        child: FocusScope(
           autofocus: true,
           child: Stack(
             fit: StackFit.expand,

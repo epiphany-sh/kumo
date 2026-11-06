@@ -7,7 +7,6 @@ use kumo_domain::daemon::{ApiVersion, AuthToken, DaemonEndpoint, DaemonError, Di
 use serde::{Deserialize, Serialize};
 
 const FILE_NAME: &str = "daemon.json";
-const APP_DIR: &str = "kumo";
 
 /// `daemon.json` in the user's local data directory, owner-only on Unix.
 #[derive(Debug, Clone)]
@@ -23,9 +22,10 @@ impl FileDiscoveryStore {
         }
     }
 
-    /// The per-user default: `<data_local_dir>/kumo/daemon.json`.
+    /// The per-user default: `<data_local_dir>/kumo/daemon.json`
+    /// (`kumo-<channel>` for a channel build).
     pub fn default_location() -> Option<Self> {
-        dirs::data_local_dir().map(|dir| Self::in_dir(dir.join(APP_DIR)))
+        dirs::data_local_dir().map(|dir| Self::in_dir(dir.join(crate::channel::app_name())))
     }
 
     pub fn path(&self) -> &Path {

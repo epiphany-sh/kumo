@@ -73,7 +73,8 @@ impl GitHubConnector {
                 "the GitHub CLI (gh) isn't installed: get it from cli.github.com".into(),
             )
         })?;
-        let mut child = crate::platform::background(program)
+        let mut command = crate::platform::background(program);
+        command
             .args(args)
             .env("PATH", self.locator.search_path())
             .env("GH_PROMPT_DISABLED", "1")
@@ -82,9 +83,24 @@ impl GitHubConnector {
             .current_dir(self.locator.home())
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| TaskError::Unavailable(format!("can't run gh: {e}")))?;
+            .stderr(Stdio::piped());
+        // Linux refuses to exec a file another process still holds open for
+        // writing (ETXTBSY): a `gh` being installed or updated, or a fake one
+        // a test just wrote while another thread forked. It clears in moments,
+        // so a few short retries beat reporting gh as unavailable.
+        let mut attempts = 0;
+        let mut child = loop {
+            match command.spawn() {
+                Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy && attempts < 10 => {
+                    attempts += 1;
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                spawned => {
+                    break spawned
+                        .map_err(|e| TaskError::Unavailable(format!("can't run gh: {e}")))?;
+                }
+            }
+        };
         let drain = |pipe: Option<Box<dyn Read + Send>>| {
             std::thread::spawn(move || {
                 let mut out = String::new();

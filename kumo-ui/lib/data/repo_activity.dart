@@ -55,6 +55,7 @@ class RepoPullRequest {
     this.checksTotal = 0,
     this.checksState,
     this.url = '',
+    this.base = '',
   });
 
   /// As the host shows it: `#521`, `!231`.
@@ -75,6 +76,27 @@ class RepoPullRequest {
   /// State of the latest run on its branch; null when nothing ran.
   final CiState? checksState;
   final String url;
+
+  /// The branch it merges into; empty when the host didn't say.
+  final String base;
+
+  /// The number without the host's sign (`#521` → 521); 0 when unknown.
+  int get id => int.tryParse(number.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
+  RepoPullRequest copyWith({String? title, RepoPrState? state}) => RepoPullRequest(
+        number: number,
+        title: title ?? this.title,
+        author: author,
+        branch: branch,
+        state: state ?? this.state,
+        mine: mine,
+        reviewRequestedFromMe: reviewRequestedFromMe,
+        checksPassed: checksPassed,
+        checksTotal: checksTotal,
+        checksState: checksState,
+        url: url,
+        base: base,
+      );
 }
 
 /// The latest pipeline run of a branch.
@@ -187,6 +209,15 @@ abstract class RepoActivitySource extends ChangeNotifier {
   /// Asks the host for pull requests again (after fixing the token).
   Future<void> retryPrs() async {}
 
+  /// Whether Kumo can change a pull request's title, description and
+  /// draft state on the host ([editPr]). False until the daemon can.
+  bool get prsEditable => false;
+
+  /// Changes what's given of [pr] on the host (a null stays as it is), then
+  /// reads the list again. Throws a readable message when the host refuses.
+  Future<void> editPr(RepoPullRequest pr, {String? title, String? body, bool? draft}) async =>
+      throw 'Kumo can’t change ${pr.number} from here yet';
+
   /// The repository's CI; null when its host has none Kumo reads.
   CiProvider? get provider;
 
@@ -283,6 +314,7 @@ class MockRepoActivity extends RepoActivitySource {
           state: state,
           mine: author == _me,
           reviewRequestedFromMe: reviewMe,
+          url: _urlOf(repo, number),
         )),
     ];
 
@@ -318,7 +350,19 @@ class MockRepoActivity extends RepoActivitySource {
 
   late final List<RepoCommit> _commits;
   late final List<RepoRun> _runs;
-  late final List<RepoPullRequest> _prs;
+  late List<RepoPullRequest> _prs;
+
+  /// Bodies set with [editPr], by number.
+  final Map<String, String> descriptions = {};
+
+  static String _urlOf(Repo repo, String number) {
+    final n = number.replaceAll(RegExp(r'[^0-9]'), '');
+    return switch (repo.host) {
+      'GL' => 'https://gitlab.com/pricing/${repo.name}/-/merge_requests/$n',
+      'BB' => 'https://bitbucket.org/pricing/${repo.name}/pull-requests/$n',
+      _ => 'https://github.com/pricing/${repo.name}/pull/$n',
+    };
+  }
   late final List<RepoBranch> _branches;
   late final CiProblem? _problem;
   late final DateTime _fetchedAt;
@@ -340,6 +384,7 @@ class MockRepoActivity extends RepoActivitySource {
       checksTotal: run.jobs.length,
       checksState: failed ? CiState.failed : run.state,
       url: p.url,
+      base: p.base,
     );
   }
 
@@ -361,6 +406,22 @@ class MockRepoActivity extends RepoActivitySource {
   bool get prsSupported => true;
   @override
   List<RepoPullRequest> get pullRequests => _prs;
+
+  @override
+  bool get prsEditable => true;
+
+  @override
+  Future<void> editPr(RepoPullRequest pr, {String? title, String? body, bool? draft}) async {
+    if (body != null) descriptions[pr.number] = body;
+    final state = switch (draft) {
+      true => RepoPrState.draft,
+      false when pr.state == RepoPrState.draft => RepoPrState.reviewRequested,
+      _ => null,
+    };
+    _prs = [for (final p in _prs) p.number == pr.number ? p.copyWith(title: title, state: state) : p];
+    if (!_disposed) notifyListeners();
+  }
+
   @override
   CiProvider? get provider => CiProvider.ofHost(repo.host);
   @override

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/change_scrollbar.dart';
+import 'indent.dart';
 import 'syntax.dart';
 
 /// Editable controller that highlights as you type. The span text always
@@ -16,18 +17,94 @@ class CodeController extends TextEditingController {
   bool deleted;
   KumoPalette? palette;
 
+  /// The editor's font size, set by it. Flutter draws a tab as wide as a
+  /// space; with this, each tab gets a font that many columns bigger, so it
+  /// reaches the next stop and the text stays unchanged. (Letter spacing
+  /// would also widen it, but Skia shifts the run by half of it, so the
+  /// code drew off its columns.) The line keeps its height: the strut is
+  /// forced.
+  double fontSize = 0;
+
+  /// Search matches painted over the text, and which one is current (-1:
+  /// none); sorted, not overlapping.
+  List<TextRange> _highlights = const [];
+  int _current = -1;
+  List<TextRange> get highlights => _highlights;
+
+  void setHighlights(List<TextRange> ranges, int current) {
+    if (identical(ranges, _highlights) && current == _current) return;
+    if (ranges.isEmpty && _highlights.isEmpty) return;
+    _highlights = ranges;
+    _current = current;
+    notifyListeners();
+  }
+
+  /// Set by the editor showing this text: scrolls [reveal]'s offset into
+  /// view.
+  void Function(int offset)? onReveal;
+  void reveal(int offset) => onReveal?.call(offset);
+
   @override
   TextSpan buildTextSpan({required BuildContext context, TextStyle? style, required bool withComposing}) {
     final p = palette ?? context.c;
     final lines = text.split('\n');
     final children = <InlineSpan>[];
+    final hl = _highlights;
+    final soft = p.yellow.withValues(alpha: p.isDark ? 0.24 : 0.2);
+    final strong = p.warn.withValues(alpha: p.isDark ? 0.55 : 0.38);
+    var offset = 0;
+    var h = 0;
     for (var i = 0; i < lines.length; i++) {
+      var col = 0;
       for (final (t, k) in Syntax.line(lang, lines[i])) {
-        children.add(TextSpan(text: t, style: deleted ? TextStyle(color: p.text3, decoration: TextDecoration.lineThrough) : _style(p, k)));
+        final s = deleted ? TextStyle(color: p.text3, decoration: TextDecoration.lineThrough) : _style(p, k);
+        if (hl.isEmpty) {
+          col = _addWithTabs(children, t, s, col);
+        } else {
+          // Split the token where matches start and end.
+          final end = offset + t.length;
+          var pos = offset;
+          while (pos < end) {
+            while (h < hl.length && hl[h].end <= pos) {
+              h++;
+            }
+            final inside = h < hl.length && hl[h].start <= pos;
+            final stop = inside ? (hl[h].end < end ? hl[h].end : end) : (h < hl.length && hl[h].start < end ? hl[h].start : end);
+            final piece = t.substring(pos - offset, stop - offset);
+            col = _addWithTabs(children, piece, inside ? s.copyWith(backgroundColor: h == _current ? strong : soft) : s, col);
+            pos = stop;
+          }
+        }
+        offset += t.length;
       }
-      if (i < lines.length - 1) children.add(const TextSpan(text: '\n'));
+      if (i < lines.length - 1) {
+        children.add(const TextSpan(text: '\n'));
+        offset++;
+      }
     }
     return TextSpan(style: style, children: children);
+  }
+
+  /// Adds [t] in [s] starting at column [col], each tab in a span of its
+  /// own as wide as its stop; returns the column after it.
+  int _addWithTabs(List<InlineSpan> out, String t, TextStyle s, int col) {
+    if (fontSize <= 0 || !t.contains('\t')) {
+      out.add(TextSpan(text: t, style: s));
+      return col + visualWidth(t);
+    }
+    var start = 0;
+    for (var j = 0; j < t.length; j++) {
+      if (t.codeUnitAt(j) != 0x09) continue;
+      if (j > start) out.add(TextSpan(text: t.substring(start, j), style: s));
+      col += j - start;
+      final adv = tabAdvance(col);
+      // No strike-through: at that size it would cross the line elsewhere.
+      out.add(TextSpan(text: '\t', style: adv == 1 ? s : s.copyWith(fontSize: fontSize * adv, decoration: TextDecoration.none)));
+      col += adv;
+      start = j + 1;
+    }
+    if (start < t.length) out.add(TextSpan(text: t.substring(start), style: s));
+    return col + t.length - start;
   }
 
   static TextStyle _style(KumoPalette p, Tok k) => switch (k) {
@@ -68,7 +145,37 @@ class CodeEditor extends StatefulWidget {
   final FocusNode? focusNode;
 
   /// Height of a line, and the space above the first one.
-  static double lineExtentFor(double fontSize) => fontSize * _CodeEditorState._lh;
+  ///
+  /// Measured, not `fontSize * 1.7`: the text engine rounds each line's
+  /// height (21.25 → 21), and the gutter, the guides and the line
+  /// backgrounds drift off the text by that much per line otherwise.
+  static double lineExtentFor(double fontSize) => _extents[fontSize] ??= _measureExtent(fontSize);
+  static final _extents = <double, double>{};
+
+  static double _measureExtent(double fontSize) {
+    const n = 100;
+    final tp = TextPainter(
+      text: TextSpan(text: List.filled(n, 'x').join('\n'), style: _textStyle(fontSize)),
+      strutStyle: _strut(fontSize),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final extent = tp.height / n;
+    tp.dispose();
+    return extent;
+  }
+
+  // Letter spacing 0, said out loud: the TextField would take Material's
+  // (0.5 per glyph) and the code would drift off the column grid the
+  // guides, the tabs and the line width are measured on.
+  static TextStyle _textStyle(double fontSize, {Color? color}) => mono(fontSize, color: color, height: _CodeEditorState._lh).copyWith(letterSpacing: 0);
+
+  /// Where the guide of column [col] is drawn: half a column in, so it
+  /// doesn't touch the glyphs, on a pixel.
+  @visibleForTesting
+  static double guideX(int col, double charWidth) => (col * charWidth + charWidth * 0.5).floorToDouble() + 0.5;
+
+  static StrutStyle _strut(double fontSize) =>
+      StrutStyle(fontFamily: kMono, fontFamilyFallback: kMonoFallback, fontSize: fontSize, height: _CodeEditorState._lh, forceStrutHeight: true);
   static const topPadding = 10.0;
 
   final CodeController controller;
@@ -90,14 +197,72 @@ class _CodeEditorState extends State<CodeEditor> {
   final _ownV = ScrollController();
   final _h = ScrollController();
   static const _lh = 1.7;
+  double _charW = 0;
 
   ScrollController get _v => widget.scrollController ?? _ownV;
 
+  // The guides change with the text, not with the caret: kept between
+  // builds.
+  String? _guidesText;
+  IndentGuides? _guides;
+
+  IndentGuides _guidesFor(String text, List<String> lines) {
+    if (text != _guidesText || _guides == null) {
+      _guidesText = text;
+      _guides = IndentGuides.of(lines);
+    }
+    return _guides!;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.onReveal = _reveal;
+  }
+
+  @override
+  void didUpdateWidget(CodeEditor old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.controller, widget.controller)) {
+      if (old.controller.onReveal == _reveal) old.controller.onReveal = null;
+      widget.controller.onReveal = _reveal;
+    }
+  }
+
   @override
   void dispose() {
+    if (widget.controller.onReveal == _reveal) widget.controller.onReveal = null;
     _ownV.dispose();
     _h.dispose();
     super.dispose();
+  }
+
+  /// Scrolls so [offset] shows, a third down when it has to move; after
+  /// the frame, so a text that just changed is laid out.
+  void _reveal(int offset) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final text = widget.controller.text;
+      final at = offset.clamp(0, text.length);
+      final before = text.substring(0, at);
+      final line = '\n'.allMatches(before).length;
+      final col = visualWidth(before.substring(before.lastIndexOf('\n') + 1));
+      final extent = CodeEditor.lineExtentFor(widget.fontSize);
+      if (_v.hasClients) {
+        final pos = _v.position;
+        final y = CodeEditor.topPadding + line * extent;
+        if (y < pos.pixels + extent || y + 2 * extent > pos.pixels + pos.viewportDimension) {
+          _v.animateTo((y - pos.viewportDimension / 3).clamp(0.0, pos.maxScrollExtent), duration: const Duration(milliseconds: 160), curve: Curves.easeOut);
+        }
+      }
+      if (_h.hasClients) {
+        final pos = _h.position;
+        final x = col * _charW;
+        if (x < pos.pixels + 8 || x > pos.pixels + pos.viewportDimension - 64) {
+          _h.jumpTo((x - pos.viewportDimension / 3).clamp(0.0, pos.maxScrollExtent));
+        }
+      }
+    });
   }
 
   double _charWidth(TextStyle style) {
@@ -111,16 +276,21 @@ class _CodeEditorState extends State<CodeEditor> {
   Widget build(BuildContext context) {
     final c = context.c;
     widget.controller.palette = c;
-    final style = mono(widget.fontSize, color: c.text, height: _lh);
-    final strut = StrutStyle(fontFamily: kMono, fontFamilyFallback: kMonoFallback, fontSize: widget.fontSize, height: _lh, forceStrutHeight: true);
-    final lineExtent = widget.fontSize * _lh;
-    final charW = _charWidth(style);
+    final style = CodeEditor._textStyle(widget.fontSize, color: c.text);
+    final strut = CodeEditor._strut(widget.fontSize);
+    final lineExtent = CodeEditor.lineExtentFor(widget.fontSize);
+    final charW = _charW = _charWidth(style);
+    widget.controller.fontSize = widget.fontSize;
 
     return ListenableBuilder(
       listenable: widget.controller,
       builder: (context, _) {
-        final lines = widget.controller.text.split('\n');
-        final longest = lines.fold<int>(0, (m, l) => math.max(m, l.length));
+        final text = widget.controller.text;
+        final lines = text.split('\n');
+        final longest = lines.fold<int>(0, (m, l) => math.max(m, visualWidth(l)));
+        final guides = _guidesFor(text, lines);
+        final sel = widget.controller.selection;
+        final active = sel.isValid ? guides.activeAt(widget.controller.caret.$1 - 1) : null;
         final raw = widget.decorate(lines);
         final decos = [for (var i = 0; i < lines.length; i++) i < raw.length ? raw[i] : const LineDeco()];
         // The scrollbar maps the change bars of the gutter.
@@ -169,6 +339,21 @@ class _CodeEditorState extends State<CodeEditor> {
                           Column(children: [
                             for (final d in decos) Container(height: lineExtent, color: d.background),
                           ]),
+                          // Indentation guides: where each block starts and ends.
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: CustomPaint(
+                                painter: _GuidesPainter(
+                                  guides: guides,
+                                  active: active,
+                                  charWidth: charW,
+                                  lineExtent: lineExtent,
+                                  color: c.text3.withValues(alpha: c.text3.a * 0.22),
+                                  activeColor: c.text3.withValues(alpha: c.text3.a * 0.7),
+                                ),
+                              ),
+                            ),
+                          ),
                           TextField(
                             controller: widget.controller,
                             focusNode: widget.focusNode,
@@ -194,4 +379,44 @@ class _CodeEditorState extends State<CodeEditor> {
       },
     );
   }
+}
+
+/// One vertical line per indentation level, brighter for the block around
+/// the caret.
+class _GuidesPainter extends CustomPainter {
+  _GuidesPainter({required this.guides, required this.active, required this.charWidth, required this.lineExtent, required this.color, required this.activeColor});
+
+  final IndentGuides guides;
+  final Guide? active;
+  final double charWidth;
+  final double lineExtent;
+  final Color color;
+  final Color activeColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+    // Only the lines on screen would do, but the canvas clips and this is
+    // cheap next to laying out the text.
+    for (var i = 0; i < guides.depth.length; i++) {
+      final top = i * lineExtent;
+      for (final col in guides.columnsAt(i)) {
+        final x = _x(col);
+        canvas.drawLine(Offset(x, top), Offset(x, top + lineExtent), paint);
+      }
+    }
+    final a = active;
+    if (a != null) {
+      final x = _x(a.column);
+      canvas.drawLine(Offset(x, a.first * lineExtent), Offset(x, (a.last + 1) * lineExtent), paint..color = activeColor);
+    }
+  }
+
+  double _x(int col) => CodeEditor.guideX(col, charWidth);
+
+  @override
+  bool shouldRepaint(_GuidesPainter old) =>
+      old.guides != guides || old.active != active || old.charWidth != charWidth || old.lineExtent != lineExtent || old.color != color || old.activeColor != activeColor;
 }
