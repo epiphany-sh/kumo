@@ -39,6 +39,15 @@ class EnginePullRequests implements PullRequestsSource {
     );
   }
 
+  /// `PullRequests.Edit` isn't in the daemon yet: the Git view copies the
+  /// description and opens the page instead.
+  @override
+  bool get canEdit => false;
+
+  @override
+  Future<PullRequestInfo> edit({required String repoPath, required int number, String? title, String? body, bool? draft}) async =>
+      throw 'Kumo can’t change pull requests from here yet';
+
   @override
   Future<PullRequestInfo> create({required String worktreePath, required String title, String body = '', String base = '', bool draft = false}) async =>
       pullRequestFrom(await _call((c) => c.create(pb.CreatePullRequestRequest(worktreePath: worktreePath, title: title, body: body, base: base, draft: draft))));

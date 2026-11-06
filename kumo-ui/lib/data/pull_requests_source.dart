@@ -76,6 +76,7 @@ class PullRequestInfo {
         checksTotal: checksTotal,
         checksState: checksState,
         url: url,
+        base: base,
       );
 }
 
@@ -111,6 +112,15 @@ abstract class PullRequestsSource {
   /// Opens one from the worktree's (pushed) branch; throws a readable
   /// message when the host refuses. An empty [base] is the default branch.
   Future<PullRequestInfo> create({required String worktreePath, required String title, String body = '', String base = '', bool draft = false});
+
+  /// Whether [edit] works (the daemon has `PullRequests.Edit`).
+  bool get canEdit => false;
+
+  /// Changes the title, description (Markdown) or draft state of pull
+  /// request [number] of the repository at [repoPath]; null leaves it as is.
+  /// Throws a readable message when the host refuses.
+  Future<PullRequestInfo> edit({required String repoPath, required int number, String? title, String? body, bool? draft}) async =>
+      throw 'Kumo can’t change pull requests from here yet';
 }
 
 /// The design's pull requests: #521 for feat/PRC-412-bulk-discounts (a
@@ -121,6 +131,33 @@ class MockPullRequests implements PullRequestsSource {
 
   final Duration latency;
   final created = <String, PullRequestInfo>{};
+
+  /// What [edit] changed, by number.
+  final edited = <int, ({String? title, String? body, bool? draft})>{};
+
+  @override
+  bool get canEdit => true;
+
+  @override
+  Future<PullRequestInfo> edit({required String repoPath, required int number, String? title, String? body, bool? draft}) async {
+    await _wait();
+    final pr = [..._prs, ...created.values].where((p) => p.number == number).firstOrNull;
+    if (pr == null) throw 'There’s no #$number in $repoPath';
+    edited[number] = (title: title, body: body, draft: draft);
+    return PullRequestInfo(
+      number: pr.number,
+      label: pr.label,
+      title: title ?? pr.title,
+      author: pr.author,
+      authorIsYou: pr.authorIsYou,
+      branch: pr.branch,
+      base: pr.base,
+      draft: draft ?? pr.draft,
+      review: pr.review,
+      reviewers: pr.reviewers,
+      url: pr.url,
+    );
+  }
 
   static const _prs = [
     PullRequestInfo(
