@@ -29,13 +29,21 @@ Si la ventana aparece opaca o negra en lugar de translúcida, abrí *Appearance*
 | ⌥⌘S | Mostrar/ocultar sidebar |
 | ⌘↩ | Crear (dentro del popover / modal de namespace) |
 | ⌘D / ⇧⌘D | Terminal: dividir el panel activo a la derecha / abajo |
-| ⌘W | Terminal: cerrar el panel activo (el agente pide confirmación) |
+| ⌘W | Terminal: cerrar el panel activo (el agente pide confirmación). Con un archivo a la vista, cierra el archivo |
 | ⌘T | Terminal: nueva terminal |
+| ⌘P | Ir a un archivo del worktree: unas letras del nombre o la ruta, ↑↓ y ↵ |
+| ⌘S | Files: guardar el archivo |
+| ⌘F / ⌥⌘F | Files: buscar / reemplazar en el archivo (Aa, palabra entera, regex; ↵ siguiente, ⇧↵ anterior, Esc cierra) |
+| ⌘G / ⇧⌘G | Files: coincidencia siguiente / anterior |
+| ⇧⌘V | Files: un `.md` en preview o en código |
+| ⌘/ | Editor: comentar / descomentar las líneas seleccionadas (en teclado español, ⌘⇧7 también) |
+| ⇧⌘] / ⇧⌘[ · ⌃Tab | Files: archivo siguiente / anterior |
+| ⌘C ⌘X ⌘V ⌘A ⌘Z ⇧⌘Z | Editor: copiar, cortar, pegar, seleccionar todo, deshacer, rehacer |
 | Click derecho | Menú de namespace (sidebar) y de worktree (Delete worktree) |
 | ⌥⌘B | Terminal: mostrar/ocultar el side-nav (Files · Widgets · Source control) |
 | ⌘↩ | Source control: commit con el mensaje escrito |
 
-En Windows es igual, con Ctrl en lugar de ⌘ (salvo ⌘D/⇧⌘D/⌘W/⌘T de la terminal, que por ahora son solo macOS: Ctrl+D es EOF en una shell).
+En Windows es igual, con Ctrl en lugar de ⌘ (salvo ⌘D/⇧⌘D/⌘W/⌘T de la terminal, que por ahora son solo macOS: Ctrl+D es EOF en una shell). Los de Files (Ctrl+S, Ctrl+F, Ctrl+P, Ctrl+W…) existen solo mientras se ve un archivo, para que la terminal siga recibiendo los de su shell; reemplazar es Ctrl+H.
 
 ## Decisiones de diseño
 

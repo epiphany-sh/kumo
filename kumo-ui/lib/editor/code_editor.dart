@@ -25,18 +25,62 @@ class CodeController extends TextEditingController {
   /// forced.
   double fontSize = 0;
 
+  /// Search matches painted over the text, and which one is current (-1:
+  /// none); sorted, not overlapping.
+  List<TextRange> _highlights = const [];
+  int _current = -1;
+  List<TextRange> get highlights => _highlights;
+
+  void setHighlights(List<TextRange> ranges, int current) {
+    if (identical(ranges, _highlights) && current == _current) return;
+    if (ranges.isEmpty && _highlights.isEmpty) return;
+    _highlights = ranges;
+    _current = current;
+    notifyListeners();
+  }
+
+  /// Set by the editor showing this text: scrolls [reveal]'s offset into
+  /// view.
+  void Function(int offset)? onReveal;
+  void reveal(int offset) => onReveal?.call(offset);
+
   @override
   TextSpan buildTextSpan({required BuildContext context, TextStyle? style, required bool withComposing}) {
     final p = palette ?? context.c;
     final lines = text.split('\n');
     final children = <InlineSpan>[];
+    final hl = _highlights;
+    final soft = p.yellow.withValues(alpha: p.isDark ? 0.24 : 0.2);
+    final strong = p.warn.withValues(alpha: p.isDark ? 0.55 : 0.38);
+    var offset = 0;
+    var h = 0;
     for (var i = 0; i < lines.length; i++) {
       var col = 0;
       for (final (t, k) in Syntax.line(lang, lines[i])) {
         final s = deleted ? TextStyle(color: p.text3, decoration: TextDecoration.lineThrough) : _style(p, k);
-        col = _addWithTabs(children, t, s, col);
+        if (hl.isEmpty) {
+          col = _addWithTabs(children, t, s, col);
+        } else {
+          // Split the token where matches start and end.
+          final end = offset + t.length;
+          var pos = offset;
+          while (pos < end) {
+            while (h < hl.length && hl[h].end <= pos) {
+              h++;
+            }
+            final inside = h < hl.length && hl[h].start <= pos;
+            final stop = inside ? (hl[h].end < end ? hl[h].end : end) : (h < hl.length && hl[h].start < end ? hl[h].start : end);
+            final piece = t.substring(pos - offset, stop - offset);
+            col = _addWithTabs(children, piece, inside ? s.copyWith(backgroundColor: h == _current ? strong : soft) : s, col);
+            pos = stop;
+          }
+        }
+        offset += t.length;
       }
-      if (i < lines.length - 1) children.add(const TextSpan(text: '\n'));
+      if (i < lines.length - 1) {
+        children.add(const TextSpan(text: '\n'));
+        offset++;
+      }
     }
     return TextSpan(style: style, children: children);
   }
@@ -153,6 +197,7 @@ class _CodeEditorState extends State<CodeEditor> {
   final _ownV = ScrollController();
   final _h = ScrollController();
   static const _lh = 1.7;
+  double _charW = 0;
 
   ScrollController get _v => widget.scrollController ?? _ownV;
 
@@ -170,10 +215,54 @@ class _CodeEditorState extends State<CodeEditor> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    widget.controller.onReveal = _reveal;
+  }
+
+  @override
+  void didUpdateWidget(CodeEditor old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.controller, widget.controller)) {
+      if (old.controller.onReveal == _reveal) old.controller.onReveal = null;
+      widget.controller.onReveal = _reveal;
+    }
+  }
+
+  @override
   void dispose() {
+    if (widget.controller.onReveal == _reveal) widget.controller.onReveal = null;
     _ownV.dispose();
     _h.dispose();
     super.dispose();
+  }
+
+  /// Scrolls so [offset] shows, a third down when it has to move; after
+  /// the frame, so a text that just changed is laid out.
+  void _reveal(int offset) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final text = widget.controller.text;
+      final at = offset.clamp(0, text.length);
+      final before = text.substring(0, at);
+      final line = '\n'.allMatches(before).length;
+      final col = visualWidth(before.substring(before.lastIndexOf('\n') + 1));
+      final extent = CodeEditor.lineExtentFor(widget.fontSize);
+      if (_v.hasClients) {
+        final pos = _v.position;
+        final y = CodeEditor.topPadding + line * extent;
+        if (y < pos.pixels + extent || y + 2 * extent > pos.pixels + pos.viewportDimension) {
+          _v.animateTo((y - pos.viewportDimension / 3).clamp(0.0, pos.maxScrollExtent), duration: const Duration(milliseconds: 160), curve: Curves.easeOut);
+        }
+      }
+      if (_h.hasClients) {
+        final pos = _h.position;
+        final x = col * _charW;
+        if (x < pos.pixels + 8 || x > pos.pixels + pos.viewportDimension - 64) {
+          _h.jumpTo((x - pos.viewportDimension / 3).clamp(0.0, pos.maxScrollExtent));
+        }
+      }
+    });
   }
 
   double _charWidth(TextStyle style) {
@@ -190,7 +279,7 @@ class _CodeEditorState extends State<CodeEditor> {
     final style = CodeEditor._textStyle(widget.fontSize, color: c.text);
     final strut = CodeEditor._strut(widget.fontSize);
     final lineExtent = CodeEditor.lineExtentFor(widget.fontSize);
-    final charW = _charWidth(style);
+    final charW = _charW = _charWidth(style);
     widget.controller.fontSize = widget.fontSize;
 
     return ListenableBuilder(
