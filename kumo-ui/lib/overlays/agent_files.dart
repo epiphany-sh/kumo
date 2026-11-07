@@ -20,6 +20,10 @@ class AgentFileWatch {
 
   /// Only a file changed after this counts (set before asking for a redo).
   DateTime? baseline;
+
+  /// What the file held at [rebase]: on a filesystem whose times are in
+  /// whole seconds, a rewrite within the same second only shows in its text.
+  String? _baselineText;
   int _last = -1;
   int _waits = 0;
 
@@ -35,7 +39,14 @@ class AgentFileWatch {
     }
     final size = stat?.size ?? 0;
     final b = baseline;
-    final fresh = stat != null && size > 0 && (b == null || stat.modified.isAfter(b));
+    var fresh = stat != null && size > 0 && (b == null || stat.modified.isAfter(b));
+    if (!fresh && stat != null && size > 0 && _baselineText != null) {
+      try {
+        fresh = file.readAsStringSync() != _baselineText;
+      } on Object {
+        fresh = false;
+      }
+    }
     if (!fresh || size != _last) {
       _last = fresh ? size : -1;
       return null;
@@ -71,6 +82,7 @@ class AgentFileWatch {
     try {
       if (text != null) File(path).writeAsStringSync(text);
       baseline = File(path).statSync().modified;
+      _baselineText = File(path).readAsStringSync();
     } on Object {
       baseline = DateTime.now();
     }

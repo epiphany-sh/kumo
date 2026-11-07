@@ -57,7 +57,7 @@ void main() {
   test('a hunk numbers its lines and writes its header', () {
     final h = DiffHunk.parse(72, 72, [' a', '-b', '-c', '+d', ' e'], section: 'func f()');
     expect(h.header, '@@ -72,4 +72,3 @@ func f()');
-    expect([for (final l in h.lines) (l.oldNo, l.newNo)], [(72, 72), (73, null), (74, null), (null, 74), (75, 75)]);
+    expect([for (final l in h.lines) (l.oldNo, l.newNo)], [(72, 72), (73, null), (74, null), (null, 73), (75, 74)]);
     expect(h.lines[3].kind, DiffKind.added);
     final f = CommitFile(path: 'internal/x/y.go', kind: CommitFileKind.modified, hunks: [h]);
     expect((f.added, f.deleted, f.name, f.dir), (1, 2, 'y.go', 'internal/x'));
@@ -108,16 +108,22 @@ void main() {
     });
 
     test('the first release is written from the project', () {
-      final p = releaseNotesPrompt(const ReleaseTarget(repoName: 'price-reader-v2', host: 'GL', tag: 'v0.1.0'), draftPath: '/tmp/n.md');
+      final p = releaseNotesPrompt(const ReleaseTarget(repoName: 'price-reader-v2', host: 'GL', tag: 'v0.1.0', first: true), draftPath: '/tmp/n.md');
       expect(p, contains('the first release of price-reader-v2'));
       expect(p, contains('nothing before v0.1.0 to compare with'));
       expect(p, contains('README'));
       expect(p, isNot(contains('..v0.1.0')));
     });
 
+    test('an oldest listed release that isn’t the first: git finds the tag before it', () {
+      final p = releaseNotesPrompt(const ReleaseTarget(repoName: 'price-admin', host: 'GH', tag: 'v1.6.4'), draftPath: '/tmp/n.md');
+      expect(p, isNot(contains('first release')));
+      expect(p, contains(r'$(git describe --tags --abbrev=0 v1.6.4^)..v1.6.4'));
+    });
+
     test('resolve comments lists the threads and asks for the answers file', () {
-      final t = PrAgentTarget(
-        pr: const RepoPullRequest(number: '#521', title: 'feat: bulk discounts', author: 'Mauri', branch: 'feat/PRC-412', state: RepoPrState.draft, mine: true),
+      const t = PrAgentTarget(
+        pr: RepoPullRequest(number: '#521', title: 'feat: bulk discounts', author: 'Mauri', branch: 'feat/PRC-412', state: RepoPrState.draft, mine: true),
         repoName: 'price-admin',
         host: 'GH',
         base: 'main',
@@ -198,9 +204,9 @@ void main() {
 
   testWidgets('releases: the list, a release’s actions, and notes by an agent', (tester) async {
     final state = await _pumpGit(tester);
-    await tester.tap(find.text('Releases'));
+    await tester.tap(find.text('Releases & tags'));
     await tester.pump();
-    expect(find.text('Releases & tags'), findsOneWidget);
+    expect(find.textContaining('6 releases · 1 tag only'), findsOneWidget);
     expect(find.text('Latest'), findsWidgets);
     expect(find.text('Bulk discounts'), findsWidgets, reason: 'the latest is picked');
 

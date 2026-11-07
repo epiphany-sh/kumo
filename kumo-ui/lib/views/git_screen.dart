@@ -214,7 +214,10 @@ class _GitScreenState extends State<GitScreen> {
           label: 'Git view',
           value: _releases,
           onChanged: (v) => setState(() => _releases = v),
-          items: const [(false, 'Overview', null, null), (true, 'Releases', null, null)],
+          items: [
+            (false, 'Overview', null, null),
+            (true, 'Releases & tags', source != null && source.releasesSupported && source.releases.isNotEmpty ? source.releases.length : null, null),
+          ],
         ),
       ]),
       primary: newWorktree,
@@ -580,42 +583,6 @@ String _dur(Duration d) {
 // ---------------------------------------------------------------------------
 // Recent commits
 // ---------------------------------------------------------------------------
-
-class _CommitsSection extends StatelessWidget {
-  const _CommitsSection({required this.source, required this.allBranches, required this.onScope});
-  final RepoActivitySource source;
-  final bool allBranches;
-  final ValueChanged<bool> onScope;
-
-  @override
-  Widget build(BuildContext context) {
-    final main = source.mainBranch;
-    final commits = source.commits(allBranches: allBranches);
-    final branchCount = {for (final k in commits) if (k.branch case final b?) b}.length;
-    final me = source.currentUser;
-    final error = source.error;
-    final rows = <Widget>[
-      if (commits.isEmpty)
-        _Note(source.loading ? 'Loading history…' : (error != null ? 'Couldn’t read the history: $error' : 'No commits on $main yet.')),
-      for (final k in commits) _CommitRow(commit: k, mine: me != null && k.author == me),
-    ];
-    return _Panel(
-      icon: Icons.commit,
-      title: allBranches ? 'Recent commits' : 'Recent commits on $main',
-      subtitle: allBranches ? '$main + $branchCount ${branchCount == 1 ? 'branch' : 'branches'}' : source.repo.name,
-      trailing: _Segments<bool>(
-        label: 'Commit scope',
-        value: allBranches,
-        onChanged: onScope,
-        items: [
-          (false, main, null, null),
-          (true, 'all branches', null, source.allBranchesSupported ? null : 'All branches needs a newer kumod'),
-        ],
-      ),
-      child: ListView(padding: EdgeInsets.zero, children: rows),
-    );
-  }
-}
 
 class _CommitRow extends StatelessWidget {
   const _CommitRow({required this.commit, required this.mine, this.showBranch = true, this.onTap});

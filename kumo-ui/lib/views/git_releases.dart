@@ -100,7 +100,9 @@ class _ReleasesViewState extends State<_ReleasesView> {
             latest: selected == latest,
             range: _rangeOf(all, selected),
             menuOpen: _menuOpen,
-            onMenu: (open) => setState(() => _menuOpen = open),
+            onMenu: (open) {
+              if (mounted) setState(() => _menuOpen = open);
+            },
           );
     return LayoutBuilder(builder: (context, box) {
       if (box.maxWidth < 1000) {
@@ -267,6 +269,8 @@ class _ReleaseDetail extends StatelessWidget {
         ]),
         const SizedBox(height: 12),
         FutureBuilder<ReleaseRange>(
+          // Keyed: another release's numbers never show for a frame.
+          key: ValueKey('range ${r.tag}'),
           future: range,
           builder: (context, snap) => _RangeStrip(
             range: snap.data,
@@ -322,6 +326,7 @@ class _ReleaseDetail extends StatelessWidget {
               ),
             const SizedBox(height: 14),
             FutureBuilder<ReleaseRange>(
+              key: ValueKey('prs ${r.tag}'),
               future: range,
               builder: (context, snap) {
                 final prs = snap.data?.prs ?? const <MergedPr>[];
@@ -480,6 +485,7 @@ class _ReleaseDetail extends StatelessWidget {
           host: source.repo.host,
           tag: r.tag,
           since: prev?.tag,
+          first: _first,
           preRelease: r.kind == ReleaseKind.preRelease,
           skipped: [for (final x in skippedBetween(releases, index, _prev)) if (x.notes.trim().isEmpty) x.tag],
         ),

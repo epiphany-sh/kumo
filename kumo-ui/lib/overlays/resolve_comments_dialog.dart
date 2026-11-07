@@ -107,6 +107,13 @@ class _ResolveCommentsDialogState extends State<ResolveCommentsDialog> {
   @override
   void dispose() {
     _poll?.cancel();
+    // A one-off session: it ends with the dialog (unless handed to its tab).
+    final id = _runId;
+    final s = _app;
+    if (id != null && s != null && _phase != _Phase.done) {
+      final run = s.agents.runs.where((r) => r.id == id).firstOrNull;
+      if (run != null && run.status != AgentStatus.done) s.agents.stop(id).ignore();
+    }
     _files?.delete();
     for (final c in _replies.values) {
       c.dispose();

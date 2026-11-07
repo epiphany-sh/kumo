@@ -49,25 +49,29 @@ enum ReleaseAgentJob {
 
 /// What the agent knows about the release it works on.
 class ReleaseTarget {
-  const ReleaseTarget({required this.repoName, required this.host, required this.tag, this.since, this.preRelease = false, this.skipped = const []});
+  const ReleaseTarget({required this.repoName, required this.host, required this.tag, this.since, this.first = false, this.preRelease = false, this.skipped = const []});
   final String repoName;
   final String host;
   final String tag;
 
-  /// The release it's compared with; null: the first release.
+  /// The release it's compared with; null: the first release, or one
+  /// whose previous release isn't listed (the agent finds it).
   final String? since;
+
+  /// Nothing was tagged before it: it's described from the project.
+  final bool first;
   final bool preRelease;
 
   /// Tags between [since] and [tag] without notes of their own.
   final List<String> skipped;
 
-  bool get first => since == null;
-  String get range => first ? tag : '$since..$tag';
+  /// The tag before it as git finds it, when [since] isn't known.
+  String get _before => since ?? '\$(git describe --tags --abbrev=0 $tag^)';
 }
 
 String _readRange(ReleaseTarget t) => t.first
     ? 'This is the first release of ${t.repoName}: there’s nothing before ${t.tag} to compare with. Read the project itself instead: the README, docs/, the build files (go.mod, package.json, Cargo.toml… whatever it has) and its main packages, then `git log --oneline ${t.tag}` for how it got here.'
-    : 'Read what changed since ${t.since}: `git fetch --tags`, `git log --format=\'%h %s%n%b\' ${t.since}..${t.tag}` and `git diff --stat ${t.since}..${t.tag}`.'
+    : 'Read what changed since ${t.since ?? 'the tag before it'}: `git fetch --tags`, `git log --format=\'%h %s%n%b\' ${t._before}..${t.tag}` and `git diff --stat ${t._before}..${t.tag}`.'
         '${t.skipped.isEmpty ? '' : ' That includes ${t.skipped.join(', ')}, which ${t.skipped.length == 1 ? 'has' : 'have'} no notes of ${t.skipped.length == 1 ? 'its' : 'their'} own.'}'
         '${t.preRelease ? ' ${t.tag} is a pre-release: say so in a line on top, so nobody mistakes it for the latest.' : ''}';
 
@@ -115,7 +119,7 @@ String releaseNotesPrompt(
 /// "Explain what changed" and "Draft an announcement" for a release.
 String releaseAgentPrompt(ReleaseAgentJob job, ReleaseTarget t) => switch (job) {
       ReleaseAgentJob.explain => [
-          t.first ? 'Explain ${t.repoName} as of ${t.tag}, its first release, to someone joining the team.' : 'Explain what changed in ${t.repoName} from ${t.since} to ${t.tag}.',
+          t.first ? 'Explain ${t.repoName} as of ${t.tag}, its first release, to someone joining the team.' : 'Explain what changed in ${t.repoName} from ${t.since ?? 'the tag before it'} to ${t.tag}.',
           _readRange(t),
           t.first ? 'Say what it does, how it’s laid out and how to run it.' : 'Group it by what it means for people using it, then list anything risky to deploy (migrations, flags, config).',
           'Don’t change any file.',

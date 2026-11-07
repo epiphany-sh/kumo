@@ -152,6 +152,7 @@ class _ReleaseNotesDialogState extends State<ReleaseNotesDialog> {
         host: widget.source.repo.host,
         tag: release.tag,
         since: _sinceRelease?.tag,
+        first: _first,
         preRelease: release.kind == ReleaseKind.preRelease,
         skipped: [for (final r in skippedBetween(widget.releases, widget.index, _since)) if (r.notes.trim().isEmpty) r.tag],
       );
@@ -167,7 +168,9 @@ class _ReleaseNotesDialogState extends State<ReleaseNotesDialog> {
     if (!s.agents.live) return _makeUp();
     final dir = mainCheckoutOf(s, widget.source);
     if (dir == null) return _fail('${widget.source.repo.name} has no checkout on this Mac for an agent to read.');
-    final files = _files = AgentFileWatch.fresh('${widget.source.repo.name}-${release.tag}-notes', 'md', companionExt: _suggestName ? 'name.txt' : null);
+    // A tag can have slashes (release/1.2): not in a file name.
+    final stem = '${widget.source.repo.name}-${release.tag}-notes'.replaceAll(RegExp(r'[^\w.-]'), '_');
+    final files = _files = AgentFileWatch.fresh(stem, 'md', companionExt: _suggestName ? 'name.txt' : null);
     final prev = _sinceRelease;
     final prompt = releaseNotesPrompt(
       _target(),
@@ -462,7 +465,7 @@ class _ReleaseNotesDialogState extends State<ReleaseNotesDialog> {
           else
             ReadRow(
               icon: KIcons.commit,
-              title: 'Changes since ${since?.tag ?? 'the previous release'}',
+              title: since == null ? 'Changes since the tag before it' : 'Changes since ${since.tag}',
               note: range == null ? (_rangeError ?? 'Counting…') : '${range.commits} commits · ${range.files} files · +${range.added} −${range.deleted}',
               value: true,
               onChanged: null,
