@@ -514,7 +514,7 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
       if (connected.isNotEmpty) ...[
         _label(context, 'Agent'),
         Wrap(spacing: 6, runSpacing: 6, children: [
-          for (final p in connected) _AgentChip(provider: p, selected: p.id == provider, onTap: () => setState(() => _provider = p.id)),
+          for (final p in connected) AgentPickChip(provider: p, selected: p.id == provider, onTap: () => setState(() => _provider = p.id)),
         ]),
         const SizedBox(height: 14),
       ],
@@ -522,15 +522,15 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
       Container(
         decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(12)),
         child: Column(children: [
-          _ReadRow(icon: KIcons.files, title: 'Changes against ${pr.base.isNotEmpty ? pr.base : widget.source.mainBranch}', note: 'Always', value: true, onChanged: null),
-          _ReadRow(icon: KIcons.git, title: 'Its commit messages', value: _commits, onChanged: (v) => setState(() => _commits = v)),
+          ReadRow(icon: KIcons.files, title: 'Changes against ${pr.base.isNotEmpty ? pr.base : widget.source.mainBranch}', note: 'Always', value: true, onChanged: null),
+          ReadRow(icon: KIcons.git, title: 'Its commit messages', value: _commits, onChanged: (v) => setState(() => _commits = v)),
           if (task != null)
-            _ReadRow(icon: KIcons.tasks, title: '${task.key} · ${task.title}', note: 'Description, acceptance criteria and comments', value: _ticket, onChanged: (v) => setState(() => _ticket = v))
+            ReadRow(icon: KIcons.tasks, title: '${task.key} · ${task.title}', note: 'Description, acceptance criteria and comments', value: _ticket, onChanged: (v) => setState(() => _ticket = v))
           else if (key != null)
-            _ReadRow(icon: KIcons.tasks, title: key, note: 'Not in your tasks, so the agent can’t read it', value: false, onChanged: null),
-          if (_templatePath case final t?) _ReadRow(icon: KIcons.page, title: 'Your template', note: t, monospace: true, value: _template, onChanged: (v) => setState(() => _template = v)),
+            ReadRow(icon: KIcons.tasks, title: key, note: 'Not in your tasks, so the agent can’t read it', value: false, onChanged: null),
+          if (_templatePath case final t?) ReadRow(icon: KIcons.page, title: 'Your template', note: t, monospace: true, value: _template, onChanged: (v) => setState(() => _template = v)),
           if (cli != null)
-            _ReadRow(icon: KIcons.rename, title: 'The current description', note: 'Keeps what’s still true in it (with `$cli`)', value: _keepCurrent, onChanged: (v) => setState(() => _keepCurrent = v)),
+            ReadRow(icon: KIcons.rename, title: 'The current description', note: 'Keeps what’s still true in it (with `$cli`)', value: _keepCurrent, onChanged: (v) => setState(() => _keepCurrent = v)),
         ]),
       ),
       const SizedBox(height: 14),
@@ -762,8 +762,8 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
 }
 
 /// An agent to pick, with what's left on its plan when Kumo can read it.
-class _AgentChip extends StatelessWidget {
-  const _AgentChip({required this.provider, required this.selected, required this.onTap});
+class AgentPickChip extends StatelessWidget {
+  const AgentPickChip({super.key, required this.provider, required this.selected, required this.onTap});
   final AgentProviderInfo provider;
   final bool selected;
   final VoidCallback onTap;
@@ -812,8 +812,8 @@ class _AgentChip extends StatelessWidget {
 }
 
 /// One thing the agent reads, with a check (null [onChanged]: fixed).
-class _ReadRow extends StatelessWidget {
-  const _ReadRow({required this.icon, required this.title, required this.value, required this.onChanged, this.note, this.monospace = false});
+class ReadRow extends StatelessWidget {
+  const ReadRow({super.key, required this.icon, required this.title, required this.value, required this.onChanged, this.note, this.monospace = false});
   final IconData icon;
   final String title;
   final String? note;

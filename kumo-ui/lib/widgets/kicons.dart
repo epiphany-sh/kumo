@@ -10,6 +10,16 @@ abstract final class KIcons {
   static const git = Icons.account_tree_outlined;
   static const docs = Icons.menu_book_outlined;
   static const branch = Icons.alt_route_rounded;
+  static const tag = Icons.sell_outlined;
+  static const commit = Icons.commit;
+  static const people = Icons.group_outlined;
+  static const megaphone = Icons.campaign_outlined;
+  static const star = Icons.star_outline_rounded;
+  static const compare = Icons.compare_arrows_rounded;
+  static const chat = Icons.chat_bubble_outline_rounded;
+  static const overview = Icons.dashboard_outlined;
+  static const package = Icons.inventory_2_outlined;
+  static const wrench = Icons.build_outlined;
   static const pullRequest = Icons.merge_type_rounded;
   static const repo = Icons.folder_outlined;
   static const folder = Icons.folder_outlined;

@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import 'models.dart';
 import 'pipelines_source.dart';
+import 'repo_history.dart';
 
 /// A commit on main (or, with all branches, on any branch).
 @immutable
@@ -247,6 +248,57 @@ abstract class RepoActivitySource extends ChangeNotifier {
 
   /// Extra status bar note (git version, worktree root); null for none.
   String? get statusNote;
+
+  // ---- A commit's changes ----
+
+  /// Whether [commitDetail] works (the daemon reads commits).
+  bool get commitDetailsSupported => false;
+
+  /// What [commit] changed, file by file. Throws a readable message.
+  Future<CommitDetail> commitDetail(RepoCommit commit) async => throw 'Kumo’s engine can’t read a commit’s changes yet: update kumod';
+
+  // ---- Releases and tags ----
+
+  /// Whether [releases] can be read at all.
+  bool get releasesSupported => false;
+  bool get releasesLoading => false;
+
+  /// Releases and bare tags, newest version first.
+  List<RepoRelease> get releases => const [];
+
+  /// Releases older than [releases] has, not listed.
+  int get olderReleases => 0;
+
+  /// What changed in [release] since [since] (null: since the first commit).
+  Future<ReleaseRange> releaseRange(RepoRelease release, {RepoRelease? since}) async => throw 'Kumo’s engine can’t compare tags yet: update kumod';
+
+  /// Whether [editRelease] works on this host.
+  bool get releasesEditable => false;
+
+  /// Sets [release]'s name or notes (null: as is). For a bare tag this
+  /// creates its release; [publish] turns a pre-release or draft into the
+  /// latest release. Throws a readable message.
+  Future<void> editRelease(RepoRelease release, {String? name, String? notes, bool publish = false}) async =>
+      throw 'Kumo can’t change releases from here yet';
+
+  // ---- Review threads ----
+
+  /// Whether [reviewThreads] can be read.
+  bool get threadsSupported => false;
+
+  /// Open review threads of [pr]; null when unknown.
+  int? openThreadsOf(RepoPullRequest pr) => null;
+
+  /// [pr]'s review threads, open and resolved, oldest first.
+  Future<List<ReviewThread>> reviewThreads(RepoPullRequest pr) async => const [];
+
+  /// Whether [answerThread] can post.
+  bool get threadsWritable => false;
+
+  /// Replies to [thread] (when [reply] isn't empty) and resolves it when
+  /// [resolve]. Throws a readable message.
+  Future<void> answerThread(RepoPullRequest pr, ReviewThread thread, {String reply = '', bool resolve = false}) async =>
+      throw 'Kumo can’t answer review threads from here yet';
 }
 
 /// Builds the source for [repo]; [worktrees] are its visible worktrees.
@@ -451,6 +503,97 @@ class MockRepoActivity extends RepoActivitySource {
   DateTime? get fetchedAt => _fetchedAt;
   @override
   String? get statusNote => 'git 2.47 · worktrees in ~/wt';
+
+  // ---- History, releases and threads (the design's) ----
+
+  @override
+  bool get commitDetailsSupported => true;
+
+  @override
+  Future<CommitDetail> commitDetail(RepoCommit commit) async {
+    final i = _commits.indexOf(commit);
+    final parent = i >= 0 && i + 1 < _commits.length ? _commits[i + 1].shortSha : '';
+    return mockCommitDetail(commit.shortSha, commit.subject, parent: parent);
+  }
+
+  late List<MockRelease> _releases = mockReleases(repo.name, repo.host, _fetchedAt);
+
+  @override
+  bool get releasesSupported => true;
+  @override
+  List<RepoRelease> get releases => [for (final r in _releases) r.release];
+  @override
+  int get olderReleases => repo.name == 'price-admin' ? 8 : 0;
+
+  @override
+  Future<ReleaseRange> releaseRange(RepoRelease release, {RepoRelease? since}) async {
+    final i = _releases.indexWhere((r) => r.release.tag == release.tag);
+    if (i < 0) throw 'There’s no ${release.tag}';
+    final j = since == null ? null : _releases.indexWhere((r) => r.release.tag == since.tag);
+    return mockRangeOf(_releases, i, j == null || j < 0 ? null : j);
+  }
+
+  @override
+  bool get releasesEditable => repo.host != 'BB';
+
+  /// What [editRelease] was asked, by tag.
+  final releaseEdits = <String, ({String? name, String? notes, bool publish})>{};
+
+  @override
+  Future<void> editRelease(RepoRelease release, {String? name, String? notes, bool publish = false}) async {
+    if (!releasesEditable) throw 'Bitbucket has tags but no releases';
+    releaseEdits[release.tag] = (name: name, notes: notes, publish: publish);
+    _releases = [
+      for (final r in _releases)
+        if (r.release.tag != release.tag)
+          r
+        else
+          MockRelease(
+            r.release.copyWith(
+              name: name,
+              notes: notes,
+              kind: publish || r.release.isTag ? ReleaseKind.release : null,
+            ),
+            commits: r.commits,
+            added: r.added,
+            deleted: r.deleted,
+            files: r.files,
+            prs: r.prs,
+          ),
+    ];
+    if (!_disposed) notifyListeners();
+  }
+
+  /// Threads answered with [answerThread]: (reply, resolved), by id.
+  final answers = <String, (String, bool)>{};
+
+  List<ReviewThread> _threadsOf(RepoPullRequest pr) => [
+        for (final t in mockThreads(pr.number, _fetchedAt))
+          if (answers[t.id] case (_, true))
+            ReviewThread(id: t.id, author: t.author, path: t.path, line: t.line, body: t.body, time: t.time, resolved: true)
+          else
+            t,
+      ];
+
+  @override
+  bool get threadsSupported => true;
+  @override
+  int? openThreadsOf(RepoPullRequest pr) {
+    final all = _threadsOf(pr);
+    return all.isEmpty ? null : all.where((t) => !t.resolved).length;
+  }
+
+  @override
+  Future<List<ReviewThread>> reviewThreads(RepoPullRequest pr) async => _threadsOf(pr);
+
+  @override
+  bool get threadsWritable => true;
+
+  @override
+  Future<void> answerThread(RepoPullRequest pr, ReviewThread thread, {String reply = '', bool resolve = false}) async {
+    answers[thread.id] = (reply, resolve);
+    if (!_disposed) notifyListeners();
+  }
 }
 
 /// (sha, subject, author, minutes ago, PR, branch; '' = on main).
