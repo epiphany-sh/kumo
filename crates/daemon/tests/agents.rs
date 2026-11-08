@@ -888,7 +888,7 @@ async fn an_agent_keeps_asking_while_its_prompt_blinks_until_answered() {
         &daemon.bin(),
         "claude",
         "printf 'Allow?\\033]9;Claude needs your permission\\007'; \
-         (while :; do sleep 0.2; printf .; done) & read a; kill $!; echo answered; read b",
+         (while :; do /bin/sleep 0.2; printf .; done) & read a; kill $!; echo answered; read b",
     );
     connect(&mut client, "claude", true).await;
     let session = client
@@ -905,7 +905,8 @@ async fn an_agent_keeps_asking_while_its_prompt_blinks_until_answered() {
     let still = session_where(&mut client, &session.id, |_| true).await;
     assert!(still.asked, "{still:?}");
 
-    let terminal = Attached::new(&mut client, &session.terminal_id, false).await;
+    let mut terminal = Attached::new(&mut client, &session.terminal_id, true).await;
+    terminal.read_until("...").await;
     terminal.send(b"1\r").await;
     let answered = session_where(&mut client, &session.id, |s| !s.asked).await;
     assert_ne!(answered.state(), pb::AgentState::Exited);
