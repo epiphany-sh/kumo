@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
+import '../data/agent_defs_source.dart';
 import '../data/agents_source.dart';
 import '../data/ai_usage_source.dart';
 import '../data/ci_hosts_source.dart';
@@ -82,6 +83,7 @@ class AppState extends ChangeNotifier {
     WorkspaceSource? workspace,
     WorktreeChanges Function(String worktreePath)? changesFor,
     AgentsSource? agents,
+    AgentDefsSource? agentDefs,
     AiUsageSource? usage,
     TasksSource? tasks,
     PipelinesFactory? pipelinesFor,
@@ -96,6 +98,9 @@ class AppState extends ChangeNotifier {
   })  : prefs = prefs ?? Preferences.memory(),
         workspace = workspace ?? MockWorkspaceSource(),
         agents = agents ?? MockAgentsSource(),
+        // The design's agents with the design's daemon; a real daemon needs
+        // the AgentDefs service first.
+        agentDefs = agentDefs ?? (agents == null ? MockAgentDefs() : UnsupportedAgentDefs()),
         usage = usage ?? MockAiUsageSource(),
         tasks = tasks ?? MockTasksSource(),
         _changesFor = changesFor,
@@ -112,7 +117,9 @@ class AppState extends ChangeNotifier {
     _bindPipelines();
     _bindTests();
     this.workspace.addListener(_onWorkspaceChanged);
-    this.agents.addListener(notifyListeners);
+    this.agents
+      ..addListener(notifyListeners)
+      ..addListener(_flushQueued);
     this.usage.addListener(notifyListeners);
     this.updates.addListener(notifyListeners);
     this.profiles.addListener(notifyListeners);
@@ -1252,6 +1259,67 @@ class AppState extends ChangeNotifier {
   /// Coding agents (optional): connected providers and running sessions.
   final AgentsSource agents;
 
+  /// Your agents (Claude Code subagents): their files, runs and test runs.
+  /// Views listen to it directly.
+  final AgentDefsSource agentDefs;
+
+  /// What the Agents view should show next (set from elsewhere: a session
+  /// just started, an agent to edit). The view takes it and clears it.
+  final agentsRequest = ValueNotifier<AgentsRequest?>(null);
+
+  /// Opens the Agents view on [request].
+  void showInAgents(AgentsRequest request) {
+    agentsRequest.value = request;
+    setSetting('agents.mode', request.agent == null ? 'sessions' : 'library');
+    view = KumoView.agents;
+  }
+
+  final _queued = <(String, AgentContextItem, String)>[];
+  bool _flushing = false;
+
+  /// Sends [text] to agent [id] now, or, while it waits on an approval
+  /// (where typing would answer it), as soon as it's asked nothing. True
+  /// when it was sent or queued.
+  Future<bool> sendToAgent(String id, AgentContextItem item, String text) async {
+    final run = agents.runs.where((r) => r.id == id).firstOrNull;
+    if (run != null && run.status == AgentStatus.needsYou) {
+      _queued.add((id, item, text));
+      notifyListeners();
+      return true;
+    }
+    return agents.addContext(id, item, text: text);
+  }
+
+  /// Messages held for agent [id].
+  int queuedFor(String id) => _queued.where((q) => q.$1 == id).length;
+
+  void _flushQueued() {
+    if (_queued.isNotEmpty && !_flushing) _flush().ignore();
+  }
+
+  /// Sends what was held, in order, for agents no longer asking anything;
+  /// says so when one can't go.
+  Future<void> _flush() async {
+    _flushing = true;
+    try {
+      for (final q in [..._queued]) {
+        if (_disposed) return;
+        final run = agents.runs.where((r) => r.id == q.$1).firstOrNull;
+        if (run != null && run.status == AgentStatus.needsYou) continue;
+        _queued.remove(q);
+        if (run == null || run.status == AgentStatus.done) {
+          notify('A message you held for an agent wasn’t sent: it ${run == null ? 'is gone' : 'ended'} first');
+          continue;
+        }
+        final ok = await agents.addContext(q.$1, q.$2, text: q.$3);
+        if (!ok && !_disposed) notify('The message you held for ${run.providerName} didn’t go: ${agents.error ?? 'unknown error'}');
+      }
+    } finally {
+      _flushing = false;
+    }
+    if (!_disposed) notifyListeners();
+  }
+
   /// What's left on each agent's plan, and what fills a session's context
   /// window. Optional: nothing shows when it isn't reported.
   final AiUsageSource usage;
@@ -1454,7 +1522,10 @@ class AppState extends ChangeNotifier {
     }
     agents
       ..removeListener(notifyListeners)
+      ..removeListener(_flushQueued)
       ..dispose();
+    agentDefs.dispose();
+    agentsRequest.dispose();
     tasks.dispose();
     usage
       ..removeListener(notifyListeners)
@@ -1553,4 +1624,24 @@ PipelinesSource mockPipelinesFor({required Repo repo, required Worktree worktree
     scenario: worktree.everPushed ? MockPipelinesScenario.running : MockPipelinesScenario.notPushed,
     unpushed: worktree.unpushed,
   );
+}
+
+/// What the Agents view is asked to show: a session's terminal, or one of
+/// your agents (on a tab, maybe on one of its runs).
+class AgentsRequest {
+  const AgentsRequest.session(String this.session)
+      : agent = null,
+        tab = null,
+        run = null;
+  const AgentsRequest.agent(String this.agent, {this.tab = 'run', this.run}) : session = null;
+
+  /// An [AgentRun.id] (Sessions).
+  final String? session;
+
+  /// An [AgentDef.key] (Your agents).
+  final String? agent;
+
+  /// run, edit or playground.
+  final String? tab;
+  final String? run;
 }

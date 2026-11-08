@@ -46,7 +46,30 @@ class AgentProviderInfo {
   final bool hasLogin;
 }
 
-enum AgentContextKind { task, doc, code }
+enum AgentContextKind {
+  task,
+  doc,
+  code,
+
+  /// A pull request: its diff and description, saved for the run.
+  pullRequest,
+
+  /// Files or a folder of a worktree.
+  files,
+
+  /// A web page, fetched once and saved as text.
+  link,
+}
+
+/// The two-letter tag a context item shows.
+String agentContextTag(AgentContextKind k) => switch (k) {
+      AgentContextKind.task => 'TK',
+      AgentContextKind.doc => 'DC',
+      AgentContextKind.code => 'CD',
+      AgentContextKind.pullRequest => 'PR',
+      AgentContextKind.files => 'FI',
+      AgentContextKind.link => 'LN',
+    };
 
 /// A ticket, page or piece of code an agent was given.
 @immutable
@@ -116,9 +139,13 @@ class AgentRun {
     this.lastLine = '',
     this.context = const [],
     this.steps = const [],
+    this.agent = '',
   });
 
   final String id;
+
+  /// The agent of yours it runs (`claude --agent <name>`); empty: the plain CLI.
+  final String agent;
   final String providerId;
   final String providerName;
   final String short;
@@ -136,6 +163,33 @@ class AgentRun {
 
   /// What it did, oldest first.
   final List<AgentStep> steps;
+}
+
+/// An agent CLI someone started by hand in one of Kumo's terminals (typed
+/// `claude` in a shell): the daemon sees each terminal's foreground process.
+@immutable
+class TerminalAgent {
+  const TerminalAgent({required this.terminalId, required this.providerId, required this.name, required this.terminalTitle, required this.cwd, this.state = AgentStatus.running, this.busy = false});
+  final String terminalId;
+
+  /// The known CLI it is (claude, codex, gemini…).
+  final String providerId;
+
+  /// The program as typed, e.g. `claude`.
+  final String name;
+
+  /// The tab it's in, e.g. "zsh 2".
+  final String terminalTitle;
+
+  /// Its working directory: which worktree it's in.
+  final String cwd;
+
+  /// needsYou: it's asking something (an approval), so text typed now
+  /// would answer it.
+  final AgentStatus state;
+
+  /// Mid-turn: what's typed now queues as its next message.
+  final bool busy;
 }
 
 /// Coding agents: the providers the user connected in Settings and the
@@ -177,6 +231,14 @@ abstract class AgentsSource extends ChangeNotifier {
 
   Future<void> stop(String id);
   Future<void> dismiss(String id);
+
+  /// Agent CLIs started by hand in Kumo's terminals (empty when the daemon
+  /// can't tell).
+  List<TerminalAgent> get terminalAgents => const [];
+
+  /// Types [text] into terminal [terminalId] as a paste, and presses Enter
+  /// when [submit]. False when it couldn't ([error] says why).
+  Future<bool> sendToTerminal(String terminalId, String text, {bool submit = true}) async => false;
 
   /// Last failure reported by the daemon, readable.
   String? get error;
@@ -247,6 +309,21 @@ class MockAgentsSource extends AgentsSource {
 
   @override
   List<AgentRun> get runs => const [];
+
+  /// In the design, `claude` typed by hand in zsh 2 of feat/PRC-412.
+  @override
+  List<TerminalAgent> get terminalAgents => const [
+        TerminalAgent(terminalId: 'mock:zsh2', providerId: 'claude', name: 'claude', terminalTitle: 'zsh 2', cwd: '~/wt/price-admin/PRC-412'),
+      ];
+
+  /// What [sendToTerminal] typed.
+  final typed = <(String, String, bool)>[];
+
+  @override
+  Future<bool> sendToTerminal(String terminalId, String text, {bool submit = true}) async {
+    typed.add((terminalId, text, submit));
+    return true;
+  }
 
   @override
   Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = '', List<AgentContextItem> context = const []}) async => null;

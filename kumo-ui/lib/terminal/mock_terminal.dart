@@ -159,3 +159,95 @@ abstract final class MockSessions {
         ],
       );
 }
+
+/// Agents' terminals as the Agents view shows them in the design.
+abstract final class MockAgentTerminals {
+  static TermLine _l(List<(String, TermRole)> parts, {bool bold = false}) => TermLine.of(parts, bold: bold);
+
+  /// Codex in fix/PRC-398, waiting for an approval.
+  static MockTerminalSurface codex() => MockTerminalSurface(
+        title: 'Codex',
+        cwd: '~/wt/price-admin/PRC-398',
+        initial: [
+          _l([('>_ ', TermRole.acc), ('Codex', TermRole.text), ('  · ask before shell', TermRole.text3)], bold: true),
+          _l([('> ', TermRole.text3), ('Fix PRC-398: installment prices round wrong for 18 cuotas.', TermRole.text2)]),
+          TermLine.empty,
+          _l([('• ', TermRole.text), ('Found it: Installment() divides before rounding, so 18 cuotas lose a cent each.', TermRole.text)]),
+          _l([('• ', TermRole.ok), ('Edited ', TermRole.text), ('internal/price/installments.go', TermRole.text2), (' (+9 −6)', TermRole.text3)]),
+          _l([('• ', TermRole.ok), ('Ran ', TermRole.text), ('go test ./internal/price/...', TermRole.text2)]),
+          _l([('  └ ', TermRole.text3), ('ok  price-admin/internal/price  0.41s  (14 tests)', TermRole.text3)]),
+          _l([('• ', TermRole.text), ('The integration test needs the new column on staging.', TermRole.text)]),
+          TermLine.empty,
+          _l([('▌ ', TermRole.warn), ('Allow command?  ', TermRole.warn), ('make migrate-up ENV=staging', TermRole.text)], bold: true),
+          _l([('  y ', TermRole.text), ('yes, once   ', TermRole.text3), ('a ', TermRole.text), ('always, this session   ', TermRole.text3), ('n ', TermRole.text), ('no, and tell Codex what to do', TermRole.text3)]),
+        ],
+      );
+
+  /// Gemini planning the audit log.
+  static MockTerminalSurface gemini() => MockTerminalSurface(
+        title: 'Gemini CLI',
+        cwd: '~/wt/users-permissions/audit',
+        loop: true,
+        initial: [
+          _l([('✦ ', TermRole.purple), ('Gemini CLI', TermRole.text), ('  · read-only until the plan is approved', TermRole.text3)], bold: true),
+          _l([('> ', TermRole.text3), ('Plan CU-2291: an audit log for permission changes.', TermRole.text2)]),
+          TermLine.empty,
+          _l([('✦ ', TermRole.ok), ('ReadFile ', TermRole.text), ('internal/authz/policy.go', TermRole.text2)]),
+          _l([('  └ ', TermRole.text3), ('Read 240 lines', TermRole.text3)]),
+        ],
+        script: [
+          _l([('✦ ', TermRole.ok), ('SearchText ', TermRole.text), ('"func (s *Service) Grant" in internal/', TermRole.text2)]),
+          _l([('  └ ', TermRole.text3), ('3 matches', TermRole.text3)]),
+          _l([('⠋ ', TermRole.warn), ('Drafting the plan…', TermRole.warn)]),
+        ],
+      );
+
+  /// A session that ended.
+  static MockTerminalSurface finished(String title, String cwd, String prompt, List<String> said) => MockTerminalSurface(
+        title: title,
+        cwd: cwd,
+        initial: [
+          _l([('✻ ', TermRole.acc), (title, TermRole.text)], bold: true),
+          _l([('> ', TermRole.text3), (prompt, TermRole.text2)]),
+          TermLine.empty,
+          for (final s in said) _l([('⏺ ', TermRole.text), (s, TermRole.text)]),
+          TermLine.empty,
+          _l([('✓ ', TermRole.ok), ('Done', TermRole.ok), (' · exit 0', TermRole.text3)]),
+        ],
+      );
+
+  /// go-pr-reviewer reviewing PR #521.
+  static MockTerminalSurface reviewer() => MockTerminalSurface(
+        title: 'go-pr-reviewer',
+        cwd: '~/wt/price-admin/PRC-412',
+        initial: [
+          _l([('✻ ', TermRole.acc), ('Claude Code', TermRole.text), ('  · agent go-pr-reviewer', TermRole.text3)], bold: true),
+          _l([('  context ', TermRole.text3), ('~/.kumo/runs/go-pr-reviewer-2 · 3 items', TermRole.text3)]),
+          _l([('> ', TermRole.text3), ('Review PR #521 against main. Point out code that already existed and could have been reused.', TermRole.text2)]),
+          TermLine.empty,
+          _l([('⏺ ', TermRole.text), ('I’ll read the PR’s diff first, then look for existing code for each new function.', TermRole.text)]),
+          _l([('⏺ ', TermRole.ok), ('Read', TermRole.text), ('(~/.kumo/runs/go-pr-reviewer-2/pr-521.diff)', TermRole.text2)], bold: true),
+          _l([('  ⎿ ', TermRole.text3), ('Read 412 lines', TermRole.text3)]),
+          _l([('⏺ ', TermRole.ok), ('Grep', TermRole.text), ('(pattern: "func (\\w*Percent|round\\w*)", path: "internal/")', TermRole.text2)], bold: true),
+          _l([('  ⎿ ', TermRole.text3), ('Found 3 matches', TermRole.text3)]),
+        ],
+        script: [
+          _l([('⏺ ', TermRole.ok), ('Read', TermRole.text), ('(internal/money/round.go)', TermRole.text2)], bold: true),
+          _l([('  ⎿ ', TermRole.text3), ('Read 40 lines', TermRole.text3)]),
+          _l([('⏺ ', TermRole.text), ('Two so far: bulkPercent repeats applyPercent; roundCents repeats money.RoundCents.', TermRole.text)]),
+          _l([('✻ ', TermRole.warn), ('Checking the repository layer…', TermRole.warn), (' (esc to interrupt)', TermRole.text3)]),
+        ],
+      );
+
+  /// One of your agents, just started.
+  static MockTerminalSurface started(String agent, String prompt) => MockTerminalSurface(
+        title: agent,
+        cwd: '~',
+        initial: [
+          _l([('✻ ', TermRole.acc), ('Claude Code', TermRole.text), ('  · agent $agent', TermRole.text3)], bold: true),
+          if (prompt.isNotEmpty) _l([('> ', TermRole.text3), (prompt, TermRole.text2)]),
+          TermLine.empty,
+          _l([('✻ ', TermRole.warn), (prompt.isEmpty ? 'Ready: type its first message.' : 'Reading the context folder…', TermRole.warn)]),
+        ],
+      );
+}

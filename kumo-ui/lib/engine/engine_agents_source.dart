@@ -137,6 +137,8 @@ class EngineAgentsSource extends AgentsSource {
           AgentContextKind.task => pb.AgentContextKind.AGENT_CONTEXT_KIND_TASK,
           AgentContextKind.doc => pb.AgentContextKind.AGENT_CONTEXT_KIND_DOC,
           AgentContextKind.code => pb.AgentContextKind.AGENT_CONTEXT_KIND_CODE,
+          // Until the proto has kinds of their own (spec: agents-builder-engine.md).
+          AgentContextKind.pullRequest || AgentContextKind.files || AgentContextKind.link => pb.AgentContextKind.AGENT_CONTEXT_KIND_DOC,
         },
         title: item.title,
         detail: item.detail,

@@ -26,6 +26,7 @@ import '../widgets/context_menu.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
+import '../widgets/toolbar_segments.dart';
 
 part 'git_commits.dart';
 part 'git_releases.dart';
@@ -210,7 +211,7 @@ class _GitScreenState extends State<GitScreen> {
       breadcrumb: Row(mainAxisSize: MainAxisSize.min, children: [
         Flexible(child: breadcrumb),
         const SizedBox(width: 12),
-        _Segments<bool>(
+        ToolbarSegments<bool>(
           label: 'Git view',
           value: _releases,
           onChanged: (v) => setState(() => _releases = v),
@@ -427,60 +428,6 @@ class _Panel extends StatelessWidget {
         const SizedBox(height: 8),
         Expanded(child: child),
       ]),
-    );
-  }
-}
-
-/// Segmented filter on a tinted track, as in the design (smaller than
-/// [KSegmented], with counts, and items that can be disabled with a reason).
-class _Segments<T> extends StatelessWidget {
-  const _Segments({required this.items, required this.value, required this.onChanged, required this.label});
-
-  /// (value, label, count, why it's disabled; null = enabled).
-  final List<(T, String, int?, String?)> items;
-  final T value;
-  final ValueChanged<T> onChanged;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    final children = <Widget>[];
-    for (final (v, text, count, disabledWhy) in items) {
-      if (children.isNotEmpty) children.add(const SizedBox(width: 2));
-      final enabled = disabledWhy == null;
-      final on = v == value;
-      children.add(KPressable(
-        onTap: enabled ? () => onChanged(v) : null,
-        tooltip: disabledWhy,
-        semanticLabel: text,
-        selected: on,
-        builder: (context, hover, focus) => Container(
-          height: 24,
-          padding: const EdgeInsets.symmetric(horizontal: 9),
-          alignment: Alignment.center,
-          decoration: on
-              ? chipDecoration(c, radius: 8, fill: c.tabActive)
-              : BoxDecoration(
-                  color: hover && enabled ? c.tabActive : null,
-                  borderRadius: BorderRadius.circular(8),
-                  border: focus ? Border.all(color: c.acc, width: 1.5) : null,
-                ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text(text, style: sans(11.5, weight: on ? FontWeight.w600 : FontWeight.w500, color: !enabled ? c.text3 : (on ? c.text : c.text2))),
-            if (count != null) ...[const SizedBox(width: 5), Text('$count', style: sans(10.5, weight: FontWeight.w500, color: c.text3))],
-          ]),
-        ),
-      ));
-    }
-    return Semantics(
-      label: label,
-      container: true,
-      child: Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(10)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: children),
-      ),
     );
   }
 }
@@ -990,7 +937,7 @@ class _PullRequestsSection extends StatelessWidget {
     return _Panel(
       icon: KIcons.pullRequest,
       title: title,
-      trailing: _Segments<_PrFilter>(
+      trailing: ToolbarSegments<_PrFilter>(
         label: 'Filter ${terms.prs}',
         value: filter,
         onChanged: onFilter,

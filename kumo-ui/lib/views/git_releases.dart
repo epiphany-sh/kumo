@@ -65,7 +65,7 @@ class _ReleasesViewState extends State<_ReleasesView> {
       icon: KIcons.tag,
       title: 'Releases & tags',
       subtitle: all.isEmpty ? '' : '$nReleases ${nReleases == 1 ? 'release' : 'releases'}${nTags == 0 ? '' : ' · $nTags ${nTags == 1 ? 'tag' : 'tags'} only'}',
-      trailing: _Segments<_ReleaseFilter>(
+      trailing: ToolbarSegments<_ReleaseFilter>(
         label: 'Show',
         value: _filter,
         onChanged: (f) => setState(() => _filter = f),
