@@ -38,6 +38,18 @@ impl RunGit for GitCli {
             .to_owned())
     }
 
+    fn update_branch(&self, repo: &Path, branch: &str) -> Result<(), String> {
+        if branch.starts_with('-') {
+            return Err(format!("not a branch: {branch}"));
+        }
+        let refspec = format!("+refs/heads/{branch}:refs/remotes/origin/{branch}");
+        self.exec(
+            repo,
+            ["fetch", "-q", "--no-recurse-submodules", "origin", &refspec],
+        )
+        .map(drop)
+    }
+
     fn origin_url(&self, repo: &Path) -> Result<String, String> {
         // Not `remote get-url`: that one rewrites it by `insteadOf`.
         Ok(self

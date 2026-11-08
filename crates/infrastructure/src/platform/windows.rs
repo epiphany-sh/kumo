@@ -42,6 +42,9 @@ impl ProcessTrees for Windows {
             .args(["/T", "/F", "/PID", &pid.to_string()])
             .output();
     }
+
+    /// No groups to look for; `taskkill /T` needs the parent alive.
+    fn kill_group(_pid: u32) {}
 }
 
 impl ProgramSearch for Windows {

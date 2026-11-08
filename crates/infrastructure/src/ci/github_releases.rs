@@ -65,10 +65,8 @@ impl ReleaseClient for GitHubReleases {
     ) -> Result<Release, CiProblem> {
         let headers = Self::headers(token);
         // Drafts aren't found by tag: look in the list.
-        let existing = self
-            .raw_list(target, token, 100)?
-            .into_iter()
-            .find(|r| r["tag_name"] == tag);
+        let all = self.raw_list(target, token, 100)?;
+        let existing = all.iter().find(|r| r["tag_name"] == tag).cloned();
         let mut body = Map::new();
         if let Some(name) = &edit.name {
             body.insert("name".into(), json!(name));
@@ -94,9 +92,10 @@ impl ReleaseClient for GitHubReleases {
                 body.insert("tag_name".into(), json!(tag));
                 body.entry("name").or_insert_with(|| json!(tag));
                 // GitHub would make any new release Latest, an old tag's too.
+                let latest = edit.publish || newest_release(tag, &all);
                 body.insert(
                     "make_latest".into(),
-                    json!(if edit.publish { "true" } else { "false" }),
+                    json!(if latest { "true" } else { "false" }),
                 );
                 if !edit.sha.is_empty() {
                     body.insert("target_commitish".into(), json!(edit.sha));
@@ -150,6 +149,24 @@ fn parse_release(r: &Value) -> Release {
             })
             .collect(),
     }
+}
+
+/// A tag's version numbers; None for a pre-release or if it has none.
+fn version(tag: &str) -> Option<Vec<u64>> {
+    let digits = tag.trim_start_matches(|c: char| !c.is_ascii_digit());
+    digits.split('.').map(|part| part.parse().ok()).collect()
+}
+
+/// Whether `tag` is a version above every published release.
+fn newest_release(tag: &str, releases: &[Value]) -> bool {
+    let Some(ours) = version(tag) else {
+        return false;
+    };
+    releases
+        .iter()
+        .filter(|r| r["draft"] != true && r["prerelease"] != true)
+        .filter_map(|r| version(r["tag_name"].as_str()?))
+        .all(|other| ours > other)
 }
 
 #[cfg(test)]
@@ -273,6 +290,23 @@ mod tests {
             post.json(),
             json!({"tag_name": "v1.7.3", "name": "v1.7.3", "body": "Notes", "target_commitish": "3c09e1a", "make_latest": "false"})
         );
+    }
+
+    #[test]
+    fn a_new_release_is_latest_only_if_its_tag_is_the_newest() {
+        let published = |tag: &str| json!({"tag_name": tag, "draft": false, "prerelease": false});
+        let list = [
+            published("v1.9.0"),
+            json!({"tag_name": "v3.0.0", "draft": true, "prerelease": false}),
+            json!({"tag_name": "v2.5.0-rc.1", "draft": false, "prerelease": true}),
+        ];
+        assert!(newest_release("v2.0.0", &list));
+        assert!(newest_release("v1.10.0", &list), "by number, not by text");
+        assert!(!newest_release("v1.7.3", &list));
+        assert!(!newest_release("v1.9.0", &list));
+        assert!(!newest_release("v2.0.0-rc.1", &list), "a pre-release");
+        assert!(!newest_release("nightly", &list));
+        assert!(newest_release("v0.1.0", &[]), "the first one");
     }
 
     #[test]

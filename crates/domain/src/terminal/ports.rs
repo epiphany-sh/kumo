@@ -50,4 +50,6 @@ pub trait PtyChild: Send {
 /// Kills the spawned process from any thread.
 pub trait PtyKiller: Send + Sync {
     fn kill(&mut self) -> Result<(), TerminalError>;
+    /// Kills it and what it started, even in process groups of their own.
+    fn kill_tree(&mut self) -> Result<(), TerminalError>;
 }

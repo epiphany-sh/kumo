@@ -604,7 +604,7 @@ impl AgentService {
         let terminal = self.session(id)?.terminal;
         // The time limit may have said why already.
         self.stopped_lock().entry(id.clone()).or_insert(STOPPED);
-        match self.terminals.close(&terminal) {
+        match self.terminals.close_tree(&terminal) {
             Ok(()) | Err(TerminalError::NotFound(_)) => Ok(()),
             Err(e) => Err(launch_error(e)),
         }
@@ -613,7 +613,7 @@ impl AgentService {
     /// Forgets a finished session (a running one is stopped first).
     pub fn dismiss(&self, id: &AgentSessionId) -> Result<(), AgentError> {
         let session = self.session(id)?;
-        let _ = self.terminals.close(&session.terminal);
+        let _ = self.terminals.close_tree(&session.terminal);
         self.update(|snapshot| snapshot.sessions.retain(|s| &s.id != id));
         if let Some(target) = self.usage_lock().forget(id)
             && let Some(source) = self

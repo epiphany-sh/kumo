@@ -29,10 +29,13 @@ impl HeadlessKiller for Killer {
     /// keep working in a folder that's about to go.
     fn kill(&self) {
         let mut child = self.child.lock().unwrap_or_else(PoisonError::into_inner);
-        // Gone already: its pid may be someone else's by now.
         if matches!(child.try_wait(), Ok(None)) {
             platform::kill_process_tree(self.pid);
             let _ = child.kill();
+        } else {
+            // Gone, with tools that may hold its output open. Its pid may be
+            // someone else's by now, but only a live group answers to `-pid`.
+            platform::kill_process_group(self.pid);
         }
     }
 }
@@ -178,6 +181,27 @@ mod tests {
             .status
             .success();
         assert!(!alive, "the tool it started is still running");
+    }
+
+    #[test]
+    fn stopping_ends_a_run_whose_program_is_gone_but_a_tool_holds_its_output() {
+        let dir = tempfile::tempdir().unwrap();
+        let spec = HeadlessSpec {
+            program: "/bin/sh".into(),
+            args: vec!["-c".into(), "/bin/sleep 60 & echo up; exit 0".into()],
+            cwd: dir.path().to_owned(),
+            env: Vec::new(),
+        };
+        let HeadlessProcess {
+            mut lines,
+            killer,
+            wait,
+        } = ProcessHeadlessRunner.start(&spec).unwrap();
+        assert_eq!(lines.next().as_deref(), Some("up"));
+        std::thread::sleep(Duration::from_millis(200));
+        killer.kill();
+        assert_eq!(lines.next(), None);
+        wait();
     }
 
     #[test]

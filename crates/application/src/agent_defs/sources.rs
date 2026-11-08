@@ -40,6 +40,7 @@ pub trait RunSources: Send + Sync + 'static {
     fn pull_request<'a>(
         &'a self,
         repo: &'a Path,
+        outside_origin: Option<&'a str>,
         number: u64,
     ) -> BoxFuture<'a, Result<PullContext, String>>;
 }
@@ -97,9 +98,13 @@ impl RunSources for ServiceSources {
     fn pull_request<'a>(
         &'a self,
         repo: &'a Path,
+        outside_origin: Option<&'a str>,
         number: u64,
     ) -> BoxFuture<'a, Result<PullContext, String>> {
         Box::pin(async move {
+            if let Some(origin) = outside_origin {
+                self.pulls.adopt_clone(repo, origin);
+            }
             let list = self
                 .pulls
                 .list(repo, false)
