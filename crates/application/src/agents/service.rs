@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
@@ -19,6 +19,11 @@ use super::monitor;
 use super::usage::{self, UsageState};
 use crate::terminal::TerminalService;
 use crate::workspace::WorkspaceService;
+
+/// The exit code of a session stopped from Kumo (as Ctrl-C in a shell).
+pub(super) const STOPPED: i32 = 130;
+/// …and of one stopped by its time limit (as `timeout`).
+pub(super) const STOPPED_BY_TIME_LIMIT: i32 = 124;
 
 /// Silence after which a running agent is considered to wait for input.
 const QUIET_AFTER: Duration = Duration::from_millis(2500);
@@ -81,8 +86,9 @@ pub struct AgentService {
     published: watch::Sender<Arc<AgentsSnapshot>>,
     usage: Mutex<UsageState>,
     pub(super) quiet_after: Duration,
-    /// Sessions stopped by their time limit, until their exit is recorded.
-    timed_out: Mutex<HashSet<AgentSessionId>>,
+    /// Sessions Kumo stopped and the code they end with, until their exit
+    /// is recorded.
+    stopped: Mutex<HashMap<AgentSessionId, i32>>,
 }
 
 /// How [`AgentService::launch`] starts an agent.
@@ -121,7 +127,7 @@ impl AgentService {
             published,
             usage: Mutex::default(),
             quiet_after: QUIET_AFTER,
-            timed_out: Mutex::default(),
+            stopped: Mutex::default(),
         }
     }
 
@@ -426,20 +432,20 @@ impl AgentService {
             return;
         }
         tracing::info!(session = %id, "agent reached its time limit");
-        service.timed_out_lock().insert(id.clone());
+        service
+            .stopped_lock()
+            .insert(id.clone(), STOPPED_BY_TIME_LIMIT);
         let _ = service.stop(&id);
     }
 
-    /// Whether the session was stopped by its time limit (asked once, as
-    /// it exits).
-    pub(super) fn took_time_limit(&self, id: &AgentSessionId) -> bool {
-        self.timed_out_lock().remove(id)
+    /// The exit code Kumo gives a session it stopped (130, or 124 for its
+    /// time limit); asked once, as it exits.
+    pub(super) fn stopped_with(&self, id: &AgentSessionId) -> Option<i32> {
+        self.stopped_lock().remove(id)
     }
 
-    fn timed_out_lock(&self) -> std::sync::MutexGuard<'_, HashSet<AgentSessionId>> {
-        self.timed_out
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+    fn stopped_lock(&self) -> std::sync::MutexGuard<'_, HashMap<AgentSessionId, i32>> {
+        self.stopped.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     /// Sends a ticket or page to a running agent: `text` is typed into its
@@ -570,9 +576,11 @@ impl AgentService {
         Ok(())
     }
 
-    /// Kills the agent's process; its session ends as exited.
+    /// Kills the agent's process; its session ends as exited, code 130.
     pub fn stop(&self, id: &AgentSessionId) -> Result<(), AgentError> {
         let terminal = self.session(id)?.terminal;
+        // The time limit may have said why already.
+        self.stopped_lock().entry(id.clone()).or_insert(STOPPED);
         match self.terminals.close(&terminal) {
             Ok(()) | Err(TerminalError::NotFound(_)) => Ok(()),
             Err(e) => Err(launch_error(e)),

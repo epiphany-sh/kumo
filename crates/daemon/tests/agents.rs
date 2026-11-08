@@ -389,10 +389,13 @@ async fn stop_kills_a_running_agent() {
         })
         .await
         .unwrap();
-    session_where(&mut client, &session.id, |s| {
+    let ended = session_where(&mut client, &session.id, |s| {
         s.state() == pb::AgentState::Exited
     })
     .await;
+    // As Ctrl-C would: the card says "stopped".
+    assert_eq!(ended.exit_code, 130);
+    assert_eq!(ended.events.last().unwrap().text, "Stopped");
 }
 
 #[tokio::test(flavor = "multi_thread")]

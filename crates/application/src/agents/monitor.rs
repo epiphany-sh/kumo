@@ -12,21 +12,15 @@ use kumo_domain::terminal::{ExitStatus, TerminalEvent};
 use kumo_domain::time::Timestamp;
 
 use super::AgentService;
+use super::service::{STOPPED, STOPPED_BY_TIME_LIMIT};
 use crate::terminal::Attachment;
 
 /// The last line on the card refreshes at most this often.
 const LINE_EVERY: Duration = Duration::from_secs(1);
 const TICK: Duration = Duration::from_millis(250);
-/// The exit code of a session stopped by its time limit (as `timeout`).
-const TIME_LIMIT: i32 = 124;
-
-/// How it exited: 124 when its time limit stopped it.
+/// How it exited: 130 when Kumo stopped it, 124 when its time limit did.
 fn exit_of(service: &AgentService, id: &AgentSessionId, status: ExitStatus) -> ExitStatus {
-    if service.took_time_limit(id) {
-        ExitStatus::new(TIME_LIMIT)
-    } else {
-        status
-    }
+    service.stopped_with(id).map_or(status, ExitStatus::new)
 }
 
 /// Runs until the agent exits. `typed` is a prompt to type in the first
@@ -82,8 +76,8 @@ pub(super) async fn run(
                     Some(AgentState::Exited(status)) => {
                         let how = match status.code() {
                             0 => "Finished".to_owned(),
-                            -1 => "Stopped".to_owned(),
-                            TIME_LIMIT => "Stopped: its time limit".to_owned(),
+                            -1 | STOPPED => "Stopped".to_owned(),
+                            STOPPED_BY_TIME_LIMIT => "Stopped: its time limit".to_owned(),
                             code => format!("Exited with code {code}"),
                         };
                         session.record(AgentEventKind::Exited, how, now);
