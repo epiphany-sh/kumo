@@ -12,6 +12,7 @@
 //! - [`test_runs`]: a worktree's tests, run in a terminal and read.
 //! - [`workspace`]: namespaces, repositories and worktrees.
 
+pub mod agent_defs;
 pub mod agents;
 pub mod changes;
 pub mod daemon;

@@ -23,6 +23,9 @@ pub struct DaemonConfig {
     /// The `kumod` git runs as its credential helper (`kumod
     /// git-credential`). `None` is this program.
     pub credential_helper: Option<PathBuf>,
+    /// How long a minute of your agents' time limits lasts. `None` is a
+    /// minute (tests pass less).
+    pub agent_minute: Option<std::time::Duration>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

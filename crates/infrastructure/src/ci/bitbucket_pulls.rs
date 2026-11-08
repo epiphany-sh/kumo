@@ -328,6 +328,7 @@ pub(super) fn parse_pr(pr: &Value, statuses: Option<&Value>, me: &str) -> PullRe
             .unwrap_or(u32::MAX),
         // The list doesn't count unresolved comments.
         open_threads: None,
+        body: pr["description"].as_str().unwrap_or_default().to_owned(),
     }
 }
 

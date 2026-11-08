@@ -41,6 +41,7 @@ fn pr(number: u64, branch: &str) -> PullRequest {
         updated_at: None,
         comment_count: 0,
         open_threads: None,
+        body: String::new(),
     }
 }
 

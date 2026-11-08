@@ -133,14 +133,30 @@ class AgentContextKind extends $pb.ProtobufEnum {
   static const AgentContextKind AGENT_CONTEXT_KIND_CODE =
       AgentContextKind._(2, _omitEnumNames ? '' : 'AGENT_CONTEXT_KIND_CODE');
 
+  /// A pull request: its diff and description, saved for the run.
+  static const AgentContextKind AGENT_CONTEXT_KIND_PULL_REQUEST =
+      AgentContextKind._(
+          3, _omitEnumNames ? '' : 'AGENT_CONTEXT_KIND_PULL_REQUEST');
+
+  /// Files or a folder of a worktree: their paths are listed.
+  static const AgentContextKind AGENT_CONTEXT_KIND_FILES =
+      AgentContextKind._(4, _omitEnumNames ? '' : 'AGENT_CONTEXT_KIND_FILES');
+
+  /// A web page, fetched once and saved as text.
+  static const AgentContextKind AGENT_CONTEXT_KIND_LINK =
+      AgentContextKind._(5, _omitEnumNames ? '' : 'AGENT_CONTEXT_KIND_LINK');
+
   static const $core.List<AgentContextKind> values = <AgentContextKind>[
     AGENT_CONTEXT_KIND_TASK,
     AGENT_CONTEXT_KIND_DOC,
     AGENT_CONTEXT_KIND_CODE,
+    AGENT_CONTEXT_KIND_PULL_REQUEST,
+    AGENT_CONTEXT_KIND_FILES,
+    AGENT_CONTEXT_KIND_LINK,
   ];
 
   static final $core.List<AgentContextKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
   static AgentContextKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -265,6 +281,48 @@ class ContextSliceKind extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const ContextSliceKind._(super.value, super.name);
+}
+
+class AgentDefScope extends $pb.ProtobufEnum {
+  /// The workspace's Claude Code folder: `<CLAUDE_CONFIG_DIR>/agents`.
+  static const AgentDefScope AGENT_DEF_SCOPE_PERSONAL =
+      AgentDefScope._(0, _omitEnumNames ? '' : 'AGENT_DEF_SCOPE_PERSONAL');
+
+  /// `<repo main checkout>/.claude/agents`.
+  static const AgentDefScope AGENT_DEF_SCOPE_PROJECT =
+      AgentDefScope._(1, _omitEnumNames ? '' : 'AGENT_DEF_SCOPE_PROJECT');
+
+  static const $core.List<AgentDefScope> values = <AgentDefScope>[
+    AGENT_DEF_SCOPE_PERSONAL,
+    AGENT_DEF_SCOPE_PROJECT,
+  ];
+
+  static final $core.List<AgentDefScope?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
+  static AgentDefScope? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const AgentDefScope._(super.value, super.name);
+}
+
+class AgentDefTrigger extends $pb.ProtobufEnum {
+  static const AgentDefTrigger AGENT_DEF_TRIGGER_PULL_REQUEST =
+      AgentDefTrigger._(
+          0, _omitEnumNames ? '' : 'AGENT_DEF_TRIGGER_PULL_REQUEST');
+  static const AgentDefTrigger AGENT_DEF_TRIGGER_SCHEDULE =
+      AgentDefTrigger._(1, _omitEnumNames ? '' : 'AGENT_DEF_TRIGGER_SCHEDULE');
+
+  static const $core.List<AgentDefTrigger> values = <AgentDefTrigger>[
+    AGENT_DEF_TRIGGER_PULL_REQUEST,
+    AGENT_DEF_TRIGGER_SCHEDULE,
+  ];
+
+  static final $core.List<AgentDefTrigger?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
+  static AgentDefTrigger? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const AgentDefTrigger._(super.value, super.name);
 }
 
 class TaskSourceKind extends $pb.ProtobufEnum {

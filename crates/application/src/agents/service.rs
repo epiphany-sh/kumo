@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
@@ -6,9 +7,11 @@ use bytes::Bytes;
 use kumo_domain::agents::{
     AgentContext, AgentError, AgentEventKind, AgentPreset, AgentProvider, AgentSession,
     AgentSessionId, AgentState, AgentStore, CliHomes, PRESETS, PlanUsage, PlanUsageStore,
-    ProgramLocator, StoredProvider, UsageReport, UsageSource, UsageTarget,
+    ProgramLocator, StoredProvider, TerminalAgent, UsageReport, UsageSource, UsageTarget,
 };
-use kumo_domain::terminal::{LaunchSpec, TerminalError, TerminalId, TerminalSize};
+use kumo_domain::terminal::{
+    LaunchSpec, TerminalError, TerminalId, TerminalSize, bracketed_paste, typed_text,
+};
 use kumo_domain::time::Timestamp;
 use tokio::sync::watch;
 
@@ -63,6 +66,8 @@ pub struct ProviderSettings {
 pub struct AgentsSnapshot {
     pub version: u64,
     pub sessions: Vec<AgentSession>,
+    /// Agent CLIs started by hand in the profile's terminals.
+    pub terminal_agents: Vec<TerminalAgent>,
 }
 
 /// Coding agents: providers (known CLIs and custom commands) and the
@@ -76,6 +81,29 @@ pub struct AgentService {
     published: watch::Sender<Arc<AgentsSnapshot>>,
     usage: Mutex<UsageState>,
     quiet_after: Duration,
+    /// Sessions stopped by their time limit, until their exit is recorded.
+    timed_out: Mutex<HashSet<AgentSessionId>>,
+}
+
+/// How [`AgentService::launch`] starts an agent.
+#[derive(Debug, Clone, Default)]
+pub struct AgentLaunch {
+    /// None: the default agent.
+    pub provider_id: Option<String>,
+    pub cwd: PathBuf,
+    pub prompt: String,
+    /// Shown on the card; empty uses the prompt's first line.
+    pub title: String,
+    pub context: Vec<AgentContext>,
+    pub size: TerminalSize,
+    /// The program's arguments, the prompt included; None: the provider's
+    /// own, with `prompt`.
+    pub args: Option<Vec<String>>,
+    /// The agent of yours it runs.
+    pub agent_name: Option<String>,
+    pub context_dir: Option<PathBuf>,
+    /// Stopped (code 124) when it's up.
+    pub time_limit: Option<Duration>,
 }
 
 impl AgentService {
@@ -93,6 +121,7 @@ impl AgentService {
             published,
             usage: Mutex::default(),
             quiet_after: QUIET_AFTER,
+            timed_out: Mutex::default(),
         }
     }
 
@@ -264,7 +293,40 @@ impl AgentService {
         context: Vec<AgentContext>,
         size: TerminalSize,
     ) -> Result<AgentSession, AgentError> {
-        let provider = match provider_id {
+        let worktree = self
+            .workspace
+            .known_worktree(worktree)
+            .await
+            .ok_or_else(|| AgentError::UnknownWorktree(worktree.into()))?;
+        self.launch(AgentLaunch {
+            provider_id: provider_id.map(str::to_owned),
+            cwd: worktree,
+            prompt: prompt.to_owned(),
+            title: title.to_owned(),
+            context,
+            size,
+            ..AgentLaunch::default()
+        })
+        .await
+    }
+
+    /// Starts an agent in `launch.cwd` (checked by the caller), in a new
+    /// terminal.
+    pub async fn launch(self: &Arc<Self>, launch: AgentLaunch) -> Result<AgentSession, AgentError> {
+        let AgentLaunch {
+            provider_id,
+            cwd: worktree,
+            prompt,
+            title,
+            context,
+            size,
+            args: given_args,
+            agent_name,
+            context_dir,
+            time_limit,
+        } = launch;
+        let (prompt, title) = (prompt.as_str(), title.as_str());
+        let provider = match provider_id.as_deref() {
             Some(id) => self.provider(id).await?,
             None => self.default_provider().await?,
         };
@@ -274,13 +336,11 @@ impl AgentService {
                 provider.name
             )));
         }
-        let worktree = self
-            .workspace
-            .known_worktree(worktree)
-            .await
-            .ok_or_else(|| AgentError::UnknownWorktree(worktree.into()))?;
         let program = self.installed(&provider).await?;
-        let (mut args, prompt_passed) = provider.launch_args(prompt)?;
+        let (mut args, prompt_passed) = match given_args {
+            Some(args) => (args, true),
+            None => provider.launch_args(prompt)?,
+        };
         let id = AgentSessionId::generate();
         // Before it starts: a session's files are matched by start time.
         let target = UsageTarget {
@@ -321,8 +381,14 @@ impl AgentService {
             last_line: String::new(),
             context: Vec::new(),
             events: Vec::new(),
+            agent_name,
+            context_dir,
         };
-        session.record(AgentEventKind::Started, provider.name.clone(), now);
+        let started = session
+            .agent_name
+            .clone()
+            .unwrap_or_else(|| provider.name.clone());
+        session.record(AgentEventKind::Started, started, now);
         for item in context {
             session.record(AgentEventKind::Context, item.title.clone(), now);
             session.context.push(item);
@@ -343,7 +409,37 @@ impl AgentService {
             self.usage_lock().follow(target.clone());
             tokio::spawn(usage::follow(Arc::clone(self), target, source));
         }
+        if let Some(limit) = time_limit {
+            tokio::spawn(Self::stop_after(
+                Arc::clone(self),
+                session.id.clone(),
+                limit,
+            ));
+        }
         Ok(session)
+    }
+
+    /// Stops a session still running after `limit`: it ends with code 124.
+    async fn stop_after(service: Arc<Self>, id: AgentSessionId, limit: Duration) {
+        tokio::time::sleep(limit).await;
+        if matches!(service.state_of(&id), None | Some(AgentState::Exited(_))) {
+            return;
+        }
+        tracing::info!(session = %id, "agent reached its time limit");
+        service.timed_out_lock().insert(id.clone());
+        let _ = service.stop(&id);
+    }
+
+    /// Whether the session was stopped by its time limit (asked once, as
+    /// it exits).
+    pub(super) fn took_time_limit(&self, id: &AgentSessionId) -> bool {
+        self.timed_out_lock().remove(id)
+    }
+
+    fn timed_out_lock(&self) -> std::sync::MutexGuard<'_, HashSet<AgentSessionId>> {
+        self.timed_out
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
     }
 
     /// Sends a ticket or page to a running agent: `text` is typed into its
@@ -421,12 +517,7 @@ impl AgentService {
             .terminals
             .attach(&session.terminal, false)
             .map_err(launch_error)?;
-        let text = text.replace('\x1b', "");
-        let typed = if text.contains('\n') {
-            format!("\x1b[200~{text}\x1b[201~")
-        } else {
-            text
-        };
+        let typed = typed_text(text, text.contains('\n'));
         attachment
             .session
             .write(Bytes::from(typed))
@@ -438,6 +529,45 @@ impl AgentService {
             .write(Bytes::from_static(b"\r"))
             .await
             .map_err(launch_error)
+    }
+
+    /// Types `text` into one of the profile's terminals (an agent CLI
+    /// started there by hand): as a bracketed paste when the terminal
+    /// turned it on, then Enter when `submit`.
+    pub async fn send_to_terminal(
+        &self,
+        terminal: &TerminalId,
+        text: &str,
+        submit: bool,
+    ) -> Result<(), AgentError> {
+        let attachment = self.terminals.attach(terminal, true).map_err(|e| match e {
+            TerminalError::NotFound(_) => AgentError::Invalid("that terminal is closed".to_owned()),
+            e => launch_error(e),
+        })?;
+        let shown: Vec<u8> = attachment
+            .output
+            .replay()
+            .iter()
+            .flat_map(|b| b.data.iter().copied())
+            .collect();
+        // Not in what's kept: several lines still go as one paste.
+        let bracketed = bracketed_paste(&shown).unwrap_or_else(|| text.contains('\n'));
+        if !text.is_empty() {
+            attachment
+                .session
+                .write(Bytes::from(typed_text(text, bracketed)))
+                .await
+                .map_err(launch_error)?;
+        }
+        if submit {
+            tokio::time::sleep(Duration::from_millis(80)).await;
+            attachment
+                .session
+                .write(Bytes::from_static(b"\r"))
+                .await
+                .map_err(launch_error)?;
+        }
+        Ok(())
     }
 
     /// Kills the agent's process; its session ends as exited.
@@ -572,6 +702,17 @@ impl AgentService {
             .into_iter()
             .find(|p| p.enabled && p.is_default)
             .ok_or(AgentError::NoProvider)
+    }
+
+    /// A provider's program and the environment it runs with in this
+    /// profile (its own folder, the user's PATH): for headless runs.
+    pub async fn program_env(
+        &self,
+        provider_id: &str,
+    ) -> Result<(PathBuf, Vec<(String, String)>), AgentError> {
+        let provider = self.provider(provider_id).await?;
+        let program = self.installed(&provider).await?;
+        Ok((program, self.env_for(&provider).await?))
     }
 
     async fn installed(&self, provider: &AgentProvider) -> Result<PathBuf, AgentError> {

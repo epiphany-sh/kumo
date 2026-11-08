@@ -52,6 +52,10 @@ pub struct AgentSession {
     pub context: Vec<AgentContext>,
     /// What it did, oldest first; the last [`AgentSession::MAX_EVENTS`].
     pub events: Vec<AgentEvent>,
+    /// The agent of yours it runs (`claude --agent <name>`).
+    pub agent_name: Option<String>,
+    /// What it was given for the run, as files (`--add-dir`).
+    pub context_dir: Option<PathBuf>,
 }
 
 /// Where a piece of context came from.
@@ -61,6 +65,12 @@ pub enum ContextKind {
     Doc,
     /// Code selected in a file.
     Code,
+    /// A pull request: its diff and description.
+    PullRequest,
+    /// Files or a folder of a worktree.
+    Files,
+    /// A web page, read once.
+    Link,
 }
 
 /// A ticket or page an agent was given.
@@ -72,6 +82,8 @@ pub struct AgentContext {
     /// Where it lives, e.g. "Jira" or "Confluence · Pricing".
     pub detail: String,
     pub url: String,
+    /// Its id where it comes from (a task's or a page's), if known.
+    pub id: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -135,4 +147,19 @@ impl AgentSession {
             None => provider_name.to_owned(),
         }
     }
+}
+
+/// A known agent CLI in the foreground of one of Kumo's terminals, started
+/// there by hand (typed `claude` in a shell).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerminalAgent {
+    pub terminal: TerminalId,
+    pub provider_id: String,
+    /// The program as it runs, e.g. `claude`.
+    pub program: String,
+    pub cwd: PathBuf,
+    /// Read from its screen, like a session's.
+    pub state: AgentState,
+    /// Producing output.
+    pub busy: bool,
 }

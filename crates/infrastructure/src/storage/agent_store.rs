@@ -13,7 +13,7 @@ use super::migrations;
 /// [`AgentStore`] on the same SQLite file as the workspace.
 #[derive(Debug)]
 pub struct SqliteAgentStore {
-    conn: Mutex<Connection>,
+    pub(super) conn: Mutex<Connection>,
 }
 
 impl SqliteAgentStore {
@@ -180,7 +180,7 @@ fn windows_from_json(raw: &str) -> Vec<UsageWindow> {
         .collect()
 }
 
-fn store_error(error: impl std::fmt::Display) -> AgentError {
+pub(super) fn store_error(error: impl std::fmt::Display) -> AgentError {
     AgentError::Store(error.to_string())
 }
 

@@ -12,6 +12,7 @@ use kumo_domain::workspace::WorktreeLocation;
 use tokio::sync::broadcast::error::RecvError;
 
 use super::{GitEnvironment, ProfileBundle, ProfileService};
+use crate::agent_defs::AgentDefService;
 use crate::agents::AgentService;
 use crate::changes::ChangesService;
 use crate::docs::DocsService;
@@ -31,6 +32,8 @@ pub struct ProfileServices {
     pub workspace: Arc<WorkspaceService>,
     pub changes: Arc<ChangesService>,
     pub agents: Arc<AgentService>,
+    /// Your agents: their files, runs and test runs.
+    pub agent_defs: Arc<AgentDefService>,
     pub tasks: Arc<TaskService>,
     pub pipelines: Arc<PipelinesService>,
     pub pulls: Arc<PullRequestService>,

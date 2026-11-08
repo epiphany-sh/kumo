@@ -91,6 +91,7 @@ impl Daemon {
             locator,
             secrets,
             terminals: Arc::clone(&terminals),
+            agent_minute: config.agent_minute.unwrap_or(Duration::from_secs(60)),
         };
         let profiles = Arc::new(ProfileService::load(
             Arc::new(FileProfileStore::in_dir(&data_dir)),

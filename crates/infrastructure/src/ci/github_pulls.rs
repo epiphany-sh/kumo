@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use super::http::{CiHttp, Header};
 use super::{needs, ts};
 
-const FIELDS: &str = "number title url isDraft state createdAt updatedAt headRefName baseRefName reviewDecision \
+const FIELDS: &str = "number title body url isDraft state createdAt updatedAt headRefName baseRefName reviewDecision \
     author { login ... on User { name } } \
     reviewRequests(first: 20) { nodes { requestedReviewer { ... on User { login name } ... on Team { slug name } } } } \
     latestReviews(first: 20) { nodes { author { login ... on User { name } } state } } \
@@ -379,6 +379,7 @@ pub(super) fn parse_pr(pr: &Value, viewer: &str) -> PullRequest {
         updated_at: ts(&pr["updatedAt"]),
         comment_count: u32::try_from(pr["comments"]["totalCount"].as_u64().unwrap_or_default())
             .unwrap_or(u32::MAX),
+        body: pr["body"].as_str().unwrap_or_default().to_owned(),
         open_threads: pr["reviewThreads"]["nodes"].as_array().map(|nodes| {
             let open = nodes.iter().filter(|t| t["isResolved"] == false).count();
             u32::try_from(open).unwrap_or(u32::MAX)

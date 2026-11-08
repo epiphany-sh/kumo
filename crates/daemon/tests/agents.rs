@@ -261,6 +261,7 @@ async fn timeline_and_context_follow_what_the_agent_does() {
         title: "PRC-412 · Bulk discounts".into(),
         detail: "Jira".into(),
         url: "https://acme.atlassian.net/browse/PRC-412".into(),
+        ..Default::default()
     };
     let session = client
         .agents
@@ -299,6 +300,7 @@ async fn timeline_and_context_follow_what_the_agent_does() {
         title: "Discount rules v3".into(),
         detail: "Confluence · Pricing".into(),
         url: String::new(),
+        ..Default::default()
     };
     let updated = client
         .agents

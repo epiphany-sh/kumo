@@ -1,5 +1,6 @@
 //! Conversions between protobuf messages and domain types.
 
+mod agent_defs;
 mod agents;
 mod changes;
 mod docs;
@@ -14,6 +15,9 @@ mod tests;
 mod usage;
 mod workspace;
 
+pub use agent_defs::{
+    agent_def_from, agent_def_to, capabilities_to, play_event_to, play_record_to,
+};
 pub use agents::{agent_context_from, agent_session_to, agents_snapshot_to, provider_to};
 pub use changes::{commit_detail_to, commit_to, diff_scope_from, diff_to, worktree_changes_to};
 pub use docs::{doc_level_to, doc_list_to, doc_to};

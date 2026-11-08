@@ -1,5 +1,6 @@
 //! tonic service implementations. Thin: decode, call the use case, encode.
 
+mod agent_defs;
 mod agents;
 mod core;
 mod docs;
@@ -13,6 +14,7 @@ mod terminals;
 mod tests;
 mod workspace;
 
+pub use self::agent_defs::AgentDefsGrpc;
 pub use self::agents::AgentsGrpc;
 pub use self::core::CoreGrpc;
 pub use self::docs::DocsGrpc;

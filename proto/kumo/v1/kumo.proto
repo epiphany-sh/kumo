@@ -712,6 +712,10 @@ service Agents {
   rpc Usage(UsageRequest) returns (UsageReport);
   // Types the agent's own compact command (/compact, /compress) and submits it.
   rpc Compact(CompactAgentRequest) returns (AgentSession);
+  // Types text into one of the profile's terminals (as a bracketed paste
+  // when the terminal turned it on), then Enter when asked: for an agent
+  // CLI started there by hand.
+  rpc SendToTerminal(SendToTerminalRequest) returns (SendToTerminalResponse);
 }
 
 message AgentProvider {
@@ -803,6 +807,12 @@ enum AgentContextKind {
   AGENT_CONTEXT_KIND_DOC = 1;
   // Code selected in a file.
   AGENT_CONTEXT_KIND_CODE = 2;
+  // A pull request: its diff and description, saved for the run.
+  AGENT_CONTEXT_KIND_PULL_REQUEST = 3;
+  // Files or a folder of a worktree: their paths are listed.
+  AGENT_CONTEXT_KIND_FILES = 4;
+  // A web page, fetched once and saved as text.
+  AGENT_CONTEXT_KIND_LINK = 5;
 }
 
 // A ticket, page or piece of code an agent was given.
@@ -813,6 +823,9 @@ message AgentContext {
   // Where it lives, e.g. "Jira" or "Confluence · Pricing".
   string detail = 3;
   string url = 4;
+  // Its id where it comes from (a task's or a page's), when Kumo has one:
+  // a run reads it whole from there.
+  string id = 5;
 }
 
 enum AgentEventKind {
@@ -865,6 +878,12 @@ message AgentSession {
   repeated AgentContext context = 14;
   // Oldest first; the last 80.
   repeated AgentEvent events = 15;
+  // The agent of yours it runs (`claude --agent <name>`); empty: the CLI
+  // itself.
+  string agent_name = 16;
+  // What it was given for the run, written as files (`--add-dir`); empty
+  // when it was given nothing.
+  string context_dir = 17;
 }
 
 message StopAgentRequest {
@@ -891,7 +910,36 @@ message WatchAgentsRequest {}
 message AgentsSnapshot {
   uint64 version = 1;
   repeated AgentSession sessions = 2;
+  // Agent CLIs someone started by hand in one of the profile's terminals
+  // (typed `claude` in a shell). Empty where the daemon can't tell
+  // (Windows).
+  repeated TerminalAgent terminal_agents = 3;
 }
+
+// A known agent CLI in the foreground of a terminal Kumo runs.
+message TerminalAgent {
+  string terminal_id = 1;
+  // The provider it matches (claude, codex…).
+  string provider_id = 2;
+  // The program as it runs, e.g. "claude".
+  string program = 3;
+  // Its working directory.
+  string cwd = 4;
+  // Read from its screen, like a session's: NEEDS_INPUT while it asks
+  // something (text typed now would answer it).
+  AgentState state = 5;
+  // Mid-turn: producing output.
+  bool busy = 6;
+}
+
+message SendToTerminalRequest {
+  string terminal_id = 1;
+  string text = 2;
+  // Press Enter after the text.
+  bool submit = 3;
+}
+
+message SendToTerminalResponse {}
 
 // Usage: only what an agent's CLI itself reports (Claude Code's status
 // line, Codex's session files). What can't be read is left out, never
@@ -951,6 +999,195 @@ message UsageReport {
 
 message CompactAgentRequest {
   string id = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Agent definitions: your own agents (Claude Code subagents)
+// ---------------------------------------------------------------------------
+//
+// The files Claude Code reads (`.claude/agents/<name>.md`), personal and per
+// repository, plus Kumo's own settings for each. The daemon never parses
+// them: it moves the Markdown, runs `claude` and streams what it prints. The
+// UI owns the format (kumo-ui/lib/data/agent_defs.dart).
+
+service AgentDefs {
+  // Every agent file of the workspace: personal, then each repository's.
+  rpc List(ListAgentDefsRequest) returns (AgentDefList);
+  // Writes the file (and Kumo's settings for it). With `previous`, a rename
+  // or move: the old file goes once the new one is written.
+  rpc Save(SaveAgentDefRequest) returns (AgentDefFile);
+  rpc Delete(DeleteAgentDefRequest) returns (DeleteAgentDefResponse);
+  // Starts it in a terminal of its own; the session shows in Agents.Watch.
+  rpc Run(RunAgentDefRequest) returns (AgentSession);
+  // A headless test run: Claude Code's stream-json lines, as they come.
+  rpc Play(PlayRequest) returns (stream PlayEvent);
+  rpc StopPlay(StopPlayRequest) returns (StopPlayResponse);
+  // The last 10 test runs of an agent, kept across restarts.
+  rpc ListPlays(ListPlaysRequest) returns (PlayList);
+  // One-shot `claude -p`: drafts an agent, improves instructions.
+  rpc Ask(AskClaudeRequest) returns (AskClaudeResponse);
+  // Skills and MCP servers an agent can be given; whether triggers run.
+  rpc Capabilities(AgentDefCapabilitiesRequest) returns (AgentDefCapabilities);
+}
+
+enum AgentDefScope {
+  // The workspace's Claude Code folder: `<CLAUDE_CONFIG_DIR>/agents`.
+  AGENT_DEF_SCOPE_PERSONAL = 0;
+  // `<repo main checkout>/.claude/agents`.
+  AGENT_DEF_SCOPE_PROJECT = 1;
+}
+
+enum AgentDefTrigger {
+  AGENT_DEF_TRIGGER_PULL_REQUEST = 0;
+  AGENT_DEF_TRIGGER_SCHEDULE = 1;
+}
+
+// Kumo's own settings for an agent: not subagent fields, kept by the daemon.
+message AgentDefSettings {
+  // The daemon stops a run when it's up.
+  optional uint32 max_minutes = 1;
+  // Headless runs only, where Claude Code takes a budget.
+  optional double max_cost_usd = 2;
+  // Saved; they don't run yet (AgentDefCapabilities.triggers_supported).
+  repeated AgentDefTrigger triggers = 3;
+}
+
+message AgentDefFile {
+  AgentDefScope scope = 1;
+  // Project agents: the repository (main checkout path and name).
+  string repo_path = 2;
+  string repo_name = 3;
+  // The file's stem: what `claude --agent <name>` takes.
+  string name = 4;
+  // The whole file, as is.
+  string markdown = 5;
+  AgentDefSettings settings = 6;
+  string file_path = 7;
+  int64 modified_unix_ms = 8;
+}
+
+message ListAgentDefsRequest {}
+
+message AgentDefList {
+  repeated AgentDefFile agents = 1;
+}
+
+message SaveAgentDefRequest {
+  // Its markdown and settings; file_path is ignored.
+  AgentDefFile agent = 1;
+  // Where it was saved before (a rename or a move).
+  optional AgentDefFile previous = 2;
+}
+
+message DeleteAgentDefRequest {
+  AgentDefFile agent = 1;
+}
+
+message DeleteAgentDefResponse {}
+
+message RunAgentDefRequest {
+  AgentDefFile agent = 1;
+  // Set when it isn't found by name where it runs (a project agent outside
+  // its repo): passed as `--agents`. Built by the UI (agentInlineJson).
+  string inline_json = 2;
+  oneof where {
+    // A worktree of the workspace.
+    string worktree_path = 3;
+    // A repository's main checkout: a new worktree from its default branch.
+    string new_worktree_repo = 4;
+    // A repository, branch or pull/merge request link.
+    string link_url = 5;
+    // Any existing folder.
+    string folder = 6;
+    // An empty folder Kumo makes (removed after 7 days).
+    bool scratch = 7;
+  }
+  // Its first message; empty: the user types.
+  string prompt = 8;
+  // Written into the run's folder (`--add-dir`).
+  repeated AgentContext context = 9;
+  uint32 cols = 10;
+  uint32 rows = 11;
+}
+
+message PlayRequest {
+  string name = 1;
+  // The draft as the UI has it (unsaved edits included).
+  string inline_json = 2;
+  string task = 3;
+  string worktree_path = 4;
+  // It can change files: it runs in a detached worktree of HEAD, removed
+  // after.
+  bool throwaway = 5;
+  repeated AgentContext context = 6;
+  optional uint32 max_turns = 7;
+  optional uint32 max_minutes = 8;
+  // Which agent's history it goes in (as saved; a draft may have another
+  // name).
+  AgentDefFile agent = 9;
+  // Passed to Claude Code's budget flag when it has one.
+  optional double max_cost_usd = 10;
+  // The unsaved draft ran (not the saved file).
+  bool draft = 11;
+}
+
+message PlayEvent {
+  string play_id = 1;
+  oneof kind {
+    // One stdout line of stream-json, as is.
+    string line = 2;
+    // The exit code; the stream ends after it.
+    int32 exited = 3;
+  }
+  // Since the start.
+  int64 at_ms = 4;
+}
+
+message StopPlayRequest {
+  string play_id = 1;
+}
+
+message StopPlayResponse {}
+
+message ListPlaysRequest {
+  AgentDefFile agent = 1;
+}
+
+message PlayRecord {
+  string play_id = 1;
+  string task = 2;
+  bool draft = 3;
+  int64 started_unix_ms = 4;
+  repeated PlayEvent events = 5;
+  // Still running (its events so far).
+  bool running = 6;
+}
+
+message PlayList {
+  // Newest first.
+  repeated PlayRecord plays = 1;
+}
+
+message AskClaudeRequest {
+  string prompt = 1;
+  // Where it reads from; empty: an empty folder.
+  string cwd = 2;
+}
+
+message AskClaudeResponse {
+  string text = 1;
+}
+
+message AgentDefCapabilitiesRequest {}
+
+message AgentDefCapabilities {
+  // Folder names under `<CLAUDE_CONFIG_DIR>/skills` and each repository's
+  // `.claude/skills`.
+  repeated string skills = 1;
+  // The MCP servers Claude Code is configured with.
+  repeated string mcp_servers = 2;
+  // False until triggers run; saving them works either way.
+  bool triggers_supported = 3;
 }
 
 // ---------------------------------------------------------------------------

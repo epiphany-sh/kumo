@@ -1,6 +1,6 @@
 use kumo_application::agents::{AgentsSnapshot, ProviderView};
 use kumo_domain::agents::{
-    AgentContext, AgentEvent, AgentEventKind, AgentSession, AgentState, ContextKind,
+    AgentContext, AgentEvent, AgentEventKind, AgentSession, AgentState, ContextKind, TerminalAgent,
 };
 use kumo_proto::v1 as pb;
 
@@ -57,6 +57,11 @@ pub fn agent_session_to(session: AgentSession) -> pb::AgentSession {
         last_line: session.last_line,
         context: session.context.into_iter().map(agent_context_to).collect(),
         events: session.events.into_iter().map(agent_event_to).collect(),
+        agent_name: session.agent_name.unwrap_or_default(),
+        context_dir: session
+            .context_dir
+            .map(|d| d.display().to_string())
+            .unwrap_or_default(),
     }
 }
 
@@ -65,12 +70,16 @@ pub fn agent_context_to(context: AgentContext) -> pb::AgentContext {
         ContextKind::Task => pb::AgentContextKind::Task,
         ContextKind::Doc => pb::AgentContextKind::Doc,
         ContextKind::Code => pb::AgentContextKind::Code,
+        ContextKind::PullRequest => pb::AgentContextKind::PullRequest,
+        ContextKind::Files => pb::AgentContextKind::Files,
+        ContextKind::Link => pb::AgentContextKind::Link,
     };
     pb::AgentContext {
         kind: kind.into(),
         title: context.title,
         detail: context.detail,
         url: context.url,
+        id: context.id,
     }
 }
 
@@ -80,10 +89,14 @@ pub fn agent_context_from(context: pb::AgentContext) -> AgentContext {
             pb::AgentContextKind::Task => ContextKind::Task,
             pb::AgentContextKind::Doc => ContextKind::Doc,
             pb::AgentContextKind::Code => ContextKind::Code,
+            pb::AgentContextKind::PullRequest => ContextKind::PullRequest,
+            pb::AgentContextKind::Files => ContextKind::Files,
+            pb::AgentContextKind::Link => ContextKind::Link,
         },
         title: context.title,
         detail: context.detail,
         url: context.url,
+        id: context.id,
     }
 }
 
@@ -115,6 +128,27 @@ pub fn agents_snapshot_to(snapshot: &AgentsSnapshot) -> pb::AgentsSnapshot {
             .cloned()
             .map(agent_session_to)
             .collect(),
+        terminal_agents: snapshot
+            .terminal_agents
+            .iter()
+            .map(terminal_agent_to)
+            .collect(),
+    }
+}
+
+fn terminal_agent_to(agent: &TerminalAgent) -> pb::TerminalAgent {
+    let state = match agent.state {
+        AgentState::Working => pb::AgentState::Working,
+        AgentState::NeedsInput => pb::AgentState::NeedsInput,
+        AgentState::Exited(_) => pb::AgentState::Exited,
+    };
+    pb::TerminalAgent {
+        terminal_id: agent.terminal.to_string(),
+        provider_id: agent.provider_id.clone(),
+        program: agent.program.clone(),
+        cwd: agent.cwd.display().to_string(),
+        state: state.into(),
+        busy: agent.busy,
     }
 }
 
@@ -128,12 +162,16 @@ mod tests {
             pb::AgentContextKind::Task,
             pb::AgentContextKind::Doc,
             pb::AgentContextKind::Code,
+            pb::AgentContextKind::PullRequest,
+            pb::AgentContextKind::Files,
+            pb::AgentContextKind::Link,
         ] {
             let sent = pb::AgentContext {
                 kind: kind.into(),
                 title: "parse_key · lib.rs:12-30".into(),
                 detail: "src/lib.rs".into(),
                 url: String::new(),
+                id: "t-1".into(),
             };
             assert_eq!(agent_context_to(agent_context_from(sent.clone())), sent);
         }

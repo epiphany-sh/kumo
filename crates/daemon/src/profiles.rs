@@ -4,6 +4,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use futures::future::BoxFuture;
+use kumo_application::agent_defs::{
+    AgentDefPlaces, AgentDefPorts, AgentDefService, ServiceSources,
+};
 use kumo_application::agents::{AgentPorts, AgentService};
 use kumo_application::changes::{ChangesPorts, ChangesService};
 use kumo_application::docs::{DocsPorts, DocsService};
@@ -20,6 +23,7 @@ use kumo_domain::pipelines::{HostTokens, TokenFallback};
 use kumo_domain::profiles::{Profile, ProfileActivity, ProfileEnv, ProfileError, ProfileId};
 use kumo_domain::tasks::{SecretStore, TaskConnector};
 use kumo_domain::workspace::{WorkspaceStore, WorktreeLocation};
+use kumo_infrastructure::agent_defs::{HttpPageReader, LocalAgentDefFiles, ProcessHeadlessRunner};
 use kumo_infrastructure::agents::{
     ClaudeStatusLine, CodexRollouts, ProfileCliHomes, claude_config_dir, codex_home,
 };
@@ -79,6 +83,8 @@ pub(crate) struct ProfileOpener {
     /// `!'<kumod>' --data-dir '<data>' git-credential`, for git config.
     pub helper: String,
     pub terminals: Arc<TerminalService>,
+    /// A minute of your agents' time limits.
+    pub agent_minute: std::time::Duration,
 }
 
 impl OpenProfile<ProfileServices> for ProfileOpener {
@@ -249,6 +255,7 @@ impl ProfileOpener {
         };
 
         let agent_store = Arc::new(SqliteAgentStore::open(&db)?);
+        let agent_store_for_defs = Arc::clone(&agent_store);
         let agents = Arc::new(AgentService::new(
             AgentPorts {
                 store: agent_store.clone(),
@@ -264,6 +271,30 @@ impl ProfileOpener {
             Arc::clone(&terminals),
             Arc::clone(&workspace),
         ));
+        let agent_defs = Arc::new(
+            AgentDefService::new(
+                AgentDefPorts {
+                    files: Arc::new(LocalAgentDefFiles),
+                    store: agent_store_for_defs,
+                    headless: Arc::new(ProcessHeadlessRunner),
+                    pages: Arc::new(HttpPageReader::default()),
+                    git: Arc::new(git.clone()),
+                    sources: Arc::new(ServiceSources {
+                        tasks: Arc::clone(&tasks),
+                        docs: Arc::clone(&docs),
+                        pulls: Arc::clone(&pulls),
+                    }),
+                },
+                AgentDefPlaces {
+                    claude_config: claude_config_file(home, &claude_dir, profile.is_default()),
+                    claude_dir,
+                    data_dir: dir.clone(),
+                },
+                Arc::clone(&agents),
+                Arc::clone(&workspace),
+            )
+            .with_minute(self.agent_minute),
+        );
         let changes = Arc::new(ChangesService::new(
             ChangesPorts {
                 git: Arc::new(git.clone()),
@@ -285,6 +316,7 @@ impl ProfileOpener {
             workspace,
             changes,
             agents,
+            agent_defs,
             tasks,
             pipelines,
             pulls,
@@ -294,5 +326,21 @@ impl ProfileOpener {
             terminals,
             git: git_env,
         })
+    }
+}
+
+/// Claude Code's config file (its MCP servers): `.claude.json` in its
+/// folder when the profile has one of its own, else the user's
+/// `~/.claude.json` (or in `CLAUDE_CONFIG_DIR` when the user set it).
+fn claude_config_file(
+    home: &std::path::Path,
+    claude_dir: &std::path::Path,
+    shared: bool,
+) -> PathBuf {
+    let own = std::env::var_os("CLAUDE_CONFIG_DIR").is_some_and(|v| !v.is_empty());
+    if shared && !own {
+        home.join(".claude.json")
+    } else {
+        claude_dir.join(".claude.json")
     }
 }

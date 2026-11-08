@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 
 use kumo_domain::daemon::{ApiVersion, AuthToken};
 use kumo_proto::v1 as pb;
+use kumo_proto::v1::agent_defs_client::AgentDefsClient;
 use kumo_proto::v1::agents_client::AgentsClient;
 use kumo_proto::v1::core_client::CoreClient;
 use kumo_proto::v1::docs_client::DocsClient;
@@ -52,6 +53,7 @@ pub struct KumoClient {
     pub pipelines: PipelinesClient<AuthChannel>,
     pub pulls: PullRequestsClient<AuthChannel>,
     pub releases: ReleasesClient<AuthChannel>,
+    pub agent_defs: AgentDefsClient<AuthChannel>,
     pub docs: DocsClient<AuthChannel>,
     pub tests: TestsClient<AuthChannel>,
     channel: Channel,
@@ -92,6 +94,7 @@ impl KumoClient {
             pipelines: PipelinesClient::with_interceptor(channel.clone(), auth.clone()),
             pulls: PullRequestsClient::with_interceptor(channel.clone(), auth.clone()),
             releases: ReleasesClient::with_interceptor(channel.clone(), auth.clone()),
+            agent_defs: AgentDefsClient::with_interceptor(channel.clone(), auth.clone()),
             docs: DocsClient::with_interceptor(channel.clone(), auth.clone()),
             tests: TestsClient::with_interceptor(channel.clone(), auth),
             channel,

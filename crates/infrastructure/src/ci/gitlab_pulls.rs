@@ -299,6 +299,7 @@ pub(super) fn parse_mr(mr: &Value, approvals: Option<&Value>, me: &str) -> PullR
             .unwrap_or(u32::MAX),
         // The list doesn't count unresolved discussions.
         open_threads: None,
+        body: mr["description"].as_str().unwrap_or_default().to_owned(),
     }
 }
 

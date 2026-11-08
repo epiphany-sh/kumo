@@ -44,6 +44,8 @@ pub struct PullRequest {
     pub comment_count: u32,
     /// Unresolved review threads; None when the host's list doesn't say.
     pub open_threads: Option<u32>,
+    /// Its description, Markdown.
+    pub body: String,
 }
 
 /// A review thread (GitLab: a resolvable discussion; Bitbucket: a

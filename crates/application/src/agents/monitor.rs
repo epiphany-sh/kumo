@@ -17,6 +17,17 @@ use crate::terminal::Attachment;
 /// The last line on the card refreshes at most this often.
 const LINE_EVERY: Duration = Duration::from_secs(1);
 const TICK: Duration = Duration::from_millis(250);
+/// The exit code of a session stopped by its time limit (as `timeout`).
+const TIME_LIMIT: i32 = 124;
+
+/// How it exited: 124 when its time limit stopped it.
+fn exit_of(service: &AgentService, id: &AgentSessionId, status: ExitStatus) -> ExitStatus {
+    if service.took_time_limit(id) {
+        ExitStatus::new(TIME_LIMIT)
+    } else {
+        status
+    }
+}
 
 /// Runs until the agent exits. `typed` is a prompt to type in the first
 /// time the agent waits for input.
@@ -48,8 +59,8 @@ pub(super) async fn run(
                     done = actions.push(&batch.data);
                     tracker.on_output(&batch.data, Instant::now())
                 }
-                Some(TerminalEvent::Exited(status)) => tracker.exited(status),
-                None => tracker.exited(ExitStatus::UNKNOWN),
+                Some(TerminalEvent::Exited(status)) => tracker.exited(exit_of(&service, &id, status)),
+                None => tracker.exited(exit_of(&service, &id, ExitStatus::UNKNOWN)),
             },
             _ = ticker.tick() => tracker.tick(Instant::now()),
         };
@@ -72,6 +83,7 @@ pub(super) async fn run(
                         let how = match status.code() {
                             0 => "Finished".to_owned(),
                             -1 => "Stopped".to_owned(),
+                            TIME_LIMIT => "Stopped: its time limit".to_owned(),
                             code => format!("Exited with code {code}"),
                         };
                         session.record(AgentEventKind::Exited, how, now);

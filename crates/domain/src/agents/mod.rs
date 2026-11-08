@@ -21,7 +21,8 @@ pub use ports::{AgentStore, CliHomes, ProgramLocator, SharedCliHomes, StoredProv
 pub use presets::{AgentPreset, PRESETS};
 pub use provider::{AgentProvider, PromptStyle};
 pub use session::{
-    AgentContext, AgentEvent, AgentEventKind, AgentSession, AgentSessionId, AgentState, ContextKind,
+    AgentContext, AgentEvent, AgentEventKind, AgentSession, AgentSessionId, AgentState,
+    ContextKind, TerminalAgent,
 };
 pub use usage::{
     ContextReading, ContextSlice, ContextSliceKind, PlanReading, PlanUsage, PlanUsageStore,

@@ -66,6 +66,8 @@ pub fn test_config(dir: &std::path::Path) -> DaemonConfig {
         secrets: SecretsBackend::Memory,
         // Git's credential helper: the real kumod (not the test binary).
         credential_helper: Some(env!("CARGO_BIN_EXE_kumod").into()),
+        // Agents' time limits in tenths of a second.
+        agent_minute: Some(Duration::from_millis(300)),
         ..Default::default()
     }
 }
