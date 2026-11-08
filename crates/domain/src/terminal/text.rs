@@ -16,6 +16,13 @@ fn find_last(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).rposition(|w| w == needle)
 }
 
+/// Whether input to a terminal is someone answering: keys that type, Enter,
+/// Ctrl-something or Esc. Other escape sequences aren't: arrows only move a
+/// selection, and mouse, focus and the terminal's own replies aren't typing.
+pub fn is_answer(input: &[u8]) -> bool {
+    !input.is_empty() && (input[0] != 0x1b || input.len() == 1)
+}
+
 /// `text` as typed into a terminal: escapes dropped, and wrapped as a
 /// bracketed paste when `bracketed` (several lines then go in as one
 /// message instead of one per line).
@@ -106,6 +113,24 @@ impl LineSplitter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn typing_answers_and_escape_sequences_do_not() {
+        for typed in [&b"1"[..], b"\r", b"yes\r", b"\x03", b"\x1b"] {
+            assert!(is_answer(typed), "{typed:?}");
+        }
+        for other in [
+            &b""[..],
+            b"\x1b[A",
+            b"\x1b[I",
+            b"\x1b[O",
+            b"\x1b[<0;10;5M",
+            b"\x1b[?1;2c",
+            b"\x1b[200~text\x1b[201~",
+        ] {
+            assert!(!is_answer(other), "{other:?}");
+        }
+    }
 
     #[test]
     fn paste_mode_is_the_last_one_set() {

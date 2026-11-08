@@ -7,16 +7,20 @@ use crate::terminal::plain_text;
 ///
 /// Agent TUIs redraw while they work (spinners, streamed text) and go
 /// quiet when it's the user's turn. Many also ring the bell or send a
-/// desktop notification (OSC 9 / OSC 777) when they need attention. Pure:
-/// the caller passes the clock.
+/// desktop notification (OSC 9 / OSC 777) when they ask something: that
+/// lasts until it's answered, even if a prompt keeps blinking meanwhile.
+/// Pure: the caller passes the clock.
 #[derive(Debug)]
 pub struct ActivityTracker {
     quiet_after: Duration,
     state: AgentState,
     last_output: Instant,
     attention_at: Option<Instant>,
+    resized_at: Option<Instant>,
     /// It's waiting because it asked (bell, notification), not just quiet.
     asked: bool,
+    /// The output being read told it's only waiting for its next message.
+    told_idle: bool,
     osc: OscState,
 }
 
@@ -29,8 +33,16 @@ enum OscState {
     OscEscape(Vec<u8>),
 }
 
-/// Output right after a notification is the TUI redrawing, not new work.
-const ATTENTION_GRACE: Duration = Duration::from_millis(600);
+/// Output right after a notification or a resize is the TUI redrawing, not
+/// new work.
+const REDRAW_GRACE: Duration = Duration::from_millis(600);
+/// This much output at once is work; less, while it's asking, is its prompt
+/// blinking (Claude Code writes about 40 bytes every 0.6 s).
+const WORK_OUTPUT: usize = 512;
+/// How much of a notification is read to tell what it says.
+const OSC_HEAD: usize = 96;
+/// What Claude Code says when its turn ended: it isn't asking anything.
+const IDLE_NOTICE: &[u8] = b"waiting for your input";
 
 impl ActivityTracker {
     pub fn new(now: Instant, quiet_after: Duration) -> Self {
@@ -39,7 +51,9 @@ impl ActivityTracker {
             state: AgentState::Working,
             last_output: now,
             attention_at: None,
+            resized_at: None,
             asked: false,
+            told_idle: false,
             osc: OscState::Ground,
         }
     }
@@ -65,12 +79,35 @@ impl ActivityTracker {
             self.asked = true;
             return self.set(AgentState::NeedsInput);
         }
-        let in_grace = self
-            .attention_at
-            .is_some_and(|t| now.duration_since(t) < ATTENTION_GRACE);
-        if self.state == AgentState::NeedsInput && in_grace {
+        let small = bytes.len() < WORK_OUTPUT;
+        if std::mem::take(&mut self.told_idle) && small {
             return None;
         }
+        if self.asked && small {
+            return None;
+        }
+        let redrawing = [self.attention_at, self.resized_at]
+            .into_iter()
+            .flatten()
+            .any(|t| now.duration_since(t) < REDRAW_GRACE);
+        if self.state == AgentState::NeedsInput && redrawing {
+            return None;
+        }
+        self.set(AgentState::Working)
+    }
+
+    /// Its terminal changed size at `at`: it redraws, and that isn't work.
+    pub fn resized(&mut self, at: Instant) {
+        self.resized_at = Some(at);
+    }
+
+    /// Someone typed in its terminal at `at`: typed after it asked, that's
+    /// the answer. Returns the new state if it changed.
+    pub fn typed(&mut self, at: Instant) -> Option<AgentState> {
+        if !self.asked() || self.attention_at.is_none_or(|asked| at <= asked) {
+            return None;
+        }
+        self.last_output = at;
         self.set(AgentState::Working)
     }
 
@@ -122,12 +159,12 @@ impl ActivityTracker {
                 }
                 OscState::Osc(mut head) => match b {
                     0x07 => {
-                        attention |= is_notification(&head);
+                        attention |= self.notified(&head);
                         OscState::Ground
                     }
                     0x1b => OscState::OscEscape(head),
                     _ => {
-                        if head.len() < 16 {
+                        if head.len() < OSC_HEAD {
                             head.push(b);
                         }
                         OscState::Osc(head)
@@ -135,7 +172,7 @@ impl ActivityTracker {
                 },
                 OscState::OscEscape(head) => {
                     if b == b'\\' {
-                        attention |= is_notification(&head);
+                        attention |= self.notified(&head);
                         OscState::Ground
                     } else {
                         OscState::Osc(head)
@@ -145,10 +182,18 @@ impl ActivityTracker {
         }
         attention
     }
-}
 
-fn is_notification(head: &[u8]) -> bool {
-    head.starts_with(b"9;") || head.starts_with(b"777;notify")
+    /// Whether an OSC asks for attention. "Waiting for your input" is only
+    /// its turn ending, and `9;4;` is a progress bar.
+    fn notified(&mut self, head: &[u8]) -> bool {
+        let notification = head.starts_with(b"9;") || head.starts_with(b"777;notify");
+        if !notification || head.starts_with(b"9;4;") {
+            return false;
+        }
+        let idle = head.windows(IDLE_NOTICE.len()).any(|w| w == IDLE_NOTICE);
+        self.told_idle |= idle;
+        !idle
+    }
 }
 
 /// The last readable line of an agent's output, for its card.
@@ -234,8 +279,83 @@ mod tests {
         let mut asking = ActivityTracker::new(t0, Duration::from_secs(1));
         asking.on_output(b"Allow?\x07", t0);
         assert!(asking.asked());
-        asking.on_output(b"working", t0 + Duration::from_secs(1));
+        asking.typed(t0 + Duration::from_secs(1));
         assert!(!asking.asked());
+        assert_eq!(asking.state(), AgentState::Working);
+    }
+
+    #[test]
+    fn it_keeps_asking_while_its_prompt_blinks_until_it_is_answered() {
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        let mut tracker = ActivityTracker::new(t0, QUIET);
+        tracker.typed(t0);
+        tracker.on_output(b"\x1b]9;Claude needs your permission\x07", at(100));
+        assert!(tracker.asked());
+        for ms in (700..10_000).step_by(600) {
+            assert_eq!(tracker.on_output(&[b'x'; 40], at(ms)), None);
+            tracker.tick(at(ms));
+            assert!(tracker.asked(), "at {ms} ms");
+        }
+        // Typed before it asked: not the answer.
+        assert_eq!(tracker.typed(t0), None);
+        assert_eq!(tracker.typed(at(10_000)), Some(AgentState::Working));
+        assert!(!tracker.asked());
+    }
+
+    #[test]
+    fn real_output_ends_a_question_answered_elsewhere() {
+        let t0 = Instant::now();
+        let mut tracker = ActivityTracker::new(t0, QUIET);
+        tracker.on_output(b"Allow?\x07", t0);
+        assert_eq!(
+            tracker.on_output(&[b'x'; WORK_OUTPUT], t0 + Duration::from_secs(1)),
+            Some(AgentState::Working)
+        );
+        assert!(!tracker.asked());
+    }
+
+    #[test]
+    fn the_end_of_its_turn_is_not_a_question_and_leaves_it_waiting() {
+        let t0 = Instant::now();
+        let mut tracker = ActivityTracker::new(t0, QUIET);
+        tracker.tick(t0 + QUIET);
+        assert_eq!(
+            tracker.on_output(
+                b"\x1b]9;Claude is waiting for your input\x07",
+                t0 + Duration::from_secs(60),
+            ),
+            None
+        );
+        assert_eq!(tracker.state(), AgentState::NeedsInput);
+        assert!(!tracker.asked());
+    }
+
+    #[test]
+    fn a_progress_bar_is_not_a_question() {
+        let t0 = Instant::now();
+        let mut tracker = ActivityTracker::new(t0, QUIET);
+        tracker.on_output(b"\x1b]9;4;1;50\x07", t0);
+        assert_eq!(tracker.state(), AgentState::Working);
+    }
+
+    /// What made a note under the terminal flash: it appears when the agent
+    /// goes quiet, resizes the terminal, the agent redraws, and that was read
+    /// as work, which took the note away.
+    #[test]
+    fn redrawing_after_a_resize_is_not_work() {
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        let mut tracker = ActivityTracker::new(t0, QUIET);
+        assert_eq!(tracker.tick(at(2_000)), Some(AgentState::NeedsInput));
+        tracker.resized(at(2_100));
+        assert_eq!(tracker.on_output(b"redraw", at(2_110)), None);
+        assert_eq!(tracker.state(), AgentState::NeedsInput);
+        // Later output is work again.
+        assert_eq!(
+            tracker.on_output(b"thinking", at(2_800)),
+            Some(AgentState::Working)
+        );
     }
 
     #[test]
@@ -257,7 +377,7 @@ mod tests {
             None
         );
         assert_eq!(
-            tracker.on_output(b"new work", t0 + Duration::from_secs(1)),
+            tracker.typed(t0 + Duration::from_secs(1)),
             Some(AgentState::Working)
         );
         assert_eq!(

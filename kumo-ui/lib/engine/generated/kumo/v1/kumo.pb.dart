@@ -7273,6 +7273,7 @@ class AgentSession extends $pb.GeneratedMessage {
     $core.Iterable<AgentEvent>? events,
     $core.String? agentName,
     $core.String? contextDir,
+    $core.bool? asked,
   }) {
     final result = AgentSession._();
     if (id != null) result.id = id;
@@ -7292,6 +7293,7 @@ class AgentSession extends $pb.GeneratedMessage {
     if (events != null) result.events.addAll(events);
     if (agentName != null) result.agentName = agentName;
     if (contextDir != null) result.contextDir = contextDir;
+    if (asked != null) result.asked = asked;
     return result;
   }
 
@@ -7332,6 +7334,7 @@ class AgentSession extends $pb.GeneratedMessage {
         subBuilder: AgentEvent.$_createMessage)
     ..aOS(16, _omitFieldNames ? '' : 'agentName')
     ..aOS(17, _omitFieldNames ? '' : 'contextDir')
+    ..aOB(18, _omitFieldNames ? '' : 'asked')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7502,6 +7505,17 @@ class AgentSession extends $pb.GeneratedMessage {
   $core.bool hasContextDir() => $_has(16);
   @$pb.TagNumber(17)
   void clearContextDir() => $_clearField(17);
+
+  /// NEEDS_INPUT because it asked something (an approval), so what's typed
+  /// now answers it; false when it's only quiet.
+  @$pb.TagNumber(18)
+  $core.bool get asked => $_getBF(17);
+  @$pb.TagNumber(18)
+  set asked($core.bool value) => $_setBool(17, value);
+  @$pb.TagNumber(18)
+  $core.bool hasAsked() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearAsked() => $_clearField(18);
 }
 
 class StopAgentRequest extends $pb.GeneratedMessage {

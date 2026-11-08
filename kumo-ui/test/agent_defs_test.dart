@@ -332,19 +332,32 @@ void main() {
     expect(state.queuedFor('w'), 0);
     state.dispose();
   });
+
+  test('a message to an agent that is only quiet goes in now', () async {
+    final agents = _Waiting(asked: false);
+    final state = AppState(agents: agents);
+    const item = AgentContextItem(kind: AgentContextKind.code, title: 'x');
+    expect(await state.sendToAgent('w', item, 'hello'), isTrue);
+    expect(agents.sent, ['hello']);
+    expect(state.queuedFor('w'), 0);
+    state.dispose();
+  });
 }
 
 class _Waiting extends MockAgentsSource {
+  _Waiting({this.asked = true});
+  bool asked;
   var _status = AgentStatus.needsYou;
   final sent = <String>[];
 
   @override
   List<AgentRun> get runs => [
-        AgentRun(id: 'w', providerId: 'codex', providerName: 'Codex', short: 'CX', worktreePath: '/wt', terminalId: 't', title: 'x', status: _status, startedAt: DateTime(2026)),
+        AgentRun(id: 'w', providerId: 'codex', providerName: 'Codex', short: 'CX', worktreePath: '/wt', terminalId: 't', title: 'x', status: _status, asked: asked, startedAt: DateTime(2026)),
       ];
 
   void answer() {
     _status = AgentStatus.running;
+    asked = false;
     notifyListeners();
   }
 

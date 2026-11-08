@@ -185,7 +185,8 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
             id: 'run:${r.id}',
             name: r.agent.isEmpty ? r.providerName : r.agent,
             note: r.title.isEmpty ? 'running here' : r.title,
-            state: r.status,
+            state: r.asked ? AgentStatus.needsYou : AgentStatus.running,
+            busy: r.status == AgentStatus.running,
             run: r,
           ),
       for (final t in s.agents.terminalAgents)
@@ -293,7 +294,7 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
       _AskTarget(terminal: final t?, state: AgentStatus.needsYou) => 'It’s asking you something in ${t.terminalTitle}: answer it there first, or anything typed now would be the answer.',
       _AskTarget(terminal: final t?) => 'Kumo pastes it into ${t.terminalTitle}’s prompt, as if you typed it there.',
       _AskTarget(state: AgentStatus.needsYou, :final name) => '$name is waiting on an approval. Kumo holds your message and sends it once you answer, so it isn’t taken as the answer.',
-      _AskTarget(state: AgentStatus.running) => 'Mid-task: your message goes in as its next one.',
+      _AskTarget(busy: true) => 'Mid-task: your message goes in as its next one.',
       _ => null,
     };
     final message = _sentMessage ?? _message(s, lines);
@@ -374,8 +375,8 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
                   name: t.name,
                   note: t.note,
                   mine: t.terminal != null,
-                  state: t.state == AgentStatus.needsYou ? 'needs you' : (t.busy || t.state == AgentStatus.running && t.terminal == null ? 'working' : 'idle'),
-                  stateColor: t.state == AgentStatus.needsYou ? c.warn : (t.busy || t.terminal == null ? c.acc : c.ok),
+                  state: t.state == AgentStatus.needsYou ? 'needs you' : (t.busy ? 'working' : 'idle'),
+                  stateColor: t.state == AgentStatus.needsYou ? c.warn : (t.busy ? c.acc : c.ok),
                   selected: _target == t.id,
                   onTap: () => setState(() {
                     _target = t.id;

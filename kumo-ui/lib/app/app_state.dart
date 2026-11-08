@@ -1282,7 +1282,7 @@ class AppState extends ChangeNotifier {
   /// when it was sent or queued.
   Future<bool> sendToAgent(String id, AgentContextItem item, String text) async {
     final run = agents.runs.where((r) => r.id == id).firstOrNull;
-    if (run != null && run.status == AgentStatus.needsYou) {
+    if (run != null && run.asked) {
       _queued.add((id, item, text));
       notifyListeners();
       return true;
@@ -1305,7 +1305,7 @@ class AppState extends ChangeNotifier {
       for (final q in [..._queued]) {
         if (_disposed) return;
         final run = agents.runs.where((r) => r.id == q.$1).firstOrNull;
-        if (run != null && run.status == AgentStatus.needsYou) continue;
+        if (run != null && run.asked) continue;
         _queued.remove(q);
         if (run == null || run.status == AgentStatus.done) {
           notify('A message you held for an agent wasn’t sent: it ${run == null ? 'is gone' : 'ended'} first');

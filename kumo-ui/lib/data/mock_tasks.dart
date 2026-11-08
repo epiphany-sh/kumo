@@ -116,6 +116,7 @@ final class MockTasks {
           worktreePath: path,
           terminalId: '',
           title: branch,
+          asked: status == AgentStatus.needsYou,
           status: status,
           startedAt: started,
           lastLine: line,

@@ -275,7 +275,10 @@ class _AgentsScreenState extends State<AgentsScreen> {
                       }),
                       onDetach: (terminalId) => _terminals?.drop(terminalId),
                       onStop: (id) => setState(() {
-                        _agents = [for (final a in _agents) if (a.id == id) a.copyWith(status: AgentStatus.done, last: 'Stopped by you', clearApproval: true) else a];
+                        _agents = [
+                          for (final a in _agents)
+                            if (a.id == id) a.copyWith(status: AgentStatus.done, last: 'Stopped by you', clearApproval: true) else a
+                        ];
                         _terminals?.ofMock(id).sendText('Stopped by you');
                       }),
                     ),
@@ -603,8 +606,8 @@ class _SessionView extends StatelessWidget {
     final a = session;
     final (fg, bg, label) = style(a);
     final done = a.status == AgentStatus.done;
-    final asking = a.status == AgentStatus.needsYou;
     final r = run;
+    final asking = r != null ? r.asked : a.status == AgentStatus.needsYou;
     return CallbackShortcuts(
       bindings: {const SingleActivator(LogicalKeyboardKey.escape): onBack},
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -690,30 +693,38 @@ class _SessionView extends StatelessWidget {
                     )
                   : KButton(label: 'Stop', height: 26, fontSize: 11.5, onTap: () => r == null ? onStop(a.id) : s.agents.stop(r.id)),
             ]),
-            footer: asking
-                ? Container(
-                    margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-                    padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-                    decoration: BoxDecoration(color: c.warnSoft, borderRadius: BorderRadius.circular(10)),
-                    child: Row(children: [
-                      Icon(KIcons.shield, size: 14, color: c.warn),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          a.approvalCommand == null ? 'It’s asking you something: answer it in its terminal.' : '${a.agent} wants to run ${a.approvalCommand}',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(12, weight: FontWeight.w600, color: c.warn),
-                        ),
-                      ),
-                      if (a.approvalCommand != null) ...[
-                        KButton.primary(label: 'Approve once', height: 28, fontSize: 12, onTap: () => onDecide(a.id, true)),
-                        const SizedBox(width: 6),
-                        KButton(label: 'Deny', height: 28, fontSize: 12, onTap: () => onDecide(a.id, false)),
-                      ],
-                    ]),
-                  )
-                : null,
+            footer: done
+                ? null
+                : SizedBox(
+                    height: kAgentNoteSpace,
+                    child: asking
+                        ? Align(
+                            alignment: Alignment.bottomCenter,
+                            child: Container(
+                              margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                              decoration: BoxDecoration(color: c.warnSoft, borderRadius: BorderRadius.circular(10)),
+                              child: Row(children: [
+                                Icon(KIcons.shield, size: 14, color: c.warn),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    a.approvalCommand == null ? 'It’s asking you something: answer it in its terminal.' : '${a.agent} wants to run ${a.approvalCommand}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: sans(12, weight: FontWeight.w600, color: c.warn),
+                                  ),
+                                ),
+                                if (a.approvalCommand != null) ...[
+                                  KButton.primary(label: 'Approve once', height: 28, fontSize: 12, onTap: () => onDecide(a.id, true)),
+                                  const SizedBox(width: 6),
+                                  KButton(label: 'Deny', height: 28, fontSize: 12, onTap: () => onDecide(a.id, false)),
+                                ],
+                              ]),
+                            ),
+                          )
+                        : null,
+                  ),
           ),
         ),
       ]),

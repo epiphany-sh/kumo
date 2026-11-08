@@ -58,6 +58,7 @@ pub fn agent_session_to(session: AgentSession) -> pb::AgentSession {
         context: session.context.into_iter().map(agent_context_to).collect(),
         events: session.events.into_iter().map(agent_event_to).collect(),
         agent_name: session.agent_name.unwrap_or_default(),
+        asked: session.asked,
         context_dir: session
             .context_dir
             .map(|d| d.display().to_string())

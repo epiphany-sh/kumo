@@ -545,12 +545,20 @@ class _RunTerminal extends StatelessWidget {
                     },
                   ),
           ]),
-          footer: r.status == AgentStatus.needsYou
-              ? Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-                  child: _Note(icon: KIcons.shield, text: 'It’s asking you something: answer it in its terminal.', color: c.warn, background: c.warnSoft),
-                )
-              : null,
+          footer: done
+              ? null
+              : SizedBox(
+                  height: kAgentNoteSpace,
+                  child: r.asked
+                      ? Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                            child: _Note(icon: KIcons.shield, text: 'It’s asking you something: answer it in its terminal.', color: c.warn, background: c.warnSoft),
+                          ),
+                        )
+                      : null,
+                ),
         ),
       ),
     ]);

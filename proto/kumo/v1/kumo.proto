@@ -884,6 +884,9 @@ message AgentSession {
   // What it was given for the run, written as files (`--add-dir`); empty
   // when it was given nothing.
   string context_dir = 17;
+  // NEEDS_INPUT because it asked something (an approval), so what's typed
+  // now answers it; false when it's only quiet.
+  bool asked = 18;
 }
 
 message StopAgentRequest {

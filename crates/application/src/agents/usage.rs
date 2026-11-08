@@ -265,6 +265,7 @@ mod tests {
             prompt: String::new(),
             state,
             started_at: at(0),
+            asked: false,
             state_since: at(0),
             last_line: String::new(),
             context: Vec::new(),

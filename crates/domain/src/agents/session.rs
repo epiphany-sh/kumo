@@ -45,6 +45,9 @@ pub struct AgentSession {
     pub title: String,
     pub prompt: String,
     pub state: AgentState,
+    /// Waiting because it asked something (an approval), so what's typed
+    /// now answers it; false when it's only quiet.
+    pub asked: bool,
     pub started_at: Timestamp,
     pub state_since: Timestamp,
     pub last_line: String,

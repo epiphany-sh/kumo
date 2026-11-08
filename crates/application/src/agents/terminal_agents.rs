@@ -130,6 +130,7 @@ async fn follow(
             event = events.next() => match event {
                 Some(TerminalEvent::Output(batch)) => {
                     if let Some(tracker) = tracker.as_mut() {
+                        super::monitor::read_input(tracker, &session);
                         tracker.on_output(&batch.data, Instant::now());
                     }
                     true
@@ -138,6 +139,7 @@ async fn follow(
             },
             _ = ticker.tick() => {
                 if let Some(tracker) = tracker.as_mut() {
+                    super::monitor::read_input(tracker, &session);
                     tracker.tick(Instant::now());
                 }
                 false

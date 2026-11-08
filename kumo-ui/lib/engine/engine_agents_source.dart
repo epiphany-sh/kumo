@@ -220,6 +220,7 @@ AgentRun agentRunFrom(pb.AgentSession s) => AgentRun(
         context: [for (final item in s.context) agentContextFrom(item)],
         steps: [for (final e in s.events) agentStepFrom(e)],
         agent: s.agentName,
+        asked: s.asked,
       );
 
 AgentStep agentStepFrom(pb.AgentEvent e) => AgentStep(

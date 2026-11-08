@@ -144,9 +144,14 @@ class AgentRun {
     this.context = const [],
     this.steps = const [],
     this.agent = '',
+    this.asked = false,
   });
 
   final String id;
+
+  /// needsYou because it asked something (an approval), so text typed now
+  /// would answer it; false when it's only quiet, waiting for its next message.
+  final bool asked;
 
   /// The agent of yours it runs (`claude --agent <name>`); empty: the plain CLI.
   final String agent;

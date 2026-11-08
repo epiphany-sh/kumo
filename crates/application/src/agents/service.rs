@@ -382,6 +382,7 @@ impl AgentService {
             title: AgentSession::title_for(title, prompt, &provider.name),
             prompt: prompt.to_owned(),
             state: AgentState::Working,
+            asked: false,
             started_at: now,
             state_since: now,
             last_line: String::new(),

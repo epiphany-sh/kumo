@@ -28,4 +28,4 @@ pub use ports::{PtyChild, PtyKiller, PtyMaster, PtyProcess, PtySystem};
 pub use replay_buffer::ReplayBuffer;
 pub use size::TerminalSize;
 pub use status::TerminalStatus;
-pub use text::{LineSplitter, bracketed_paste, plain_text, typed_text};
+pub use text::{LineSplitter, bracketed_paste, is_answer, plain_text, typed_text};

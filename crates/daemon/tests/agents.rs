@@ -877,6 +877,74 @@ async fn terminal_agents_where(
     .expect("the terminal's agent never showed as expected")
 }
 
+/// What Claude Code does at an approval: it asks once and its prompt keeps
+/// blinking. It's asking until it's answered, not only until the next output.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_agent_keeps_asking_while_its_prompt_blinks_until_answered() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    fake_cli(
+        &daemon.bin(),
+        "claude",
+        "printf 'Allow?\\033]9;Claude needs your permission\\007'; \
+         (while :; do sleep 0.2; printf .; done) & read a; kill $!; echo answered; read b",
+    );
+    connect(&mut client, "claude", true).await;
+    let session = client
+        .agents
+        .start(start(&wt, "", ""))
+        .await
+        .unwrap()
+        .into_inner();
+    let asking = session_where(&mut client, &session.id, |s| s.asked).await;
+    assert_eq!(asking.state(), pb::AgentState::NeedsInput);
+
+    // Well past the grace for a redraw, with the prompt blinking.
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+    let still = session_where(&mut client, &session.id, |_| true).await;
+    assert!(still.asked, "{still:?}");
+
+    let terminal = Attached::new(&mut client, &session.terminal_id, false).await;
+    terminal.send(b"1\r").await;
+    let answered = session_where(&mut client, &session.id, |s| !s.asked).await;
+    assert_ne!(answered.state(), pb::AgentState::Exited);
+}
+
+/// An agent that's only quiet isn't asking, and redrawing because its
+/// terminal changed size doesn't make it look at work.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_quiet_agent_is_not_asking_and_a_resize_does_not_wake_it() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    fake_cli(
+        &daemon.bin(),
+        "claude",
+        "trap 'printf redraw' WINCH; echo ready; while :; do read a && exit 0; done",
+    );
+    connect(&mut client, "claude", true).await;
+    let session = client
+        .agents
+        .start(start(&wt, "", ""))
+        .await
+        .unwrap()
+        .into_inner();
+    let quiet = session_where(&mut client, &session.id, |s| {
+        s.state() == pb::AgentState::NeedsInput
+    })
+    .await;
+    assert!(!quiet.asked, "{quiet:?}");
+
+    let mut terminal = Attached::new(&mut client, &session.terminal_id, false).await;
+    terminal.resize(90, 20).await;
+    terminal.read_until("redraw").await;
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let after = session_where(&mut client, &session.id, |_| true).await;
+    assert_eq!(after.state(), pb::AgentState::NeedsInput, "{after:?}");
+    assert_eq!(after.state_since_unix_ms, quiet.state_since_unix_ms);
+}
+
 /// `claude` typed by hand in a shell shows as that terminal's agent, asks
 /// (a bell) and goes when it exits.
 #[tokio::test(flavor = "multi_thread")]
