@@ -72,8 +72,12 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
   final _note = TextEditingController();
   final _noteFocus = FocusNode();
 
-  /// The running agent picked, or null for a new one.
+  /// The agent picked (`run:<id>`, or `term:<terminal>` for one started by
+  /// hand in a terminal), or null for a new one.
   String? _target;
+
+  /// For an agent typed into a terminal: press Enter after the paste.
+  bool _enter = true;
   bool _pickedTarget = false;
   bool _preview = false;
   bool _sending = false;
@@ -169,7 +173,29 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
     );
   }
 
-  Future<void> _send(AppState s, List<AgentRun> running) async {
+  /// Who can take it: the worktree's agents, then the ones started by hand in
+  /// its terminals.
+  List<_AskTarget> _targets(AppState s) {
+    final entry = s.activeWorktreeEntry;
+    final here = entry == null ? '' : s.workspace.absolutePathOf(entry);
+    return [
+      for (final r in s.worktreeAgents)
+        if (r.status != AgentStatus.done)
+          _AskTarget(
+            id: 'run:${r.id}',
+            name: r.agent.isEmpty ? r.providerName : r.agent,
+            note: r.title.isEmpty ? 'running here' : r.title,
+            state: r.asked ? AgentStatus.needsYou : AgentStatus.running,
+            busy: r.status == AgentStatus.running,
+            run: r,
+          ),
+      for (final t in s.agents.terminalAgents)
+        if (here.isNotEmpty && t.cwd == here)
+          _AskTarget(id: 'term:${t.terminalId}', name: t.name, note: 'in ${t.terminalTitle} · started by you', state: t.state, busy: t.busy, terminal: t),
+    ];
+  }
+
+  Future<void> _send(AppState s, List<_AskTarget> targets) async {
     final lines = _lines;
     if (lines == null || _note.text.trim().isEmpty || _sending) return;
     final message = _message(s, lines);
@@ -179,8 +205,8 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
       title: '$name · ${lines.$1 == lines.$2 ? 'line ${lines.$1}' : 'lines ${lines.$1}–${lines.$2}'}',
       detail: [s.activeRepo?.name ?? '', s.changes.branch].where((p) => p.isNotEmpty).join(' · '),
     );
-    final agent = running.where((r) => r.id == _target).firstOrNull;
-    if (agent == null) {
+    final target = targets.where((t) => t.id == _target).firstOrNull;
+    if (target == null) {
       // A new agent: the dialog starts with this message as its prompt. The
       // popup stays (with your note) unless an agent did start.
       final before = s.worktreeAgents.length;
@@ -188,19 +214,25 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
       if (mounted && s.worktreeAgents.length > before) _close();
       return;
     }
+    if (target.terminal != null && target.state == AgentStatus.needsYou) return;
     setState(() {
       _sending = true;
       _error = null;
     });
-    final ok = await s.agents.addContext(agent.id, item, text: message);
+    final waiting = target.run != null && target.state == AgentStatus.needsYou;
+    final ok = target.terminal != null
+        ? await s.agents.sendToTerminal(target.terminal!.terminalId, message, submit: _enter)
+        : await s.sendToAgent(target.run!.id, item, message);
     if (!mounted) return;
     setState(() {
       _sending = false;
       if (ok) {
-        _sentTo = agent.providerName;
+        _sentTo = waiting
+            ? 'Queued for ${target.name}: it goes in once you answer its approval'
+            : (target.terminal != null && !_enter ? 'Typed into ${target.name}’s prompt in ${target.terminal!.terminalTitle}: press Enter there' : 'Sent to ${target.name}');
         _sentMessage = message;
       } else {
-        _error = s.agents.error ?? 'The message didn’t reach ${agent.providerName}.';
+        _error = s.agents.error ?? 'The message didn’t reach ${target.name}.';
       }
     });
   }
@@ -232,7 +264,7 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
           final width = math.min(_width, box.maxWidth - 16);
           final left = (box.maxWidth - width - 16).clamp(8.0, 120.0);
           final maxH = math.max(160.0, box.maxHeight - 12);
-          const wanted = 420.0;
+          const wanted = 560.0;
           final double top = below + wanted < box.maxHeight
               ? below
               : (above - wanted > 6 ? above - wanted : 6.0);
@@ -251,17 +283,27 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
 
   Widget _popup(BuildContext context, AppState s, (int, int) lines, double width) {
     final c = context.c;
-    final running = [for (final r in s.worktreeAgents) if (r.status != AgentStatus.done) r];
-    if (!_pickedTarget) _target = running.firstOrNull?.id;
+    final targets = _targets(s);
+    if (!_pickedTarget) _target = targets.firstOrNull?.id;
     final range = lines.$1 == lines.$2 ? 'line ${lines.$1}' : 'lines ${lines.$1}–${lines.$2}';
-    final canSend = _note.text.trim().isNotEmpty && !_sending;
-    final agentName = running.where((r) => r.id == _target).firstOrNull?.providerName;
+    final target = targets.where((t) => t.id == _target).firstOrNull;
+    final blocked = target?.terminal != null && target!.state == AgentStatus.needsYou;
+    final canSend = _note.text.trim().isNotEmpty && !_sending && !blocked;
+    final hint = switch (target) {
+      null => null,
+      _AskTarget(terminal: final t?, state: AgentStatus.needsYou) => 'It’s asking you something in ${t.terminalTitle}: answer it there first, or anything typed now would be the answer.',
+      _AskTarget(terminal: final t?) => 'Kumo pastes it into ${t.terminalTitle}’s prompt, as if you typed it there. It can’t tell if it’s asking something: look there first, or this could be taken as the answer.',
+      _AskTarget(state: AgentStatus.needsYou, :final name) => '$name is waiting on an approval. Kumo holds your message and sends it once you answer, so it isn’t taken as the answer.',
+      _AskTarget(run: AgentRun(tellsAsking: false), :final name) => '$name doesn’t tell Kumo when it’s asking something: look at its terminal first, or this could be taken as the answer.',
+      _AskTarget(busy: true) => 'Mid-task: your message goes in as its next one.',
+      _ => null,
+    };
     final message = _sentMessage ?? _message(s, lines);
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.escape): _close,
-        const SingleActivator(LogicalKeyboardKey.enter, meta: true): () => _send(s, running),
-        const SingleActivator(LogicalKeyboardKey.enter, control: true): () => _send(s, running),
+        const SingleActivator(LogicalKeyboardKey.enter, meta: true): () => _send(s, targets),
+        const SingleActivator(LogicalKeyboardKey.enter, control: true): () => _send(s, targets),
       },
       child: Semantics(
         scopesRoute: true,
@@ -329,19 +371,33 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
               const SizedBox(height: 10),
               Text('Send to', style: sans(11, color: c.text3)),
               const SizedBox(height: 4),
-              Row(children: [
-                for (final r in running.take(2)) ...[
-                  Expanded(child: _Target(name: r.providerName, note: r.title.isEmpty ? 'running here' : r.title, selected: _target == r.id, onTap: () => setState(() {
-                    _target = r.id;
+              for (final t in targets.take(4)) ...[
+                _Target(
+                  name: t.name,
+                  note: t.note,
+                  mine: t.terminal != null,
+                  state: t.state == AgentStatus.needsYou ? 'needs you' : (t.busy ? 'working' : 'idle'),
+                  stateColor: t.state == AgentStatus.needsYou ? c.warn : (t.busy ? c.acc : c.ok),
+                  selected: _target == t.id,
+                  onTap: () => setState(() {
+                    _target = t.id;
                     _pickedTarget = true;
-                  }))),
-                  const SizedBox(width: 4),
-                ],
-                Expanded(child: _Target(name: 'New agent', note: 'starts in this worktree', selected: _target == null, onTap: () => setState(() {
-                  _target = null;
-                  _pickedTarget = true;
-                }))),
-              ]),
+                  }),
+                ),
+                const SizedBox(height: 3),
+              ],
+              _Target(name: 'New agent', note: 'starts in this worktree, with this as its first message', selected: _target == null, onTap: () => setState(() {
+                _target = null;
+                _pickedTarget = true;
+              })),
+              if (hint != null) ...[
+                const SizedBox(height: 5),
+                Text(hint, style: sans(11, color: blocked || target?.state == AgentStatus.needsYou ? c.warn : c.text3, height: 1.4)),
+              ],
+              if (target?.terminal != null) ...[
+                const SizedBox(height: 6),
+                KCheck(value: _enter, label: 'Press Enter for me (off: it waits in its prompt for you to send)', onChanged: (v) => setState(() => _enter = v)),
+              ],
               const SizedBox(height: 8),
             ] else
               Container(
@@ -350,7 +406,7 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
                 child: Row(children: [
                   Icon(KIcons.check, size: 14, color: c.ok),
                   const SizedBox(width: 8),
-                  Expanded(child: Text('Sent to $_sentTo', style: sans(12, color: c.text))),
+                  Expanded(child: Text(_sentTo!, style: sans(12, color: c.text))),
                   KButton(
                     label: 'Open terminal',
                     kind: KButtonKind.ghost,
@@ -395,10 +451,16 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
                 // A long agent name ellipsizes in a narrow editor.
                 Flexible(
                   child: KButton.primary(
-                    label: _sending ? 'Sending…' : (agentName == null ? 'Start agent ⌘↩' : 'Send to $agentName ⌘↩'),
+                    label: _sending
+                        ? 'Sending…'
+                        : (target == null
+                            ? 'Start agent ⌘↩'
+                            : (target.run != null && target.state == AgentStatus.needsYou
+                                ? 'Queue for ${target.name} ⌘↩'
+                                : (target.terminal != null && !_enter ? 'Type it in ${target.terminal!.terminalTitle} ⌘↩' : 'Send to ${target.name} ⌘↩'))),
                     height: 30,
                     fontSize: 12.5,
-                    onTap: canSend ? () => _send(s, running) : null,
+                    onTap: canSend ? () => _send(s, targets) : null,
                   ),
                 ),
               ] else
@@ -438,12 +500,33 @@ class _Pill extends StatelessWidget {
   }
 }
 
+/// Someone the popup can send to.
+class _AskTarget {
+  const _AskTarget({required this.id, required this.name, required this.note, required this.state, this.busy = false, this.run, this.terminal});
+  final String id;
+  final String name;
+  final String note;
+  final AgentStatus state;
+  final bool busy;
+
+  /// A session Kumo runs…
+  final AgentRun? run;
+
+  /// …or a CLI typed by hand in one of its terminals.
+  final TerminalAgent? terminal;
+}
+
 class _Target extends StatelessWidget {
-  const _Target({required this.name, required this.note, required this.selected, required this.onTap});
+  const _Target({required this.name, required this.note, required this.selected, required this.onTap, this.mine = false, this.state = '', this.stateColor});
   final String name;
   final String note;
   final bool selected;
   final VoidCallback onTap;
+
+  /// Started by hand in a terminal.
+  final bool mine;
+  final String state;
+  final Color? stateColor;
 
   @override
   Widget build(BuildContext context) {
@@ -460,9 +543,22 @@ class _Target extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: selected ? c.acc : c.chipBorder),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, weight: FontWeight.w600, color: c.text)),
-          Text(note, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(10.5, color: c.text3)),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, weight: FontWeight.w600, color: c.text))),
+                if (mine) ...[const SizedBox(width: 6), const TagChip('by you')],
+              ]),
+              Text(note, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(10.5, color: c.text3)),
+            ]),
+          ),
+          if (state.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            Dot(stateColor ?? c.text3, size: 6),
+            const SizedBox(width: 4),
+            Text(state, style: sans(10.5, weight: FontWeight.w600, color: stateColor ?? c.text3)),
+          ],
         ]),
       ),
     );

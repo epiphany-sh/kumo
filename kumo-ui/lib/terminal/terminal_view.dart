@@ -1123,6 +1123,11 @@ class _TerminalPainter extends CustomPainter {
       old.barColor != barColor;
 }
 
+/// The room kept under an agent's terminal for "it's asking you something".
+/// Kept empty when it isn't: a note that took room as it came would resize
+/// the terminal, and the agent would redraw just as it's being read.
+const double kAgentNoteSpace = 64;
+
 /// A titled terminal pane: header row + canvas + optional footer.
 /// [focused] draws the accent ring of the active split pane; [onFocus]
 /// fires on any pointer down inside it (without stealing the gesture).

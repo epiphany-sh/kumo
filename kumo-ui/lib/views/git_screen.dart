@@ -2,13 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
+import '../data/changes.dart';
+import '../data/git_agent_prompts.dart';
 import '../data/models.dart';
 import '../data/pipelines_source.dart';
 import '../data/repo_activity.dart';
+import '../data/repo_history.dart';
+import '../editor/diff_colors.dart';
+import '../editor/markdown_preview.dart';
 import '../engine/engine_repo_activity.dart';
 import '../data/pr_agent_prompts.dart';
 import '../engine/engine_scope.dart';
 import '../overlays/pr_description_dialog.dart';
+import '../overlays/release_notes_dialog.dart';
+import '../overlays/resolve_comments_dialog.dart';
 import '../overlays/settings_dialog.dart';
 import '../platform/open_url.dart';
 import '../shell/screen_chrome.dart';
@@ -19,6 +26,10 @@ import '../widgets/context_menu.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
+import '../widgets/toolbar_segments.dart';
+
+part 'git_commits.dart';
+part 'git_releases.dart';
 
 /// Git view: what happened in ONE repository, teammates' work included —
 /// main's recent commits, open pull requests, pipelines across branches,
@@ -39,7 +50,15 @@ enum _PrFilter { all, mine, review }
 class _GitScreenState extends State<GitScreen> {
   /// Repository picked in the breadcrumb; null follows the current worktree.
   String? _repoId;
-  bool _allBranches = false;
+
+  /// Commits of: '' main, [_allBranchesKey] every branch, else one branch.
+  String _branch = '';
+
+  /// Commits by (null: anyone).
+  String? _author;
+
+  /// Releases & tags instead of the overview.
+  bool _releases = false;
   _PrFilter _prFilter = _PrFilter.all;
   bool _menuOpen = false;
 
@@ -98,7 +117,8 @@ class _GitScreenState extends State<GitScreen> {
 
   void _pickRepo(AppState s, Repo repo) => setState(() {
         _repoId = repo.id == s.activeRepo?.id ? null : repo.id;
-        _allBranches = false;
+        _branch = '';
+        _author = null;
         _prFilter = _PrFilter.all;
       });
 
@@ -155,7 +175,10 @@ class _GitScreenState extends State<GitScreen> {
       const SizedBox(width: 8),
       Text('Git', style: sans(13, weight: FontWeight.w600, color: c.text)),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Text('/', style: sans(13, color: c.text3))),
+      // The repository before the note: when there's little room, the note
+      // gives way first.
       Flexible(
+        flex: 4,
         child: Builder(
           builder: (anchor) => KPressable(
             onTap: () => _openRepoMenu(anchor, s, repos, repo),
@@ -187,7 +210,22 @@ class _GitScreenState extends State<GitScreen> {
       ],
     ]);
 
-    final toolbar = ScreenToolbar(breadcrumb: breadcrumb, primary: newWorktree);
+    final toolbar = ScreenToolbar(
+      breadcrumb: Row(mainAxisSize: MainAxisSize.min, children: [
+        Flexible(child: breadcrumb),
+        const SizedBox(width: 12),
+        ToolbarSegments<bool>(
+          label: 'Git view',
+          value: _releases,
+          onChanged: (v) => setState(() => _releases = v),
+          items: [
+            (false, 'Overview', null, null),
+            (true, 'Releases & tags', source != null && source.releasesSupported && source.releases.isNotEmpty ? source.releases.length : null, null),
+          ],
+        ),
+      ]),
+      primary: newWorktree,
+    );
     if (source == null) {
       // Offstage: nothing is read until the view shows.
       return ScreenFrame(toolbar: toolbar, body: const SizedBox.shrink(), status: const []);
@@ -203,8 +241,11 @@ class _GitScreenState extends State<GitScreen> {
 
     final commits = _CommitsSection(
       source: source,
-      allBranches: _allBranches && source.allBranchesSupported,
-      onScope: (all) => setState(() => _allBranches = all),
+      branch: source.allBranchesSupported ? _branch : '',
+      author: _author,
+      onBranch: (b) => setState(() => _branch = b),
+      onAuthor: (a) => setState(() => _author = a),
+      onOpen: (shown, i) => _showCommitSheet(context, source, shown, i),
     );
     final prs = _PullRequestsSection(
       source: source,
@@ -232,7 +273,9 @@ class _GitScreenState extends State<GitScreen> {
     final noAccess = problem != null && problem.needsSettings;
     return ScreenFrame(
       toolbar: toolbar,
-      body: LayoutBuilder(builder: (context, box) {
+      body: _releases
+          ? _ReleasesView(key: ValueKey('releases ${repo.id}'), source: source)
+          : LayoutBuilder(builder: (context, box) {
         if (box.maxWidth < 1000) {
           // Narrow window: the four sections stacked.
           return ListView(padding: EdgeInsets.zero, children: [
@@ -392,60 +435,6 @@ class _Panel extends StatelessWidget {
   }
 }
 
-/// Segmented filter on a tinted track, as in the design (smaller than
-/// [KSegmented], with counts, and items that can be disabled with a reason).
-class _Segments<T> extends StatelessWidget {
-  const _Segments({required this.items, required this.value, required this.onChanged, required this.label});
-
-  /// (value, label, count, why it's disabled; null = enabled).
-  final List<(T, String, int?, String?)> items;
-  final T value;
-  final ValueChanged<T> onChanged;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    final children = <Widget>[];
-    for (final (v, text, count, disabledWhy) in items) {
-      if (children.isNotEmpty) children.add(const SizedBox(width: 2));
-      final enabled = disabledWhy == null;
-      final on = v == value;
-      children.add(KPressable(
-        onTap: enabled ? () => onChanged(v) : null,
-        tooltip: disabledWhy,
-        semanticLabel: text,
-        selected: on,
-        builder: (context, hover, focus) => Container(
-          height: 24,
-          padding: const EdgeInsets.symmetric(horizontal: 9),
-          alignment: Alignment.center,
-          decoration: on
-              ? chipDecoration(c, radius: 8, fill: c.tabActive)
-              : BoxDecoration(
-                  color: hover && enabled ? c.tabActive : null,
-                  borderRadius: BorderRadius.circular(8),
-                  border: focus ? Border.all(color: c.acc, width: 1.5) : null,
-                ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text(text, style: sans(11.5, weight: on ? FontWeight.w600 : FontWeight.w500, color: !enabled ? c.text3 : (on ? c.text : c.text2))),
-            if (count != null) ...[const SizedBox(width: 5), Text('$count', style: sans(10.5, weight: FontWeight.w500, color: c.text3))],
-          ]),
-        ),
-      ));
-    }
-    return Semantics(
-      label: label,
-      container: true,
-      child: Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(10)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: children),
-      ),
-    );
-  }
-}
-
 /// Initial on a tinted circle: "you" in the accent, teammates in a stable
 /// color per name.
 class _Avatar extends StatelessWidget {
@@ -545,57 +534,34 @@ String _dur(Duration d) {
 // Recent commits
 // ---------------------------------------------------------------------------
 
-class _CommitsSection extends StatelessWidget {
-  const _CommitsSection({required this.source, required this.allBranches, required this.onScope});
-  final RepoActivitySource source;
-  final bool allBranches;
-  final ValueChanged<bool> onScope;
-
-  @override
-  Widget build(BuildContext context) {
-    final main = source.mainBranch;
-    final commits = source.commits(allBranches: allBranches);
-    final branchCount = {for (final k in commits) if (k.branch case final b?) b}.length;
-    final me = source.currentUser;
-    final error = source.error;
-    final rows = <Widget>[
-      if (commits.isEmpty)
-        _Note(source.loading ? 'Loading history…' : (error != null ? 'Couldn’t read the history: $error' : 'No commits on $main yet.')),
-      for (final k in commits) _CommitRow(commit: k, mine: me != null && k.author == me),
-    ];
-    return _Panel(
-      icon: Icons.commit,
-      title: allBranches ? 'Recent commits' : 'Recent commits on $main',
-      subtitle: allBranches ? '$main + $branchCount ${branchCount == 1 ? 'branch' : 'branches'}' : source.repo.name,
-      trailing: _Segments<bool>(
-        label: 'Commit scope',
-        value: allBranches,
-        onChanged: onScope,
-        items: [
-          (false, main, null, null),
-          (true, 'all branches', null, source.allBranchesSupported ? null : 'All branches needs a newer kumod'),
-        ],
-      ),
-      child: ListView(padding: EdgeInsets.zero, children: rows),
-    );
-  }
-}
-
 class _CommitRow extends StatelessWidget {
-  const _CommitRow({required this.commit, required this.mine});
+  const _CommitRow({required this.commit, required this.mine, this.showBranch = true, this.onTap});
   final RepoCommit commit;
   final bool mine;
+
+  /// The branch chip (off when the panel shows one branch anyway).
+  final bool showBranch;
+
+  /// Opens what it changed.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final k = commit;
     final pr = k.prRef;
-    final branch = k.branch;
-    return Container(
+    final branch = showBranch ? k.branch : null;
+    return KPressable(
+      onTap: onTap,
+      semanticLabel: '${k.shortSha} ${k.subject}',
+      tooltip: onTap == null ? null : 'Show what ${k.shortSha} changed',
+      builder: (context, hover, focus) => Container(
       constraints: const BoxConstraints(minHeight: 33),
       padding: const EdgeInsets.symmetric(horizontal: 6),
-      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.divider))),
+      decoration: BoxDecoration(
+        color: hover || focus ? c.tile : null,
+        border: Border(bottom: BorderSide(color: c.divider)),
+      ),
       child: Row(children: [
         SizedBox(width: 52, child: Text(k.shortSha, maxLines: 1, overflow: TextOverflow.clip, style: mono(11, color: c.text3))),
         const SizedBox(width: 10),
@@ -633,6 +599,7 @@ class _CommitRow extends StatelessWidget {
         const SizedBox(width: 10),
         SizedBox(width: 66, child: Text(_rel(k.time), textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11, color: c.text3))),
       ]),
+    ),
     );
   }
 }
@@ -973,7 +940,7 @@ class _PullRequestsSection extends StatelessWidget {
     return _Panel(
       icon: KIcons.pullRequest,
       title: title,
-      trailing: _Segments<_PrFilter>(
+      trailing: ToolbarSegments<_PrFilter>(
         label: 'Filter ${terms.prs}',
         value: filter,
         onChanged: onFilter,
@@ -1102,8 +1069,19 @@ void _openPrMenu(BuildContext anchor, RepoActivitySource source, RepoPullRequest
           KMenuItem(icon: KIcons.agent, label: 'Review it…', onTap: () => agent(PrAgentJob.review)),
         KMenuItem(icon: KIcons.info, label: 'Explain the changes', onTap: () => agent(PrAgentJob.explain)),
         if (pr.checksState == CiState.failed) KMenuItem(icon: KIcons.warning, label: 'Fix the failing checks…', onTap: () => agent(PrAgentJob.fixChecks)),
-        if (pr.mine && pr.state == RepoPrState.changesRequested)
-          KMenuItem(icon: KIcons.rename, label: 'Address the review comments…', onTap: () => agent(PrAgentJob.addressComments)),
+        if (pr.mine && source.threadsSupported && (source.openThreadsOf(pr) ?? 0) > 0)
+          KMenuItem(
+            icon: KIcons.chat,
+            label: 'Resolve comments…',
+            shortcut: '${source.openThreadsOf(pr)} open',
+            onTap: () {
+              close();
+              showResolveCommentsDialog(anchor, source: source, pr: pr);
+            },
+          )
+        else if (pr.mine && pr.state == RepoPrState.changesRequested)
+          // Without the threads, the agent reads them itself.
+          KMenuItem(icon: KIcons.chat, label: 'Resolve comments…', onTap: () => agent(PrAgentJob.addressComments)),
         const KMenuDivider(),
         KMenuItem(
           icon: KIcons.external,
@@ -1257,6 +1235,19 @@ class _PrRowState extends State<_PrRow> {
               if (pr.reviewRequestedFromMe) Text(' · your review', style: sans(11.5, weight: FontWeight.w500, color: c.warn)),
             ]),
           ),
+          if (widget.source.openThreadsOf(pr) case final n?) ...[
+            const SizedBox(width: 8),
+            KPressable(
+              onTap: pr.mine && n > 0 ? () => showResolveCommentsDialog(context, source: widget.source, pr: pr) : null,
+              semanticLabel: n == 0 ? 'Every review thread resolved' : '$n open review ${n == 1 ? 'thread' : 'threads'}',
+              tooltip: n == 0 ? 'Every review thread is resolved' : '$n open review ${n == 1 ? 'thread' : 'threads'}${pr.mine ? ' · Resolve comments…' : ''}',
+              builder: (context, hover, focus) => Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(n == 0 ? KIcons.check : KIcons.chat, size: 12, color: n == 0 ? c.ok : (pr.mine ? c.warn : c.text2)),
+                const SizedBox(width: 4),
+                Text(n == 0 ? 'resolved' : '$n', style: sans(11.5, color: n == 0 ? c.ok : (pr.mine ? c.warn : c.text2))),
+              ]),
+            ),
+          ],
           const SizedBox(width: 8),
           Tooltip(
             message: ckTip,

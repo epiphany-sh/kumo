@@ -4,6 +4,7 @@
 //! runtime or transport: outer layers implement its ports (traits).
 //!
 //! - [`agents`]: the user's coding-agent CLIs and the sessions they run.
+//! - [`agent_defs`]: your own agents (Claude Code subagent files) and their runs.
 //! - [`changes`]: changes, files and history of one worktree.
 //! - [`terminal`]: PTY-backed terminal sessions, their output and lifecycle.
 //! - [`daemon`]: daemon identity, security and discovery rules.
@@ -14,6 +15,7 @@
 //! - [`test_runs`]: a worktree's tests, run and read as they go.
 //! - [`workspace`]: namespaces, git repositories and their worktrees.
 
+pub mod agent_defs;
 pub mod agents;
 pub mod changes;
 pub mod daemon;
@@ -21,6 +23,7 @@ pub mod docs;
 pub mod pipelines;
 pub mod profiles;
 pub mod pulls;
+pub mod releases;
 pub mod tasks;
 pub mod terminal;
 pub mod test_runs;

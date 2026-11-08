@@ -5,6 +5,7 @@ import 'app/kumo_app.dart';
 import 'app/preferences.dart';
 import 'data/pipelines_source.dart';
 import 'data/profiles_source.dart';
+import 'engine/engine_agent_defs.dart';
 import 'engine/engine_agents_source.dart';
 import 'engine/engine_ai_usage.dart';
 import 'engine/engine_pipelines_source.dart';
@@ -36,14 +37,16 @@ Future<void> main() async {
 
   AppState stateFor(KumoEngine engine, {bool owner = false}) {
     final agents = EngineAgentsSource(engine);
+    final workspace = EngineWorkspaceSource(engine);
     return AppState(
       demoWallpaper: !WindowEffects.nativeBackdrop,
       prefs: prefs,
       profiles: profiles,
       ownsShared: owner,
-      workspace: EngineWorkspaceSource(engine),
+      workspace: workspace,
       changesFor: (worktree) => EngineWorktreeChanges(engine, worktree),
       agents: agents,
+      agentDefs: EngineAgentDefs(engine, agents, workspace),
       usage: EngineAiUsage(engine, agents),
       tasks: EngineTasksSource(engine),
       pipelinesFor: ({required repo, required worktree, required worktreePath}) =>

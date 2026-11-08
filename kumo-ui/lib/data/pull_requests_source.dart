@@ -30,6 +30,7 @@ class PullRequestInfo {
     this.created,
     this.updated,
     this.commentCount = 0,
+    this.openThreads,
   });
 
   final int number;
@@ -56,6 +57,9 @@ class PullRequestInfo {
   final DateTime? updated;
   final int commentCount;
 
+  /// Unresolved review threads; null when the host's list doesn't say.
+  final int? openThreads;
+
   /// What the Git view's list shows.
   RepoPullRequest toRepo() => RepoPullRequest(
         number: label,
@@ -77,6 +81,7 @@ class PullRequestInfo {
         checksState: checksState,
         url: url,
         base: base,
+        openThreads: openThreads,
       );
 }
 

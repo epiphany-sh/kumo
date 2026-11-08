@@ -17,11 +17,15 @@ pub use activity::{ActivityTracker, LastLine};
 pub use args::split_args;
 pub use error::AgentError;
 pub use homes::{CLI_HOMES, CliHome, cli_home};
-pub use ports::{AgentStore, CliHomes, ProgramLocator, SharedCliHomes, StoredProvider};
+pub use ports::{
+    AgentStore, CliHomes, ProcessDetails, ProcessInspector, ProgramLocator, SharedCliHomes,
+    StoredProvider,
+};
 pub use presets::{AgentPreset, PRESETS};
 pub use provider::{AgentProvider, PromptStyle};
 pub use session::{
-    AgentContext, AgentEvent, AgentEventKind, AgentSession, AgentSessionId, AgentState, ContextKind,
+    AgentContext, AgentEvent, AgentEventKind, AgentSession, AgentSessionId, AgentState,
+    ContextKind, TerminalAgent, agent_program,
 };
 pub use usage::{
     ContextReading, ContextSlice, ContextSliceKind, PlanReading, PlanUsage, PlanUsageStore,

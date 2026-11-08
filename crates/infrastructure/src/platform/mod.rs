@@ -97,6 +97,21 @@ pub trait AgentHooks {
     fn sh_status_line() -> bool;
 }
 
+/// A running process, as seen from outside.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunningProcess {
+    pub exe: PathBuf,
+    /// Its arguments, the program first.
+    pub args: Vec<String>,
+    pub cwd: PathBuf,
+}
+
+/// Reading other processes (an agent CLI started by hand in a terminal).
+pub trait Processes {
+    /// What `pid` runs and where; None when the OS can't tell.
+    fn process(pid: u32) -> Option<RunningProcess>;
+}
+
 /// How the OS asks the daemon to stop.
 pub trait Signals {
     /// Resolves when the daemon is asked to stop.
@@ -166,6 +181,11 @@ pub fn obsidian_settings(home: &Path) -> PathBuf {
 /// See [`AgentHooks::sh_status_line`].
 pub fn sh_status_line() -> bool {
     Current::sh_status_line()
+}
+
+/// See [`Processes::process`].
+pub fn process(pid: u32) -> Option<RunningProcess> {
+    Current::process(pid)
 }
 
 /// See [`Signals::shutdown`].

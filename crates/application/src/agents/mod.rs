@@ -3,6 +3,10 @@
 
 mod monitor;
 mod service;
+mod terminal_agents;
 mod usage;
 
-pub use service::{AgentPorts, AgentService, AgentsSnapshot, ProviderSettings, ProviderView};
+pub use service::{
+    AgentLaunch, AgentPorts, AgentService, AgentsSnapshot, ProviderSettings, ProviderView,
+};
+pub(crate) use service::{STOPPED, STOPPED_BY_TIME_LIMIT};

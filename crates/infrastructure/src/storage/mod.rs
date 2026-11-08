@@ -1,5 +1,6 @@
 //! SQLite persistence (`kumo.db` in the user's data directory).
 
+mod agent_def_store;
 mod agent_store;
 mod migrations;
 mod task_json;

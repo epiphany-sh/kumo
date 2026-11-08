@@ -68,7 +68,9 @@ void main() {
   testWidgets('all branches adds commits not on main yet', (tester) async {
     await _pumpGit(tester);
     expect(find.text('refactor: extract rule interfaces', skipOffstage: false), findsNothing);
-    await tester.tap(find.text('all branches'));
+    await tester.tap(find.byTooltip('Which branch’s commits'));
+    await tester.pump();
+    await tester.tap(find.descendant(of: find.byType(KMenuPanel), matching: find.text('All branches')));
     await tester.pump();
     // Low in the list: it may sit below the visible part of the panel.
     expect(find.text('refactor: extract rule interfaces', skipOffstage: false), findsOneWidget);

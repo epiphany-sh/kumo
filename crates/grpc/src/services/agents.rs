@@ -5,6 +5,7 @@ use std::sync::Arc;
 use futures::{Stream, StreamExt};
 use kumo_application::agents::{AgentService, ProviderSettings};
 use kumo_domain::agents::AgentSessionId;
+use kumo_domain::terminal::TerminalId;
 use kumo_proto::v1 as pb;
 use tokio_stream::wrappers::WatchStream;
 use tonic::{Request, Response, Status};
@@ -197,6 +198,20 @@ impl pb::agents_server::Agents for AgentsGrpc {
             .await
             .map_err(agents_status_from)?;
         Ok(Response::new(agent_session_to(session)))
+    }
+
+    async fn send_to_terminal(
+        &self,
+        request: Request<pb::SendToTerminalRequest>,
+    ) -> Result<Response<pb::SendToTerminalResponse>, Status> {
+        let service = self.service(&request).await?;
+        let request = request.into_inner();
+        let terminal = TerminalId::parse(&request.terminal_id).map_err(status_from)?;
+        service
+            .send_to_terminal(&terminal, &request.text, request.submit)
+            .await
+            .map_err(agents_status_from)?;
+        Ok(Response::new(pb::SendToTerminalResponse {}))
     }
 
     type WatchStream = SnapshotStream;

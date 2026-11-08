@@ -3,8 +3,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use kumo_domain::changes::{
-    ChangeWatcher, ChangesError, CommitInfo, CommitOptions, DiffScope, FileContent, FileDiff,
-    FileList, FileStore, GitChanges, RelativePath, WorktreeChanges,
+    ChangeWatcher, ChangesError, CommitDetail, CommitInfo, CommitOptions, DiffScope, FileContent,
+    FileDiff, FileList, FileStore, GitChanges, RelativePath, WorktreeChanges,
 };
 use tokio::sync::mpsc;
 
@@ -219,14 +219,28 @@ impl ChangesService {
             .await
     }
 
+    /// Newest first; `all_branches` adds every other branch's commits not
+    /// on the worktree's branch yet.
     pub async fn log(
         &self,
         worktree: &Path,
         limit: usize,
+        all_branches: bool,
     ) -> Result<Vec<CommitInfo>, ChangesError> {
         let worktree = self.worktree(worktree).await?;
         let git = Arc::clone(&self.ports.git);
-        blocking(move || git.log(&worktree, limit.clamp(1, 500))).await
+        blocking(move || git.log(&worktree, limit.clamp(1, 500), all_branches)).await
+    }
+
+    /// What one commit changed, file by file.
+    pub async fn show_commit(
+        &self,
+        worktree: &Path,
+        sha: &str,
+    ) -> Result<CommitDetail, ChangesError> {
+        let (worktree, sha) = (self.worktree(worktree).await?, sha.trim().to_owned());
+        let git = Arc::clone(&self.ports.git);
+        blocking(move || git.show_commit(&worktree, &sha)).await
     }
 
     /// The canonical path of a worktree in the workspace.

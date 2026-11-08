@@ -1,4 +1,5 @@
 import Cocoa
+import UniformTypeIdentifiers
 import FlutterMacOS
 
 class MainFlutterWindow: NSWindow, NSWindowDelegate {
@@ -89,6 +90,23 @@ final class Pasteboard {
       switch call.method {
       case "paths":
         result(Pasteboard.paths(NSPasteboard.general))
+      case "chooseFile":
+        // A file to read (an agent's .md to import): the system's open panel.
+        let args = call.arguments as? [String: Any]
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.message = args?["message"] as? String ?? ""
+        let exts = args?["extensions"] as? [String] ?? []
+        if !exts.isEmpty {
+          if #available(macOS 11.0, *) {
+            panel.allowedContentTypes = exts.compactMap { UTType(filenameExtension: $0) }
+          } else {
+            panel.allowedFileTypes = exts
+          }
+        }
+        result(panel.runModal() == .OK ? panel.url?.path : nil)
       default:
         result(FlutterMethodNotImplemented)
       }

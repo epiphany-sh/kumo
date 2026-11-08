@@ -1,5 +1,6 @@
 use std::fmt;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use crate::terminal::{ExitStatus, TerminalId};
 use crate::time::Timestamp;
@@ -45,13 +46,25 @@ pub struct AgentSession {
     pub title: String,
     pub prompt: String,
     pub state: AgentState,
+    /// Waiting because it asked something (an approval), so what's typed
+    /// now answers it; false when it's only quiet.
+    pub asked: bool,
+    /// Its CLI was told to say when it asks. False: `asked` is never set, and
+    /// what's typed could be taken as an answer.
+    pub tells_asking: bool,
     pub started_at: Timestamp,
     pub state_since: Timestamp,
+    /// How long it spent working before `state_since`.
+    pub worked: Duration,
     pub last_line: String,
     /// What it was given to work from, in the order it got it.
     pub context: Vec<AgentContext>,
     /// What it did, oldest first; the last [`AgentSession::MAX_EVENTS`].
     pub events: Vec<AgentEvent>,
+    /// The agent of yours it runs (`claude --agent <name>`).
+    pub agent_name: Option<String>,
+    /// What it was given for the run, as files (`--add-dir`).
+    pub context_dir: Option<PathBuf>,
 }
 
 /// Where a piece of context came from.
@@ -61,6 +74,12 @@ pub enum ContextKind {
     Doc,
     /// Code selected in a file.
     Code,
+    /// A pull request: its diff and description.
+    PullRequest,
+    /// Files or a folder of a worktree.
+    Files,
+    /// A web page, read once.
+    Link,
 }
 
 /// A ticket or page an agent was given.
@@ -72,6 +91,8 @@ pub struct AgentContext {
     /// Where it lives, e.g. "Jira" or "Confluence · Pricing".
     pub detail: String,
     pub url: String,
+    /// Its id where it comes from (a task's or a page's), if known.
+    pub id: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,6 +141,21 @@ impl AgentSession {
         }
     }
 
+    /// Moves to `state`, adding up the time it worked.
+    pub fn enter(&mut self, state: AgentState, now: Timestamp) {
+        self.worked = self.worked_at(now);
+        self.state = state;
+        self.state_since = now;
+    }
+
+    /// How long it has been working by `now`; waiting for you doesn't count.
+    pub fn worked_at(&self, now: Timestamp) -> Duration {
+        if self.state != AgentState::Working {
+            return self.worked;
+        }
+        self.worked + now.since(self.state_since)
+    }
+
     /// The card title: the given one, else the prompt's first line, else
     /// the agent's name.
     pub fn title_for(title: &str, prompt: &str, provider_name: &str) -> String {
@@ -134,5 +170,128 @@ impl AgentSession {
             Some(line) => line.to_owned(),
             None => provider_name.to_owned(),
         }
+    }
+}
+
+/// A known agent CLI in the foreground of one of Kumo's terminals, started
+/// there by hand (typed `claude` in a shell).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerminalAgent {
+    pub terminal: TerminalId,
+    pub provider_id: String,
+    /// The program as it runs, e.g. `claude`.
+    pub program: String,
+    pub cwd: PathBuf,
+    /// Read from its screen, like a session's.
+    pub state: AgentState,
+    /// Producing output.
+    pub busy: bool,
+}
+
+/// Runtimes a CLI can be a script of (`node …/claude`, a shell wrapper).
+const RUNTIMES: &[&str] = &[
+    "node", "bun", "deno", "python", "python3", "sh", "bash", "zsh",
+];
+
+fn base_name(path: &str) -> &str {
+    path.rsplit(['/', '\\']).next().unwrap_or(path)
+}
+
+/// Which of `programs` (provider id, program) a process is: its
+/// executable or its first argument, or, for a runtime, its script.
+pub fn agent_program<'a>(
+    exe: &str,
+    args: &[String],
+    programs: &'a [(String, String)],
+) -> Option<&'a (String, String)> {
+    let mut names = vec![base_name(exe)];
+    if let Some(first) = args.first() {
+        names.push(base_name(first));
+    }
+    if names.iter().any(|n| RUNTIMES.contains(n))
+        && let Some(script) = args.get(1)
+    {
+        names.push(base_name(script));
+    }
+    programs.iter().find(|(_, program)| {
+        let program = base_name(program);
+        !program.is_empty() && names.contains(&program)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_time_working_adds_up() {
+        let at = |secs: u64| Timestamp::from_unix_nanos(secs * 1_000_000_000);
+        let mut session = AgentSession {
+            id: AgentSessionId::generate(),
+            provider_id: String::new(),
+            provider_name: String::new(),
+            short: String::new(),
+            worktree: PathBuf::new(),
+            terminal: TerminalId::generate(),
+            title: String::new(),
+            prompt: String::new(),
+            state: AgentState::Working,
+            asked: false,
+            tells_asking: true,
+            started_at: at(0),
+            state_since: at(0),
+            worked: Duration::ZERO,
+            last_line: String::new(),
+            context: Vec::new(),
+            events: Vec::new(),
+            agent_name: None,
+            context_dir: None,
+        };
+        let secs = Duration::from_secs;
+        assert_eq!(session.worked_at(at(10)), secs(10));
+        session.enter(AgentState::NeedsInput, at(10));
+        assert_eq!(session.worked_at(at(500)), secs(10));
+        session.enter(AgentState::Working, at(500));
+        assert_eq!(session.worked_at(at(503)), secs(13));
+    }
+
+    #[test]
+    fn a_cli_is_found_by_its_program_or_its_script() {
+        let programs = vec![
+            ("claude".to_owned(), "claude".to_owned()),
+            ("codex".to_owned(), "codex".to_owned()),
+        ];
+        let args = |a: &[&str]| a.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+        assert_eq!(
+            agent_program("/opt/homebrew/bin/codex", &args(&["codex"]), &programs)
+                .unwrap()
+                .0,
+            "codex"
+        );
+        assert_eq!(
+            agent_program(
+                "/usr/local/bin/node",
+                &args(&["node", "/usr/local/bin/claude", "-c"]),
+                &programs
+            )
+            .unwrap()
+            .0,
+            "claude"
+        );
+        assert_eq!(
+            agent_program("claude", &args(&["claude", "--resume"]), &programs)
+                .unwrap()
+                .0,
+            "claude"
+        );
+        assert!(agent_program("/usr/bin/vim", &args(&["vim", "claude"]), &programs).is_none());
+        assert!(agent_program("/bin/zsh", &args(&["-zsh"]), &programs).is_none());
+        assert!(agent_program("/bin/sh", &args(&["/bin/sh", "-c", "claude"]), &programs).is_none());
+        assert_eq!(
+            agent_program("/bin/sh", &args(&["/bin/sh", "/opt/bin/claude"]), &programs)
+                .unwrap()
+                .0,
+            "claude"
+        );
     }
 }

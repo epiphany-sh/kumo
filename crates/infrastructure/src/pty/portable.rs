@@ -70,6 +70,13 @@ impl PtyMaster for PortableMaster {
             .resize(pty_size(size))
             .map_err(|e| TerminalError::Io(e.to_string()))
     }
+
+    #[cfg(unix)]
+    fn foreground(&self) -> Option<u32> {
+        self.0
+            .process_group_leader()
+            .and_then(|pid| u32::try_from(pid).ok())
+    }
 }
 
 struct PortableChild(Box<dyn portable_pty::Child + Send + Sync>);

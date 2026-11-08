@@ -6,12 +6,13 @@ mod io_threads;
 mod pump;
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::time::Instant;
 
 use bytes::Bytes;
 use kumo_domain::terminal::{
     LaunchSpec, PtyKiller, PtyMaster, PtyProcess, TerminalError, TerminalId, TerminalInfo,
-    TerminalSize, TerminalStatus,
+    TerminalSize, TerminalStatus, is_answer,
 };
 use kumo_domain::time::Timestamp;
 use tokio::sync::{mpsc, oneshot};
@@ -24,6 +25,10 @@ use pump::Pump;
 
 type SharedMaster = Arc<Mutex<Option<Box<dyn PtyMaster>>>>;
 
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
 pub struct TerminalSession {
     id: TerminalId,
     program: String,
@@ -34,6 +39,9 @@ pub struct TerminalSession {
     master: SharedMaster,
     killer: Mutex<Box<dyn PtyKiller>>,
     hub: Arc<OutputHub>,
+    /// When its size last changed, and when someone last answered in it.
+    resized_at: Mutex<Option<Instant>>,
+    answered_at: Mutex<Option<Instant>>,
 }
 
 impl std::fmt::Debug for TerminalSession {
@@ -104,6 +112,8 @@ impl TerminalSession {
             master,
             killer: Mutex::new(killer),
             hub,
+            resized_at: Mutex::new(None),
+            answered_at: Mutex::new(None),
         })
     }
 
@@ -132,6 +142,9 @@ impl TerminalSession {
 
     /// Queues input for the PTY. Waits if the input queue is full.
     pub async fn write(&self, data: Bytes) -> Result<(), TerminalError> {
+        if is_answer(&data) {
+            *lock(&self.answered_at) = Some(Instant::now());
+        }
         self.input
             .send(data)
             .await
@@ -140,11 +153,28 @@ impl TerminalSession {
 
     /// Resizing a finished session is a no-op.
     pub fn resize(&self, size: TerminalSize) -> Result<(), TerminalError> {
+        *lock(&self.resized_at) = Some(Instant::now());
         let master = self.master.lock().unwrap_or_else(PoisonError::into_inner);
         match master.as_ref() {
             Some(master) => master.resize(size),
             None => Ok(()),
         }
+    }
+
+    pub fn resized_at(&self) -> Option<Instant> {
+        *lock(&self.resized_at)
+    }
+
+    /// When someone last typed an answer in it ([`is_answer`]).
+    pub fn answered_at(&self) -> Option<Instant> {
+        *lock(&self.answered_at)
+    }
+
+    /// The process in its foreground (what was typed in its shell, or the
+    /// shell); None once it exited or where the OS can't tell.
+    pub fn foreground(&self) -> Option<u32> {
+        let master = self.master.lock().unwrap_or_else(PoisonError::into_inner);
+        master.as_ref().and_then(|m| m.foreground())
     }
 
     /// Kills the process. Killing an exited process is a no-op.

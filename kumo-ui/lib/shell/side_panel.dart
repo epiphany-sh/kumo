@@ -1958,11 +1958,7 @@ String _contextBadge(AgentContextItem item) {
   for (final kind in DocKind.values) {
     if (kind.label == from) return kind.badge;
   }
-  return switch (item.kind) {
-    AgentContextKind.task => 'TK',
-    AgentContextKind.doc => 'DC',
-    AgentContextKind.code => 'CD',
-  };
+  return agentContextTag(item.kind);
 }
 
 /// CI runs of the selected worktree's branch, from its repository's host

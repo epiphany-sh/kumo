@@ -11,8 +11,8 @@ use std::sync::Arc;
 use keyring_core::{CredentialStore, Error as KeyringError};
 
 use super::{
-    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles,
-    ProgramSearch, ScriptShell, Signals,
+    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, Processes,
+    ProgramSearch, RunningProcess, ScriptShell, Signals,
 };
 
 /// The child gets a console nobody sees.
@@ -114,6 +114,13 @@ impl Signals for Windows {
     /// Ctrl-C (Windows has no SIGTERM).
     async fn shutdown() {
         let _ = tokio::signal::ctrl_c().await;
+    }
+}
+
+impl Processes for Windows {
+    /// Not read yet: terminals on Windows don't report agent CLIs.
+    fn process(_pid: u32) -> Option<RunningProcess> {
+        None
     }
 }
 

@@ -261,6 +261,7 @@ async fn timeline_and_context_follow_what_the_agent_does() {
         title: "PRC-412 · Bulk discounts".into(),
         detail: "Jira".into(),
         url: "https://acme.atlassian.net/browse/PRC-412".into(),
+        ..Default::default()
     };
     let session = client
         .agents
@@ -299,6 +300,7 @@ async fn timeline_and_context_follow_what_the_agent_does() {
         title: "Discount rules v3".into(),
         detail: "Confluence · Pricing".into(),
         url: String::new(),
+        ..Default::default()
     };
     let updated = client
         .agents
@@ -387,10 +389,13 @@ async fn stop_kills_a_running_agent() {
         })
         .await
         .unwrap();
-    session_where(&mut client, &session.id, |s| {
+    let ended = session_where(&mut client, &session.id, |s| {
         s.state() == pb::AgentState::Exited
     })
     .await;
+    // As Ctrl-C would: the card says "stopped".
+    assert_eq!(ended.exit_code, 130);
+    assert_eq!(ended.events.last().unwrap().text, "Stopped");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -665,7 +670,12 @@ async fn turned_off_claude_code_gets_no_status_line() {
     assert!(!again.read_usage);
 
     client.agents.start(start(&wt, "", "x")).await.unwrap();
-    assert_eq!(args_of(&daemon.bin(), "claude"), ["x"]);
+    // Only what makes it say when it asks: no status line.
+    let args = args_of(&daemon.bin(), "claude");
+    assert_eq!(args.len(), 3, "{args:?}");
+    assert_eq!(args[0], "--settings");
+    assert!(!args[1].contains("statusLine"), "{args:?}");
+    assert_eq!(args[2], "x");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -693,7 +703,7 @@ async fn codex_usage_is_read_from_its_rollout_file() {
         .await
         .unwrap()
         .into_inner();
-    assert_eq!(args_of(&daemon.bin(), "codex"), ["go"]);
+    assert_eq!(args_of(&daemon.bin(), "codex").last().unwrap(), "go");
     let report = usage_where(&mut client, |r| !r.sessions.is_empty()).await;
     let plan = &report.plans[0];
     assert_eq!(
@@ -847,4 +857,180 @@ async fn each_profile_gives_the_clis_their_own_folders() {
     let own = |id: &str| list.iter().find(|p| p.id == id).unwrap().own_sign_in;
     assert!(own("claude") && own("codex"));
     assert!(!own("gemini") && !own("copilot"));
+}
+
+/// Waits for the snapshot's agents started by hand to satisfy `ready`.
+async fn terminal_agents_where(
+    client: &mut KumoClient,
+    ready: impl Fn(&[pb::TerminalAgent]) -> bool,
+) -> Vec<pb::TerminalAgent> {
+    let mut stream = client
+        .agents
+        .watch(pb::WatchAgentsRequest {})
+        .await
+        .unwrap()
+        .into_inner();
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            let snapshot = stream.message().await.unwrap().expect("watch ended");
+            if ready(&snapshot.terminal_agents) {
+                return snapshot.terminal_agents;
+            }
+        }
+    })
+    .await
+    .expect("the terminal's agent never showed as expected")
+}
+
+/// What Claude Code does at an approval: it asks once and its prompt keeps
+/// blinking. It's asking until it's answered, not only until the next output.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_agent_keeps_asking_while_its_prompt_blinks_until_answered() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    fake_cli(
+        &daemon.bin(),
+        "claude",
+        "printf 'Allow?\\033]9;Claude needs your permission\\007'; \
+         (while :; do /bin/sleep 0.2; printf .; done) & read a; kill $!; echo answered; read b",
+    );
+    connect(&mut client, "claude", true).await;
+    let session = client
+        .agents
+        .start(start(&wt, "", ""))
+        .await
+        .unwrap()
+        .into_inner();
+    let asking = session_where(&mut client, &session.id, |s| s.asked).await;
+    assert_eq!(asking.state(), pb::AgentState::NeedsInput);
+
+    // Well past the grace for a redraw, with the prompt blinking.
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+    let still = session_where(&mut client, &session.id, |_| true).await;
+    assert!(still.asked, "{still:?}");
+
+    let mut terminal = Attached::new(&mut client, &session.terminal_id, true).await;
+    terminal.read_until("...").await;
+    terminal.send(b"1\r").await;
+    let answered = session_where(&mut client, &session.id, |s| !s.asked).await;
+    assert_ne!(answered.state(), pb::AgentState::Exited);
+}
+
+/// Claude Code and Codex are told to say when they ask; Kumo can't tell for
+/// other CLIs, and says so.
+#[tokio::test(flavor = "multi_thread")]
+async fn which_clis_say_when_they_ask() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    for name in ["codex", "copilot"] {
+        fake_cli(&daemon.bin(), name, "echo \"args: $*\"; read a");
+        connect(&mut client, name, true).await;
+    }
+    let codex = client
+        .agents
+        .start(start(&wt, "codex", "go"))
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(codex.tells_asking);
+    let mut terminal = Attached::new(&mut client, &codex.terminal_id, true).await;
+    terminal.read_until("tui.notification_condition").await;
+
+    let copilot = client
+        .agents
+        .start(start(&wt, "copilot", ""))
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(!copilot.tells_asking);
+}
+
+/// An agent that's only quiet isn't asking, and redrawing because its
+/// terminal changed size doesn't make it look at work.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_quiet_agent_is_not_asking_and_a_resize_does_not_wake_it() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    fake_cli(
+        &daemon.bin(),
+        "claude",
+        "trap 'printf redraw' WINCH; echo ready; while :; do read a && exit 0; done",
+    );
+    connect(&mut client, "claude", true).await;
+    let session = client
+        .agents
+        .start(start(&wt, "", ""))
+        .await
+        .unwrap()
+        .into_inner();
+    let quiet = session_where(&mut client, &session.id, |s| {
+        s.state() == pb::AgentState::NeedsInput
+    })
+    .await;
+    assert!(!quiet.asked, "{quiet:?}");
+
+    let mut terminal = Attached::new(&mut client, &session.terminal_id, false).await;
+    terminal.resize(90, 20).await;
+    terminal.read_until("redraw").await;
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let after = session_where(&mut client, &session.id, |_| true).await;
+    assert_eq!(after.state(), pb::AgentState::NeedsInput, "{after:?}");
+    assert_eq!(after.state_since_unix_ms, quiet.state_since_unix_ms);
+}
+
+/// `claude` typed by hand in a shell shows as that terminal's agent, asks
+/// (a bell) and goes when it exits.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_cli_typed_in_a_terminal_is_seen() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let repo = worktree(&daemon, &mut client).await;
+    fake_cli(
+        &daemon.bin(),
+        "claude",
+        "printf 'ready\\n'; read a; printf 'Allow?\\a'; read b; exit 0",
+    );
+    let terminal = client
+        .terminals
+        .open(pb::OpenRequest {
+            program: "/bin/sh".into(),
+            cwd: repo.display().to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .terminal_id;
+    let typed: &'static [u8] = Box::leak(
+        format!("{}\n", daemon.bin().join("claude").display())
+            .into_bytes()
+            .into_boxed_slice(),
+    );
+    let mut shell = Attached::new(&mut client, &terminal, true).await;
+    shell.send(typed).await;
+    shell.read_until("ready").await;
+
+    let seen = terminal_agents_where(&mut client, |a| !a.is_empty()).await;
+    assert_eq!(seen.len(), 1);
+    assert_eq!(
+        (
+            seen[0].terminal_id.as_str(),
+            seen[0].provider_id.as_str(),
+            seen[0].program.as_str()
+        ),
+        (terminal.as_str(), "claude", "claude")
+    );
+    assert_eq!(std::fs::canonicalize(&seen[0].cwd).unwrap(), repo);
+
+    shell.send(b"go\n").await;
+    terminal_agents_where(&mut client, |a| {
+        a.first()
+            .is_some_and(|a| a.state == pb::AgentState::NeedsInput as i32)
+    })
+    .await;
+    shell.send(b"yes\n").await;
+    terminal_agents_where(&mut client, <[pb::TerminalAgent]>::is_empty).await;
 }

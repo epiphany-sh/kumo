@@ -10,7 +10,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
 use crate::mapping::{
-    changes_status_from, commit_to, diff_scope_from, diff_to, worktree_changes_to,
+    changes_status_from, commit_detail_to, commit_to, diff_scope_from, diff_to, worktree_changes_to,
 };
 use crate::profile::{Profiles, services_of};
 
@@ -275,11 +275,24 @@ impl pb::git_server::Git for GitGrpc {
             request.limit as usize
         };
         let commits = service
-            .log(&path(request.worktree_path), limit)
+            .log(&path(request.worktree_path), limit, request.all_branches)
             .await
             .map_err(changes_status_from)?;
         Ok(Response::new(pb::LogResponse {
             commits: commits.into_iter().map(commit_to).collect(),
         }))
+    }
+
+    async fn show_commit(
+        &self,
+        request: Request<pb::ShowCommitRequest>,
+    ) -> Result<Response<pb::CommitDetail>, Status> {
+        let service = self.service(&request).await?;
+        let request = request.into_inner();
+        let detail = service
+            .show_commit(&path(request.worktree_path), &request.sha)
+            .await
+            .map_err(changes_status_from)?;
+        Ok(Response::new(commit_detail_to(detail)))
     }
 }

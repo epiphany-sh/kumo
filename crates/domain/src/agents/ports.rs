@@ -41,6 +41,21 @@ pub trait ProgramLocator: Send + Sync + 'static {
     fn script(&self, command: &str) -> (String, Vec<String>);
 }
 
+/// What a running process is: an agent CLI started by hand in a terminal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessDetails {
+    pub exe: PathBuf,
+    /// The program first.
+    pub args: Vec<String>,
+    pub cwd: PathBuf,
+}
+
+/// Reads other processes.
+pub trait ProcessInspector: Send + Sync + 'static {
+    /// None when it's gone or the OS can't tell.
+    fn inspect(&self, pid: u32) -> Option<ProcessDetails>;
+}
+
 /// The CLIs' own folders in a profile (see [`super::CLI_HOMES`]).
 pub trait CliHomes: Send + Sync + 'static {
     /// The variables that point `provider` at the profile's folder, which
