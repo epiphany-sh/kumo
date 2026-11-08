@@ -433,7 +433,9 @@ async fn a_run_starts_claude_with_its_agent_and_its_context() {
             "--agents",
             r#"{"rev":{"description":"d","prompt":"p"}}"#,
             "--agent",
-            "rev"
+            "rev",
+            "--append-system-prompt",
+            &kumo_domain::agent_defs::role_sentence("rev"),
         ]
     );
     let scratch = std::fs::canonicalize(s.profile_dir().join("scratch/rev-1")).unwrap();
