@@ -145,9 +145,20 @@ class AgentRun {
     this.steps = const [],
     this.agent = '',
     this.asked = false,
+    this.worked = Duration.zero,
+    this.stateSince,
   });
 
   final String id;
+
+  /// How long it worked before [stateSince].
+  final Duration worked;
+
+  /// When it got to its [status]; null: when it started.
+  final DateTime? stateSince;
+
+  /// How long it has been working by [now]; waiting for you doesn't count.
+  Duration workedAt(DateTime now) => status == AgentStatus.running ? worked + now.difference(stateSince ?? startedAt) : worked;
 
   /// needsYou because it asked something (an approval), so text typed now
   /// would answer it; false when it's only quiet, waiting for its next message.

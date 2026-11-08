@@ -106,8 +106,7 @@ pub(super) async fn run(
                     _ => {}
                 }
                 if let Some(state) = change {
-                    session.state = state;
-                    session.state_since = now;
+                    session.enter(state, now);
                 }
                 session.asked = asked;
                 session.last_line = line;

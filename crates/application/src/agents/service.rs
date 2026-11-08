@@ -27,6 +27,9 @@ pub(super) const STOPPED_BY_TIME_LIMIT: i32 = 124;
 
 /// Silence after which a running agent is considered to wait for input.
 const QUIET_AFTER: Duration = Duration::from_millis(2500);
+/// A time limit almost used up by an agent that's waiting is looked at this
+/// often.
+const LIMIT_RECHECK: Duration = Duration::from_millis(50);
 
 #[derive(Clone)]
 pub struct AgentPorts {
@@ -385,6 +388,7 @@ impl AgentService {
             asked: false,
             started_at: now,
             state_since: now,
+            worked: Duration::ZERO,
             last_line: String::new(),
             context: Vec::new(),
             events: Vec::new(),
@@ -426,11 +430,17 @@ impl AgentService {
         Ok(session)
     }
 
-    /// Stops a session still running after `limit`: it ends with code 124.
+    /// Stops a session once it has worked for `limit`, however long it
+    /// waited for you meanwhile: it ends with code 124.
     async fn stop_after(service: Arc<Self>, id: AgentSessionId, limit: Duration) {
-        tokio::time::sleep(limit).await;
-        if matches!(service.state_of(&id), None | Some(AgentState::Exited(_))) {
-            return;
+        loop {
+            let Some(worked) = service.worked_of(&id) else {
+                return;
+            };
+            if worked >= limit {
+                break;
+            }
+            tokio::time::sleep((limit - worked).max(LIMIT_RECHECK)).await;
         }
         tracing::info!(session = %id, "agent reached its time limit");
         service
@@ -650,6 +660,15 @@ impl AgentService {
     }
 
     /// The session's state; None once dismissed.
+    /// How long a session still running has worked.
+    fn worked_of(&self, id: &AgentSessionId) -> Option<Duration> {
+        self.lock()
+            .sessions
+            .iter()
+            .find(|s| &s.id == id && !matches!(s.state, AgentState::Exited(_)))
+            .map(|s| s.worked_at(Timestamp::now()))
+    }
+
     pub(super) fn state_of(&self, id: &AgentSessionId) -> Option<AgentState> {
         self.lock()
             .sessions

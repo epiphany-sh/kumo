@@ -887,6 +887,8 @@ message AgentSession {
   // NEEDS_INPUT because it asked something (an approval), so what's typed
   // now answers it; false when it's only quiet.
   bool asked = 18;
+  // How long it worked before state_since; waiting for you doesn't count.
+  uint64 worked_ms = 19;
 }
 
 message StopAgentRequest {

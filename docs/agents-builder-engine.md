@@ -158,7 +158,7 @@ claude [--agents '<inline_json>'] --agent <name> --add-dir <run dir> "<prompt>\n
 - The session streams in `Agents.Watch` like any other: title = the prompt's first line, or `Run <n>`.
 
 **Limits**
-- `settings.max_minutes`: the daemon stops the process when it's up. Use exit code 124 and an `EXITED` event "Stopped: its time limit".
+- `settings.max_minutes`: the daemon stops the process once it has worked that long (`AgentSession.worked_ms`, plus the time since `state_since` while working); waiting for you doesn't count. Use exit code 124 and an `EXITED` event "Stopped: its time limit".
 - `maxTurns` is Claude Code's own (in the file).
 - Stop is exit code 130; the UI shows "stopped".
 

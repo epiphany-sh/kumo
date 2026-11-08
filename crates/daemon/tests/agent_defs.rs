@@ -499,6 +499,60 @@ async fn a_run_is_stopped_when_its_time_is_up() {
     assert_eq!(ended.events.last().unwrap().text, "Stopped: its time limit");
 }
 
+/// A conversation isn't cut short while it waits for you: only working
+/// counts towards the limit.
+#[tokio::test(flavor = "multi_thread")]
+async fn waiting_for_you_does_not_use_up_a_runs_time() {
+    use pb::run_agent_def_request::Where;
+    let mut s = Setup::new().await;
+    let path = s.daemon.bin().join("claude");
+    std::fs::write(
+        &path,
+        r#"#!/bin/sh
+if [ "$1" = "--version" ]; then echo "2.1.0 (Claude Code)"; exit 0; fi
+if [ "$1" = "--help" ]; then echo "  --max-budget-usd <amount>"; exit 0; fi
+printf 'Allow?\a'
+read answer
+while :; do /bin/sleep 0.05; printf .; done
+"#,
+    )
+    .unwrap();
+    // A minute lasts 300 ms in tests.
+    let agent = pb::AgentDefFile {
+        settings: Some(pb::AgentDefSettings {
+            max_minutes: Some(1),
+            ..Default::default()
+        }),
+        ..personal("patient")
+    };
+    let session = s
+        .client
+        .agent_defs
+        .run(run(
+            agent,
+            Where::WorktreePath(s.repo.display().to_string()),
+            "go",
+        ))
+        .await
+        .unwrap()
+        .into_inner();
+    session_where(&mut s.client, &session.id, |x| x.asked).await;
+
+    // Three times its limit, waiting.
+    tokio::time::sleep(std::time::Duration::from_millis(900)).await;
+    let waiting = session_where(&mut s.client, &session.id, |_| true).await;
+    assert_eq!(waiting.state(), pb::AgentState::NeedsInput, "{waiting:?}");
+
+    let terminal = Attached::new(&mut s.client, &session.terminal_id, false).await;
+    terminal.send(b"yes\r").await;
+    let ended = session_where(&mut s.client, &session.id, |x| {
+        x.state == pb::AgentState::Exited as i32
+    })
+    .await;
+    assert_eq!(ended.exit_code, 124);
+    assert!(ended.worked_ms >= 250, "{ended:?}");
+}
+
 async fn play(client: &mut KumoClient, request: pb::PlayRequest) -> Vec<pb::PlayEvent> {
     let mut stream = client.agent_defs.play(request).await.unwrap().into_inner();
     tokio::time::timeout(TIMEOUT, async {

@@ -7274,6 +7274,7 @@ class AgentSession extends $pb.GeneratedMessage {
     $core.String? agentName,
     $core.String? contextDir,
     $core.bool? asked,
+    $fixnum.Int64? workedMs,
   }) {
     final result = AgentSession._();
     if (id != null) result.id = id;
@@ -7294,6 +7295,7 @@ class AgentSession extends $pb.GeneratedMessage {
     if (agentName != null) result.agentName = agentName;
     if (contextDir != null) result.contextDir = contextDir;
     if (asked != null) result.asked = asked;
+    if (workedMs != null) result.workedMs = workedMs;
     return result;
   }
 
@@ -7335,6 +7337,9 @@ class AgentSession extends $pb.GeneratedMessage {
     ..aOS(16, _omitFieldNames ? '' : 'agentName')
     ..aOS(17, _omitFieldNames ? '' : 'contextDir')
     ..aOB(18, _omitFieldNames ? '' : 'asked')
+    ..a<$fixnum.Int64>(
+        19, _omitFieldNames ? '' : 'workedMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7516,6 +7521,16 @@ class AgentSession extends $pb.GeneratedMessage {
   $core.bool hasAsked() => $_has(17);
   @$pb.TagNumber(18)
   void clearAsked() => $_clearField(18);
+
+  /// How long it worked before state_since; waiting for you doesn't count.
+  @$pb.TagNumber(19)
+  $fixnum.Int64 get workedMs => $_getI64(18);
+  @$pb.TagNumber(19)
+  set workedMs($fixnum.Int64 value) => $_setInt64(18, value);
+  @$pb.TagNumber(19)
+  $core.bool hasWorkedMs() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearWorkedMs() => $_clearField(19);
 }
 
 class StopAgentRequest extends $pb.GeneratedMessage {

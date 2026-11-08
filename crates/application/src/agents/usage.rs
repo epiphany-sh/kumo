@@ -267,6 +267,7 @@ mod tests {
             started_at: at(0),
             asked: false,
             state_since: at(0),
+            worked: Duration::ZERO,
             last_line: String::new(),
             context: Vec::new(),
             events: Vec::new(),

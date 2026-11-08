@@ -1,5 +1,6 @@
 use std::fmt;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use crate::terminal::{ExitStatus, TerminalId};
 use crate::time::Timestamp;
@@ -50,6 +51,8 @@ pub struct AgentSession {
     pub asked: bool,
     pub started_at: Timestamp,
     pub state_since: Timestamp,
+    /// How long it spent working before `state_since`.
+    pub worked: Duration,
     pub last_line: String,
     /// What it was given to work from, in the order it got it.
     pub context: Vec<AgentContext>,
@@ -135,6 +138,21 @@ impl AgentSession {
         }
     }
 
+    /// Moves to `state`, adding up the time it worked.
+    pub fn enter(&mut self, state: AgentState, now: Timestamp) {
+        self.worked = self.worked_at(now);
+        self.state = state;
+        self.state_since = now;
+    }
+
+    /// How long it has been working by `now`; waiting for you doesn't count.
+    pub fn worked_at(&self, now: Timestamp) -> Duration {
+        if self.state != AgentState::Working {
+            return self.worked;
+        }
+        self.worked + now.since(self.state_since)
+    }
+
     /// The card title: the given one, else the prompt's first line, else
     /// the agent's name.
     pub fn title_for(title: &str, prompt: &str, provider_name: &str) -> String {
@@ -201,6 +219,37 @@ pub fn agent_program<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_time_working_adds_up() {
+        let at = |secs: u64| Timestamp::from_unix_nanos(secs * 1_000_000_000);
+        let mut session = AgentSession {
+            id: AgentSessionId::generate(),
+            provider_id: String::new(),
+            provider_name: String::new(),
+            short: String::new(),
+            worktree: PathBuf::new(),
+            terminal: TerminalId::generate(),
+            title: String::new(),
+            prompt: String::new(),
+            state: AgentState::Working,
+            asked: false,
+            started_at: at(0),
+            state_since: at(0),
+            worked: Duration::ZERO,
+            last_line: String::new(),
+            context: Vec::new(),
+            events: Vec::new(),
+            agent_name: None,
+            context_dir: None,
+        };
+        let secs = Duration::from_secs;
+        assert_eq!(session.worked_at(at(10)), secs(10));
+        session.enter(AgentState::NeedsInput, at(10));
+        assert_eq!(session.worked_at(at(500)), secs(10));
+        session.enter(AgentState::Working, at(500));
+        assert_eq!(session.worked_at(at(503)), secs(13));
+    }
 
     #[test]
     fn a_cli_is_found_by_its_program_or_its_script() {

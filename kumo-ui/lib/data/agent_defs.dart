@@ -155,7 +155,7 @@ class AgentDef {
     this.extra = const [],
     this.scope = AgentScope.personal,
     this.repo = '',
-    this.maxMinutes = 10,
+    this.maxMinutes,
     this.maxCostUsd,
     this.triggers = const [],
   });

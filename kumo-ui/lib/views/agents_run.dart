@@ -483,7 +483,7 @@ class _RunTerminal extends StatelessWidget {
     final s = AppScope.of(context);
     final r = run;
     final done = r.status == AgentStatus.done;
-    final elapsed = DateTime.now().difference(r.startedAt);
+    final worked = r.workedAt(DateTime.now());
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _RunStrip(runs: runs, shown: r.id, onShow: onShow),
       const SizedBox(height: 10),
@@ -494,10 +494,10 @@ class _RunTerminal extends StatelessWidget {
         for (final k in agent.knowledge) _Chip(label: k, tag: 'MD'),
         if (!done && agent.maxMinutes != null)
           _Meter(
-            label: 'Time',
-            value: '${elapsed.inMinutes}:${(elapsed.inSeconds % 60).toString().padLeft(2, '0')} / ${agent.maxMinutes}:00',
-            fraction: elapsed.inSeconds / (agent.maxMinutes! * 60),
-            tooltip: 'Kumo ends the run when the time is up',
+            label: 'Working',
+            value: '${worked.inMinutes}:${(worked.inSeconds % 60).toString().padLeft(2, '0')} / ${agent.maxMinutes}:00',
+            fraction: worked.inSeconds / (agent.maxMinutes! * 60),
+            tooltip: 'Kumo ends the run after this much time working. Waiting for you doesn’t count.',
           ),
       ]),
       const SizedBox(height: 10),

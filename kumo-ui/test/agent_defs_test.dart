@@ -144,7 +144,7 @@ void main() {
       final tests = agentTemplates.firstWhere((t) => t.id == 'test-writer').draft();
       expect(tests.isolation, isTrue, reason: 'it changes files: its own worktree');
       expect(tests.maxTurns, 25);
-      expect(tests.maxMinutes, 10);
+      expect(tests.maxMinutes, isNull, reason: 'a clock would end a conversation that’s only waiting for you');
     });
   });
 
@@ -331,6 +331,17 @@ void main() {
     expect(agents.sent, ['hello']);
     expect(state.queuedFor('w'), 0);
     state.dispose();
+  });
+
+  test('only time working counts towards a run’s limit', () {
+    final started = DateTime(2026);
+    AgentRun run(AgentStatus status) => AgentRun(
+          id: 'w', providerId: 'claude', providerName: 'Claude', short: 'CC', worktreePath: '/wt', terminalId: 't', title: 'x',
+          status: status, startedAt: started, worked: const Duration(minutes: 2), stateSince: started.add(const Duration(minutes: 5)),
+        );
+    final now = started.add(const Duration(minutes: 6));
+    expect(run(AgentStatus.needsYou).workedAt(now), const Duration(minutes: 2));
+    expect(run(AgentStatus.running).workedAt(now), const Duration(minutes: 3));
   });
 
   test('a message to an agent that is only quiet goes in now', () async {
