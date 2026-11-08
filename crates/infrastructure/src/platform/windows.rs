@@ -117,6 +117,13 @@ impl Signals for Windows {
     }
 }
 
+impl Processes for Windows {
+    /// Not read yet: terminals on Windows don't report agent CLIs.
+    fn process(_pid: u32) -> Option<RunningProcess> {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,12 +162,5 @@ mod tests {
             &path,
             &meta
         ));
-    }
-}
-
-impl Processes for Windows {
-    /// Not read yet: terminals on Windows don't report agent CLIs.
-    fn process(_pid: u32) -> Option<RunningProcess> {
-        None
     }
 }

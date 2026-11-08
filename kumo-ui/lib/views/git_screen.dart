@@ -175,7 +175,10 @@ class _GitScreenState extends State<GitScreen> {
       const SizedBox(width: 8),
       Text('Git', style: sans(13, weight: FontWeight.w600, color: c.text)),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Text('/', style: sans(13, color: c.text3))),
+      // The repository before the note: when there's little room, the note
+      // gives way first.
       Flexible(
+        flex: 4,
         child: Builder(
           builder: (anchor) => KPressable(
             onTap: () => _openRepoMenu(anchor, s, repos, repo),

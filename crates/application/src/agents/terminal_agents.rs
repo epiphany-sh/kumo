@@ -22,6 +22,9 @@ const CHECK_EVERY: Duration = Duration::from_secs(1);
 /// …and this often while it's quiet.
 const QUIET_CHECK_EVERY: Duration = Duration::from_secs(3);
 const TICK: Duration = Duration::from_millis(250);
+/// A new foreground that isn't an agent is read again for this long: right
+/// after the fork, before its exec, it still looks like the shell.
+const RECHECK_FOR: Duration = Duration::from_secs(5);
 
 impl AgentService {
     /// Starts following the profile's terminals for agent CLIs started by
@@ -99,6 +102,8 @@ async fn scan(service: Weak<AgentService>, inspector: Arc<dyn ProcessInspector>)
 struct Seen {
     pid: Option<u32>,
     agent: Option<(String, String, std::path::PathBuf)>,
+    /// When this pid came to the foreground.
+    since: Instant,
 }
 
 async fn follow(
@@ -113,6 +118,7 @@ async fn follow(
     let mut seen = Seen {
         pid: None,
         agent: None,
+        since: Instant::now(),
     };
     let mut tracker: Option<ActivityTracker> = None;
     let mut agent: Option<TerminalAgent> = None;
@@ -148,7 +154,9 @@ async fn follow(
         if checked.elapsed() >= due {
             checked = Instant::now();
             let pid = session.foreground();
-            if pid != seen.pid {
+            let new = pid != seen.pid;
+            if new || (seen.agent.is_none() && pid.is_some() && seen.since.elapsed() < RECHECK_FOR)
+            {
                 let details: Option<ProcessDetails> = match pid {
                     Some(pid) => {
                         let inspector = Arc::clone(&inspector);
@@ -167,7 +175,11 @@ async fn follow(
                     }
                     None => None,
                 };
-                seen = Seen { pid, agent };
+                seen = Seen {
+                    pid,
+                    agent,
+                    since: if new { Instant::now() } else { seen.since },
+                };
             }
             match &seen.agent {
                 Some((provider_id, program, cwd)) => {

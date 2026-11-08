@@ -30,7 +30,15 @@ mod tests {
             .stdin(std::process::Stdio::piped())
             .spawn()
             .unwrap();
-        let details = OsProcesses.inspect(child.id()).unwrap();
+        // Right after fork it may not have exec'd yet: its arguments come then.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let details = loop {
+            let details = OsProcesses.inspect(child.id()).unwrap();
+            if details.args.iter().any(|a| a == "-c") || std::time::Instant::now() > deadline {
+                break details;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        };
         let _ = child.kill();
         let _ = child.wait();
         assert!(details.exe.ends_with("sh"), "{details:?}");

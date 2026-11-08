@@ -129,6 +129,8 @@ mod tests {
         let clone = dir.path().join("clones/app");
         cli.clone_repo(&origin.display().to_string(), &clone)
             .unwrap();
+        // The throwaway worktree checks out too.
+        git(&clone, &["config", "core.autocrlf", "false"]);
         assert_eq!(cli.default_branch(&clone).unwrap(), "main");
         let head = cli.fetch(&clone, "refs/pull/7/head").unwrap();
         assert_eq!(head.len(), 40);

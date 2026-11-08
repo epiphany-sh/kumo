@@ -223,6 +223,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(ReleaseNotesDialog), findsOneWidget);
     expect(find.text('previous release · suggested'), findsOneWidget);
+    // The dialog scrolls: its button can start below the fold.
+    await tester.ensureVisible(find.text('Write the notes'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Write the notes'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 1300));
