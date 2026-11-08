@@ -397,6 +397,11 @@ class _AgentList extends StatelessWidget {
               monospace: true,
             ),
         ],
+        if (AppScope.of(context).agents.lacksClaude)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+            child: Text('Your agents run on Claude Code: connect it in Settings to pick one here.', style: sans(11.5, color: c.text3, height: 1.4)),
+          ),
         Container(height: 1, color: c.divider, margin: const EdgeInsets.symmetric(vertical: 4)),
         KPressable(
           onTap: onCreate,

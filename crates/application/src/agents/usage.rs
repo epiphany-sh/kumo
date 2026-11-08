@@ -266,6 +266,7 @@ mod tests {
             state,
             started_at: at(0),
             asked: false,
+            tells_asking: true,
             state_since: at(0),
             worked: Duration::ZERO,
             last_line: String::new(),

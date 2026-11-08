@@ -159,4 +159,11 @@ void main() {
     expect(tester.getSize(terminal), size, reason: 'a resize makes the agent redraw');
     expect(tester.takeException(), isNull);
   });
+
+  test('your agents need Claude Code: said only when another CLI is what’s connected', () {
+    AgentProviderInfo cli(String id) => AgentProviderInfo(id: id, name: id, short: 'XX', program: id, args: '', custom: false, enabled: true, isDefault: false, installed: true, resolvedPath: '', installHint: '', takesPrompt: true, hasLogin: false);
+    expect(_FakeAgents().lacksClaude, isFalse, reason: 'nothing connected yet has its own message');
+    expect(_FakeAgents(providers: [cli('codex')]).lacksClaude, isTrue);
+    expect(_FakeAgents(providers: [cli('codex'), cli('claude')]).lacksClaude, isFalse);
+  });
 }

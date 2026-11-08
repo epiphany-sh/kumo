@@ -889,6 +889,9 @@ message AgentSession {
   bool asked = 18;
   // How long it worked before state_since; waiting for you doesn't count.
   uint64 worked_ms = 19;
+  // Its CLI says when it asks something. False: `asked` is never set, and
+  // what's typed could be taken as an answer.
+  bool tells_asking = 20;
 }
 
 message StopAgentRequest {

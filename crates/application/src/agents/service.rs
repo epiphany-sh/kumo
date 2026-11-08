@@ -27,6 +27,7 @@ pub(super) const STOPPED_BY_TIME_LIMIT: i32 = 124;
 
 /// Silence after which a running agent is considered to wait for input.
 const QUIET_AFTER: Duration = Duration::from_millis(2500);
+const SETTINGS_FLAG: &str = "--settings";
 /// A time limit almost used up by an agent that's waiting is looked at this
 /// often.
 const LIMIT_RECHECK: Duration = Duration::from_millis(50);
@@ -357,9 +358,19 @@ impl AgentService {
             worktree: worktree.clone(),
             started_at: Timestamp::now(),
         };
+        // Their own `--settings` leaves theirs in charge of notifications.
+        let own_settings = args.iter().any(|a| a == SETTINGS_FLAG);
         let source = self.usage_source(&provider);
         if let Some(source) = &source {
             args = usage::launch_args(source, &target, args).await;
+        }
+        let notice = provider.ask_notice();
+        let tells_asking = !notice.is_empty() && !own_settings;
+        // Claude Code's usage settings ask for it too, and it takes one.
+        let settings_given =
+            notice.first() == Some(&SETTINGS_FLAG) && args.iter().any(|a| a == SETTINGS_FLAG);
+        if tells_asking && !settings_given {
+            args = notice.iter().map(|a| (*a).to_owned()).chain(args).collect();
         }
         let env = self.env_for(&provider).await?;
         let spec = LaunchSpec::new(program.display().to_string())
@@ -386,6 +397,7 @@ impl AgentService {
             prompt: prompt.to_owned(),
             state: AgentState::Working,
             asked: false,
+            tells_asking,
             started_at: now,
             state_since: now,
             worked: Duration::ZERO,

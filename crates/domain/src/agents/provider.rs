@@ -93,6 +93,11 @@ impl AgentProvider {
         Ok((args, used))
     }
 
+    /// Arguments that make it say when it's asking something.
+    pub fn ask_notice(&self) -> &'static [&'static str] {
+        self.preset.map_or(&[], |p| p.ask_notice)
+    }
+
     /// Arguments of the sign-in flow.
     pub fn login_args(&self) -> Vec<String> {
         self.preset

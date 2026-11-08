@@ -7275,6 +7275,7 @@ class AgentSession extends $pb.GeneratedMessage {
     $core.String? contextDir,
     $core.bool? asked,
     $fixnum.Int64? workedMs,
+    $core.bool? tellsAsking,
   }) {
     final result = AgentSession._();
     if (id != null) result.id = id;
@@ -7296,6 +7297,7 @@ class AgentSession extends $pb.GeneratedMessage {
     if (contextDir != null) result.contextDir = contextDir;
     if (asked != null) result.asked = asked;
     if (workedMs != null) result.workedMs = workedMs;
+    if (tellsAsking != null) result.tellsAsking = tellsAsking;
     return result;
   }
 
@@ -7340,6 +7342,7 @@ class AgentSession extends $pb.GeneratedMessage {
     ..a<$fixnum.Int64>(
         19, _omitFieldNames ? '' : 'workedMs', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOB(20, _omitFieldNames ? '' : 'tellsAsking')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7531,6 +7534,17 @@ class AgentSession extends $pb.GeneratedMessage {
   $core.bool hasWorkedMs() => $_has(18);
   @$pb.TagNumber(19)
   void clearWorkedMs() => $_clearField(19);
+
+  /// Its CLI says when it asks something. False: `asked` is never set, and
+  /// what's typed could be taken as an answer.
+  @$pb.TagNumber(20)
+  $core.bool get tellsAsking => $_getBF(19);
+  @$pb.TagNumber(20)
+  set tellsAsking($core.bool value) => $_setBool(19, value);
+  @$pb.TagNumber(20)
+  $core.bool hasTellsAsking() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearTellsAsking() => $_clearField(20);
 }
 
 class StopAgentRequest extends $pb.GeneratedMessage {

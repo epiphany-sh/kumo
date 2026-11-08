@@ -59,6 +59,7 @@ pub fn agent_session_to(session: AgentSession) -> pb::AgentSession {
         events: session.events.into_iter().map(agent_event_to).collect(),
         agent_name: session.agent_name.unwrap_or_default(),
         asked: session.asked,
+        tells_asking: session.tells_asking,
         worked_ms: u64::try_from(session.worked.as_millis()).unwrap_or(u64::MAX),
         context_dir: session
             .context_dir

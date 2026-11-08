@@ -145,6 +145,7 @@ class AgentRun {
     this.steps = const [],
     this.agent = '',
     this.asked = false,
+    this.tellsAsking = true,
     this.worked = Duration.zero,
     this.stateSince,
   });
@@ -163,6 +164,10 @@ class AgentRun {
   /// needsYou because it asked something (an approval), so text typed now
   /// would answer it; false when it's only quiet, waiting for its next message.
   final bool asked;
+
+  /// Its CLI says when it asks something. False: [asked] stays false, and
+  /// what's sent could be taken as an answer.
+  final bool tellsAsking;
 
   /// The agent of yours it runs (`claude --agent <name>`); empty: the plain CLI.
   final String agent;
@@ -224,6 +229,9 @@ abstract class AgentsSource extends ChangeNotifier {
   /// Connected providers, the default first.
   List<AgentProviderInfo> get connected =>
       [for (final p in providers) if (p.enabled && p.isDefault) p, for (final p in providers) if (p.enabled && !p.isDefault) p];
+
+  /// Other CLIs are connected but not Claude Code, which your agents run on.
+  bool get lacksClaude => connected.isNotEmpty && !connected.any((p) => p.id == 'claude');
 
   /// Re-reads providers (and whether they are installed).
   Future<void> loadProviders();

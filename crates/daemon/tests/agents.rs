@@ -670,7 +670,12 @@ async fn turned_off_claude_code_gets_no_status_line() {
     assert!(!again.read_usage);
 
     client.agents.start(start(&wt, "", "x")).await.unwrap();
-    assert_eq!(args_of(&daemon.bin(), "claude"), ["x"]);
+    // Only what makes it say when it asks: no status line.
+    let args = args_of(&daemon.bin(), "claude");
+    assert_eq!(args.len(), 3, "{args:?}");
+    assert_eq!(args[0], "--settings");
+    assert!(!args[1].contains("statusLine"), "{args:?}");
+    assert_eq!(args[2], "x");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -698,7 +703,7 @@ async fn codex_usage_is_read_from_its_rollout_file() {
         .await
         .unwrap()
         .into_inner();
-    assert_eq!(args_of(&daemon.bin(), "codex"), ["go"]);
+    assert_eq!(args_of(&daemon.bin(), "codex").last().unwrap(), "go");
     let report = usage_where(&mut client, |r| !r.sessions.is_empty()).await;
     let plan = &report.plans[0];
     assert_eq!(
@@ -910,6 +915,36 @@ async fn an_agent_keeps_asking_while_its_prompt_blinks_until_answered() {
     terminal.send(b"1\r").await;
     let answered = session_where(&mut client, &session.id, |s| !s.asked).await;
     assert_ne!(answered.state(), pb::AgentState::Exited);
+}
+
+/// Claude Code and Codex are told to say when they ask; Kumo can't tell for
+/// other CLIs, and says so.
+#[tokio::test(flavor = "multi_thread")]
+async fn which_clis_say_when_they_ask() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    for name in ["codex", "copilot"] {
+        fake_cli(&daemon.bin(), name, "echo \"args: $*\"; read a");
+        connect(&mut client, name, true).await;
+    }
+    let codex = client
+        .agents
+        .start(start(&wt, "codex", "go"))
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(codex.tells_asking);
+    let mut terminal = Attached::new(&mut client, &codex.terminal_id, true).await;
+    terminal.read_until("tui.notification_condition").await;
+
+    let copilot = client
+        .agents
+        .start(start(&wt, "copilot", ""))
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(!copilot.tells_asking);
 }
 
 /// An agent that's only quiet isn't asking, and redrawing because its

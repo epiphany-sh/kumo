@@ -49,6 +49,9 @@ pub struct AgentSession {
     /// Waiting because it asked something (an approval), so what's typed
     /// now answers it; false when it's only quiet.
     pub asked: bool,
+    /// Its CLI was told to say when it asks. False: `asked` is never set, and
+    /// what's typed could be taken as an answer.
+    pub tells_asking: bool,
     pub started_at: Timestamp,
     pub state_since: Timestamp,
     /// How long it spent working before `state_since`.
@@ -234,6 +237,7 @@ mod tests {
             prompt: String::new(),
             state: AgentState::Working,
             asked: false,
+            tells_asking: true,
             started_at: at(0),
             state_since: at(0),
             worked: Duration::ZERO,

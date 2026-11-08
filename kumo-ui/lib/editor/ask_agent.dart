@@ -292,8 +292,9 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
     final hint = switch (target) {
       null => null,
       _AskTarget(terminal: final t?, state: AgentStatus.needsYou) => 'It’s asking you something in ${t.terminalTitle}: answer it there first, or anything typed now would be the answer.',
-      _AskTarget(terminal: final t?) => 'Kumo pastes it into ${t.terminalTitle}’s prompt, as if you typed it there.',
+      _AskTarget(terminal: final t?) => 'Kumo pastes it into ${t.terminalTitle}’s prompt, as if you typed it there. It can’t tell if it’s asking something: look there first, or this could be taken as the answer.',
       _AskTarget(state: AgentStatus.needsYou, :final name) => '$name is waiting on an approval. Kumo holds your message and sends it once you answer, so it isn’t taken as the answer.',
+      _AskTarget(run: AgentRun(tellsAsking: false), :final name) => '$name doesn’t tell Kumo when it’s asking something: look at its terminal first, or this could be taken as the answer.',
       _AskTarget(busy: true) => 'Mid-task: your message goes in as its next one.',
       _ => null,
     };

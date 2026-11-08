@@ -341,8 +341,10 @@ class AgentLibraryState extends State<AgentLibrary> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Text(
-            'Claude Code subagent files: ${s.workspace.repos.isEmpty ? '' : '.claude/agents/*.md. '}Ones you add by hand show up here too.',
-            style: sans(11, color: c.text3, height: 1.4),
+            s.agents.lacksClaude
+                ? 'Your agents run on Claude Code, which isn’t connected: connect it in Settings to run them. Other CLIs run as plain sessions, from New agent.'
+                : 'Claude Code subagent files: ${s.workspace.repos.isEmpty ? '' : '.claude/agents/*.md. '}Ones you add by hand show up here too.',
+            style: sans(11, color: s.agents.lacksClaude ? c.warn : c.text3, height: 1.4),
           ),
         ),
       ]),

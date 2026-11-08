@@ -221,6 +221,7 @@ AgentRun agentRunFrom(pb.AgentSession s) => AgentRun(
         steps: [for (final e in s.events) agentStepFrom(e)],
         agent: s.agentName,
         asked: s.asked,
+        tellsAsking: s.tellsAsking,
         worked: Duration(milliseconds: s.workedMs.toInt()),
         stateSince: DateTime.fromMillisecondsSinceEpoch(s.stateSinceUnixMs.toInt()),
       );

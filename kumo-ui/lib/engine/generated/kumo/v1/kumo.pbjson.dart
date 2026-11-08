@@ -2289,6 +2289,7 @@ const AgentSession$json = {
     {'1': 'context_dir', '3': 17, '4': 1, '5': 9, '10': 'contextDir'},
     {'1': 'asked', '3': 18, '4': 1, '5': 8, '10': 'asked'},
     {'1': 'worked_ms', '3': 19, '4': 1, '5': 4, '10': 'workedMs'},
+    {'1': 'tells_asking', '3': 20, '4': 1, '5': 8, '10': 'tellsAsking'},
   ],
 };
 
@@ -2305,7 +2306,8 @@ final $typed_data.Uint8List agentSessionDescriptor = $convert.base64Decode(
     'FS5rdW1vLnYxLkFnZW50Q29udGV4dFIHY29udGV4dBIrCgZldmVudHMYDyADKAsyEy5rdW1vLn'
     'YxLkFnZW50RXZlbnRSBmV2ZW50cxIdCgphZ2VudF9uYW1lGBAgASgJUglhZ2VudE5hbWUSHwoL'
     'Y29udGV4dF9kaXIYESABKAlSCmNvbnRleHREaXISFAoFYXNrZWQYEiABKAhSBWFza2VkEhsKCX'
-    'dvcmtlZF9tcxgTIAEoBFIId29ya2VkTXM=');
+    'dvcmtlZF9tcxgTIAEoBFIId29ya2VkTXMSIQoMdGVsbHNfYXNraW5nGBQgASgIUgt0ZWxsc0Fz'
+    'a2luZw==');
 
 @$core.Deprecated('Use stopAgentRequestDescriptor instead')
 const StopAgentRequest$json = {
