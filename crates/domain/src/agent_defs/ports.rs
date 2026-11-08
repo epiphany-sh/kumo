@@ -88,7 +88,8 @@ impl std::fmt::Debug for HeadlessProcess {
 pub trait HeadlessRunner: Send + Sync + 'static {
     fn start(&self, spec: &HeadlessSpec) -> Result<HeadlessProcess, AgentError>;
     /// Whether `program --help` mentions `flag`.
-    fn has_flag(&self, program: &Path, flag: &str) -> bool;
+    /// Whether `program --help` lists `flag`; None when it couldn't tell.
+    fn has_flag(&self, program: &Path, flag: &str, env: &[(String, String)]) -> Option<bool>;
 }
 
 /// A web page, read once as text.

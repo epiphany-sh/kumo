@@ -95,7 +95,15 @@ class EngineAgentDefs extends AgentDefsSource {
   /// The main checkout of the workspace's repository [name].
   String _repoPath(String name) => _workspace.repos.where((r) => r.name == name).firstOrNull?.path ?? '';
 
-  pb.AgentDefFile _fileOf(AgentDef a) => agentDefFileTo(a, repoPath: a.scope == AgentScope.project ? _repoPath(a.repo) : '');
+  /// The main checkout of the repository [where]'s worktree belongs to.
+  String _repoOfWorktree(AgentWhere where) {
+    for (final repo in _workspace.repos) {
+      if (repo.worktrees.any((w) => _workspace.absolutePathOf(w) == where.path)) return repo.path ?? '';
+    }
+    return _repoPath(where.repo);
+  }
+
+  pb.AgentDefFile _fileOf(AgentDef a) => agentDefFileTo(a, repoPath: a.scope == AgentScope.project ? (a.repoPath.isNotEmpty ? a.repoPath : _repoPath(a.repo)) : '');
 
   @override
   Future<AgentDef> save(AgentDef agent, {AgentDef? previous}) async {
@@ -103,6 +111,8 @@ class EngineAgentDefs extends AgentDefsSource {
       final request = pb.SaveAgentDefRequest(agent: _fileOf(agent));
       if (previous != null) request.previous = _fileOf(previous);
       await (await _client).save(request);
+      // As it lists from now on.
+      agent = agent.copyWith(repoPath: request.agent.repoPath);
       if (previous != null && previous.key != agent.key) {
         final kept = _plays.remove(previous.key);
         if (kept != null) _plays[agent.key] = kept;
@@ -154,14 +164,9 @@ class EngineAgentDefs extends AgentDefsSource {
 
   @override
   Future<AgentRun?> run(AgentDef agent, AgentWhere where, {String prompt = '', List<AgentContextItem> context = const []}) async {
-    final here = switch (where.kind) {
-      AgentWhereKind.worktree || AgentWhereKind.newWorktree => where.repo,
-      AgentWhereKind.link => parseRepoLink(where.url)?.name ?? '',
-      _ => '',
-    };
     final request = pb.RunAgentDefRequest(
       agent: _fileOf(agent),
-      inlineJson: agentFoundIn(agent, here) ? '' : agentInlineJson(agent),
+      inlineJson: agentFoundByName(agent) ? '' : agentInlineJson(agent),
       prompt: prompt,
       context: [for (final c in context) agentContextTo(c)],
       cols: 120,
@@ -169,7 +174,13 @@ class EngineAgentDefs extends AgentDefsSource {
     );
     switch (where.kind) {
       case AgentWhereKind.worktree:
-        request.worktreePath = where.path;
+        // Claude Code doesn't isolate an agent run with --agent: Kumo does.
+        final repo = agent.isolation ? _repoOfWorktree(where) : '';
+        if (repo.isNotEmpty) {
+          request.newWorktreeRepo = repo;
+        } else {
+          request.worktreePath = where.path;
+        }
       case AgentWhereKind.newWorktree:
         request.newWorktreeRepo = _repoPath(where.repo);
       case AgentWhereKind.link:
@@ -321,10 +332,11 @@ String unfence(String text) {
 /// read still lists, its text as the instructions, for Edit to show.
 AgentDef agentDefFrom(pb.AgentDefFile f) {
   final scope = f.scope == pb.AgentDefScope.AGENT_DEF_SCOPE_PROJECT ? AgentScope.project : AgentScope.personal;
-  final read = readAgentFile(f.markdown, scope: scope, repo: f.repoName).agent;
+  final read = readAgentFile(f.markdown, scope: scope, repo: f.repoName, asWritten: true).agent;
   final agent = (read ?? AgentDef(name: f.name, instructions: f.markdown, scope: scope, repo: f.repoName)).copyWith(name: f.name);
   final s = f.settings;
   return agent.copyWith(
+    repoPath: f.repoPath,
     maxMinutes: () => s.hasMaxMinutes() ? s.maxMinutes : null,
     maxCostUsd: () => s.hasMaxCostUsd() ? s.maxCostUsd : null,
     triggers: [
@@ -357,7 +369,8 @@ pb.AgentDefFile agentDefFileTo(AgentDef a, {String repoPath = ''}) {
 /// it already).
 PlayRun playEnded(PlayRun run, int code, {bool stopped = false}) {
   if (run.state != PlayState.running) return run;
-  if (stopped) return run.copyWith(state: PlayState.stopped);
+  // 130: stopped; 124: its time limit.
+  if (stopped || code == 130 || code == 124) return run.copyWith(state: PlayState.stopped);
   return code == 0 ? run.copyWith(state: PlayState.done) : run.copyWith(state: PlayState.failed, error: 'Claude Code exited with code $code.');
 }
 

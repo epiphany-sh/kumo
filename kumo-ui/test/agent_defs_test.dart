@@ -118,9 +118,9 @@ void main() {
 
     test('commands: by name where it’s found, inline elsewhere', () {
       const a = AgentDef(name: 'go-pr-reviewer', scope: AgentScope.project, repo: 'price-admin');
-      expect(agentFoundIn(a, 'price-admin'), isTrue);
-      expect(agentFoundIn(a, 'users-permissions'), isFalse);
-      expect(agentCommand(a, foundHere: true, contextDir: '~/.kumo/runs/x', prompt: 'Review #521'), 'claude --agent go-pr-reviewer --add-dir ~/.kumo/runs/x "Review #521"');
+      expect(agentFoundByName(a), isFalse, reason: 'its file may be uncommitted, or not in that worktree');
+      expect(agentFoundByName(const AgentDef(name: 'x')), isTrue);
+      expect(agentCommand(a, foundHere: true, contextDir: '~/.kumo/runs/x', prompt: 'Review #521'), 'claude --agent go-pr-reviewer --add-dir ~/.kumo/runs/x -- "Review #521"');
       expect(agentCommand(a, foundHere: false), startsWith('claude --agents \'{"go-pr-reviewer": …}\' --agent go-pr-reviewer'));
       final inline = jsonDecode(agentInlineJson(a.copyWith(instructions: 'Hi.'))) as Map;
       expect((inline['go-pr-reviewer'] as Map)['prompt'], 'Hi.');
@@ -205,7 +205,7 @@ void main() {
       await tester.tap(find.text('go-pr-reviewer').first);
       await tester.pump();
       expect(find.text('1 · Where should it work?'), findsOneWidget);
-      expect(find.textContaining('claude --agent go-pr-reviewer'), findsOneWidget);
+      expect(find.textContaining('--agent go-pr-reviewer'), findsOneWidget);
       // Its running review: a terminal right here.
       await tester.tap(find.text('PR #521 · Bulk discounts').first);
       await tester.pump();
@@ -343,6 +343,36 @@ void main() {
     expect(read.maxMinutes, 7, reason: 'what only Kumo keeps stays');
     expect(agentFromPastedFile(read), isNull);
     expect(agentFromPastedFile(a.copyWith(instructions: 'You find duplicates.\n---\nmore')), isNull);
+  });
+
+  test('a file in use shows what it really grants; an import comes in safer', () {
+    const file = '---\nname: wide\ndescription: d\npermissionMode: bypassPermissions\n---\n\nDo things.';
+    final listed = readAgentFile(file, asWritten: true).agent!;
+    expect((listed.everyTool, listed.approvals, agentWrites(listed.tools)), (true, AgentApprovals.bypass, true));
+    expect(agentChecks(listed).where((c) => c.level == CheckLevel.warn).map((c) => c.text).join(), allOf(contains('bypassPermissions'), contains('no tools line')));
+    expect(listed.toMarkdown(), isNot(contains('tools:')), reason: 'saving doesn’t narrow it behind your back');
+    expect(listed.toMarkdown(), contains('permissionMode: bypassPermissions'));
+    expect((jsonDecode(agentInlineJson(listed)) as Map)['wide'], isNot(contains('tools')));
+    expect(listed.copyWith(tools: readOnlyTools).everyTool, isFalse);
+
+    final imported = readAgentFile(file).agent!;
+    expect((imported.everyTool, imported.approvals, imported.tools), (false, AgentApprovals.ask, readOnlyTools));
+  });
+
+  test('inline, an agent keeps what its file says', () {
+    const file = '---\nname: full\ndescription: d\ntools: Read, Bash\nskills: a, b\nmemory: project\ndisallowedTools: Bash, Write\neffort: high\nhooks:\n  Stop:\n    - type: command\n---\n\nDo things.';
+    final json = (jsonDecode(agentInlineJson(readAgentFile(file, asWritten: true).agent!)) as Map)['full'] as Map;
+    expect(json['disallowedTools'], ['Bash', 'Write'], reason: 'a list, or --agents refuses the whole agent');
+    expect(json['skills'], ['a', 'b']);
+    expect(json['memory'], 'project');
+    expect(json['effort'], 'high');
+    expect(json['hooks'], {'Stop': [{'type': 'command'}]});
+  });
+
+  test('two repositories of the same name keep their agents apart', () {
+    const one = AgentDef(name: 'rev', scope: AgentScope.project, repo: 'api', repoPath: '/work/api');
+    final other = one.copyWith(repoPath: '/oss/api');
+    expect(one.key, isNot(other.key));
   });
 
   test('only time working counts towards a run’s limit', () {

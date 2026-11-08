@@ -429,6 +429,7 @@ class _AgentEditorState extends State<_AgentEditor> {
           hint: 'what it asks you first',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             for (final p in AgentApprovals.values)
+              if (p != AgentApprovals.bypass || a.approvals == p)
               _Radio(label: p.label, detail: p.key, hint: p.hint, selected: a.approvals == p, onTap: () => _set(a.copyWith(approvals: p))),
           ]),
         ),

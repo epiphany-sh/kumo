@@ -81,11 +81,16 @@ impl HeadlessRunner for ProcessHeadlessRunner {
         })
     }
 
-    fn has_flag(&self, program: &Path, flag: &str) -> bool {
+    fn has_flag(&self, program: &Path, flag: &str, env: &[(String, String)]) -> Option<bool> {
         let mut command = Command::new(program);
         command.arg("--help");
-        run_with_timeout(command, Duration::from_secs(10))
-            .is_ok_and(|(out, err)| out.contains(flag) || err.contains(flag))
+        command.envs(env.iter().map(|(k, v)| (k, v)));
+        let (out, err) = run_with_timeout(command, Duration::from_secs(10)).ok()?;
+        if out.contains(flag) || err.contains(flag) {
+            return Some(true);
+        }
+        // A help that lists options, without this one; else it didn't run.
+        out.contains("--").then_some(false)
     }
 }
 
@@ -132,7 +137,25 @@ mod tests {
         let mut perms = std::fs::metadata(&program).unwrap().permissions();
         std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o755);
         std::fs::set_permissions(&program, perms).unwrap();
-        assert!(ProcessHeadlessRunner.has_flag(&program, "--max-budget-usd"));
-        assert!(!ProcessHeadlessRunner.has_flag(&program, "--nope"));
+        assert_eq!(
+            ProcessHeadlessRunner.has_flag(&program, "--max-budget-usd", &[]),
+            Some(true)
+        );
+        // It ran and listed options, or didn't list a thing: not the same.
+        assert_eq!(
+            ProcessHeadlessRunner.has_flag(&program, "--nope", &[]),
+            Some(false)
+        );
+        std::fs::write(&program, "#!/bin/sh\necho $KUMO_MARK\n").unwrap();
+        assert_eq!(
+            ProcessHeadlessRunner.has_flag(&program, "--nope", &[]),
+            None,
+            "a hiccup isn't an answer"
+        );
+        let env = [("KUMO_MARK".to_owned(), "--from-its-env".to_owned())];
+        assert_eq!(
+            ProcessHeadlessRunner.has_flag(&program, "--from-its-env", &env),
+            Some(true)
+        );
     }
 }

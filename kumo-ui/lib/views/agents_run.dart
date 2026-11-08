@@ -148,16 +148,10 @@ class _RunTabState extends State<_RunTab> {
       for (final i in [...found, ...f.added]) if (!f.removed.contains(i.title)) i,
     ];
     final knowledge = widget.current.knowledge;
-    final repoHere = switch (f.where) {
-      AgentWhereKind.worktree => picked?.$1.name ?? '',
-      AgentWhereKind.newWorktree => f.newIn ?? '',
-      AgentWhereKind.link => link?.name ?? '',
-      _ => '',
-    };
     final writes = agentWrites(a.tools);
     final busy = picked != null && s.agents.runs.any((r) => r.worktreePath == picked.$3 && r.status != AgentStatus.done);
     final (whereNote, whereWarn) = switch (f.where) {
-      AgentWhereKind.worktree when a.isolation => ('Isolation is on: it works in a fresh worktree of ${picked?.$1.name ?? 'the repo'}, so the files here don’t change.', false),
+      AgentWhereKind.worktree when a.isolation => ('Isolation is on: Kumo makes it a fresh worktree of ${picked?.$1.name ?? 'the repo'} from the default branch, so the files here don’t change.', false),
       AgentWhereKind.worktree when writes && busy => ('Another agent is working in this worktree, and this one can change files: pick a new worktree, or turn on Isolation in Edit.', true),
       AgentWhereKind.worktree when busy => ('Read-only, so it can share this worktree with the agent working there without touching its files.', false),
       AgentWhereKind.worktree => ('Nothing else runs in this worktree.', false),
@@ -167,7 +161,7 @@ class _RunTabState extends State<_RunTab> {
       AgentWhereKind.scratch => ('An empty folder kept for a week, for research or writing. Files can open it.', false),
     };
     final contextDir = context0.isEmpty && knowledge.isEmpty ? '' : '~/.kumo/runs/${a.name}-${widget.runs.length + 1}';
-    final cmd = agentCommand(a, foundHere: agentFoundIn(a, repoHere), contextDir: contextDir, prompt: f.prompt.text);
+    final cmd = agentCommand(a, foundHere: agentFoundByName(a), contextDir: contextDir, prompt: f.prompt.text);
     final canStart = !widget.fresh && !_starting && switch (f.where) {
       AgentWhereKind.worktree => picked != null,
       AgentWhereKind.newWorktree => f.newIn != null,

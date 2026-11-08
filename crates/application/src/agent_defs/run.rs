@@ -10,7 +10,7 @@ use kumo_domain::agent_defs::{
     AgentDefFile, ContextFile, RepoLink, WrittenContext, check_agent_name, context_index,
     file_name, next_free, pull_number, run_args, task_key,
 };
-use kumo_domain::agents::{AgentContext, AgentError, AgentSession, ContextKind};
+use kumo_domain::agents::{AgentContext, AgentError, AgentSession, AgentState, ContextKind};
 use kumo_domain::terminal::TerminalSize;
 
 use super::service::{AgentDefService, CLAUDE, blocking};
@@ -219,32 +219,69 @@ impl AgentDefService {
                 .find(|w| w.branch.as_deref() == Some(branch))
                 .map(|w| w.path.clone())
         };
-        let (branch, reference) = match (link.number, link.branch.as_str()) {
-            (Some(number), _) => {
-                let head = self
-                    .ports
-                    .sources
-                    .pull_request(&repo, number)
-                    .await
-                    .ok()
-                    .map(|pr| pr.head);
-                if let Some(path) = head.as_deref().and_then(on_branch) {
-                    return Ok((path, Some(repo)));
-                }
-                let reference = link.head_ref().unwrap_or_default();
-                (head.unwrap_or_else(|| format!("pr-{number}")), reference)
+        let fetch = |reference: String| {
+            let (git, at) = (Arc::clone(&self.ports.git), repo.clone());
+            blocking(move || git.fetch(&at, &reference).map_err(launch_error))
+        };
+        if let Some(number) = link.number {
+            let head = self
+                .ports
+                .sources
+                .pull_request(&repo, number)
+                .await
+                .ok()
+                .map(|pr| pr.head);
+            let sha = fetch(link.head_ref().unwrap_or_default()).await?;
+            // A branch of that name is this pull request's only if it's at
+            // its head: a fork's may be called `main`, a local one be behind.
+            let at_head = |branch: &str| {
+                state
+                    .worktrees
+                    .iter()
+                    .find(|w| {
+                        w.branch.as_deref() == Some(branch)
+                            && !w.head.is_empty()
+                            && sha.starts_with(&w.head)
+                    })
+                    .map(|w| w.path.clone())
+            };
+            let fallback = format!("pr-{number}");
+            if let Some(path) = head
+                .as_deref()
+                .and_then(at_head)
+                .or_else(|| at_head(&fallback))
+            {
+                return Ok((path, Some(repo)));
             }
-            (None, "") => return Ok((repo.clone(), Some(repo))),
-            (None, branch) => {
+            let branches = self
+                .workspace
+                .branches(&repo)
+                .await
+                .map_err(workspace_error)?;
+            let taken = |name: &str| branches.local.iter().any(|b| b == name);
+            let name = head.filter(|h| !taken(h)).unwrap_or(fallback);
+            let name = if taken(&name) {
+                next_free(&name, taken)
+            } else {
+                name
+            };
+            let worktree = self
+                .workspace
+                .create_worktree(&repo, &name, true, Some(sha), "")
+                .await
+                .map_err(workspace_error)?;
+            return Ok((worktree.path, Some(repo)));
+        }
+        let (branch, reference) = match link.branch.as_str() {
+            "" => return Ok((repo.clone(), Some(repo))),
+            branch => {
                 if let Some(path) = on_branch(branch) {
                     return Ok((path, Some(repo)));
                 }
                 (branch.to_owned(), branch.to_owned())
             }
         };
-        let git = Arc::clone(&self.ports.git);
-        let at = repo.clone();
-        let sha = blocking(move || git.fetch(&at, &reference).map_err(launch_error)).await?;
+        let sha = fetch(reference).await?;
         let branches = self
             .workspace
             .branches(&repo)
@@ -276,6 +313,14 @@ impl AgentDefService {
         };
         let (git, files) = (Arc::clone(&self.ports.git), Arc::clone(&self.ports.files));
         let url = format!("https://{}/{}.git", link.host, link.path);
+        // An agent may be at work in the one from before.
+        let in_use: Vec<PathBuf> = self
+            .agents
+            .sessions()
+            .into_iter()
+            .filter(|s| !matches!(s.state, AgentState::Exited(_)))
+            .map(|s| s.worktree)
+            .collect();
         blocking(move || {
             if !files.exists(&clone) {
                 git.clone_repo(&url, &clone).map_err(launch_error)?;
@@ -284,8 +329,11 @@ impl AgentDefService {
                 return Ok(clone);
             };
             let sha = git.fetch(&clone, &reference).map_err(launch_error)?;
-            let worktree = PathBuf::from(format!("{}@{suffix}", clone.display()));
-            if files.exists(&worktree) {
+            let named = |suffix: &str| PathBuf::from(format!("{}@{suffix}", clone.display()));
+            let mut worktree = named(&suffix);
+            if in_use.contains(&worktree) {
+                worktree = named(&next_free(&suffix, |n| files.exists(&named(n))));
+            } else if files.exists(&worktree) {
                 git.remove_worktree(&clone, &worktree)
                     .map_err(launch_error)?;
             }

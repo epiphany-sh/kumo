@@ -31,7 +31,7 @@ void main() {
       expect(file.settings.maxMinutes, 5);
       expect(file.settings.maxCostUsd, 1.5);
       expect(file.settings.triggers, [pb.AgentDefTrigger.AGENT_DEF_TRIGGER_PULL_REQUEST]);
-      expect(agentDefFrom(file), reviewer);
+      expect(agentDefFrom(file), reviewer.copyWith(repoPath: '/w/price-admin'), reason: 'names aren’t unique: it remembers which');
     });
 
     test('a personal agent has no repository; no settings mean no limits', () {
@@ -97,5 +97,12 @@ void main() {
       final unfinished = playRunFrom(pb.PlayRecord(playId: 'p2', events: [line({'type': 'system'}, 1)]), agent: 'a');
       expect(unfinished.state, PlayState.stopped);
     });
+  });
+
+  test('a stopped test run ends stopped, also when read back', () {
+    final run = PlayRun(id: 'p', agent: 'a', task: 't', draft: false, startedAt: DateTime(2026));
+    expect(playEnded(run, 130).state, PlayState.stopped);
+    expect(playEnded(run, 124).state, PlayState.stopped);
+    expect(playEnded(run, 2).state, PlayState.failed);
   });
 }

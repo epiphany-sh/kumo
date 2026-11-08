@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::time::{Duration, Instant};
 
 use kumo_domain::agent_defs::{
@@ -14,6 +15,7 @@ use kumo_domain::time::Timestamp;
 use tokio::sync::mpsc;
 
 use super::service::{AgentDefService, CLAUDE, blocking};
+use crate::agents::{STOPPED, STOPPED_BY_TIME_LIMIT};
 
 /// How long a question to Claude may take.
 const ASK_TIMEOUT: Duration = Duration::from_secs(120);
@@ -23,6 +25,8 @@ pub(super) struct LivePlay {
     pub key: AgentDefKey,
     pub record: PlayRecord,
     pub killer: Arc<dyn HeadlessKiller>,
+    /// The exit code it ends with because Kumo stopped it; 0 until then.
+    pub stopped: Arc<AtomicI32>,
 }
 
 impl std::fmt::Debug for LivePlay {
@@ -75,15 +79,26 @@ fn failure_line(code: i32, stderr: &str) -> String {
 
 impl AgentDefService {
     /// Whether the installed Claude Code takes a budget; asked once.
-    async fn budget_flag(&self, program: &std::path::Path) -> bool {
+    async fn budget_flag(&self, program: &std::path::Path, env: &[(String, String)]) -> bool {
         if let Some(known) = self.budget_flag.get() {
             return *known;
         }
-        let (headless, program) = (Arc::clone(&self.ports.headless), program.to_owned());
-        let has = blocking(move || Ok(headless.has_flag(&program, "--max-budget-usd")))
+        let (headless, program, env) = (
+            Arc::clone(&self.ports.headless),
+            program.to_owned(),
+            env.to_vec(),
+        );
+        let has = blocking(move || Ok(headless.has_flag(&program, "--max-budget-usd", &env)))
             .await
-            .unwrap_or(false);
-        *self.budget_flag.get_or_init(|| has)
+            .unwrap_or(None);
+        match has {
+            Some(has) => *self.budget_flag.get_or_init(|| has),
+            // Asked again next time: a hiccup isn't its answer.
+            None => {
+                tracing::warn!("couldn't tell if Claude Code takes a budget");
+                false
+            }
+        }
     }
 
     /// Starts a test run: its id, and its events as they come (the last
@@ -103,7 +118,7 @@ impl AgentDefService {
             .await
             .ok_or_else(|| AgentError::UnknownWorktree(start.worktree.clone()))?;
         let (program, env) = self.agents.program_env(CLAUDE).await?;
-        let budget = self.budget_flag(&program).await;
+        let budget = self.budget_flag(&program, &env).await;
         let id = format!("play-{}", AgentSessionId::generate());
 
         let cwd = if start.throwaway {
@@ -172,6 +187,7 @@ impl AgentDefService {
                 key: start.owner.key(),
                 record,
                 killer: Arc::clone(&killer),
+                stopped: Arc::new(AtomicI32::new(0)),
             },
         );
         tracing::info!(play = %id, agent = start.name, "test run started");
@@ -180,13 +196,8 @@ impl AgentDefService {
             let (service, play) = (Arc::clone(self), id.clone());
             tokio::spawn(async move {
                 tokio::time::sleep(service.minutes(minutes)).await;
-                let live = service
-                    .plays_lock()
-                    .get(&play)
-                    .map(|p| Arc::clone(&p.killer));
-                if let Some(killer) = live {
+                if service.stop_play_with(&play, STOPPED_BY_TIME_LIMIT) {
                     tracing::info!(play = %play, "test run reached its time limit");
-                    killer.kill();
                 }
             });
         }
@@ -214,7 +225,9 @@ impl AgentDefService {
                     }
                     let (code, stderr) = wait();
                     let at_ms = elapsed_ms(since);
-                    if code != 0 && !result_seen {
+                    let stopped = service.stopped_play(&play_id);
+                    let code = stopped.unwrap_or(code);
+                    if code != 0 && !result_seen && stopped.is_none() {
                         let line = failure_line(code, &stderr);
                         service.push_line(&play_id, line.clone(), at_ms);
                         let _ = tx.blocking_send(PlayEvent {
@@ -282,10 +295,29 @@ impl AgentDefService {
 
     /// Stops a test run; fine when it already ended.
     pub fn stop_play(&self, id: &str) {
-        let killer = self.plays_lock().get(id).map(|p| Arc::clone(&p.killer));
-        if let Some(killer) = killer {
-            killer.kill();
-        }
+        self.stop_play_with(id, STOPPED);
+    }
+
+    /// Stops it, to end with `code`; false if it isn't running.
+    fn stop_play_with(&self, id: &str, code: i32) -> bool {
+        let live = self
+            .plays_lock()
+            .get(id)
+            .map(|p| (Arc::clone(&p.killer), Arc::clone(&p.stopped)));
+        let Some((killer, stopped)) = live else {
+            return false;
+        };
+        stopped.store(code, Ordering::SeqCst);
+        killer.kill();
+        true
+    }
+
+    /// The exit code of a test run Kumo stopped.
+    fn stopped_play(&self, id: &str) -> Option<i32> {
+        self.plays_lock()
+            .get(id)
+            .map(|p| p.stopped.load(Ordering::SeqCst))
+            .filter(|code| *code != 0)
     }
 
     /// The test runs of `agent`, newest first: the running ones, then the

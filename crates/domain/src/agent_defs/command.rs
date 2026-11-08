@@ -23,7 +23,7 @@ pub fn role_sentence(name: &str) -> String {
 }
 
 /// `claude [--agents <json>] --agent <name> [--add-dir <dir>]
-/// --append-system-prompt <text> [<prompt>]`: an agent in a terminal of its
+/// --append-system-prompt <text> [-- <prompt>]`: an agent in a terminal of its
 /// own. With no prompt the user types; the context folder is then pointed at
 /// in the system prompt instead.
 pub fn run_args(
@@ -47,6 +47,8 @@ pub fn run_args(
     }
     args.extend(["--append-system-prompt".to_owned(), system]);
     if !prompt.is_empty() {
+        // After `--`: a prompt starting with `-` is still the prompt.
+        args.push("--".to_owned());
         args.push(match context_dir {
             Some(dir) => format!("{prompt}\n\n{}", context_sentence(dir)),
             None => prompt.to_owned(),
@@ -141,9 +143,16 @@ mod tests {
                 "/d/runs/rev-1",
                 "--append-system-prompt",
                 &role_sentence("rev"),
+                "--",
                 "Review #521\n\nWhat you were given for this run is in /d/runs/rev-1: start with context.md."
             ]
         );
+    }
+
+    #[test]
+    fn a_prompt_starting_with_a_dash_is_still_the_prompt() {
+        let args = run_args("rev", "", None, "-fix the login test");
+        assert_eq!(&args[args.len() - 2..], ["--", "-fix the login test"]);
     }
 
     #[test]

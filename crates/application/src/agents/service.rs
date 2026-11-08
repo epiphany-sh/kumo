@@ -21,9 +21,9 @@ use crate::terminal::TerminalService;
 use crate::workspace::WorkspaceService;
 
 /// The exit code of a session stopped from Kumo (as Ctrl-C in a shell).
-pub(super) const STOPPED: i32 = 130;
+pub(crate) const STOPPED: i32 = 130;
 /// …and of one stopped by its time limit (as `timeout`).
-pub(super) const STOPPED_BY_TIME_LIMIT: i32 = 124;
+pub(crate) const STOPPED_BY_TIME_LIMIT: i32 = 124;
 
 /// Silence after which a running agent is considered to wait for input.
 const QUIET_AFTER: Duration = Duration::from_millis(2500);

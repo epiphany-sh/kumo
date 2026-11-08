@@ -24,10 +24,22 @@ impl RepoLink {
             .or_else(|| url.strip_prefix("http://"))?;
         let rest = rest.split(['?', '#']).next().unwrap_or_default();
         let (host, path) = rest.split_once('/')?;
-        if host.is_empty() {
+        let host_ok = host.chars().any(char::is_alphanumeric)
+            && !host.contains("..")
+            && host
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':'));
+        if !host_ok {
             return None;
         }
         let parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
+        // These become folders under the clones.
+        if parts
+            .iter()
+            .any(|p| matches!(*p, "." | "..") || p.contains('\\'))
+        {
+            return None;
+        }
         let dash = parts.iter().position(|p| *p == "-");
         let cut = dash.or_else(|| {
             parts
@@ -226,6 +238,21 @@ pub fn html_text(html: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_link_cannot_leave_the_clones_folder() {
+        for url in [
+            "https://host.example/../../../../some/dir/x/tree/b",
+            "https://host.example/a/../../../x",
+            "https://host.example/./a/b",
+            "https://host.example/a\\..\\b/c",
+            "https://../a/b",
+            "https://ho st/a/b",
+        ] {
+            assert_eq!(RepoLink::parse(url), None, "{url}");
+        }
+        assert!(RepoLink::parse("https://git.host.example:8443/a/b.c").is_some());
+    }
 
     fn item(kind: ContextKind, title: &str, url: &str) -> AgentContext {
         AgentContext {

@@ -386,6 +386,7 @@ async fn a_run_starts_claude_with_its_agent_and_its_context() {
         [
             "--append-system-prompt",
             &kumo_domain::agent_defs::role_sentence("rev"),
+            "--",
             "Review the branch",
             "",
             &sentence
@@ -508,6 +509,165 @@ async fn a_run_is_stopped_when_its_time_is_up() {
     .await;
     assert_eq!(ended.exit_code, 124);
     assert_eq!(ended.events.last().unwrap().text, "Stopped: its time limit");
+}
+
+/// A local repository with a pull request 7, standing in for a host.
+fn host_repo(s: &Setup) -> PathBuf {
+    let origin = git_repo(&s.daemon.home().join("origin"), None);
+    let head = git(&origin, &["rev-parse", "HEAD"]);
+    git(&origin, &["update-ref", "refs/pull/7/head", head.trim()]);
+    origin
+}
+
+/// Git fetches the workspace's repository's `origin` from `host` instead.
+fn serve_origin(s: &Setup, host: &Path) {
+    git(
+        &s.repo,
+        &[
+            "config",
+            &format!("url.{}.insteadOf", host.display()),
+            "https://github.com/acme/app.git",
+        ],
+    );
+}
+
+/// Moves pull request 7 forward.
+fn push_to_pull(origin: &Path) {
+    git(origin, &["commit", "--allow-empty", "-q", "-m", "more"]);
+    let head = git(origin, &["rev-parse", "HEAD"]);
+    git(origin, &["update-ref", "refs/pull/7/head", head.trim()]);
+}
+
+/// A pull request's link is its head, not whatever a branch of that name has.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_pull_request_runs_at_its_head() {
+    use pb::run_agent_def_request::Where;
+    let mut s = Setup::new().await;
+    let origin = host_repo(&s);
+    serve_origin(&s, &origin);
+    let link = "https://github.com/acme/app/pull/7";
+    let agent = personal("rev");
+    s.client
+        .agent_defs
+        .run(run(agent.clone(), Where::LinkUrl(link.into()), ""))
+        .await
+        .unwrap();
+    appears(&s.log.join("run.cwd")).await;
+    let first = s.cwd("run");
+    let head = |dir: &Path| git(dir, &["rev-parse", "HEAD"]).trim().to_owned();
+    assert_eq!(head(&first), head(&origin));
+
+    // Same head: the same worktree. A new one once the head moved.
+    std::fs::remove_file(s.log.join("run.cwd")).unwrap();
+    s.client
+        .agent_defs
+        .run(run(agent.clone(), Where::LinkUrl(link.into()), ""))
+        .await
+        .unwrap();
+    appears(&s.log.join("run.cwd")).await;
+    assert_eq!(s.cwd("run"), first);
+
+    push_to_pull(&origin);
+    std::fs::remove_file(s.log.join("run.cwd")).unwrap();
+    s.client
+        .agent_defs
+        .run(run(agent, Where::LinkUrl(link.into()), ""))
+        .await
+        .unwrap();
+    appears(&s.log.join("run.cwd")).await;
+    let moved = s.cwd("run");
+    assert_ne!(moved, first);
+    assert_eq!(head(&moved), head(&origin));
+}
+
+/// A second run on a link outside the workspace leaves the first one's files.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_second_run_on_a_link_leaves_the_first_ones_worktree() {
+    use pb::run_agent_def_request::Where;
+    let mut s = Setup::new().await;
+    // Already cloned: only fetching from it is left.
+    let origin = host_repo(&s);
+    let clone = s.profile_dir().join("clones/host.example/acme/other");
+    std::fs::create_dir_all(clone.parent().unwrap()).unwrap();
+    git(
+        &s.daemon.home(),
+        &[
+            "clone",
+            "-q",
+            &origin.display().to_string(),
+            &clone.display().to_string(),
+        ],
+    );
+    let link = "https://host.example/acme/other/pull/7";
+    let agent = personal("rev");
+    s.client
+        .agent_defs
+        .run(run(agent.clone(), Where::LinkUrl(link.into()), ""))
+        .await
+        .unwrap();
+    appears(&s.log.join("run.cwd")).await;
+    let first = s.cwd("run");
+    let work = first.join("uncommitted.txt");
+    std::fs::write(&work, "work").unwrap();
+
+    std::fs::remove_file(s.log.join("run.cwd")).unwrap();
+    s.client
+        .agent_defs
+        .run(run(agent, Where::LinkUrl(link.into()), ""))
+        .await
+        .unwrap();
+    appears(&s.log.join("run.cwd")).await;
+    assert_ne!(s.cwd("run"), first);
+    assert_eq!(std::fs::read_to_string(&work).unwrap(), "work");
+}
+
+/// Stopping a test run isn't its failing.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_stopped_test_run_ends_with_130_and_no_failure() {
+    let mut s = Setup::new().await;
+    let path = s.daemon.bin().join("claude");
+    std::fs::write(
+        &path,
+        "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"2.1.0 (Claude Code)\"; exit 0; fi\nif [ \"$1\" = \"--help\" ]; then echo '  --max-budget-usd <amount>'; exit 0; fi\necho '{\"type\":\"system\",\"subtype\":\"init\"}'\nexec /bin/sleep 30\n",
+    )
+    .unwrap();
+    let mut stream = s
+        .client
+        .agent_defs
+        .play(pb::PlayRequest {
+            name: "rev".into(),
+            agent: Some(personal("rev")),
+            inline_json: r#"{"rev":{}}"#.into(),
+            task: "go".into(),
+            worktree_path: s.repo.display().to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let first = stream.message().await.unwrap().unwrap();
+    s.client
+        .agent_defs
+        .stop_play(pb::StopPlayRequest {
+            play_id: first.play_id.clone(),
+        })
+        .await
+        .unwrap();
+    let mut failed = false;
+    let mut exit = None;
+    while let Some(event) = tokio::time::timeout(TIMEOUT, stream.message())
+        .await
+        .unwrap()
+        .unwrap()
+    {
+        match event.kind {
+            Some(pb::play_event::Kind::Line(line)) => failed |= line.contains("is_error"),
+            Some(pb::play_event::Kind::Exited(code)) => exit = Some(code),
+            _ => {}
+        }
+    }
+    assert!(!failed);
+    assert_eq!(exit, Some(130));
 }
 
 /// A conversation isn't cut short while it waits for you: only working

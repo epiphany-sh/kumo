@@ -7,6 +7,8 @@ library;
 
 import 'dart:convert';
 
+import 'package:yaml/yaml.dart';
+
 import 'package:flutter/foundation.dart';
 
 // ---------------------------------------------------------------------------
@@ -32,7 +34,10 @@ enum AgentApprovals {
   ask('default', 'Ask first', 'Asks before each edit and command its tools allow.'),
   plan('plan', 'Plan only', 'Reads and proposes; changes nothing.'),
   acceptEdits('acceptEdits', 'Edits without asking', 'Still asks before commands.'),
-  dontAsk('dontAsk', 'Never ask', 'Denies whatever isn’t allowed instead of asking. For triggers.');
+  dontAsk('dontAsk', 'Never ask', 'Denies whatever isn’t allowed instead of asking. For triggers.'),
+
+  /// Only as a file says it: never offered, and an import comes in asking.
+  bypass('bypassPermissions', 'Skips every approval', 'As its file says: runs everything without asking.');
 
   const AgentApprovals(this.key, this.label, this.hint);
 
@@ -112,6 +117,9 @@ const agentToolGroups = <(String, AgentRisk, List<(String, String)>, String)>[
 
 const readOnlyTools = ['Read', 'Grep', 'Glob'];
 
+/// What a file with no tools line has, as far as Kumo shows it: everything.
+const everyAgentTool = ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'Bash', 'WebFetch', 'WebSearch'];
+
 bool _edits(String t) => t == 'Edit' || t == 'Write' || t == 'MultiEdit' || t == 'NotebookEdit';
 
 /// What [tools] let it do: the riskiest thing, and how to say it.
@@ -156,6 +164,8 @@ class AgentDef {
     this.scope = AgentScope.personal,
     this.repo = '',
     this.maxMinutes,
+    this.everyTool = false,
+    this.repoPath = '',
     this.maxCostUsd,
     this.triggers = const [],
   });
@@ -201,6 +211,12 @@ class AgentDef {
   /// Kumo ends the run when it's up; null: no limit.
   final int? maxMinutes;
 
+  /// Its file has no tools line: every tool, so none is written either.
+  final bool everyTool;
+
+  /// The main checkout of [repo], when known: names aren't unique.
+  final String repoPath;
+
   /// For headless runs (playground, triggers); null: no limit.
   final double? maxCostUsd;
   final List<AgentTrigger> triggers;
@@ -210,7 +226,7 @@ class AgentDef {
   String get file => scope == AgentScope.project ? '$repo/.claude/agents/$name.md' : 'agents/$name.md';
 
   /// The same agent, wherever it's saved.
-  String get key => '${scope.name}:${scope == AgentScope.project ? repo : ''}:$name';
+  String get key => '${scope.name}:${scope == AgentScope.project ? (repoPath.isEmpty ? repo : repoPath) : ''}:$name';
 
   AgentDef copyWith({
     String? name,
@@ -232,6 +248,7 @@ class AgentDef {
     AgentScope? scope,
     String? repo,
     int? Function()? maxMinutes,
+    String? repoPath,
     double? Function()? maxCostUsd,
     List<AgentTrigger>? triggers,
   }) =>
@@ -255,6 +272,8 @@ class AgentDef {
         scope: scope ?? this.scope,
         repo: repo ?? this.repo,
         maxMinutes: maxMinutes == null ? this.maxMinutes : maxMinutes(),
+        everyTool: tools == null && everyTool,
+        repoPath: repoPath ?? this.repoPath,
         maxCostUsd: maxCostUsd == null ? this.maxCostUsd : maxCostUsd(),
         triggers: triggers ?? this.triggers,
       );
@@ -262,7 +281,7 @@ class AgentDef {
   /// The whole agent as text, to compare drafts with what's saved.
   String get fingerprint => jsonEncode([
         name, description, instructions, tools, model, approvals.key, maxTurns, skills, mcpServers, memory.key, isolation, color, knowledge,
-        output.name, outputTemplate, [for (final (k, v) in extra) '$k=$v'], scope.name, repo, maxMinutes, maxCostUsd, [for (final t in triggers) t.name],
+        output.name, outputTemplate, [for (final (k, v) in extra) '$k=$v'], scope.name, repo, repoPath, everyTool, maxMinutes, maxCostUsd, [for (final t in triggers) t.name],
       ]);
 
   @override
@@ -278,7 +297,7 @@ class AgentDef {
     final fm = <(String, String)>[
       ('name', name),
       ('description', one(description)),
-      ('tools', [...tools, for (final m in mcpServers) 'mcp__$m'].join(', ')),
+      if (!everyTool) ('tools', [...tools, for (final m in mcpServers) 'mcp__$m'].join(', ')),
       ('model', model),
       if (approvals != AgentApprovals.ask) ('permissionMode', approvals.key),
       if (maxTurns != null) ('maxTurns', '$maxTurns'),
@@ -372,7 +391,10 @@ class AgentFileRead {
 /// instructions). [taken] are the names already used where it would go: a
 /// clash comes in as `<name>-2`. Without a `tools` line (every tool, in
 /// Claude Code) it comes in read-only.
-AgentFileRead readAgentFile(String text, {AgentScope scope = AgentScope.personal, String repo = '', Set<String> taken = const {}}) {
+///
+/// [asWritten] is for a file already in use (listing): it shows what the file
+/// really grants. Without it (an import) it comes in safer than it was.
+AgentFileRead readAgentFile(String text, {AgentScope scope = AgentScope.personal, String repo = '', Set<String> taken = const {}, bool asWritten = false}) {
   final t = text.replaceAll('\r\n', '\n').trim();
   if (t.isEmpty) return const AgentFileRead(null, []);
   final m = RegExp(r'^---\n([\s\S]*?)\n---[ \t]*(?:\n([\s\S]*))?$').firstMatch(t);
@@ -431,7 +453,7 @@ AgentFileRead readAgentFile(String text, {AgentScope scope = AgentScope.personal
   var tools = [for (final t in allTools) if (!t.startsWith('mcp__')) t];
   if (!fields.containsKey('tools')) {
     checks.add(const AgentCheck(CheckLevel.warn, 'No tools line: in Claude Code that means every tool. It comes in read-only; give it more in Edit.'));
-    tools = readOnlyTools;
+    tools = asWritten ? everyAgentTool : readOnlyTools;
   } else {
     final writes = agentWrites(tools);
     checks.add(AgentCheck(writes ? CheckLevel.warn : CheckLevel.ok, 'Tools: ${allTools.join(', ')}.${writes ? ' It can change things: check its approvals in Edit.' : ''}'));
@@ -487,7 +509,8 @@ AgentFileRead readAgentFile(String text, {AgentScope scope = AgentScope.personal
       instructions: body,
       tools: tools,
       model: (fields['model'] ?? '').isEmpty ? 'inherit' : fields['model']!,
-      approvals: AgentApprovals.of(fields['permissionMode'] ?? '') ?? AgentApprovals.ask,
+      approvals: _approvalsOf(fields['permissionMode'] ?? '', asWritten: asWritten),
+      everyTool: asWritten && !fields.containsKey('tools'),
       // No maxTurns line: no limit, as Claude Code reads it.
       maxTurns: turns,
       skills: list(fields['skills']),
@@ -504,6 +527,11 @@ AgentFileRead readAgentFile(String text, {AgentScope scope = AgentScope.personal
     ),
     checks,
   );
+}
+
+AgentApprovals _approvalsOf(String key, {required bool asWritten}) {
+  final approvals = AgentApprovals.of(key) ?? AgentApprovals.ask;
+  return approvals == AgentApprovals.bypass && !asWritten ? AgentApprovals.ask : approvals;
 }
 
 String _unquote(String s) {
@@ -582,6 +610,10 @@ List<AgentCheck> agentChecks(AgentDef a, {Set<String> taken = const {}}) {
       const AgentCheck(CheckLevel.error, 'Pick at least one tool, even if only Read.')
     else
       AgentCheck(CheckLevel.ok, 'Tools: ${agentToolsKind(a.tools).$2}.'),
+    if (a.approvals == AgentApprovals.bypass)
+      const AgentCheck(CheckLevel.warn, 'Its file skips every approval (bypassPermissions): it runs everything without asking.'),
+    if (a.everyTool)
+      const AgentCheck(CheckLevel.warn, 'Its file has no tools line: it has every tool, MCP ones too. Pick some in Edit to limit it.'),
     if (writes && (a.approvals == AgentApprovals.acceptEdits || a.approvals == AgentApprovals.dontAsk) && a.maxTurns == null && a.maxMinutes == null)
       const AgentCheck(CheckLevel.warn, 'It changes things without asking and has no limits.'),
     if (writes && a.triggers.isNotEmpty && !a.isolation)
@@ -603,6 +635,7 @@ String? agentToolsWarning(AgentDef a) {
     AgentApprovals.plan => 'Plan only: it proposes, and changes nothing until you say so.',
     AgentApprovals.acceptEdits => 'It edits without asking, and asks before commands.',
     AgentApprovals.dontAsk => 'It won’t ask: anything not allowed is denied.',
+    AgentApprovals.bypass => 'It won’t ask: its file skips every approval.',
   };
   return '$what $where $ask';
 }
@@ -617,16 +650,38 @@ String agentInlineJson(AgentDef a) => jsonEncode({
       a.name: {
         'description': a.description,
         'prompt': a.toMarkdown().split('\n---\n').skip(1).join('\n---\n').trim(),
-        'tools': [...a.tools, for (final m in a.mcpServers) 'mcp__$m'],
+        if (!a.everyTool) 'tools': [...a.tools, for (final m in a.mcpServers) 'mcp__$m'],
         'model': a.model,
         if (a.approvals != AgentApprovals.ask) 'permissionMode': a.approvals.key,
         if (a.maxTurns != null) 'maxTurns': a.maxTurns,
+        if (a.skills.isNotEmpty) 'skills': a.skills,
+        if (a.mcpServers.isNotEmpty) 'mcpServers': a.mcpServers,
+        if (a.memory != AgentMemory.none) 'memory': a.memory.key,
+        for (final (k, v) in a.extra) k: _inlineValue(k, v),
       },
     });
 
-/// Whether [a] is found by name where it runs: personal agents everywhere,
-/// a project agent only in its own repository.
-bool agentFoundIn(AgentDef a, String repoName) => a.scope == AgentScope.personal || a.repo == repoName;
+/// A field Kumo doesn't edit, from the way it's written in the file to what
+/// `--agents` takes (which refuses the whole agent over a wrong type).
+Object? _inlineValue(String key, String written) {
+  Object? value;
+  try {
+    final doc = loadYaml('$key:${written.startsWith('\n') ? written : ' $written'}');
+    value = jsonDecode(jsonEncode((doc as Map)[key]));
+  } on Object {
+    value = written.trim();
+  }
+  // Written as "A, B" in a file, a list here.
+  if (const {'disallowedTools'}.contains(key) && value is String) {
+    return [for (final t in value.split(',')) if (t.trim().isNotEmpty) t.trim()];
+  }
+  return value;
+}
+
+/// Whether [a] is found by name wherever it runs: only personal agents. A
+/// project agent's file may be uncommitted, or missing from another worktree,
+/// so it always goes inline, as saved.
+bool agentFoundByName(AgentDef a) => a.scope == AgentScope.personal;
 
 /// The command its terminal runs, as Kumo shows it (the engine builds the
 /// real argv from the same parts).
@@ -635,7 +690,7 @@ String agentCommand(AgentDef a, {required bool foundHere, String contextDir = ''
   final agent = foundHere ? '--agent ${a.name}' : '--agents \'{"${a.name}": …}\' --agent ${a.name}';
   final p = prompt.trim();
   final quoted = p.isEmpty ? '' : ' "${p.length > 70 ? '${p.substring(0, 68)}…' : p}"';
-  return 'claude $agent${contextDir.isEmpty ? '' : ' --add-dir $contextDir'}$quoted';
+  return 'claude $agent${contextDir.isEmpty ? '' : ' --add-dir $contextDir'}${quoted.isEmpty ? '' : ' --$quoted'}';
 }
 
 /// The headless run the playground starts.
