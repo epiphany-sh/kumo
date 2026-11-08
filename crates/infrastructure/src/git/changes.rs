@@ -4,8 +4,8 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use kumo_domain::changes::{
-    ChangeKind, ChangesError, CommitInfo, CommitOptions, DiffLine, DiffLineKind, DiffScope,
-    FileChange, FileDiff, FileList, GitChanges, RelativePath, WorktreeChanges,
+    ChangeKind, ChangesError, CommitDetail, CommitInfo, CommitOptions, DiffLine, DiffLineKind,
+    DiffScope, FileChange, FileDiff, FileList, GitChanges, RelativePath, WorktreeChanges,
 };
 
 use super::GitCli;
@@ -309,7 +309,7 @@ impl GitChanges for GitCli {
             args.extend(["-m", message]);
         }
         self.git(worktree, args)?;
-        self.log(worktree, 1)?
+        self.log(worktree, 1, false)?
             .into_iter()
             .next()
             .ok_or_else(|| ChangesError::Git("commit not found".into()))
@@ -336,19 +336,24 @@ impl GitChanges for GitCli {
             .map(drop)
     }
 
-    fn log(&self, worktree: &Path, limit: usize) -> Result<Vec<CommitInfo>, ChangesError> {
+    fn log(
+        &self,
+        worktree: &Path,
+        limit: usize,
+        all_branches: bool,
+    ) -> Result<Vec<CommitInfo>, ChangesError> {
         if !self.has_head(worktree) {
             return Ok(Vec::new());
         }
-        let raw = self.git(
-            worktree,
-            [
-                "log",
-                &format!("-n{limit}"),
-                "--format=%H%x1f%h%x1f%s%x1f%an%x1f%at%x1e",
-            ],
-        )?;
-        Ok(parse_log(&raw))
+        if all_branches {
+            self.log_all_branches(worktree, limit)
+        } else {
+            self.log_range(worktree, "HEAD", limit)
+        }
+    }
+
+    fn show_commit(&self, worktree: &Path, sha: &str) -> Result<CommitDetail, ChangesError> {
+        self.show(worktree, sha)
     }
 
     fn watched_paths(&self, worktree: &Path) -> Result<Vec<PathBuf>, ChangesError> {
@@ -564,21 +569,6 @@ fn parse_unified(raw: &str) -> FileDiff {
     }
 }
 
-fn parse_log(raw: &str) -> Vec<CommitInfo> {
-    raw.split('\x1e')
-        .filter_map(|record| {
-            let mut f = record.trim_start_matches('\n').split('\x1f');
-            Some(CommitInfo {
-                sha: f.next().filter(|s| !s.is_empty())?.to_owned(),
-                short_sha: f.next()?.to_owned(),
-                subject: f.next()?.to_owned(),
-                author: f.next()?.to_owned(),
-                time_unix: f.next()?.trim().parse().unwrap_or(0),
-            })
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -693,20 +683,5 @@ mod tests {
             ]
         );
         assert!(parse_unified("Binary files a/x and b/x differ\n").binary);
-    }
-
-    #[test]
-    fn parses_log_records() {
-        let raw = "abc\x1fab\x1ffeat: x\x1fAna\x1f1700000000\x1e\ndef\x1fde\x1ffix: y\x1fBo\x1f1700000001\x1e\n";
-        let log = parse_log(raw);
-        assert_eq!(log.len(), 2);
-        assert_eq!(
-            (
-                log[1].short_sha.as_str(),
-                log[1].subject.as_str(),
-                log[1].time_unix
-            ),
-            ("de", "fix: y", 1_700_000_001)
-        );
     }
 }

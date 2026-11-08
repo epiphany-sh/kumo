@@ -57,6 +57,7 @@ class RepoPullRequest {
     this.checksState,
     this.url = '',
     this.base = '',
+    this.openThreads,
   });
 
   /// As the host shows it: `#521`, `!231`.
@@ -81,6 +82,9 @@ class RepoPullRequest {
   /// The branch it merges into; empty when the host didn't say.
   final String base;
 
+  /// Unresolved review threads, when the host's list says.
+  final int? openThreads;
+
   /// The number without the host's sign (`#521` → 521); 0 when unknown.
   int get id => int.tryParse(number.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
 
@@ -97,6 +101,7 @@ class RepoPullRequest {
         checksState: checksState,
         url: url,
         base: base,
+        openThreads: openThreads,
       );
 }
 

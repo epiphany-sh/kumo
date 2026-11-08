@@ -371,6 +371,7 @@ async fn stage_commit_undo_and_log() {
         .log(pb::LogRequest {
             worktree_path: request(&wt),
             limit: 10,
+            ..Default::default()
         })
         .await
         .unwrap()
@@ -535,4 +536,160 @@ async fn restore_discards_modified_added_and_untracked_files() {
     assert!(!wt.join("new file.txt").exists());
     assert!(wt.join("keep.txt").exists());
     assert_eq!(git(&wt, &["status", "--porcelain"]), "?? keep.txt\n");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn every_branch_history_and_what_a_commit_changed() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = feature_worktree(&daemon, &mut client).await;
+    let main = std::fs::canonicalize(daemon.home().join("dev/app")).unwrap();
+    let log = |all_branches| pb::LogRequest {
+        worktree_path: request(&main),
+        limit: 10,
+        all_branches,
+    };
+
+    let only_main = client
+        .git
+        .log(log(false))
+        .await
+        .unwrap()
+        .into_inner()
+        .commits;
+    assert_eq!(
+        only_main
+            .iter()
+            .map(|c| c.subject.as_str())
+            .collect::<Vec<_>>(),
+        ["init"]
+    );
+    let all = client
+        .git
+        .log(log(true))
+        .await
+        .unwrap()
+        .into_inner()
+        .commits;
+    // Both commits can share a second: compare without the order.
+    let mut rows: Vec<_> = all
+        .iter()
+        .map(|c| (c.subject.as_str(), c.branch.as_str()))
+        .collect();
+    rows.sort_unstable();
+    assert_eq!(rows, [("feat: first", "feat/x"), ("init", "")]);
+    let first = all.iter().find(|c| c.branch == "feat/x").unwrap();
+
+    let detail = client
+        .git
+        .show_commit(pb::ShowCommitRequest {
+            worktree_path: request(&main),
+            sha: first.short_sha.clone(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(detail.sha, first.sha);
+    let files: Vec<_> = detail
+        .files
+        .iter()
+        .map(|f| (f.path.as_str(), f.kind(), f.added, f.deleted))
+        .collect();
+    assert_eq!(
+        files,
+        [
+            ("README.md", pb::ChangeKind::Modified, 1, 0),
+            ("src/lib.rs", pb::ChangeKind::Added, 1, 0)
+        ]
+    );
+    let hunk = &detail.files[0].hunks[0];
+    assert_eq!(
+        (hunk.old_start, hunk.new_start, hunk.lines.len()),
+        (1, 1, 2)
+    );
+
+    let missing = client
+        .git
+        .show_commit(pb::ShowCommitRequest {
+            worktree_path: request(&wt),
+            sha: "0123456789abcdef".into(),
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(missing.code(), tonic::Code::FailedPrecondition);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn tags_without_a_host_list_alone_with_their_ranges() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = feature_worktree(&daemon, &mut client).await;
+    let main = std::fs::canonicalize(daemon.home().join("dev/app")).unwrap();
+    git(&main, &["tag", "v0.1.0"]);
+    git(
+        &main,
+        &[
+            "merge",
+            "-q",
+            "--no-ff",
+            "feat/x",
+            "-m",
+            "Merge pull request #4 from team/feat/APP-12-first",
+        ],
+    );
+    git(&main, &["tag", "-a", "v0.2.0", "-m", "Second"]);
+    drop(wt);
+
+    let list = client
+        .releases
+        .list(pb::ListReleasesRequest {
+            repo_path: request(&main),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(
+        list.releases
+            .iter()
+            .map(|r| (r.tag.as_str(), r.kind()))
+            .collect::<Vec<_>>(),
+        [
+            ("v0.2.0", pb::ReleaseKind::TagOnly),
+            ("v0.1.0", pb::ReleaseKind::TagOnly)
+        ]
+    );
+    assert!(list.problem.is_none(), "no host: nothing to complain about");
+
+    let range = client
+        .releases
+        .range(pb::ReleaseRangeRequest {
+            repo_path: request(&main),
+            tag: "v0.2.0".into(),
+            since: "v0.1.0".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!((range.commits, range.files, range.added), (2, 2, 2));
+    assert_eq!(
+        range
+            .prs
+            .iter()
+            .map(|p| (p.r#ref.as_str(), p.ticket.as_str()))
+            .collect::<Vec<_>>(),
+        [("#4", "APP-12")]
+    );
+
+    let edit = client
+        .releases
+        .edit(pb::EditReleaseRequest {
+            repo_path: request(&main),
+            tag: "v0.2.0".into(),
+            notes: Some("Notes".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(edit.code(), tonic::Code::Unimplemented);
 }

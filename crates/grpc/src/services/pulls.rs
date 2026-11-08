@@ -2,11 +2,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use kumo_application::pulls::PullRequestService;
+use kumo_domain::pulls::ThreadAnswer;
 use kumo_proto::v1 as pb;
 use tonic::{Request, Response, Status};
 
 use crate::mapping::{
     branch_pull_request_to, pipelines_status_from, pull_request_list_to, pull_request_to,
+    review_thread_to,
 };
 use crate::profile::{Profiles, services_of};
 
@@ -74,5 +76,38 @@ impl pb::pull_requests_server::PullRequests for PullRequestsGrpc {
             .await
             .map_err(pipelines_status_from)?;
         Ok(Response::new(pull_request_to(&created)))
+    }
+
+    async fn threads(
+        &self,
+        request: Request<pb::PullRequestThreadsRequest>,
+    ) -> Result<Response<pb::ThreadList>, Status> {
+        let service = self.service(&request).await?;
+        let r = request.into_inner();
+        let threads = service
+            .threads(&PathBuf::from(r.repo_path), r.number)
+            .await
+            .map_err(pipelines_status_from)?;
+        Ok(Response::new(pb::ThreadList {
+            threads: threads.iter().map(review_thread_to).collect(),
+        }))
+    }
+
+    async fn answer_thread(
+        &self,
+        request: Request<pb::AnswerThreadRequest>,
+    ) -> Result<Response<pb::ReviewThread>, Status> {
+        let service = self.service(&request).await?;
+        let r = request.into_inner();
+        let answer = ThreadAnswer {
+            thread_id: r.thread_id,
+            reply: r.reply,
+            resolve: r.resolve,
+        };
+        let thread = service
+            .answer_thread(&PathBuf::from(r.repo_path), r.number, answer)
+            .await
+            .map_err(pipelines_status_from)?;
+        Ok(Response::new(review_thread_to(&thread)))
     }
 }

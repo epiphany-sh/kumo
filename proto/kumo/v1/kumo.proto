@@ -478,6 +478,8 @@ service Git {
   // `git reset --soft HEAD~1`: the changes stay, staged.
   rpc UndoLastCommit(WorktreeRequest) returns (GitActionResponse);
   rpc Log(LogRequest) returns (LogResponse);
+  // What one commit changed, file by file, with its hunks.
+  rpc ShowCommit(ShowCommitRequest) returns (CommitDetail);
 }
 
 message WorktreeRequest {
@@ -613,6 +615,9 @@ message CommitResponse {
 message LogRequest {
   string worktree_path = 1;
   uint32 limit = 2;
+  // Main plus the commits of every other branch (local and remote) that
+  // aren't on main yet, each with `branch` set. Newest first.
+  bool all_branches = 3;
 }
 
 message Commit {
@@ -621,10 +626,55 @@ message Commit {
   string subject = 3;
   string author = 4;
   uint64 time_unix = 5;
+  // The branch it's on when it isn't on main yet (all_branches only).
+  string branch = 6;
+  // The pull request it came from: `#518` (GitHub/Bitbucket), `!228`
+  // (GitLab), read from the message; empty when none.
+  string pr_ref = 7;
 }
 
 message LogResponse {
   repeated Commit commits = 1;
+}
+
+message ShowCommitRequest {
+  string worktree_path = 1;
+  // A commit sha (full or abbreviated).
+  string sha = 2;
+}
+
+message DiffHunk {
+  uint32 old_start = 1;
+  uint32 new_start = 2;
+  // What git prints after the second @@ (the enclosing function).
+  string section = 3;
+  repeated DiffLine lines = 4;
+}
+
+message CommitFile {
+  string path = 1;
+  // Renames: where it was.
+  string old_path = 2;
+  // ADDED, MODIFIED, DELETED, RENAMED or TYPE_CHANGED.
+  ChangeKind kind = 3;
+  uint32 added = 4;
+  uint32 deleted = 5;
+  bool binary = 6;
+  // Empty for binaries or when cut.
+  repeated DiffHunk hunks = 7;
+  // Hunks left out (the file changed too much).
+  bool cut = 8;
+}
+
+message CommitDetail {
+  string sha = 1;
+  // The message after the subject line.
+  string body = 2;
+  // Short shas.
+  repeated string parents = 3;
+  uint64 time_unix = 4;
+  // At most 300; merges against their first parent.
+  repeated CommitFile files = 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -1452,6 +1502,11 @@ service PullRequests {
   rpc ForBranch(BranchPullRequestRequest) returns (BranchPullRequest);
   // Opens a pull request from a worktree's (pushed) branch.
   rpc Create(CreatePullRequestRequest) returns (PullRequest);
+  // A pull request's review threads, open and resolved, oldest first.
+  rpc Threads(PullRequestThreadsRequest) returns (ThreadList);
+  // Replies to a thread (when `reply` isn't empty) and resolves it (when
+  // `resolve`).
+  rpc AnswerThread(AnswerThreadRequest) returns (ReviewThread);
 }
 
 enum PrState {
@@ -1494,6 +1549,9 @@ message PullRequest {
   int64 created_at = 16;
   int64 updated_at = 17;
   uint32 comment_count = 18;
+  // Unresolved review threads, when `has_threads` (the host's list said).
+  uint32 open_threads = 19;
+  bool has_threads = 20;
 }
 
 message ListPullRequestsRequest {
@@ -1529,6 +1587,144 @@ message CreatePullRequestRequest {
   // Target branch; empty = the repository's default branch.
   string base = 4;
   bool draft = 5;
+}
+
+message PullRequestThreadsRequest {
+  // The repository's main checkout.
+  string repo_path = 1;
+  uint64 number = 2;
+}
+
+message ReviewThread {
+  // The host's thread (GitLab: discussion; Bitbucket: comment) id.
+  string id = 1;
+  // Of its first comment.
+  string author = 2;
+  string path = 3;
+  // 0 = not on a line.
+  uint32 line = 4;
+  // Its first comment, Markdown.
+  string body = 5;
+  uint64 time_unix = 6;
+  bool resolved = 7;
+}
+
+message ThreadList {
+  repeated ReviewThread threads = 1;
+}
+
+message AnswerThreadRequest {
+  string repo_path = 1;
+  uint64 number = 2;
+  string thread_id = 3;
+  // Posted as a reply first, when not empty.
+  string reply = 4;
+  bool resolve = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Releases and tags
+// ---------------------------------------------------------------------------
+//
+// Tags come from git; releases from the host, with the same tokens as pull
+// requests. Bitbucket has tags only.
+
+service Releases {
+  // Newest version first: releases and bare tags. Answers are reused for a
+  // minute unless `refresh`.
+  rpc List(ListReleasesRequest) returns (ReleaseList);
+  // What changed in `tag` since `since` (empty: since the first commit).
+  rpc Range(ReleaseRangeRequest) returns (ReleaseRange);
+  // Sets a release's name and/or notes; for a bare tag, creates its
+  // release; `publish` turns a pre-release or draft into the latest.
+  rpc Edit(EditReleaseRequest) returns (Release);
+}
+
+enum ReleaseKind {
+  RELEASE_KIND_RELEASE = 0;
+  RELEASE_KIND_PRE_RELEASE = 1;
+  RELEASE_KIND_DRAFT = 2;
+  // A tag nobody turned into a release.
+  RELEASE_KIND_TAG_ONLY = 3;
+}
+
+message ReleaseAsset {
+  string name = 1;
+  // Bytes; 0 when the host doesn't say.
+  uint64 size = 2;
+}
+
+message Release {
+  string tag = 1;
+  ReleaseKind kind = 2;
+  string name = 3;
+  // Markdown; empty = none.
+  string notes = 4;
+  // Display name (or login).
+  string author = 5;
+  // The tagged commit; empty for a draft without a tag yet.
+  string sha = 6;
+  // Published, else tagged.
+  uint64 time_unix = 7;
+  // The release page, else the tag's.
+  string url = 8;
+  // Latest run on the tagged commit; unset when unknown.
+  optional CiState checks = 9;
+  reserved 10;
+  repeated ReleaseAsset assets = 11;
+}
+
+message ListReleasesRequest {
+  // The repository's main checkout.
+  string repo_path = 1;
+  // 0 = 50.
+  uint32 limit = 2;
+  // Fetch tags and ask the host even if the last answer is recent.
+  bool refresh = 3;
+}
+
+message ReleaseList {
+  repeated Release releases = 1;
+  // How many more there are beyond `limit`.
+  uint32 older = 2;
+  // Why the host's releases couldn't be read: tags are listed alone.
+  optional CiProblem problem = 3;
+}
+
+message ReleaseRangeRequest {
+  string repo_path = 1;
+  string tag = 2;
+  // Empty: since the first commit.
+  string since = 3;
+}
+
+message MergedPr {
+  // `#518`, `!228`.
+  string ref = 1;
+  string title = 2;
+  string author = 3;
+  // `PRC-412`; empty when none.
+  string ticket = 4;
+}
+
+message ReleaseRange {
+  // As asked; when it isn't an ancestor of `tag`, counts start at their
+  // merge base.
+  string since = 1;
+  uint32 commits = 2;
+  uint32 added = 3;
+  uint32 deleted = 4;
+  uint32 files = 5;
+  // Newest first.
+  repeated MergedPr prs = 6;
+}
+
+message EditReleaseRequest {
+  string repo_path = 1;
+  string tag = 2;
+  optional string name = 3;
+  optional string notes = 4;
+  bool publish = 5;
 }
 
 // ---------------------------------------------------------------------------

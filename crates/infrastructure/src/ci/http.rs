@@ -118,26 +118,58 @@ impl CiHttp {
         for (name, value) in headers {
             request = request.header(*name, value);
         }
-        let answer = answer(
-            url,
-            match body {
-                Some(body) => request.send_json(body),
-                None => request.send_empty(),
-            },
-        )?;
-        if (200..=299).contains(&answer.status) {
-            if answer.body.trim().is_empty() {
-                Ok(Value::Null)
-            } else {
-                json(url, &answer.body)
-            }
-        } else {
-            Err(classify(&answer, url, Timestamp::now()))
+        let sent = match body {
+            Some(body) => request.send_json(body),
+            None => request.send_empty(),
+        };
+        written(url, sent)
+    }
+
+    /// PUT, with a JSON body or none.
+    pub fn put(
+        &self,
+        url: &str,
+        headers: &[Header],
+        body: Option<&Value>,
+    ) -> Result<Value, CiProblem> {
+        let mut request = self.agent.put(url);
+        for (name, value) in headers {
+            request = request.header(*name, value);
         }
+        let sent = match body {
+            Some(body) => request.send_json(body),
+            None => request.send_empty(),
+        };
+        written(url, sent)
+    }
+
+    /// PATCH with a JSON body.
+    pub fn patch(&self, url: &str, headers: &[Header], body: &Value) -> Result<Value, CiProblem> {
+        let mut request = self.agent.patch(url);
+        for (name, value) in headers {
+            request = request.header(*name, value);
+        }
+        written(url, request.send_json(body))
     }
 
     fn cache(&self) -> std::sync::MutexGuard<'_, HashMap<String, (String, String)>> {
         self.etags.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+/// The answer to a POST, PUT or PATCH: its JSON (null when empty).
+fn written(
+    url: &str,
+    sent: Result<ureq::http::Response<ureq::Body>, ureq::Error>,
+) -> Result<Value, CiProblem> {
+    let answer = answer(url, sent)?;
+    if !(200..=299).contains(&answer.status) {
+        return Err(classify(&answer, url, Timestamp::now()));
+    }
+    if answer.body.trim().is_empty() {
+        Ok(Value::Null)
+    } else {
+        json(url, &answer.body)
     }
 }
 

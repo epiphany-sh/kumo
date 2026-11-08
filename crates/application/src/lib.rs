@@ -19,6 +19,7 @@ pub mod docs;
 pub mod pipelines;
 pub mod profiles;
 pub mod pulls;
+pub mod releases;
 pub mod tasks;
 pub mod terminal;
 pub mod test_runs;

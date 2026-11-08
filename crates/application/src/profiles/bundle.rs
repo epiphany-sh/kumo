@@ -17,6 +17,7 @@ use crate::changes::ChangesService;
 use crate::docs::DocsService;
 use crate::pipelines::{GitCredential, PipelinesService};
 use crate::pulls::PullRequestService;
+use crate::releases::ReleaseService;
 use crate::tasks::TaskService;
 use crate::terminal::TerminalService;
 use crate::test_runs::TestService;
@@ -33,6 +34,7 @@ pub struct ProfileServices {
     pub tasks: Arc<TaskService>,
     pub pipelines: Arc<PipelinesService>,
     pub pulls: Arc<PullRequestService>,
+    pub releases: Arc<ReleaseService>,
     pub docs: Arc<DocsService>,
     pub tests: Arc<TestService>,
     /// The daemon's terminals, scoped to this profile.

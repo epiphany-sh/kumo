@@ -1,5 +1,6 @@
 use kumo_domain::changes::{
-    ChangeKind, CommitInfo, DiffLineKind, DiffScope, FileChange, FileDiff, WorktreeChanges,
+    ChangeKind, CommitDetail, CommitInfo, DiffLine, DiffLineKind, DiffScope, FileChange, FileDiff,
+    WorktreeChanges,
 };
 use kumo_proto::v1 as pb;
 
@@ -50,17 +51,49 @@ pub fn diff_scope_from(scope: pb::DiffScope) -> DiffScope {
 pub fn diff_to(diff: FileDiff) -> pb::DiffResponse {
     pb::DiffResponse {
         binary: diff.binary,
-        lines: diff
-            .lines
+        lines: diff.lines.into_iter().map(diff_line_to).collect(),
+    }
+}
+
+fn diff_line_to(line: DiffLine) -> pb::DiffLine {
+    pb::DiffLine {
+        kind: match line.kind {
+            DiffLineKind::Context => pb::DiffLineKind::Context,
+            DiffLineKind::Added => pb::DiffLineKind::Added,
+            DiffLineKind::Deleted => pb::DiffLineKind::Deleted,
+        }
+        .into(),
+        text: line.text,
+    }
+}
+
+pub fn commit_detail_to(detail: CommitDetail) -> pb::CommitDetail {
+    pb::CommitDetail {
+        sha: detail.sha,
+        body: detail.body,
+        parents: detail.parents,
+        time_unix: detail.time_unix,
+        files: detail
+            .files
             .into_iter()
-            .map(|line| pb::DiffLine {
-                kind: match line.kind {
-                    DiffLineKind::Context => pb::DiffLineKind::Context,
-                    DiffLineKind::Added => pb::DiffLineKind::Added,
-                    DiffLineKind::Deleted => pb::DiffLineKind::Deleted,
-                }
-                .into(),
-                text: line.text,
+            .map(|file| pb::CommitFile {
+                path: file.path,
+                old_path: file.old_path.unwrap_or_default(),
+                kind: change_kind_to(file.kind).into(),
+                added: file.added,
+                deleted: file.deleted,
+                binary: file.binary,
+                hunks: file
+                    .hunks
+                    .into_iter()
+                    .map(|hunk| pb::DiffHunk {
+                        old_start: hunk.old_start,
+                        new_start: hunk.new_start,
+                        section: hunk.section,
+                        lines: hunk.lines.into_iter().map(diff_line_to).collect(),
+                    })
+                    .collect(),
+                cut: file.cut,
             })
             .collect(),
     }
@@ -73,5 +106,7 @@ pub fn commit_to(commit: CommitInfo) -> pb::Commit {
         subject: commit.subject,
         author: commit.author,
         time_unix: commit.time_unix,
+        branch: commit.branch.unwrap_or_default(),
+        pr_ref: commit.pr_ref.unwrap_or_default(),
     }
 }

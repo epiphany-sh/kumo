@@ -904,6 +904,14 @@ class GitClient extends $grpc.Client {
     return $createUnaryCall(_$log, request, options: options);
   }
 
+  /// What one commit changed, file by file, with its hunks.
+  $grpc.ResponseFuture<$0.CommitDetail> showCommit(
+    $0.ShowCommitRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$showCommit, request, options: options);
+  }
+
   // method descriptors
 
   static final _$watchStatus =
@@ -984,6 +992,11 @@ class GitClient extends $grpc.Client {
       '/kumo.v1.Git/Log',
       ($0.LogRequest value) => value.writeToBuffer(),
       $0.LogResponse.fromBuffer);
+  static final _$showCommit =
+      $grpc.ClientMethod<$0.ShowCommitRequest, $0.CommitDetail>(
+          '/kumo.v1.Git/ShowCommit',
+          ($0.ShowCommitRequest value) => value.writeToBuffer(),
+          $0.CommitDetail.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Git')
@@ -1104,6 +1117,13 @@ abstract class GitServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.LogRequest.fromBuffer(value),
         ($0.LogResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ShowCommitRequest, $0.CommitDetail>(
+        'ShowCommit',
+        showCommit_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.ShowCommitRequest.fromBuffer(value),
+        ($0.CommitDetail value) => value.writeToBuffer()));
   }
 
   $async.Stream<$0.WorktreeChanges> watchStatus_Pre($grpc.ServiceCall $call,
@@ -1234,6 +1254,14 @@ abstract class GitServiceBase extends $grpc.Service {
 
   $async.Future<$0.LogResponse> log(
       $grpc.ServiceCall call, $0.LogRequest request);
+
+  $async.Future<$0.CommitDetail> showCommit_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ShowCommitRequest> $request) async {
+    return showCommit($call, await $request);
+  }
+
+  $async.Future<$0.CommitDetail> showCommit(
+      $grpc.ServiceCall call, $0.ShowCommitRequest request);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Agents')
@@ -2206,6 +2234,23 @@ class PullRequestsClient extends $grpc.Client {
     return $createUnaryCall(_$create, request, options: options);
   }
 
+  /// A pull request's review threads, open and resolved, oldest first.
+  $grpc.ResponseFuture<$0.ThreadList> threads(
+    $0.PullRequestThreadsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$threads, request, options: options);
+  }
+
+  /// Replies to a thread (when `reply` isn't empty) and resolves it (when
+  /// `resolve`).
+  $grpc.ResponseFuture<$0.ReviewThread> answerThread(
+    $0.AnswerThreadRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$answerThread, request, options: options);
+  }
+
   // method descriptors
 
   static final _$list =
@@ -2223,6 +2268,16 @@ class PullRequestsClient extends $grpc.Client {
           '/kumo.v1.PullRequests/Create',
           ($0.CreatePullRequestRequest value) => value.writeToBuffer(),
           $0.PullRequest.fromBuffer);
+  static final _$threads =
+      $grpc.ClientMethod<$0.PullRequestThreadsRequest, $0.ThreadList>(
+          '/kumo.v1.PullRequests/Threads',
+          ($0.PullRequestThreadsRequest value) => value.writeToBuffer(),
+          $0.ThreadList.fromBuffer);
+  static final _$answerThread =
+      $grpc.ClientMethod<$0.AnswerThreadRequest, $0.ReviewThread>(
+          '/kumo.v1.PullRequests/AnswerThread',
+          ($0.AnswerThreadRequest value) => value.writeToBuffer(),
+          $0.ReviewThread.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.PullRequests')
@@ -2256,6 +2311,22 @@ abstract class PullRequestsServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.CreatePullRequestRequest.fromBuffer(value),
         ($0.PullRequest value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.PullRequestThreadsRequest, $0.ThreadList>(
+        'Threads',
+        threads_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.PullRequestThreadsRequest.fromBuffer(value),
+        ($0.ThreadList value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.AnswerThreadRequest, $0.ReviewThread>(
+        'AnswerThread',
+        answerThread_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.AnswerThreadRequest.fromBuffer(value),
+        ($0.ReviewThread value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.PullRequestList> list_Pre($grpc.ServiceCall $call,
@@ -2281,6 +2352,134 @@ abstract class PullRequestsServiceBase extends $grpc.Service {
 
   $async.Future<$0.PullRequest> create(
       $grpc.ServiceCall call, $0.CreatePullRequestRequest request);
+
+  $async.Future<$0.ThreadList> threads_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.PullRequestThreadsRequest> $request) async {
+    return threads($call, await $request);
+  }
+
+  $async.Future<$0.ThreadList> threads(
+      $grpc.ServiceCall call, $0.PullRequestThreadsRequest request);
+
+  $async.Future<$0.ReviewThread> answerThread_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.AnswerThreadRequest> $request) async {
+    return answerThread($call, await $request);
+  }
+
+  $async.Future<$0.ReviewThread> answerThread(
+      $grpc.ServiceCall call, $0.AnswerThreadRequest request);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Releases')
+class ReleasesClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  ReleasesClient(super.channel, {super.options, super.interceptors});
+
+  /// Newest version first: releases and bare tags. Answers are reused for a
+  /// minute unless `refresh`.
+  $grpc.ResponseFuture<$0.ReleaseList> list(
+    $0.ListReleasesRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$list, request, options: options);
+  }
+
+  /// What changed in `tag` since `since` (empty: since the first commit).
+  $grpc.ResponseFuture<$0.ReleaseRange> range(
+    $0.ReleaseRangeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$range, request, options: options);
+  }
+
+  /// Sets a release's name and/or notes; for a bare tag, creates its
+  /// release; `publish` turns a pre-release or draft into the latest.
+  $grpc.ResponseFuture<$0.Release> edit(
+    $0.EditReleaseRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$edit, request, options: options);
+  }
+
+  // method descriptors
+
+  static final _$list =
+      $grpc.ClientMethod<$0.ListReleasesRequest, $0.ReleaseList>(
+          '/kumo.v1.Releases/List',
+          ($0.ListReleasesRequest value) => value.writeToBuffer(),
+          $0.ReleaseList.fromBuffer);
+  static final _$range =
+      $grpc.ClientMethod<$0.ReleaseRangeRequest, $0.ReleaseRange>(
+          '/kumo.v1.Releases/Range',
+          ($0.ReleaseRangeRequest value) => value.writeToBuffer(),
+          $0.ReleaseRange.fromBuffer);
+  static final _$edit = $grpc.ClientMethod<$0.EditReleaseRequest, $0.Release>(
+      '/kumo.v1.Releases/Edit',
+      ($0.EditReleaseRequest value) => value.writeToBuffer(),
+      $0.Release.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Releases')
+abstract class ReleasesServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.Releases';
+
+  ReleasesServiceBase() {
+    $addMethod($grpc.ServiceMethod<$0.ListReleasesRequest, $0.ReleaseList>(
+        'List',
+        list_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ListReleasesRequest.fromBuffer(value),
+        ($0.ReleaseList value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ReleaseRangeRequest, $0.ReleaseRange>(
+        'Range',
+        range_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ReleaseRangeRequest.fromBuffer(value),
+        ($0.ReleaseRange value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.EditReleaseRequest, $0.Release>(
+        'Edit',
+        edit_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.EditReleaseRequest.fromBuffer(value),
+        ($0.Release value) => value.writeToBuffer()));
+  }
+
+  $async.Future<$0.ReleaseList> list_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ListReleasesRequest> $request) async {
+    return list($call, await $request);
+  }
+
+  $async.Future<$0.ReleaseList> list(
+      $grpc.ServiceCall call, $0.ListReleasesRequest request);
+
+  $async.Future<$0.ReleaseRange> range_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ReleaseRangeRequest> $request) async {
+    return range($call, await $request);
+  }
+
+  $async.Future<$0.ReleaseRange> range(
+      $grpc.ServiceCall call, $0.ReleaseRangeRequest request);
+
+  $async.Future<$0.Release> edit_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.EditReleaseRequest> $request) async {
+    return edit($call, await $request);
+  }
+
+  $async.Future<$0.Release> edit(
+      $grpc.ServiceCall call, $0.EditReleaseRequest request);
 }
 
 /// Pages of the knowledge bases behind the task sources, read only:

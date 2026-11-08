@@ -7,7 +7,10 @@ use kumo_domain::pipelines::{
     BranchReader, CiHost, CiProblem, CiProblemKind, CiProvider, CiTarget, HostTokens, LocalBranch,
     PipelinesError, TokenFallback,
 };
-use kumo_domain::pulls::{NewPullRequest, PrState, PullRequest, PullRequestClient, ReviewState};
+use kumo_domain::pulls::{
+    NewPullRequest, PrState, PullRequest, PullRequestClient, ReviewState, ReviewThread,
+    ThreadAnswer,
+};
 use kumo_domain::tasks::Person;
 use kumo_domain::workspace::{Remote, Repo, RepoState, WorkspaceSnapshot, Worktree};
 use tokio::sync::watch;
@@ -37,6 +40,7 @@ fn pr(number: u64, branch: &str) -> PullRequest {
         created_at: None,
         updated_at: None,
         comment_count: 0,
+        open_threads: None,
     }
 }
 
@@ -44,7 +48,20 @@ fn pr(number: u64, branch: &str) -> PullRequest {
 struct Host {
     lists: AtomicUsize,
     created: Mutex<Vec<NewPullRequest>>,
+    answered: Mutex<Vec<(u64, ThreadAnswer)>>,
     fail: Mutex<Option<CiProblem>>,
+}
+
+fn thread(id: &str, resolved: bool) -> ReviewThread {
+    ReviewThread {
+        id: id.into(),
+        author: "Lucía".into(),
+        path: "src/a.rs".into(),
+        line: Some(3),
+        body: "Why?".into(),
+        created_at: None,
+        resolved,
+    }
 }
 
 impl PullRequestClient for Host {
@@ -75,6 +92,23 @@ impl PullRequestClient for Host {
     ) -> Result<PullRequest, CiProblem> {
         self.created.lock().unwrap().push(new.clone());
         Ok(pr(530, &target.branch))
+    }
+    fn threads(&self, _: &CiTarget, _: &str, number: u64) -> Result<Vec<ReviewThread>, CiProblem> {
+        assert_eq!(number, 521);
+        Ok(vec![thread("t1", true), thread("t2", false)])
+    }
+    fn answer_thread(
+        &self,
+        _: &CiTarget,
+        _: &str,
+        number: u64,
+        answer: &ThreadAnswer,
+    ) -> Result<ReviewThread, CiProblem> {
+        if let Some(p) = self.fail.lock().unwrap().clone() {
+            return Err(p);
+        }
+        self.answered.lock().unwrap().push((number, answer.clone()));
+        Ok(thread(&answer.thread_id, answer.resolve))
     }
 }
 
@@ -254,4 +288,66 @@ async fn creating_opens_it_from_the_branch_and_forgets_cached_answers() {
         .await
         .unwrap_err();
     assert!(matches!(err, PipelinesError::Ci(p) if p.kind == CiProblemKind::NotPushed));
+}
+
+#[tokio::test]
+async fn threads_are_read_and_answered_on_the_repository() {
+    let f = fixture();
+    let threads = f.service.threads(Path::new(MAIN), 521).await.unwrap();
+    assert_eq!(
+        threads
+            .iter()
+            .map(|t| (t.id.as_str(), t.resolved))
+            .collect::<Vec<_>>(),
+        [("t1", true), ("t2", false)]
+    );
+    f.service.list(Path::new(MAIN), false).await.unwrap();
+    let answer = ThreadAnswer {
+        thread_id: "t2".into(),
+        reply: "Done in a91c4e2".into(),
+        resolve: true,
+    };
+    let answered = f
+        .service
+        .answer_thread(Path::new(MAIN), 521, answer.clone())
+        .await
+        .unwrap();
+    assert!(answered.resolved);
+    assert_eq!(f.host.answered.lock().unwrap()[0], (521, answer));
+    f.service.list(Path::new(MAIN), false).await.unwrap();
+    assert_eq!(
+        f.host.lists.load(Ordering::SeqCst),
+        2,
+        "open thread counts are read again"
+    );
+
+    let nothing = ThreadAnswer {
+        thread_id: "t2".into(),
+        reply: " ".into(),
+        resolve: false,
+    };
+    assert!(matches!(
+        f.service.answer_thread(Path::new(MAIN), 521, nothing).await,
+        Err(PipelinesError::Invalid(_))
+    ));
+    *f.host.fail.lock().unwrap() = Some(CiProblem::new(CiProblemKind::Forbidden, "HTTP 403"));
+    let err = f
+        .service
+        .answer_thread(
+            Path::new(MAIN),
+            521,
+            ThreadAnswer {
+                thread_id: "t2".into(),
+                reply: String::new(),
+                resolve: true,
+            },
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(err, PipelinesError::Ci(p) if p.kind == CiProblemKind::Forbidden));
+    f.tokens.delete("github.com").unwrap();
+    assert!(matches!(
+        f.service.threads(Path::new(MAIN), 521).await,
+        Err(PipelinesError::Ci(p)) if p.kind == CiProblemKind::NotConnected
+    ));
 }

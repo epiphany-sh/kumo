@@ -643,6 +643,33 @@ class ReviewState extends $pb.ProtobufEnum {
   const ReviewState._(super.value, super.name);
 }
 
+class ReleaseKind extends $pb.ProtobufEnum {
+  static const ReleaseKind RELEASE_KIND_RELEASE =
+      ReleaseKind._(0, _omitEnumNames ? '' : 'RELEASE_KIND_RELEASE');
+  static const ReleaseKind RELEASE_KIND_PRE_RELEASE =
+      ReleaseKind._(1, _omitEnumNames ? '' : 'RELEASE_KIND_PRE_RELEASE');
+  static const ReleaseKind RELEASE_KIND_DRAFT =
+      ReleaseKind._(2, _omitEnumNames ? '' : 'RELEASE_KIND_DRAFT');
+
+  /// A tag nobody turned into a release.
+  static const ReleaseKind RELEASE_KIND_TAG_ONLY =
+      ReleaseKind._(3, _omitEnumNames ? '' : 'RELEASE_KIND_TAG_ONLY');
+
+  static const $core.List<ReleaseKind> values = <ReleaseKind>[
+    RELEASE_KIND_RELEASE,
+    RELEASE_KIND_PRE_RELEASE,
+    RELEASE_KIND_DRAFT,
+    RELEASE_KIND_TAG_ONLY,
+  ];
+
+  static final $core.List<ReleaseKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ReleaseKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ReleaseKind._(super.value, super.name);
+}
+
 class DocKind extends $pb.ProtobufEnum {
   static const DocKind DOC_KIND_UNSPECIFIED =
       DocKind._(0, _omitEnumNames ? '' : 'DOC_KIND_UNSPECIFIED');

@@ -14,4 +14,7 @@ pub enum PipelinesError {
     /// The provider refused or failed an action (re-run, test).
     #[error("{0}")]
     Ci(CiProblem),
+    /// The host can't do this at all (Bitbucket releases).
+    #[error("{0}")]
+    Unsupported(String),
 }

@@ -24,6 +24,7 @@ class EngineConnection {
         tasks = TasksClient(channel, options: auth),
         pipelines = PipelinesClient(channel, options: auth),
         pulls = PullRequestsClient(channel, options: auth),
+        releases = ReleasesClient(channel, options: auth),
         docs = DocsClient(channel, options: auth),
         tests = TestsClient(channel, options: auth),
         profiles = ProfilesClient(channel, options: auth);
@@ -50,6 +51,7 @@ class EngineConnection {
   final TasksClient tasks;
   final PipelinesClient pipelines;
   final PullRequestsClient pulls;
+  final ReleasesClient releases;
   final DocsClient docs;
   final TestsClient tests;
   final ProfilesClient profiles;

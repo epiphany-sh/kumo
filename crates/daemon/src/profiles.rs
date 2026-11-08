@@ -10,6 +10,7 @@ use kumo_application::docs::{DocsPorts, DocsService};
 use kumo_application::pipelines::{PipelinesPorts, PipelinesService, PipelinesTiming};
 use kumo_application::profiles::{GitEnvironment, OpenProfile, ProfileServices};
 use kumo_application::pulls::{PullRequestPorts, PullRequestService};
+use kumo_application::releases::{ReleasePorts, ReleaseService};
 use kumo_application::tasks::{TaskPorts, TaskService, TaskTiming};
 use kumo_application::terminal::TerminalService;
 use kumo_application::test_runs::{TestPorts, TestService};
@@ -23,8 +24,8 @@ use kumo_infrastructure::agents::{
     ClaudeStatusLine, CodexRollouts, ProfileCliHomes, claude_config_dir, codex_home,
 };
 use kumo_infrastructure::ci::{
-    BitbucketPipelines, BitbucketPulls, GhTokenFallback, GitHubActions, GitHubPulls, GitLabCi,
-    GitLabPulls,
+    BitbucketPipelines, BitbucketPulls, BitbucketReleases, GhTokenFallback, GitHubActions,
+    GitHubPulls, GitHubReleases, GitLabCi, GitLabPulls, GitLabReleases,
 };
 use kumo_infrastructure::docs::{ConfluenceDocs, VaultDocs};
 use kumo_infrastructure::fs::{LocalFileStore, LocalProjectReader};
@@ -202,8 +203,22 @@ impl ProfileOpener {
                     Arc::new(BitbucketPulls::default()),
                 ],
                 tokens: Arc::clone(&host_tokens),
-                fallback: gh,
+                fallback: Arc::clone(&gh),
                 branches: Arc::new(git.clone()),
+            },
+            workspace.watch(),
+            std::time::Duration::from_secs(60),
+        ));
+        let releases = Arc::new(ReleaseService::new(
+            ReleasePorts {
+                clients: vec![
+                    Arc::new(GitHubReleases::default()),
+                    Arc::new(GitLabReleases::default()),
+                    Arc::new(BitbucketReleases),
+                ],
+                git: Arc::new(git.clone()),
+                tokens: Arc::clone(&host_tokens),
+                fallback: gh,
             },
             workspace.watch(),
             std::time::Duration::from_secs(60),
@@ -273,6 +288,7 @@ impl ProfileOpener {
             tasks,
             pipelines,
             pulls,
+            releases,
             docs,
             tests,
             terminals,

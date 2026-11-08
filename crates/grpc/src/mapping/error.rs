@@ -97,6 +97,7 @@ pub fn pipelines_status_from(error: PipelinesError) -> Status {
         PipelinesError::Secret(_) => Status::internal(message),
         PipelinesError::Ci(problem) if problem.keeps_last_run() => Status::unavailable(message),
         PipelinesError::Ci(_) => Status::failed_precondition(message),
+        PipelinesError::Unsupported(_) => Status::unimplemented(message),
     }
 }
 

@@ -11,6 +11,7 @@ use kumo_proto::v1::git_client::GitClient;
 use kumo_proto::v1::pipelines_client::PipelinesClient;
 use kumo_proto::v1::profiles_client::ProfilesClient;
 use kumo_proto::v1::pull_requests_client::PullRequestsClient;
+use kumo_proto::v1::releases_client::ReleasesClient;
 use kumo_proto::v1::tasks_client::TasksClient;
 use kumo_proto::v1::terminals_client::TerminalsClient;
 use kumo_proto::v1::tests_client::TestsClient;
@@ -50,6 +51,7 @@ pub struct KumoClient {
     pub tasks: TasksClient<AuthChannel>,
     pub pipelines: PipelinesClient<AuthChannel>,
     pub pulls: PullRequestsClient<AuthChannel>,
+    pub releases: ReleasesClient<AuthChannel>,
     pub docs: DocsClient<AuthChannel>,
     pub tests: TestsClient<AuthChannel>,
     channel: Channel,
@@ -89,6 +91,7 @@ impl KumoClient {
             tasks: TasksClient::with_interceptor(channel.clone(), auth.clone()),
             pipelines: PipelinesClient::with_interceptor(channel.clone(), auth.clone()),
             pulls: PullRequestsClient::with_interceptor(channel.clone(), auth.clone()),
+            releases: ReleasesClient::with_interceptor(channel.clone(), auth.clone()),
             docs: DocsClient::with_interceptor(channel.clone(), auth.clone()),
             tests: TestsClient::with_interceptor(channel.clone(), auth),
             channel,

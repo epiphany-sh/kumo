@@ -2,18 +2,22 @@
 //! request with its review decision, requested reviewers and checks.
 
 use kumo_domain::pipelines::{CiProblem, CiProblemKind, CiProvider, CiState, CiTarget};
-use kumo_domain::pulls::{NewPullRequest, PrState, PullRequest, PullRequestClient, ReviewState};
+use kumo_domain::pulls::{
+    NewPullRequest, PrState, PullRequest, PullRequestClient, ReviewState, ReviewThread,
+    ThreadAnswer,
+};
 use kumo_domain::tasks::Person;
 use serde_json::{Value, json};
 
 use super::http::{CiHttp, Header};
-use super::ts;
+use super::{needs, ts};
 
 const FIELDS: &str = "number title url isDraft state createdAt updatedAt headRefName baseRefName reviewDecision \
     author { login ... on User { name } } \
     reviewRequests(first: 20) { nodes { requestedReviewer { ... on User { login name } ... on Team { slug name } } } } \
     latestReviews(first: 20) { nodes { author { login ... on User { name } } state } } \
     comments { totalCount } \
+    reviewThreads(first: 100) { nodes { isResolved } } \
     commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes { \
       __typename ... on CheckRun { status conclusion } ... on StatusContext { state } } } } } } }";
 
@@ -156,6 +160,114 @@ impl PullRequestClient for GitHubPulls {
             )
         })
     }
+
+    fn threads(
+        &self,
+        target: &CiTarget,
+        token: &str,
+        number: u64,
+    ) -> Result<Vec<ReviewThread>, CiProblem> {
+        let (owner, name) = Self::owner_name(target)?;
+        let query = format!(
+            "query($owner: String!, $name: String!, $n: Int!) {{ repository(owner: $owner, name: $name) {{ \
+             pullRequest(number: $n) {{ reviewThreads(first: 100) {{ nodes {{ {THREAD_FIELDS} }} }} }} }} }}"
+        );
+        let answer = self.query(
+            target,
+            token,
+            &query,
+            json!({ "owner": owner, "name": name, "n": number }),
+        )?;
+        let pr = &answer["data"]["repository"]["pullRequest"];
+        if pr.is_null() {
+            return Err(CiProblem::new(
+                CiProblemKind::NotFound,
+                format!("No pull request #{number}"),
+            ));
+        }
+        let mut threads: Vec<ReviewThread> = pr["reviewThreads"]["nodes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(parse_thread)
+            .collect();
+        threads.sort_by_key(|t| t.created_at);
+        Ok(threads)
+    }
+
+    fn answer_thread(
+        &self,
+        target: &CiTarget,
+        token: &str,
+        number: u64,
+        answer: &ThreadAnswer,
+    ) -> Result<ReviewThread, CiProblem> {
+        let id = &answer.thread_id;
+        if !answer.reply.trim().is_empty() {
+            self.mutate(
+                target,
+                token,
+                "mutation($id: ID!, $body: String!) { addPullRequestReviewThreadReply(\
+                 input: { pullRequestReviewThreadId: $id, body: $body }) { comment { id } } }",
+                json!({ "id": id, "body": answer.reply }),
+            )?;
+        }
+        if answer.resolve {
+            let query = format!(
+                "mutation($id: ID!) {{ resolveReviewThread(input: {{ threadId: $id }}) \
+                 {{ thread {{ {THREAD_FIELDS} }} }} }}"
+            );
+            let resolved = self.mutate(target, token, &query, json!({ "id": id }))?;
+            let thread = &resolved["data"]["resolveReviewThread"]["thread"];
+            if thread.is_object() {
+                return Ok(parse_thread(thread));
+            }
+        }
+        self.threads(target, token, number)?
+            .into_iter()
+            .find(|t| &t.id == id)
+            .ok_or_else(|| CiProblem::new(CiProblemKind::NotFound, "That thread is gone"))
+    }
+}
+
+const THREAD_FIELDS: &str = "id isResolved path line originalLine \
+    comments(first: 1) { nodes { author { login ... on User { name } } body createdAt } }";
+
+impl GitHubPulls {
+    /// A mutation; a refusal says which permission writing needs.
+    fn mutate(
+        &self,
+        target: &CiTarget,
+        token: &str,
+        query: &str,
+        variables: Value,
+    ) -> Result<Value, CiProblem> {
+        self.query(target, token, query, variables)
+            .map_err(|p| needs(p, "Pull requests: Read and write"))
+    }
+}
+
+fn parse_thread(node: &Value) -> ReviewThread {
+    let first = &node["comments"]["nodes"][0];
+    let author = &first["author"];
+    let line = node["line"]
+        .as_u64()
+        .or(node["originalLine"].as_u64())
+        .and_then(|l| u32::try_from(l).ok());
+    ReviewThread {
+        id: node["id"].as_str().unwrap_or_default().to_owned(),
+        author: author["name"]
+            .as_str()
+            .filter(|n| !n.is_empty())
+            .or(author["login"].as_str())
+            .unwrap_or("ghost")
+            .to_owned(),
+        path: node["path"].as_str().unwrap_or_default().to_owned(),
+        line,
+        body: first["body"].as_str().unwrap_or_default().to_owned(),
+        created_at: ts(&first["createdAt"]),
+        resolved: node["isResolved"].as_bool().unwrap_or(false),
+    }
 }
 
 /// GraphQL answers errors with HTTP 200: classified like REST's.
@@ -267,6 +379,10 @@ pub(super) fn parse_pr(pr: &Value, viewer: &str) -> PullRequest {
         updated_at: ts(&pr["updatedAt"]),
         comment_count: u32::try_from(pr["comments"]["totalCount"].as_u64().unwrap_or_default())
             .unwrap_or(u32::MAX),
+        open_threads: pr["reviewThreads"]["nodes"].as_array().map(|nodes| {
+            let open = nodes.iter().filter(|t| t["isResolved"] == false).count();
+            u32::try_from(open).unwrap_or(u32::MAX)
+        }),
     }
 }
 
@@ -421,5 +537,132 @@ mod tests {
             ),
             (Some("feat/x"), Some("main"), Some(true))
         );
+    }
+
+    const THREADS: &str = r#"{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+        {"id":"PRRT_2","isResolved":false,"path":"src/b.rs","line":null,"originalLine":42,
+         "comments":{"nodes":[{"author":{"login":"tomas","name":""},"body":"Offset first?","createdAt":"2026-01-02T10:00:00Z"}]}},
+        {"id":"PRRT_1","isResolved":true,"path":"src/a.rs","line":88,"originalLine":80,
+         "comments":{"nodes":[{"author":{"login":"lucia","name":"Lucía"},"body":"Retry the batch?","createdAt":"2026-01-01T10:00:00Z"}]}}
+    ]}}}}}"#;
+
+    fn thread_server(forbid: bool) -> TestServer {
+        TestServer::start(move |r| {
+            let query = r.json()["query"].as_str().unwrap_or_default().to_owned();
+            if forbid && query.starts_with("mutation") {
+                return (200, r#"{"data":{"x":null},"errors":[{"type":"FORBIDDEN","message":"Resource not accessible by integration"}]}"#.to_owned());
+            }
+            if query.contains("addPullRequestReviewThreadReply") {
+                (
+                    200,
+                    r#"{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"c"}}}}"#
+                        .to_owned(),
+                )
+            } else if query.contains("resolveReviewThread") {
+                (200, r#"{"data":{"resolveReviewThread":{"thread":{"id":"PRRT_2","isResolved":true,"path":"src/b.rs","line":42,"comments":{"nodes":[{"author":{"login":"tomas"},"body":"Offset first?","createdAt":"2026-01-02T10:00:00Z"}]}}}}}"#.to_owned())
+            } else {
+                (200, THREADS.to_owned())
+            }
+        })
+    }
+
+    #[test]
+    fn reads_review_threads_oldest_first() {
+        let server = thread_server(false);
+        let threads = GitHubPulls::default()
+            .threads(&target(&server.url, ""), "t", 521)
+            .unwrap();
+        let rows: Vec<_> = threads
+            .iter()
+            .map(|t| {
+                (
+                    t.id.as_str(),
+                    t.author.as_str(),
+                    t.path.as_str(),
+                    t.line,
+                    t.resolved,
+                )
+            })
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                ("PRRT_1", "Lucía", "src/a.rs", Some(88), true),
+                ("PRRT_2", "tomas", "src/b.rs", Some(42), false),
+            ]
+        );
+        assert_eq!(server.requests()[0].json()["variables"]["n"], 521);
+    }
+
+    #[test]
+    fn answers_a_thread_with_a_reply_a_resolve_or_both() {
+        let client = GitHubPulls::default();
+        let answer = |reply: &str, resolve: bool| ThreadAnswer {
+            thread_id: "PRRT_2".into(),
+            reply: reply.into(),
+            resolve,
+        };
+        let kinds = |server: &TestServer| -> Vec<String> {
+            server
+                .requests()
+                .iter()
+                .map(|r| {
+                    let q = r.json()["query"].as_str().unwrap_or_default().to_owned();
+                    if q.contains("addPullRequestReviewThreadReply") {
+                        "reply".to_owned()
+                    } else if q.contains("resolveReviewThread") {
+                        "resolve".to_owned()
+                    } else {
+                        "read".to_owned()
+                    }
+                })
+                .collect()
+        };
+
+        let server = thread_server(false);
+        let both = client
+            .answer_thread(&target(&server.url, ""), "t", 521, &answer("Done.", true))
+            .unwrap();
+        assert!(both.resolved);
+        assert_eq!(kinds(&server), ["reply", "resolve"]);
+        let reply = &server.requests()[0].json()["variables"];
+        assert_eq!(
+            (reply["id"].as_str(), reply["body"].as_str()),
+            (Some("PRRT_2"), Some("Done."))
+        );
+
+        let server = thread_server(false);
+        let replied = client
+            .answer_thread(
+                &target(&server.url, ""),
+                "t",
+                521,
+                &answer("Why not?", false),
+            )
+            .unwrap();
+        assert!(!replied.resolved);
+        assert_eq!(kinds(&server), ["reply", "read"]);
+
+        let server = thread_server(false);
+        client
+            .answer_thread(&target(&server.url, ""), "t", 521, &answer("", true))
+            .unwrap();
+        assert_eq!(kinds(&server), ["resolve"]);
+
+        let server = thread_server(true);
+        let refused = client
+            .answer_thread(&target(&server.url, ""), "t", 521, &answer("x", true))
+            .unwrap_err();
+        assert_eq!(
+            (refused.kind, refused.missing_scope.as_str()),
+            (CiProblemKind::Forbidden, "Pull requests: Read and write")
+        );
+    }
+
+    #[test]
+    fn the_list_counts_open_threads_when_it_has_them() {
+        let pr = json!({"number": 1, "reviewThreads": {"nodes": [{"isResolved": false}, {"isResolved": true}, {"isResolved": false}]}});
+        assert_eq!(parse_pr(&pr, "").open_threads, Some(2));
+        assert_eq!(parse_pr(&json!({"number": 1}), "").open_threads, None);
     }
 }

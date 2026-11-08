@@ -5,6 +5,7 @@
 mod service;
 
 pub use service::{BranchPullRequest, PullRequestList, PullRequestPorts, PullRequestService};
+pub(crate) use service::{host_token, repo_at};
 
 #[cfg(test)]
 mod tests;
