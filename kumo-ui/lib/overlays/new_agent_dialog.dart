@@ -160,7 +160,7 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
-          if (canStart) _start(s, agent!, worktree!, context0);
+          if (canStart) _start(s, agent, worktree, context0);
         },
       },
       child: GlassOverlay(
@@ -301,7 +301,7 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
               const SizedBox(width: 8),
               KButton.primary(
                 label: _starting ? 'Starting…' : 'Start',
-                onTap: canStart ? () => _start(s, agent!, worktree!, context0) : null,
+                onTap: canStart ? () => _start(s, agent, worktree, context0) : null,
                 trailing: Kbd('⌘↩', color: c.accText, background: const Color(0x26000000)),
               ),
             ]),

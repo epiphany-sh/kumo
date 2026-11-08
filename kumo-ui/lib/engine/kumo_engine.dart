@@ -21,6 +21,7 @@ class EngineConnection {
         workspace = WorkspaceClient(channel, options: auth),
         git = GitClient(channel, options: auth),
         agents = AgentsClient(channel, options: auth),
+        agentDefs = AgentDefsClient(channel, options: auth),
         tasks = TasksClient(channel, options: auth),
         pipelines = PipelinesClient(channel, options: auth),
         pulls = PullRequestsClient(channel, options: auth),
@@ -48,6 +49,7 @@ class EngineConnection {
   final WorkspaceClient workspace;
   final GitClient git;
   final AgentsClient agents;
+  final AgentDefsClient agentDefs;
   final TasksClient tasks;
   final PipelinesClient pipelines;
   final PullRequestsClient pulls;

@@ -610,7 +610,8 @@ bool agentFoundIn(AgentDef a, String repoName) => a.scope == AgentScope.personal
 /// The command its terminal runs, as Kumo shows it (the engine builds the
 /// real argv from the same parts).
 String agentCommand(AgentDef a, {required bool foundHere, String contextDir = '', String prompt = ''}) {
-  final agent = foundHere ? '--agent ${a.name}' : '--agents "\$(kumo agent ${a.name} --json)" --agent ${a.name}';
+  // Not found by name: the engine passes it inline (agentInlineJson).
+  final agent = foundHere ? '--agent ${a.name}' : '--agents \'{"${a.name}": …}\' --agent ${a.name}';
   final p = prompt.trim();
   final quoted = p.isEmpty ? '' : ' "${p.length > 70 ? '${p.substring(0, 68)}…' : p}"';
   return 'claude $agent${contextDir.isEmpty ? '' : ' --add-dir $contextDir'}$quoted';

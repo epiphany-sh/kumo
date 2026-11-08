@@ -121,7 +121,7 @@ void main() {
       expect(agentFoundIn(a, 'price-admin'), isTrue);
       expect(agentFoundIn(a, 'users-permissions'), isFalse);
       expect(agentCommand(a, foundHere: true, contextDir: '~/.kumo/runs/x', prompt: 'Review #521'), 'claude --agent go-pr-reviewer --add-dir ~/.kumo/runs/x "Review #521"');
-      expect(agentCommand(a, foundHere: false), startsWith('claude --agents "\$(kumo agent go-pr-reviewer --json)" --agent go-pr-reviewer'));
+      expect(agentCommand(a, foundHere: false), startsWith('claude --agents \'{"go-pr-reviewer": …}\' --agent go-pr-reviewer'));
       final inline = jsonDecode(agentInlineJson(a.copyWith(instructions: 'Hi.'))) as Map;
       expect((inline['go-pr-reviewer'] as Map)['prompt'], 'Hi.');
       expect(playgroundCommand(a), contains('--output-format stream-json --verbose --max-turns 25'));

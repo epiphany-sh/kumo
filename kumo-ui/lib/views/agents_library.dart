@@ -750,25 +750,24 @@ class _Meter extends StatelessWidget {
     final c = context.c;
     final f = fraction;
     final color = f != null && f > 0.85 ? c.warn : c.acc;
-    final w = ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 112, maxWidth: 220),
-      child: IntrinsicWidth(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-          Row(children: [
-            Text(label, maxLines: 1, style: sans(11, color: c.text3)),
-            const SizedBox(width: 8),
-            const Spacer(),
-            Flexible(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11, color: f == null ? c.text2 : color))),
-          ]),
-          const SizedBox(height: 3),
-          Container(
-            height: 3,
-            decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(2)),
-            alignment: Alignment.centerLeft,
-            child: FractionallySizedBox(widthFactor: (f ?? 0).clamp(0.0, 1.0), child: Container(decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)))),
-          ),
+    // A fixed width: a bar that fills a fraction can't be measured by its
+    // content (IntrinsicWidth fails on it).
+    final w = SizedBox(
+      width: 150,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+        Row(children: [
+          Text(label, maxLines: 1, style: sans(11, color: c.text3)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.right, style: mono(11, color: f == null ? c.text2 : color))),
         ]),
-      ),
+        const SizedBox(height: 3),
+        Container(
+          height: 3,
+          decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(2)),
+          alignment: Alignment.centerLeft,
+          child: FractionallySizedBox(widthFactor: (f ?? 0).clamp(0.0, 1.0), child: Container(decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)))),
+        ),
+      ]),
     );
     return tooltip == null ? w : Tooltip(message: tooltip!, child: w);
   }

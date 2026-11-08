@@ -1430,6 +1430,7 @@ class AppState extends ChangeNotifier {
         title: '${task.key} · ${task.title}',
         detail: [tasks.source(task.sourceId)?.kind.label ?? '', task.typeName].where((p) => p.isNotEmpty).join(' · '),
         url: task.url,
+        id: task.id,
       );
 
   /// What an agent gets when it starts from a task: title, key and source,

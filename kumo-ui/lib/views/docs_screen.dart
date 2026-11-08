@@ -624,6 +624,7 @@ AgentContextItem docContext(DocPage page) => AgentContextItem(
       title: page.summary.title,
       detail: [page.source.kind.label, page.summary.place].where((p) => p.isNotEmpty).join(' · '),
       url: page.summary.url,
+      id: page.summary.id,
     );
 
 /// Writes [page] as Markdown under the temp folder; returns the path.

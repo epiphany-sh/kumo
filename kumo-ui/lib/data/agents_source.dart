@@ -74,7 +74,7 @@ String agentContextTag(AgentContextKind k) => switch (k) {
 /// A ticket, page or piece of code an agent was given.
 @immutable
 class AgentContextItem {
-  const AgentContextItem({required this.kind, required this.title, this.detail = '', this.url = ''});
+  const AgentContextItem({required this.kind, required this.title, this.detail = '', this.url = '', this.id = ''});
   final AgentContextKind kind;
 
   /// e.g. "PRC-412 · Bulk discounts by category".
@@ -84,12 +84,16 @@ class AgentContextItem {
   final String detail;
   final String url;
 
-  @override
-  bool operator ==(Object other) =>
-      other is AgentContextItem && other.kind == kind && other.title == title && other.detail == detail && other.url == url;
+  /// Its id where it comes from (a task's or a page's), when known: the
+  /// engine reads it whole from there for a run.
+  final String id;
 
   @override
-  int get hashCode => Object.hash(kind, title, detail, url);
+  bool operator ==(Object other) =>
+      other is AgentContextItem && other.kind == kind && other.title == title && other.detail == detail && other.url == url && other.id == id;
+
+  @override
+  int get hashCode => Object.hash(kind, title, detail, url, id);
 }
 
 enum AgentStepKind {
