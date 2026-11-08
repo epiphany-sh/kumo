@@ -41,7 +41,10 @@ mod tests {
         };
         let _ = child.kill();
         let _ = child.wait();
-        assert!(details.exe.ends_with("sh"), "{details:?}");
+        // By name: on Ubuntu sh is dash, and Path::ends_with compares whole
+        // components.
+        let exe = details.exe.file_name().unwrap().to_string_lossy();
+        assert!(exe.ends_with("sh"), "{details:?}");
         assert!(
             details.args.iter().any(|a| a == "read" || a == "-c"),
             "{details:?}"
