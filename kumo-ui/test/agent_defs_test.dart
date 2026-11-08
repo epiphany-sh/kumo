@@ -333,6 +333,18 @@ void main() {
     state.dispose();
   });
 
+  test('a whole agent file pasted in the instructions can go to its fields', () {
+    const pasted = '---\nname: finder\ndescription: Finds duplicates. Use it when reviewing a PR.\ntools: Read, Grep\nmodel: sonnet\n---\n\nYou find duplicates.';
+    final a = agentTemplates.firstWhere((t) => t.id == 'doc-writer').draft().copyWith(name: 'x', maxMinutes: () => 7, instructions: pasted);
+    expect(agentChecks(a).where((c) => c.level == CheckLevel.warn && c.text.contains('frontmatter')), hasLength(1));
+    final read = agentFromPastedFile(a)!;
+    expect((read.name, read.description, read.model, read.instructions), ('finder', 'Finds duplicates. Use it when reviewing a PR.', 'sonnet', 'You find duplicates.'));
+    expect(read.tools, ['Read', 'Grep']);
+    expect(read.maxMinutes, 7, reason: 'what only Kumo keeps stays');
+    expect(agentFromPastedFile(read), isNull);
+    expect(agentFromPastedFile(a.copyWith(instructions: 'You find duplicates.\n---\nmore')), isNull);
+  });
+
   test('only time working counts towards a run’s limit', () {
     final started = DateTime(2026);
     AgentRun run(AgentStatus status) => AgentRun(

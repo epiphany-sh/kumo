@@ -547,6 +547,25 @@ AgentCheck agentDescriptionCheck(AgentDef a) {
   return AgentCheck(CheckLevel.ok, '${d.length} characters · says what and when.');
 }
 
+/// Whether [instructions] start with a frontmatter of their own: a whole agent
+/// file pasted in, whose description and tools would be only text.
+bool agentInstructionsHaveFile(String instructions) => instructions.trimLeft().startsWith(RegExp(r'---\r?\n'));
+
+/// [a] with the file pasted in its instructions spread over its fields: what
+/// the file doesn't say stays out, as if imported, but where it lives and what
+/// only Kumo keeps stay [a]'s. Null when it can't be read.
+AgentDef? agentFromPastedFile(AgentDef a) {
+  if (!agentInstructionsHaveFile(a.instructions)) return null;
+  final read = readAgentFile(a.instructions, scope: a.scope, repo: a.repo).agent;
+  if (read == null) return null;
+  return read.copyWith(
+    name: read.name.isEmpty ? a.name : read.name,
+    maxMinutes: () => a.maxMinutes,
+    maxCostUsd: () => a.maxCostUsd,
+    triggers: a.triggers,
+  );
+}
+
 /// Everything to check before [a] is saved, in the order the form shows it.
 List<AgentCheck> agentChecks(AgentDef a, {Set<String> taken = const {}}) {
   final writes = agentWrites(a.tools);
@@ -555,6 +574,8 @@ List<AgentCheck> agentChecks(AgentDef a, {Set<String> taken = const {}}) {
     agentDescriptionCheck(a),
     if (a.instructions.trim().isEmpty)
       const AgentCheck(CheckLevel.error, 'Write its instructions, or have Claude draft them.')
+    else if (agentInstructionsHaveFile(a.instructions))
+      const AgentCheck(CheckLevel.warn, 'Its instructions start with a frontmatter: a whole agent file pasted in? Its description and tools there are only text.')
     else
       AgentCheck(CheckLevel.ok, 'Instructions: ${a.instructions.trim().split('\n').where((l) => l.trim().isNotEmpty).length} lines.'),
     if (a.tools.isEmpty && a.mcpServers.isEmpty)
@@ -679,7 +700,7 @@ const agentTemplates = [
       role: 'a test writer', step: 'Write tests for every function the branch changed, then run them.', dont: 'Don’t change code outside test files. Don’t push.'),
   AgentTemplate('bug-fixer', 'Bug fixer', 'Reproduces a bug from a ticket, fixes it and proves it with a test.', [...readOnlyTools, 'Edit', 'Bash'], 'red',
       role: 'a bug fixer', step: 'Reproduce the bug with a failing test, fix it, and run the tests around it.', dont: 'Don’t push. Don’t change unrelated code.'),
-  AgentTemplate('blank', 'Blank', 'Only the safe defaults: read-only, 25 turns, 10 minutes.', readOnlyTools, 'yellow'),
+  AgentTemplate('blank', 'Blank', 'Only the safe defaults: read-only, 25 turns.', readOnlyTools, 'yellow'),
 ];
 
 /// What Kumo asks Claude to draft an agent from [description] (the engine

@@ -9,7 +9,9 @@ mod model;
 mod play;
 mod ports;
 
-pub use command::{PlayCommand, ask_args, context_sentence, next_free, play_args, run_args};
+pub use command::{
+    PlayCommand, ask_args, context_sentence, next_free, play_args, role_sentence, run_args,
+};
 pub use context::{
     ContextFile, RepoLink, WrittenContext, context_index, file_name, html_text, pull_number,
     task_key,

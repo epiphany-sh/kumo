@@ -162,7 +162,17 @@ class _AgentEditorState extends State<_AgentEditor> {
           kind: KButtonKind.ghost,
           onTap: _drafting ? null : _draftInstructions,
         ),
-        child: _Area(controller: _body, minLines: 9, maxLines: 22, monospace: true, label: 'Instructions', onChanged: (v) => _set(a.copyWith(instructions: v))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _Area(controller: _body, minLines: 9, maxLines: 22, monospace: true, label: 'Instructions', onChanged: (v) => _set(a.copyWith(instructions: v))),
+          if (agentFromPastedFile(a) case final read?) ...[
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: Text('This looks like a whole agent file: its description, tools and model are only text here.', style: sans(12, color: c.warn, height: 1.4))),
+              const SizedBox(width: 8),
+              KButton(label: 'Use its fields', height: 26, fontSize: 11.5, onTap: () => _set(read)),
+            ]),
+          ],
+        ]),
       ),
       const SizedBox(height: 16),
       _tools(context),

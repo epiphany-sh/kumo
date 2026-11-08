@@ -11,9 +11,21 @@ pub fn context_sentence(dir: &Path) -> String {
     )
 }
 
-/// `claude [--agents <json>] --agent <name> [--add-dir <dir>] [<prompt>]`:
-/// an agent in a terminal of its own. With no prompt the user types; the
-/// context folder is then pointed at in the system prompt instead.
+/// Keeps a run on its agent's job. A loose request ("analyze this repo") went
+/// by the words about one time in four without it, and never in 15 runs with
+/// it (Haiku): what's typed outweighs the role otherwise.
+pub fn role_sentence(name: &str) -> String {
+    format!(
+        "You are running as the agent `{name}`. Read every request through that role: \
+         \"analyze this repo\" means do your job on this repo, not a general review. \
+         If a request is clearly outside your role, say so instead of doing it."
+    )
+}
+
+/// `claude [--agents <json>] --agent <name> [--add-dir <dir>]
+/// --append-system-prompt <text> [<prompt>]`: an agent in a terminal of its
+/// own. With no prompt the user types; the context folder is then pointed at
+/// in the system prompt instead.
 pub fn run_args(
     name: &str,
     inline_json: &str,
@@ -26,12 +38,14 @@ pub fn run_args(
     }
     args.extend(["--agent".to_owned(), name.to_owned()]);
     let prompt = prompt.trim();
+    let mut system = role_sentence(name);
     if let Some(dir) = context_dir {
         args.extend(["--add-dir".to_owned(), dir.display().to_string()]);
         if prompt.is_empty() {
-            args.extend(["--append-system-prompt".to_owned(), context_sentence(dir)]);
+            system = format!("{system} {}", context_sentence(dir));
         }
     }
+    args.extend(["--append-system-prompt".to_owned(), system]);
     if !prompt.is_empty() {
         args.push(match context_dir {
             Some(dir) => format!("{prompt}\n\n{}", context_sentence(dir)),
@@ -54,7 +68,8 @@ pub struct PlayCommand {
 }
 
 /// `claude -p --agents <json> --agent <name> --output-format stream-json
-/// --verbose [--max-turns N] [--max-budget-usd X] [--add-dir <dir>] <task>`.
+/// --verbose --append-system-prompt <text> [--max-turns N] [--max-budget-usd X]
+/// [--add-dir <dir>] <task>`.
 pub fn play_args(play: &PlayCommand, budget_flag: bool) -> Vec<String> {
     let mut args = vec!["-p".to_owned()];
     if !play.inline_json.trim().is_empty() {
@@ -66,6 +81,8 @@ pub fn play_args(play: &PlayCommand, budget_flag: bool) -> Vec<String> {
         "--output-format".to_owned(),
         "stream-json".to_owned(),
         "--verbose".to_owned(),
+        "--append-system-prompt".to_owned(),
+        role_sentence(&play.name),
     ]);
     if let Some(turns) = play.max_turns {
         args.extend(["--max-turns".to_owned(), turns.to_string()]);
@@ -122,6 +139,8 @@ mod tests {
                 "rev",
                 "--add-dir",
                 "/d/runs/rev-1",
+                "--append-system-prompt",
+                &role_sentence("rev"),
                 "Review #521\n\nWhat you were given for this run is in /d/runs/rev-1: start with context.md."
             ]
         );
@@ -131,11 +150,20 @@ mod tests {
     fn inline_without_prompt_or_context() {
         assert_eq!(
             run_args("rev", "{\"rev\":{}}", None, ""),
-            ["--agents", "{\"rev\":{}}", "--agent", "rev"]
+            [
+                "--agents",
+                "{\"rev\":{}}",
+                "--agent",
+                "rev",
+                "--append-system-prompt",
+                &role_sentence("rev"),
+            ]
         );
         let with_context = run_args("rev", "", Some(Path::new("/c")), "");
         assert_eq!(&with_context[2..4], ["--add-dir", "/c"]);
         assert_eq!(with_context[4], "--append-system-prompt");
+        assert!(with_context[5].starts_with(&role_sentence("rev")));
+        assert!(with_context[5].ends_with("start with context.md."));
         assert_eq!(
             with_context.len(),
             6,
@@ -164,6 +192,8 @@ mod tests {
                 "--output-format",
                 "stream-json",
                 "--verbose",
+                "--append-system-prompt",
+                &role_sentence("rev"),
                 "--max-turns",
                 "8",
                 "--max-budget-usd",

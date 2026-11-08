@@ -381,7 +381,16 @@ async fn a_run_starts_claude_with_its_agent_and_its_context() {
             &context.display().to_string()
         ]
     );
-    assert_eq!(args[4..], ["Review the branch", "", &sentence]);
+    assert_eq!(
+        args[4..],
+        [
+            "--append-system-prompt",
+            &kumo_domain::agent_defs::role_sentence("rev"),
+            "Review the branch",
+            "",
+            &sentence
+        ]
+    );
     assert_eq!(s.cwd("run"), s.repo);
     let index = std::fs::read_to_string(context.join("context.md")).unwrap();
     assert!(
@@ -604,6 +613,8 @@ async fn a_test_run_streams_its_lines_and_keeps_them() {
             "--output-format",
             "stream-json",
             "--verbose",
+            "--append-system-prompt",
+            &kumo_domain::agent_defs::role_sentence("rev-draft"),
             "--max-turns",
             "8",
             "--max-budget-usd",
