@@ -15,6 +15,8 @@ pub struct ActivityTracker {
     state: AgentState,
     last_output: Instant,
     attention_at: Option<Instant>,
+    /// It's waiting because it asked (bell, notification), not just quiet.
+    asked: bool,
     osc: OscState,
 }
 
@@ -37,12 +39,19 @@ impl ActivityTracker {
             state: AgentState::Working,
             last_output: now,
             attention_at: None,
+            asked: false,
             osc: OscState::Ground,
         }
     }
 
     pub fn state(&self) -> AgentState {
         self.state
+    }
+
+    /// Waiting because it asked for attention (an approval, usually), so
+    /// what's typed now would answer it; false when it's only quiet.
+    pub fn asked(&self) -> bool {
+        self.state == AgentState::NeedsInput && self.asked
     }
 
     /// Feeds output. Returns the new state if it changed.
@@ -53,6 +62,7 @@ impl ActivityTracker {
         self.last_output = now;
         if self.scan(bytes) {
             self.attention_at = Some(now);
+            self.asked = true;
             return self.set(AgentState::NeedsInput);
         }
         let in_grace = self
@@ -69,6 +79,7 @@ impl ActivityTracker {
         if self.state == AgentState::Working
             && now.duration_since(self.last_output) >= self.quiet_after
         {
+            self.asked = false;
             return self.set(AgentState::NeedsInput);
         }
         None
@@ -79,6 +90,9 @@ impl ActivityTracker {
     }
 
     fn set(&mut self, state: AgentState) -> Option<AgentState> {
+        if state == AgentState::Working {
+            self.asked = false;
+        }
         (self.state != state).then(|| {
             self.state = state;
             state
@@ -209,6 +223,19 @@ mod tests {
             tracker.on_output(b"late", t0 + Duration::from_secs(9)),
             None
         );
+    }
+
+    #[test]
+    fn asking_is_told_apart_from_being_quiet() {
+        let t0 = Instant::now();
+        let mut quiet = ActivityTracker::new(t0, Duration::from_secs(1));
+        quiet.tick(t0 + Duration::from_secs(2));
+        assert!(quiet.state() == AgentState::NeedsInput && !quiet.asked());
+        let mut asking = ActivityTracker::new(t0, Duration::from_secs(1));
+        asking.on_output(b"Allow?\x07", t0);
+        assert!(asking.asked());
+        asking.on_output(b"working", t0 + Duration::from_secs(1));
+        assert!(!asking.asked());
     }
 
     #[test]

@@ -850,3 +850,80 @@ async fn each_profile_gives_the_clis_their_own_folders() {
     assert!(own("claude") && own("codex"));
     assert!(!own("gemini") && !own("copilot"));
 }
+
+/// Waits for the snapshot's agents started by hand to satisfy `ready`.
+async fn terminal_agents_where(
+    client: &mut KumoClient,
+    ready: impl Fn(&[pb::TerminalAgent]) -> bool,
+) -> Vec<pb::TerminalAgent> {
+    let mut stream = client
+        .agents
+        .watch(pb::WatchAgentsRequest {})
+        .await
+        .unwrap()
+        .into_inner();
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            let snapshot = stream.message().await.unwrap().expect("watch ended");
+            if ready(&snapshot.terminal_agents) {
+                return snapshot.terminal_agents;
+            }
+        }
+    })
+    .await
+    .expect("the terminal's agent never showed as expected")
+}
+
+/// `claude` typed by hand in a shell shows as that terminal's agent, asks
+/// (a bell) and goes when it exits.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_cli_typed_in_a_terminal_is_seen() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let repo = worktree(&daemon, &mut client).await;
+    fake_cli(
+        &daemon.bin(),
+        "claude",
+        "printf 'ready\\n'; read a; printf 'Allow?\\a'; read b; exit 0",
+    );
+    let terminal = client
+        .terminals
+        .open(pb::OpenRequest {
+            program: "/bin/sh".into(),
+            cwd: repo.display().to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .terminal_id;
+    let typed: &'static [u8] = Box::leak(
+        format!("{}\n", daemon.bin().join("claude").display())
+            .into_bytes()
+            .into_boxed_slice(),
+    );
+    let mut shell = Attached::new(&mut client, &terminal, true).await;
+    shell.send(typed).await;
+    shell.read_until("ready").await;
+
+    let seen = terminal_agents_where(&mut client, |a| !a.is_empty()).await;
+    assert_eq!(seen.len(), 1);
+    assert_eq!(
+        (
+            seen[0].terminal_id.as_str(),
+            seen[0].provider_id.as_str(),
+            seen[0].program.as_str()
+        ),
+        (terminal.as_str(), "claude", "claude")
+    );
+    assert_eq!(std::fs::canonicalize(&seen[0].cwd).unwrap(), repo);
+
+    shell.send(b"go\n").await;
+    terminal_agents_where(&mut client, |a| {
+        a.first()
+            .is_some_and(|a| a.state == pb::AgentState::NeedsInput as i32)
+    })
+    .await;
+    shell.send(b"yes\n").await;
+    terminal_agents_where(&mut client, <[pb::TerminalAgent]>::is_empty).await;
+}

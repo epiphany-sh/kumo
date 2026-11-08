@@ -163,3 +163,79 @@ pub struct TerminalAgent {
     /// Producing output.
     pub busy: bool,
 }
+
+/// Runtimes a CLI can be a script of (`node …/claude`, a shell wrapper).
+const RUNTIMES: &[&str] = &[
+    "node", "bun", "deno", "python", "python3", "sh", "bash", "zsh",
+];
+
+fn base_name(path: &str) -> &str {
+    path.rsplit(['/', '\\']).next().unwrap_or(path)
+}
+
+/// Which of `programs` (provider id, program) a process is: its
+/// executable or its first argument, or, for a runtime, its script.
+pub fn agent_program<'a>(
+    exe: &str,
+    args: &[String],
+    programs: &'a [(String, String)],
+) -> Option<&'a (String, String)> {
+    let mut names = vec![base_name(exe)];
+    if let Some(first) = args.first() {
+        names.push(base_name(first));
+    }
+    if names.iter().any(|n| RUNTIMES.contains(n))
+        && let Some(script) = args.get(1)
+    {
+        names.push(base_name(script));
+    }
+    programs.iter().find(|(_, program)| {
+        let program = base_name(program);
+        !program.is_empty() && names.contains(&program)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_cli_is_found_by_its_program_or_its_script() {
+        let programs = vec![
+            ("claude".to_owned(), "claude".to_owned()),
+            ("codex".to_owned(), "codex".to_owned()),
+        ];
+        let args = |a: &[&str]| a.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+        assert_eq!(
+            agent_program("/opt/homebrew/bin/codex", &args(&["codex"]), &programs)
+                .unwrap()
+                .0,
+            "codex"
+        );
+        assert_eq!(
+            agent_program(
+                "/usr/local/bin/node",
+                &args(&["node", "/usr/local/bin/claude", "-c"]),
+                &programs
+            )
+            .unwrap()
+            .0,
+            "claude"
+        );
+        assert_eq!(
+            agent_program("claude", &args(&["claude", "--resume"]), &programs)
+                .unwrap()
+                .0,
+            "claude"
+        );
+        assert!(agent_program("/usr/bin/vim", &args(&["vim", "claude"]), &programs).is_none());
+        assert!(agent_program("/bin/zsh", &args(&["-zsh"]), &programs).is_none());
+        assert!(agent_program("/bin/sh", &args(&["/bin/sh", "-c", "claude"]), &programs).is_none());
+        assert_eq!(
+            agent_program("/bin/sh", &args(&["/bin/sh", "/opt/bin/claude"]), &programs)
+                .unwrap()
+                .0,
+            "claude"
+        );
+    }
+}

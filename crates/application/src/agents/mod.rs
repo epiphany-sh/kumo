@@ -3,6 +3,7 @@
 
 mod monitor;
 mod service;
+mod terminal_agents;
 mod usage;
 
 pub use service::{

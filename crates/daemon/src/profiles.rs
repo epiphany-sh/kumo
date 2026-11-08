@@ -25,7 +25,7 @@ use kumo_domain::tasks::{SecretStore, TaskConnector};
 use kumo_domain::workspace::{WorkspaceStore, WorktreeLocation};
 use kumo_infrastructure::agent_defs::{HttpPageReader, LocalAgentDefFiles, ProcessHeadlessRunner};
 use kumo_infrastructure::agents::{
-    ClaudeStatusLine, CodexRollouts, ProfileCliHomes, claude_config_dir, codex_home,
+    ClaudeStatusLine, CodexRollouts, OsProcesses, ProfileCliHomes, claude_config_dir, codex_home,
 };
 use kumo_infrastructure::ci::{
     BitbucketPipelines, BitbucketPulls, BitbucketReleases, GhTokenFallback, GitHubActions,
@@ -271,6 +271,8 @@ impl ProfileOpener {
             Arc::clone(&terminals),
             Arc::clone(&workspace),
         ));
+        // Agent CLIs typed by hand in the profile's terminals.
+        agents.watch_terminals(Arc::new(OsProcesses));
         let agent_defs = Arc::new(
             AgentDefService::new(
                 AgentDefPorts {

@@ -147,6 +147,13 @@ impl TerminalSession {
         }
     }
 
+    /// The process in its foreground (what was typed in its shell, or the
+    /// shell); None once it exited or where the OS can't tell.
+    pub fn foreground(&self) -> Option<u32> {
+        let master = self.master.lock().unwrap_or_else(PoisonError::into_inner);
+        master.as_ref().and_then(|m| m.foreground())
+    }
+
     /// Kills the process. Killing an exited process is a no-op.
     pub fn kill(&self) -> Result<(), TerminalError> {
         if matches!(self.status(), TerminalStatus::Exited(_)) {

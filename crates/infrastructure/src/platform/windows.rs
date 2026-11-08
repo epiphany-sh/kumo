@@ -11,8 +11,8 @@ use std::sync::Arc;
 use keyring_core::{CredentialStore, Error as KeyringError};
 
 use super::{
-    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles,
-    ProgramSearch, ScriptShell, Signals,
+    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, Processes,
+    ProgramSearch, RunningProcess, ScriptShell, Signals,
 };
 
 /// The child gets a console nobody sees.
@@ -155,5 +155,12 @@ mod tests {
             &path,
             &meta
         ));
+    }
+}
+
+impl Processes for Windows {
+    /// Not read yet: terminals on Windows don't report agent CLIs.
+    fn process(_pid: u32) -> Option<RunningProcess> {
+        None
     }
 }

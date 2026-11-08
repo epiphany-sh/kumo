@@ -75,12 +75,12 @@ pub struct AgentsSnapshot {
 #[derive(Debug)]
 pub struct AgentService {
     ports: AgentPorts,
-    terminals: Arc<TerminalService>,
+    pub(super) terminals: Arc<TerminalService>,
     workspace: Arc<WorkspaceService>,
     sessions: Mutex<AgentsSnapshot>,
     published: watch::Sender<Arc<AgentsSnapshot>>,
     usage: Mutex<UsageState>,
-    quiet_after: Duration,
+    pub(super) quiet_after: Duration,
     /// Sessions stopped by their time limit, until their exit is recorded.
     timed_out: Mutex<HashSet<AgentSessionId>>,
 }
@@ -616,6 +616,10 @@ impl AgentService {
                 change(session);
             }
         });
+    }
+
+    pub(super) fn update_snapshot(&self, change: impl FnOnce(&mut AgentsSnapshot)) {
+        self.update(change);
     }
 
     fn update(&self, change: impl FnOnce(&mut AgentsSnapshot)) {
