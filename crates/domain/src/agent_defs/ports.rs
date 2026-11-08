@@ -104,6 +104,8 @@ pub trait RunGit: Send + Sync + 'static {
     fn clone_repo(&self, url: &str, dest: &Path) -> Result<(), String>;
     /// Fetches `reference` from origin; the commit it points at.
     fn fetch(&self, repo: &Path, reference: &str) -> Result<String, String>;
+    /// The URL of origin, as configured.
+    fn origin_url(&self, repo: &Path) -> Result<String, String>;
     /// `git diff <base>...<head>`.
     fn diff(&self, repo: &Path, base: &str, head: &str) -> Result<String, String>;
     /// `git worktree add --detach <path> <rev>`.

@@ -264,4 +264,35 @@ void main() {
     state.dismissUndo();
     expect(tester.takeException(), isNull);
   });
+
+  test('trying again after a failure doesn’t post a reply twice', () async {
+    final repo = Mock.repoNamed('price-admin')!;
+    final source = _FailsOnce(repo, repo.worktrees, failOn: 't2');
+    final threads = [for (final id in ['t1', 't2', 't3']) ReviewThread(id: id, path: 'a.go', line: 1, author: 'x', body: 'b', time: DateTime(2026), resolved: false)];
+    final pr = source.pullRequests.first;
+    final answered = <String>{};
+    Future<(int, int, Object?)> go() => postThreadAnswers(source, pr, threads, replyOf: (_) => 'ok', resolveOf: (_) => false, answered: answered);
+    final first = await go();
+    expect((first.$1, first.$3 != null), (1, true));
+    final second = await go();
+    expect((second.$1, second.$3), (2, null));
+    expect(source.calls, ['t1', 't2', 't2', 't3'], reason: 't1 went the first time');
+    source.dispose();
+  });
+}
+
+class _FailsOnce extends MockRepoActivity {
+  _FailsOnce(super.repo, super.worktrees, {required this.failOn});
+  final String failOn;
+  bool _failed = false;
+  final calls = <String>[];
+
+  @override
+  Future<void> answerThread(RepoPullRequest pr, ReviewThread thread, {String reply = '', bool resolve = false}) async {
+    calls.add(thread.id);
+    if (thread.id == failOn && !_failed) {
+      _failed = true;
+      throw 'rate limited';
+    }
+  }
 }

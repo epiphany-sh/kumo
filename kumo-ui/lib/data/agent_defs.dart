@@ -678,16 +678,12 @@ Object? _inlineValue(String key, String written) {
   return value;
 }
 
-/// Whether [a] is found by name wherever it runs: only personal agents. A
-/// project agent's file may be uncommitted, or missing from another worktree,
-/// so it always goes inline, as saved.
-bool agentFoundByName(AgentDef a) => a.scope == AgentScope.personal;
-
 /// The command its terminal runs, as Kumo shows it (the engine builds the
 /// real argv from the same parts).
-String agentCommand(AgentDef a, {required bool foundHere, String contextDir = '', String prompt = ''}) {
-  // Not found by name: the engine passes it inline (agentInlineJson).
-  final agent = foundHere ? '--agent ${a.name}' : '--agents \'{"${a.name}": …}\' --agent ${a.name}';
+String agentCommand(AgentDef a, {String contextDir = '', String prompt = ''}) {
+  // Always inline (agentInlineJson): by name, Claude Code goes by the file's
+  // `name` line and Kumo by the file; and a file may not be where it runs.
+  final agent = '--agents \'{"${a.name}": …}\' --agent ${a.name}';
   final p = prompt.trim();
   final quoted = p.isEmpty ? '' : ' "${p.length > 70 ? '${p.substring(0, 68)}…' : p}"';
   return 'claude $agent${contextDir.isEmpty ? '' : ' --add-dir $contextDir'}${quoted.isEmpty ? '' : ' --$quoted'}';

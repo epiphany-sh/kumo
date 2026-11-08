@@ -65,7 +65,7 @@ class DiffHunk {
 /// A file a commit touched.
 @immutable
 class CommitFile {
-  const CommitFile({required this.path, required this.kind, this.hunks = const [], this.oldPath, this.binary = false, int? added, int? deleted})
+  const CommitFile({required this.path, required this.kind, this.hunks = const [], this.oldPath, this.binary = false, this.cut = false, int? added, int? deleted})
       : _added = added,
         _deleted = deleted;
   final String path;
@@ -75,6 +75,9 @@ class CommitFile {
   /// Where a renamed file was.
   final String? oldPath;
   final bool binary;
+
+  /// Too many lines changed to send them: only the counts came.
+  final bool cut;
   final int? _added;
   final int? _deleted;
 

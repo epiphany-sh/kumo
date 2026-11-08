@@ -803,6 +803,8 @@ class _FileDiff extends StatelessWidget {
         if (!folded) ...[
           if (f.binary)
             Padding(padding: const EdgeInsets.all(12), child: Text('Binary file', style: sans(12, color: c.text3)))
+          else if (f.cut)
+            Padding(padding: const EdgeInsets.all(12), child: Text('Too many lines changed to show here', style: sans(12, color: c.text3)))
           else if (f.hunks.isEmpty)
             Padding(padding: const EdgeInsets.all(12), child: Text(f.kind == CommitFileKind.renamed ? 'Renamed, content unchanged' : 'No changes to show', style: sans(12, color: c.text3)))
           else

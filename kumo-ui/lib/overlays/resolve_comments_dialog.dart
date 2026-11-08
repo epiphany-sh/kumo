@@ -40,6 +40,34 @@ Future<void> showResolveCommentsDialog(BuildContext context, {required RepoActiv
   );
 }
 
+/// Posts each thread's answer, in order, until one fails: how many replies and
+/// resolves went, and the failure. Threads in [answered] are skipped and the
+/// ones that went are added, so trying again doesn't post anything twice.
+Future<(int, int, Object?)> postThreadAnswers(
+  RepoActivitySource source,
+  RepoPullRequest pr,
+  List<ReviewThread> threads, {
+  required String Function(ReviewThread) replyOf,
+  required bool Function(ReviewThread) resolveOf,
+  required Set<String> answered,
+}) async {
+  var posted = 0, resolved = 0;
+  for (final t in threads) {
+    final reply = replyOf(t);
+    final res = resolveOf(t);
+    if ((reply.isEmpty && !res) || answered.contains(t.id)) continue;
+    try {
+      await source.answerThread(pr, t, reply: reply, resolve: res);
+    } on Object catch (e) {
+      return (posted, resolved, e);
+    }
+    answered.add(t.id);
+    if (reply.isNotEmpty) posted++;
+    if (res) resolved++;
+  }
+  return (posted, resolved, null);
+}
+
 enum _Phase { loading, setup, working, done }
 
 class ResolveCommentsDialog extends StatefulWidget {
@@ -55,6 +83,9 @@ class _ResolveCommentsDialogState extends State<ResolveCommentsDialog> {
   _Phase _phase = _Phase.loading;
   List<ReviewThread> _threads = const [];
   final _off = <String>{};
+
+  /// Threads already answered: trying again after a failure skips them.
+  final _answered = <String>{};
   String? _provider;
   ResolveMode _mode = ResolveMode.replyAndResolve;
   String? _error;
@@ -242,20 +273,21 @@ class _ResolveCommentsDialogState extends State<ResolveCommentsDialog> {
     }
     var posted = 0, resolved = 0;
     if (posting && widget.source.threadsWritable) {
-      try {
-        for (final t in done) {
-          final reply = _replies[t.id]?.text.trim() ?? '';
-          final res = _resolve[t.id] == true;
-          if (reply.isEmpty && !res) continue;
-          await widget.source.answerThread(pr, t, reply: reply, resolve: res);
-          if (reply.isNotEmpty) posted++;
-          if (res) resolved++;
-        }
-      } on Object catch (e) {
+      final (p, r, failure) = await postThreadAnswers(
+        widget.source,
+        pr,
+        done,
+        replyOf: (t) => _replies[t.id]?.text.trim() ?? '',
+        resolveOf: (t) => _resolve[t.id] == true,
+        answered: _answered,
+      );
+      posted = p;
+      resolved = r;
+      if (failure != null) {
         if (mounted) {
           setState(() {
             _applying = false;
-            _error = 'Posted $posted, then: $e';
+            _error = 'Posted $posted, then: $failure';
           });
         }
         return;

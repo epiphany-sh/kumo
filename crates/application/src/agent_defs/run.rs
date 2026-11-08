@@ -10,7 +10,7 @@ use kumo_domain::agent_defs::{
     AgentDefFile, ContextFile, RepoLink, WrittenContext, check_agent_name, context_index,
     file_name, next_free, pull_number, run_args, task_key,
 };
-use kumo_domain::agents::{AgentContext, AgentError, AgentSession, AgentState, ContextKind};
+use kumo_domain::agents::{AgentContext, AgentError, AgentSession, ContextKind};
 use kumo_domain::terminal::TerminalSize;
 
 use super::service::{AgentDefService, CLAUDE, blocking};
@@ -313,14 +313,6 @@ impl AgentDefService {
         };
         let (git, files) = (Arc::clone(&self.ports.git), Arc::clone(&self.ports.files));
         let url = format!("https://{}/{}.git", link.host, link.path);
-        // An agent may be at work in the one from before.
-        let in_use: Vec<PathBuf> = self
-            .agents
-            .sessions()
-            .into_iter()
-            .filter(|s| !matches!(s.state, AgentState::Exited(_)))
-            .map(|s| s.worktree)
-            .collect();
         blocking(move || {
             if !files.exists(&clone) {
                 git.clone_repo(&url, &clone).map_err(launch_error)?;
@@ -330,12 +322,10 @@ impl AgentDefService {
             };
             let sha = git.fetch(&clone, &reference).map_err(launch_error)?;
             let named = |suffix: &str| PathBuf::from(format!("{}@{suffix}", clone.display()));
+            // Never over one from before: it may hold an agent's work.
             let mut worktree = named(&suffix);
-            if in_use.contains(&worktree) {
+            if files.exists(&worktree) {
                 worktree = named(&next_free(&suffix, |n| files.exists(&named(n))));
-            } else if files.exists(&worktree) {
-                git.remove_worktree(&clone, &worktree)
-                    .map_err(launch_error)?;
             }
             git.add_detached(&clone, &worktree, &sha)
                 .map_err(launch_error)?;
@@ -428,7 +418,7 @@ impl AgentDefService {
                 })
             }
             ContextKind::Doc | ContextKind::Link => Err("it has no link".to_owned()),
-            ContextKind::PullRequest => self.pull_files(item, repo).await,
+            ContextKind::PullRequest => self.pull_files(item, repo, cwd).await,
             ContextKind::Files => {
                 // Nothing copied: where they are.
                 let path = Path::new(&item.title);
@@ -455,6 +445,7 @@ impl AgentDefService {
         &self,
         item: &AgentContext,
         repo: Option<&Path>,
+        cwd: &Path,
     ) -> Result<Vec<ContextFile>, String> {
         let number = pull_number(item).ok_or("it has no pull request number")?;
         let link = RepoLink::parse(&item.url);
@@ -471,9 +462,24 @@ impl AgentDefService {
                 })
                 .map(|r| r.repo.path.clone())
         });
-        let repo = linked_repo
-            .or_else(|| repo.map(Path::to_owned))
-            .ok_or("its repository isn't in the workspace")?;
+        // A link says whose pull request it is: never the same number of
+        // the repository this runs in.
+        let repo = match (&link, linked_repo) {
+            (_, Some(linked)) => linked,
+            (None, None) => repo
+                .map(Path::to_owned)
+                .ok_or("its repository isn't in the workspace")?,
+            (Some(link), None) => {
+                let (git, at) = (Arc::clone(&self.ports.git), cwd.to_owned());
+                let origin = blocking(move || git.origin_url(&at).map_err(launch_error))
+                    .await
+                    .unwrap_or_default();
+                if !link.same_repo(&origin) {
+                    return Err("its repository isn't in the workspace".to_owned());
+                }
+                cwd.to_owned()
+            }
+        };
         let mut files = Vec::new();
         let pr = self.ports.sources.pull_request(&repo, number).await;
         let base = match &pr {

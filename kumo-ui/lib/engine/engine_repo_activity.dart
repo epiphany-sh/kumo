@@ -51,6 +51,7 @@ class EngineRepoActivity extends RepoActivitySource {
 
   List<RepoPullRequest> _prs = const [];
   CiProblem? _prsProblem;
+  CiProblem? _releasesProblem;
   bool _prsLoading = true;
 
   Future<void> _loadPrs({bool refresh = false}) async {
@@ -131,6 +132,7 @@ class EngineRepoActivity extends RepoActivitySource {
           _ => CommitFileKind.modified,
         },
         binary: f.binary,
+        cut: f.cut,
         added: f.added,
         deleted: f.deleted,
         hunks: [
@@ -168,11 +170,17 @@ class EngineRepoActivity extends RepoActivitySource {
       _releases = [for (final r in list.releases) _release(r)];
       _olderReleases = list.older;
       _releasesSupported = true;
+      _releasesProblem = list.hasProblem() ? ciProblemFrom(list.problem) : null;
     } on GrpcError catch (e) {
       if (_disposed) return;
-      if (e.code == StatusCode.unimplemented) _releasesSupported = false;
-    } on Object {
+      if (e.code == StatusCode.unimplemented) {
+        _releasesSupported = false;
+      } else {
+        _releasesProblem = CiProblem(CiProblemKind.unreachable, detail: e.message ?? e.codeName);
+      }
+    } on Object catch (e) {
       if (_disposed) return;
+      _releasesProblem = CiProblem(CiProblemKind.unreachable, detail: '$e');
     }
     _releasesLoading = false;
     notifyListeners();
@@ -426,6 +434,8 @@ class EngineRepoActivity extends RepoActivitySource {
   List<RepoPullRequest> get pullRequests => _prs;
   @override
   CiProblem? get prsProblem => _prsProblem;
+  @override
+  CiProblem? get releasesProblem => _releasesProblem;
   @override
   bool get prsLoading => _prsLoading;
 

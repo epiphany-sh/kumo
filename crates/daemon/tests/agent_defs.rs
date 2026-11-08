@@ -621,6 +621,66 @@ async fn a_second_run_on_a_link_leaves_the_first_ones_worktree() {
     assert_eq!(std::fs::read_to_string(&work).unwrap(), "work");
 }
 
+/// A pull request of another repository isn't the same number of this one.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_linked_pull_request_is_read_from_its_own_repository() {
+    use pb::run_agent_def_request::Where;
+    let mut s = Setup::new().await;
+    let item = |url: &str| pb::AgentContext {
+        kind: pb::AgentContextKind::PullRequest.into(),
+        title: "#7".into(),
+        url: url.into(),
+        ..Default::default()
+    };
+    // Running here, handed one of a repository it isn't: it says it couldn't.
+    let origin = host_repo(&s);
+    let other = "https://host.example/acme/other/pull/7";
+    let mut here = run(
+        personal("rev"),
+        Where::WorktreePath(s.repo.display().to_string()),
+        "",
+    );
+    here.context = vec![item(other)];
+    let session = s.client.agent_defs.run(here).await.unwrap().into_inner();
+    let context = PathBuf::from(&session.context_dir);
+    assert!(!context.join("pr-7.diff").exists());
+    let index = std::fs::read_to_string(context.join("context.md")).unwrap();
+    assert!(index.contains("couldn’t be read"), "{index}");
+
+    // Running on its link: read from the clone.
+    let clone = s.profile_dir().join("clones/host.example/acme/other");
+    std::fs::create_dir_all(clone.parent().unwrap()).unwrap();
+    git(
+        &s.daemon.home(),
+        &[
+            "clone",
+            "-q",
+            &origin.display().to_string(),
+            &clone.display().to_string(),
+        ],
+    );
+    let url = "https://host.example/acme/other.git";
+    git(&clone, &["remote", "set-url", "origin", url]);
+    git(
+        &clone,
+        &[
+            "config",
+            &format!("url.{}.insteadOf", origin.display()),
+            url,
+        ],
+    );
+    push_to_pull(&origin);
+    let mut linked = run(personal("rev"), Where::LinkUrl(other.into()), "");
+    linked.context = vec![item(other)];
+    let session = s.client.agent_defs.run(linked).await.unwrap().into_inner();
+    let context = PathBuf::from(&session.context_dir);
+    assert!(
+        context.join("pr-7.diff").exists(),
+        "{:?}",
+        std::fs::read_to_string(context.join("context.md"))
+    );
+}
+
 /// Stopping a test run isn't its failing.
 #[tokio::test(flavor = "multi_thread")]
 async fn a_stopped_test_run_ends_with_130_and_no_failure() {

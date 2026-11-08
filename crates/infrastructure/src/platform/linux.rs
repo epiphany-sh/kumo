@@ -11,8 +11,8 @@ use std::sync::Arc;
 use keyring_core::{CredentialStore, Error as KeyringError};
 
 use super::{
-    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, Processes,
-    ProgramSearch, RunningProcess, ScriptShell, Signals, unix,
+    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, ProcessTrees,
+    Processes, ProgramSearch, RunningProcess, ScriptShell, Signals, unix,
 };
 
 pub struct Linux;
@@ -20,6 +20,15 @@ pub struct Linux;
 impl BackgroundPrograms for Linux {
     fn command(program: &OsStr) -> Command {
         unix::command(program)
+    }
+}
+
+impl ProcessTrees for Linux {
+    fn own_group(command: &mut Command) {
+        unix::own_group(command);
+    }
+    fn kill_tree(pid: u32) {
+        unix::kill_tree(pid);
     }
 }
 

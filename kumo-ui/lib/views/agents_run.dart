@@ -161,7 +161,7 @@ class _RunTabState extends State<_RunTab> {
       AgentWhereKind.scratch => ('An empty folder kept for a week, for research or writing. Files can open it.', false),
     };
     final contextDir = context0.isEmpty && knowledge.isEmpty ? '' : '~/.kumo/runs/${a.name}-${widget.runs.length + 1}';
-    final cmd = agentCommand(a, foundHere: agentFoundByName(a), contextDir: contextDir, prompt: f.prompt.text);
+    final cmd = agentCommand(a, contextDir: contextDir, prompt: f.prompt.text);
     final canStart = !widget.fresh && !_starting && switch (f.where) {
       AgentWhereKind.worktree => picked != null,
       AgentWhereKind.newWorktree => f.newIn != null,

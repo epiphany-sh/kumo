@@ -166,7 +166,7 @@ class EngineAgentDefs extends AgentDefsSource {
   Future<AgentRun?> run(AgentDef agent, AgentWhere where, {String prompt = '', List<AgentContextItem> context = const []}) async {
     final request = pb.RunAgentDefRequest(
       agent: _fileOf(agent),
-      inlineJson: agentFoundByName(agent) ? '' : agentInlineJson(agent),
+      inlineJson: agentInlineJson(agent),
       prompt: prompt,
       context: [for (final c in context) agentContextTo(c)],
       cols: 120,

@@ -118,10 +118,7 @@ void main() {
 
     test('commands: by name where it’s found, inline elsewhere', () {
       const a = AgentDef(name: 'go-pr-reviewer', scope: AgentScope.project, repo: 'price-admin');
-      expect(agentFoundByName(a), isFalse, reason: 'its file may be uncommitted, or not in that worktree');
-      expect(agentFoundByName(const AgentDef(name: 'x')), isTrue);
-      expect(agentCommand(a, foundHere: true, contextDir: '~/.kumo/runs/x', prompt: 'Review #521'), 'claude --agent go-pr-reviewer --add-dir ~/.kumo/runs/x -- "Review #521"');
-      expect(agentCommand(a, foundHere: false), startsWith('claude --agents \'{"go-pr-reviewer": …}\' --agent go-pr-reviewer'));
+      expect(agentCommand(a, contextDir: '~/.kumo/runs/x', prompt: 'Review #521'), 'claude --agents \'{"go-pr-reviewer": …}\' --agent go-pr-reviewer --add-dir ~/.kumo/runs/x -- "Review #521"');
       final inline = jsonDecode(agentInlineJson(a.copyWith(instructions: 'Hi.'))) as Map;
       expect((inline['go-pr-reviewer'] as Map)['prompt'], 'Hi.');
       expect(playgroundCommand(a), contains('--output-format stream-json --verbose --max-turns 25'));

@@ -61,6 +61,11 @@ class _ReleasesViewState extends State<_ReleasesView> {
     final nTags = all.where((r) => r.isTag).length;
     final nReleases = all.length - nTags;
 
+    // Tags still list when the host can't be read: without this they'd all
+    // look like tags with no release.
+    final problem = source.releasesProblem;
+    final provider = CiProvider.ofHost(source.repo.host);
+    final why = problem == null || provider == null ? null : describeCiProblem(problem, provider, repo: source.repo.name);
     final list = _Panel(
       icon: KIcons.tag,
       title: 'Releases & tags',
@@ -72,12 +77,13 @@ class _ReleasesViewState extends State<_ReleasesView> {
         items: const [(_ReleaseFilter.all, 'All', null, null), (_ReleaseFilter.releases, 'Releases', null, null), (_ReleaseFilter.tags, 'Tags only', null, null)],
       ),
       child: all.isEmpty
-          ? _Note(source.releasesLoading
+          ? _Note(why != null ? '${why.$1}. ${why.$2}' : source.releasesLoading
               ? 'Loading tags…'
               : source.repo.host == 'BB'
                   ? '${source.repo.name} has no tags yet. Bitbucket has tags but no releases: tag a version and it shows up here.'
                   : '${source.repo.name} has no tags yet. Tag a version and create its release: it shows up here, and an agent can write its notes from the project.')
           : ListView(padding: EdgeInsets.zero, children: [
+              if (why != null) _Note('Releases couldn’t be read, so these may have one: ${why.$1}. ${why.$2}'),
               if (shown.isEmpty) _Note(_filter == _ReleaseFilter.tags ? 'Every tag has its release.' : 'Only bare tags here.'),
               for (final i in shown)
                 _ReleaseRow(
