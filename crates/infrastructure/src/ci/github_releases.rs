@@ -93,6 +93,11 @@ impl ReleaseClient for GitHubReleases {
             None => {
                 body.insert("tag_name".into(), json!(tag));
                 body.entry("name").or_insert_with(|| json!(tag));
+                // GitHub would make any new release Latest, an old tag's too.
+                body.insert(
+                    "make_latest".into(),
+                    json!(if edit.publish { "true" } else { "false" }),
+                );
                 if !edit.sha.is_empty() {
                     body.insert("target_commitish".into(), json!(edit.sha));
                 }
@@ -266,7 +271,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             post.json(),
-            json!({"tag_name": "v1.7.3", "name": "v1.7.3", "body": "Notes", "target_commitish": "3c09e1a"})
+            json!({"tag_name": "v1.7.3", "name": "v1.7.3", "body": "Notes", "target_commitish": "3c09e1a", "make_latest": "false"})
         );
     }
 

@@ -266,6 +266,9 @@ abstract class RepoActivitySource extends ChangeNotifier {
 
   /// Whether [releases] can be read at all.
   bool get releasesSupported => false;
+
+  /// Why the host's releases couldn't be read: tags are listed alone.
+  CiProblem? get releasesProblem => null;
   bool get releasesLoading => false;
 
   /// Releases and bare tags, newest version first.

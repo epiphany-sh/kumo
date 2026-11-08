@@ -9,6 +9,7 @@ use std::time::Duration;
 use kumo_domain::agent_defs::{HeadlessKiller, HeadlessProcess, HeadlessRunner, HeadlessSpec};
 use kumo_domain::agents::AgentError;
 
+use crate::platform;
 use crate::process::run_with_timeout;
 
 /// The end of stderr kept for the error message.
@@ -18,11 +19,21 @@ const STDERR_TAIL: usize = 2_000;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ProcessHeadlessRunner;
 
-struct Killer(Arc<Mutex<Child>>);
+struct Killer {
+    child: Arc<Mutex<Child>>,
+    pid: u32,
+}
 
 impl HeadlessKiller for Killer {
+    /// Its tools go with it: one left running would hold the output open and
+    /// keep working in a folder that's about to go.
     fn kill(&self) {
-        let _ = self.0.lock().unwrap_or_else(PoisonError::into_inner).kill();
+        let mut child = self.child.lock().unwrap_or_else(PoisonError::into_inner);
+        // Gone already: its pid may be someone else's by now.
+        if matches!(child.try_wait(), Ok(None)) {
+            platform::kill_process_tree(self.pid);
+            let _ = child.kill();
+        }
     }
 }
 
@@ -36,6 +47,7 @@ impl HeadlessRunner for ProcessHeadlessRunner {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        platform::own_process_group(&mut command);
         let mut child = command.spawn().map_err(|e| {
             AgentError::Launch(format!("can't run {}: {e}", spec.program.display()))
         })?;
@@ -51,6 +63,7 @@ impl HeadlessRunner for ProcessHeadlessRunner {
                 .unwrap_or(0);
             text[start..].trim().to_owned()
         });
+        let pid = child.id();
         let child = Arc::new(Mutex::new(child));
         let waited = Arc::clone(&child);
         let lines = BufReader::new(stdout)
@@ -63,7 +76,7 @@ impl HeadlessRunner for ProcessHeadlessRunner {
             });
         Ok(HeadlessProcess {
             lines: Box::new(lines),
-            killer: Box::new(Killer(child)),
+            killer: Box::new(Killer { child, pid }),
             wait: Box::new(move || {
                 let code = loop {
                     let status = waited
@@ -127,6 +140,44 @@ mod tests {
         process.killer.kill();
         assert!(lines.next().is_none());
         assert_ne!((process.wait)().0, 0);
+    }
+
+    #[test]
+    fn stopping_takes_what_it_started_along() {
+        let dir = tempfile::tempdir().unwrap();
+        let pid_file = dir.path().join("pid");
+        let script = format!(
+            // `set -m`: in a group of its own, as Claude Code starts its tools.
+            "set -m; /bin/sleep 60 & echo $! > '{}'; echo up; wait",
+            pid_file.display()
+        );
+        let spec = HeadlessSpec {
+            program: "/bin/sh".into(),
+            args: vec!["-c".into(), script],
+            cwd: dir.path().to_owned(),
+            env: Vec::new(),
+        };
+        let HeadlessProcess {
+            mut lines,
+            killer,
+            wait,
+        } = ProcessHeadlessRunner.start(&spec).unwrap();
+        assert_eq!(lines.next().as_deref(), Some("up"));
+        let tool = std::fs::read_to_string(&pid_file)
+            .unwrap()
+            .trim()
+            .to_owned();
+        killer.kill();
+        // Reads end, though the tool had the output open too.
+        assert_eq!(lines.next(), None);
+        wait();
+        let alive = std::process::Command::new("/bin/kill")
+            .args(["-0", &tool])
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(!alive, "the tool it started is still running");
     }
 
     #[test]

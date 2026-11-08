@@ -11,8 +11,8 @@ use std::sync::Arc;
 use keyring_core::{CredentialStore, Error as KeyringError};
 
 use super::{
-    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, Processes,
-    ProgramSearch, RunningProcess, ScriptShell, Signals,
+    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, ProcessTrees,
+    Processes, ProgramSearch, RunningProcess, ScriptShell, Signals,
 };
 
 /// The child gets a console nobody sees.
@@ -30,6 +30,17 @@ impl BackgroundPrograms for Windows {
         let mut command = Command::new(program);
         command.creation_flags(CREATE_NO_WINDOW);
         command
+    }
+}
+
+impl ProcessTrees for Windows {
+    /// `taskkill /T` follows parents, not groups.
+    fn own_group(_command: &mut Command) {}
+
+    fn kill_tree(pid: u32) {
+        let _ = Self::command(OsStr::new("taskkill"))
+            .args(["/T", "/F", "/PID", &pid.to_string()])
+            .output();
     }
 }
 

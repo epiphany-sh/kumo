@@ -43,6 +43,15 @@ pub trait BackgroundPrograms {
     fn command(program: &OsStr) -> Command;
 }
 
+/// Stopping a program along with everything it started (an agent's tools).
+pub trait ProcessTrees {
+    /// Sets `command` up for [`ProcessTrees::kill_tree`].
+    fn own_group(command: &mut Command);
+    /// Kills `pid`, started with [`ProcessTrees::own_group`], and what it
+    /// started, even in groups of its own.
+    fn kill_tree(pid: u32);
+}
+
 /// Where programs are found: the user's PATH and what counts as a program.
 pub trait ProgramSearch {
     /// The PATH the user's own shell sets up, when it isn't the one Kumo
@@ -181,6 +190,16 @@ pub fn obsidian_settings(home: &Path) -> PathBuf {
 /// See [`AgentHooks::sh_status_line`].
 pub fn sh_status_line() -> bool {
     Current::sh_status_line()
+}
+
+/// See [`ProcessTrees::own_group`].
+pub fn own_process_group(command: &mut Command) {
+    Current::own_group(command);
+}
+
+/// See [`ProcessTrees::kill_tree`].
+pub fn kill_process_tree(pid: u32) {
+    Current::kill_tree(pid);
 }
 
 /// See [`Processes::process`].

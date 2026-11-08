@@ -38,6 +38,14 @@ impl RunGit for GitCli {
             .to_owned())
     }
 
+    fn origin_url(&self, repo: &Path) -> Result<String, String> {
+        // Not `remote get-url`: that one rewrites it by `insteadOf`.
+        Ok(self
+            .exec(repo, ["config", "--get", "remote.origin.url"])?
+            .trim()
+            .to_owned())
+    }
+
     fn diff(&self, repo: &Path, base: &str, head: &str) -> Result<String, String> {
         let range = format!("{base}...{head}");
         if range.starts_with('-') {

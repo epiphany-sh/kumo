@@ -39,6 +39,9 @@ impl GitTags for GitCli {
         let raw = self.exec(
             repo,
             [
+                // A pre-release goes under its final version.
+                "-c",
+                "versionsort.suffix=-",
                 "for-each-ref",
                 "refs/tags",
                 "--sort=-v:refname",
@@ -220,6 +223,15 @@ mod tests {
         git(d, &["tag", "v1.1.0"], 8);
         git(d, &["tag", "v1.10.0-rc.1"], 9);
         dir
+    }
+
+    #[test]
+    fn a_pre_release_goes_under_its_final_version() {
+        let dir = fixture();
+        git(dir.path(), &["tag", "v1.10.0"], 10);
+        let tags = GitCli::default().tags(dir.path()).unwrap();
+        let names: Vec<_> = tags.iter().take(3).map(|t| t.name.as_str()).collect();
+        assert_eq!(names, ["v1.10.0", "v1.10.0-rc.1", "v1.1.0"]);
     }
 
     #[test]
