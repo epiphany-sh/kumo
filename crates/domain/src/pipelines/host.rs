@@ -74,13 +74,13 @@ mod tests {
         );
         let ghe = host("https://github.acme.dev/team/app.git").unwrap();
         assert_eq!(ghe.api, "https://github.acme.dev/api/v3");
-        let gl = host("ssh://git@gitlab.fravega.com:2222/pricing/sub/app.git").unwrap();
+        let gl = host("ssh://git@gitlab.example.com:2222/pricing/sub/app.git").unwrap();
         assert_eq!(
             (gl.provider, gl.host.as_str(), gl.api.as_str()),
             (
                 CiProvider::GitLabCi,
-                "gitlab.fravega.com",
-                "https://gitlab.fravega.com/api/v4"
+                "gitlab.example.com",
+                "https://gitlab.example.com/api/v4"
             )
         );
         let bb = host("git@bitbucket.org:team/repo.git").unwrap();

@@ -19,7 +19,7 @@ Lenguaje visual existente (respetalo):
 ## Qué hay hoy
 
 **Tablero** (ver captura adjunta):
-- Header con "Tasks", la fuente y "synced just now", un buscador "Filter tasks" y chips de fuente con conteo (`All 37`, `Jira - Fravega 37`).
+- Header con "Tasks", la fuente y "synced just now", un buscador "Filter tasks" y chips de fuente con conteo (`All 37`, `Jira - workspace-1 37`).
 - Cuatro columnas: To do, In progress, In review, Done.
 - **Card**: badge de fuente, key (`PRC-11355`), prioridad (High/Med/Low) arriba a la derecha, título y el proyecto (`Pricing`). Nada más.
 

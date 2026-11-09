@@ -347,7 +347,7 @@ mod tests {
                 api: api.into(),
                 web: "https://bitbucket.org".into(),
             },
-            repo: "fravega-identity/users-api".into(),
+            repo: "workspace-1-identity/users-api".into(),
             branch: branch.into(),
         }
     }
@@ -357,7 +357,7 @@ mod tests {
         "source":{"branch":{"name":"feat/audit-log"}},"destination":{"branch":{"name":"main"}},
         "reviewers":[{"display_name":"Mauri","account_id":"me-1"}],
         "participants":[{"role":"REVIEWER","approved":false,"state":"changes_requested","user":{"display_name":"Nico","account_id":"n-1"}}],
-        "comment_count":2,"links":{"html":{"href":"https://bitbucket.org/fravega-identity/users-api/pull-requests/44"}},
+        "comment_count":2,"links":{"html":{"href":"https://bitbucket.org/workspace-1-identity/users-api/pull-requests/44"}},
         "created_on":"2026-10-27T10:00:00.000000+00:00","updated_on":"2026-10-28T10:00:00.000000+00:00"}"#;
 
     #[test]
@@ -369,17 +369,21 @@ mod tests {
             ),
             (
                 "GET",
-                "/repositories/fravega-identity/users-api/pullrequests?state=OPEN&sort=-updated_on&pagelen=30",
+                "/repositories/workspace-1-identity/users-api/pullrequests?state=OPEN&sort=-updated_on&pagelen=30",
             ) => (200, format!(r#"{{"values":[{PR}]}}"#)),
-            ("GET", "/repositories/fravega-identity/users-api/pullrequests/44") => (200, PR.into()),
+            ("GET", "/repositories/workspace-1-identity/users-api/pullrequests/44") => {
+                (200, PR.into())
+            }
             (
                 "GET",
-                "/repositories/fravega-identity/users-api/pullrequests/44/statuses?pagelen=100",
+                "/repositories/workspace-1-identity/users-api/pullrequests/44/statuses?pagelen=100",
             ) => (
                 200,
                 r#"{"values":[{"state":"SUCCESSFUL"},{"state":"INPROGRESS"}]}"#.into(),
             ),
-            ("POST", "/repositories/fravega-identity/users-api/pullrequests") => (201, PR.into()),
+            ("POST", "/repositories/workspace-1-identity/users-api/pullrequests") => {
+                (201, PR.into())
+            }
             _ => (
                 404,
                 r#"{"type":"error","error":{"message":"Not found"}}"#.into(),

@@ -522,7 +522,7 @@ mod tests {
     fn source(site: &str) -> TaskSource {
         TaskSource {
             id: SourceId::parse("jira1").unwrap(),
-            name: "Fravega".into(),
+            name: "workspace-1".into(),
             options: SourceOptions::Jira {
                 site: site.into(),
                 email: "ana@acme.com".into(),

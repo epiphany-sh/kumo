@@ -206,14 +206,14 @@ class MockDocsSource implements DocsSource {
     return nodes;
   }
 
-  static const _confluence = DocSourceInfo(id: 'jira1', kind: DocKind.confluence, name: 'fravega.atlassian.net', location: 'https://fravega.atlassian.net');
+  static const _confluence = DocSourceInfo(id: 'jira1', kind: DocKind.confluence, name: 'workspace-1.atlassian.net', location: 'https://workspace-1.atlassian.net');
   static const _vault = DocSourceInfo(id: 'ob1', kind: DocKind.obsidian, name: 'work', location: '~/notes/work');
 
   static final _groups = [
     DocGroup(source: _confluence, docs: [
-      DocSummary(id: 'jira1/98311', title: 'Discount rules v3', place: 'Pricing', author: 'Lucía', updated: DateTime(2026, 10, 25), url: 'https://fravega.atlassian.net/wiki/spaces/PRC/pages/98311'),
-      DocSummary(id: 'jira1/98102', title: 'Kafka topics and owners', place: 'Pricing', author: 'Tomás', updated: DateTime(2026, 10, 20), url: 'https://fravega.atlassian.net/wiki/spaces/PRC/pages/98102'),
-      DocSummary(id: 'jira1/97455', title: 'Incident: stale prices', place: 'Engineering', author: 'Nico', updated: DateTime(2026, 10, 2), url: 'https://fravega.atlassian.net/wiki/spaces/ENG/pages/97455'),
+      DocSummary(id: 'jira1/98311', title: 'Discount rules v3', place: 'Pricing', author: 'Lucía', updated: DateTime(2026, 10, 25), url: 'https://workspace-1.atlassian.net/wiki/spaces/PRC/pages/98311'),
+      DocSummary(id: 'jira1/98102', title: 'Kafka topics and owners', place: 'Pricing', author: 'Tomás', updated: DateTime(2026, 10, 20), url: 'https://workspace-1.atlassian.net/wiki/spaces/PRC/pages/98102'),
+      DocSummary(id: 'jira1/97455', title: 'Incident: stale prices', place: 'Engineering', author: 'Nico', updated: DateTime(2026, 10, 2), url: 'https://workspace-1.atlassian.net/wiki/spaces/ENG/pages/97455'),
     ]),
     DocGroup(source: _vault, docs: [
       DocSummary(id: 'ob1/PRC-412 scratchpad.md', title: 'PRC-412 scratchpad', place: 'work', updated: DateTime(2026, 10, 27), url: 'obsidian://open?vault=work&file=PRC-412%20scratchpad'),

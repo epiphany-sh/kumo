@@ -178,7 +178,7 @@ mod tests {
         let run = parse_run(
             &pipelines["values"][0],
             &steps,
-            "https://bitbucket.org/fravega-identity/users-api",
+            "https://bitbucket.org/workspace-1-identity/users-api",
         );
         assert_eq!(run.id, "{6b1e0a52-3a4f-4f0e-9a9c-2b5d0f1e7c11}");
         assert_eq!(run.label, "pipeline #132");
@@ -186,7 +186,7 @@ mod tests {
         assert_eq!(run.state, CiState::Failed);
         assert_eq!(
             run.url,
-            "https://bitbucket.org/fravega-identity/users-api/pipelines/results/132"
+            "https://bitbucket.org/workspace-1-identity/users-api/pipelines/results/132"
         );
         let states: Vec<_> = run
             .jobs

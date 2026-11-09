@@ -28,7 +28,7 @@ void main() {
   group('workspaces', () {
     test('names stay unique, and the default, current and last one stay', () async {
       final p = MockProfilesSource();
-      expect(p.current.name, 'Fravega');
+      expect(p.current.name, 'workspace-1');
       await expectLater(p.create(name: ' personal ', color: profileColors.first.$2), throwsA(contains('already')));
       final made = await p.create(name: 'Side gig', color: profileColors[4].$2);
       expect(made.worktreesDir, '~/wt/side-gig/{repo}/{key}');
@@ -54,14 +54,14 @@ void main() {
       final p = SingleProfileSource(prefs);
       expect(p.canManage, isFalse);
       expect(p.current.displayName, 'Workspace');
-      await p.update('default', const ProfileChanges(name: 'Fravega'));
-      expect(p.current.displayName, 'Fravega');
+      await p.update('default', const ProfileChanges(name: 'workspace-1'));
+      expect(p.current.displayName, 'workspace-1');
       await expectLater(p.create(name: 'x', color: profileColors.first.$2), throwsA(contains('update it')));
     });
 
     testWidgets('the switcher lists each workspace with what runs there; picking one switches, Undo comes back', (tester) async {
       final s = await _app(tester);
-      expect(find.text('Fravega'), findsOneWidget);
+      expect(find.text('workspace-1'), findsOneWidget);
       await _openSwitcher(tester);
       expect(find.text('WORKSPACES'), findsOneWidget);
       expect(find.text('Personal'), findsOneWidget);
@@ -72,7 +72,7 @@ void main() {
       await tester.pump();
       expect(s.profile.id, 'personal');
       expect(s.inHome, isTrue, reason: 'a workspace not visited yet starts at Home');
-      expect(s.undo?.message, 'In Personal · Fravega keeps running');
+      expect(s.undo?.message, 'In Personal · workspace-1 keeps running');
       s.undoLast();
       await tester.pump();
       expect(s.profile.id, 'default');
@@ -106,10 +106,10 @@ void main() {
       await first.switchProfile('personal');
       await tester.pump();
       expect(made, ['personal']);
-      expect(personal!.undo?.message, 'In Personal · Fravega keeps running', reason: 'the new state says where you came from');
+      expect(personal!.undo?.message, 'In Personal · workspace-1 keeps running', reason: 'the new state says where you came from');
       await personal!.switchProfile('default');
       await tester.pump();
-      expect(made, ['personal'], reason: 'Fravega’s state was kept, not made again');
+      expect(made, ['personal'], reason: 'workspace-1’s state was kept, not made again');
       await first.switchProfile('personal');
       await tester.pump();
       expect(made, ['personal']);
@@ -165,8 +165,8 @@ void main() {
 
       await tester.tap(find.text('Repositories'));
       await tester.pump();
-      expect(find.text('Only for Fravega. '), findsNothing, reason: 'it is one rich text');
-      expect(find.textContaining('Only for Fravega.', findRichText: true), findsOneWidget);
+      expect(find.text('Only for workspace-1. '), findsNothing, reason: 'it is one rich text');
+      expect(find.textContaining('Only for workspace-1.', findRichText: true), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
