@@ -481,9 +481,8 @@ class _CommitSheetState extends State<CommitSheet> {
       },
       child: Focus(
         focusNode: _focus,
-        child: GlassPanel(
+        child: GlassOverlay(
           padding: EdgeInsets.zero,
-          fill: c.panelStrong,
           child: FutureBuilder<CommitDetail>(
             // Keyed: the previous commit's files never show under this one.
             key: ValueKey(k.sha),

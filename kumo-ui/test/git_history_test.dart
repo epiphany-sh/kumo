@@ -14,6 +14,7 @@ import 'package:kumo_ui/overlays/resolve_comments_dialog.dart';
 import 'package:kumo_ui/data/pipelines_source.dart';
 import 'package:kumo_ui/views/git_screen.dart';
 import 'package:kumo_ui/widgets/context_menu.dart';
+import 'package:kumo_ui/widgets/glass.dart';
 
 Future<AppState> _pumpGit(WidgetTester tester) async {
   tester.view.physicalSize = const Size(1440, 960);
@@ -192,6 +193,7 @@ void main() {
     await tester.tap(find.byTooltip('Show what a3f9c12 changed'));
     await tester.pumpAndSettle();
     expect(find.byType(CommitSheet), findsOneWidget);
+    expect(find.descendant(of: find.byType(CommitSheet), matching: find.byType(GlassOverlay)), findsOneWidget, reason: 'an overlay’s surface: the Git view must not read through the diff');
     expect(find.text('history.go'), findsWidgets);
     expect(find.text('router.go'), findsWidgets);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
