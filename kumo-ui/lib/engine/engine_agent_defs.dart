@@ -137,10 +137,11 @@ class EngineAgentDefs extends AgentDefsSource {
     await load();
   }
 
-  /// One answer from Claude (plan mode), or null with [error] set.
+  /// One answer from the connected CLI ([AgentsSource.askCli]) that changes
+  /// nothing, or null with [error] set.
   Future<String?> _ask(String prompt, {String cwd = ''}) async {
     try {
-      final answer = await (await _client).ask(pb.AskClaudeRequest(prompt: prompt, cwd: cwd));
+      final answer = await (await _client).ask(pb.AskRequest(prompt: prompt, cwd: cwd, providerId: _agents.askCli?.id ?? ''));
       _error = null;
       return unfence(answer.text);
     } on Object catch (e) {
@@ -322,7 +323,7 @@ class EngineAgentDefs extends AgentDefsSource {
   }
 }
 
-/// Claude's answer without a code fence around it.
+/// A CLI's answer without a code fence around it.
 String unfence(String text) {
   final t = text.trim();
   final m = RegExp(r'^```[\w-]*\n([\s\S]*?)\n```$').firstMatch(t);

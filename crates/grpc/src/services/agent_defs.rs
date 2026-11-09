@@ -181,16 +181,16 @@ impl pb::agent_defs_server::AgentDefs for AgentDefsGrpc {
 
     async fn ask(
         &self,
-        request: Request<pb::AskClaudeRequest>,
-    ) -> Result<Response<pb::AskClaudeResponse>, Status> {
+        request: Request<pb::AskRequest>,
+    ) -> Result<Response<pb::AskResponse>, Status> {
         let service = self.service(&request).await?;
         let request = request.into_inner();
         let cwd = (!request.cwd.is_empty()).then(|| PathBuf::from(request.cwd));
         let text = service
-            .ask(&request.prompt, cwd)
+            .ask(&request.prompt, cwd, &request.provider_id)
             .await
             .map_err(agents_status_from)?;
-        Ok(Response::new(pb::AskClaudeResponse { text }))
+        Ok(Response::new(pb::AskResponse { text }))
     }
 
     async fn capabilities(

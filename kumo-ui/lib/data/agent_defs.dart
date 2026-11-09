@@ -571,8 +571,8 @@ AgentCheck agentNameCheck(AgentDef a, {Set<String> taken = const {}}) {
 AgentCheck agentDescriptionCheck(AgentDef a) {
   final d = a.description.trim();
   if (d.isEmpty) return const AgentCheck(CheckLevel.error, 'Say what it does and when to use it.');
-  if (d.length < 40 || _vague.hasMatch(d)) return const AgentCheck(CheckLevel.warn, 'Too vague: Claude won’t know when to hand it work. Say what it does and when.');
-  if (!_when.hasMatch(d)) return const AgentCheck(CheckLevel.warn, 'Add when to use it (“Use it when…”): that’s what Claude reads to delegate.');
+  if (d.length < 40 || _vague.hasMatch(d)) return const AgentCheck(CheckLevel.warn, 'Too vague: nothing says when to hand it work. Say what it does and when.');
+  if (!_when.hasMatch(d)) return const AgentCheck(CheckLevel.warn, 'Add when to use it (“Use it when…”): that’s what’s read to hand it work.');
   return AgentCheck(CheckLevel.ok, '${d.length} characters · says what and when.');
 }
 
@@ -602,7 +602,7 @@ List<AgentCheck> agentChecks(AgentDef a, {Set<String> taken = const {}}) {
     agentNameCheck(a, taken: taken),
     agentDescriptionCheck(a),
     if (a.instructions.trim().isEmpty)
-      const AgentCheck(CheckLevel.error, 'Write its instructions, or have Claude draft them.')
+      const AgentCheck(CheckLevel.error, 'Write its instructions, or have them drafted.')
     else if (agentInstructionsHaveFile(a.instructions))
       const AgentCheck(CheckLevel.warn, 'Its instructions start with a frontmatter: a whole agent file pasted in? Its description and tools there are only text.')
     else
@@ -893,14 +893,15 @@ const agentTemplates = [
   AgentTemplate('blank', 'Blank', 'Only the safe defaults: read-only.', readOnlyTools, 'yellow'),
 ];
 
-/// What Kumo asks Claude to draft an agent from [description] (the engine
-/// runs it headless and hands back the file).
+/// What Kumo asks a CLI to draft an agent from [description] (the engine
+/// runs it headless and hands back the file). The file is Claude Code's
+/// format whoever writes it, so the prompt spells it out.
 String draftAgentPrompt(String description) => [
       'Write a Claude Code subagent file for this: ${description.trim()}',
       'Reply with only the file: a frontmatter between --- lines with name (lowercase and hyphens), description (what it does, then “Use it when…”), tools (the fewest that do the job: Read, Grep and Glob unless it must change files or run commands) and model: inherit; then its instructions: its role, how to work in numbered steps, what to report, and what not to do.',
     ].join('\n\n');
 
-/// What Kumo asks Claude to improve [a]'s instructions with, from a test
+/// What Kumo asks a CLI to improve [a]'s instructions with, from a test
 /// run's step that went wrong ([step], as the playground showed it).
 String improveInstructionsPrompt(AgentDef a, {String step = '', String answer = ''}) => [
       'These are the instructions of the subagent ${a.name} (${a.description}):',

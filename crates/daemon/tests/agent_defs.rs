@@ -1022,14 +1022,59 @@ async fn runs_say_the_cli_they_ran_on_and_refuse_one_that_cant_run_agents() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn ask_goes_to_the_cli_it_names() {
+    let mut s = Setup::with_codex().await;
+    let answer = s
+        .client
+        .agent_defs
+        .ask(pb::AskRequest {
+            prompt: "Write a subagent".into(),
+            provider_id: "codex".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .text;
+    assert!(answer.contains("PONG"), "{answer}");
+    assert_eq!(
+        s.logged("codex-play"),
+        [
+            "exec",
+            "--skip-git-repo-check",
+            "-s",
+            "read-only",
+            "-c",
+            "approval_policy=\"never\"",
+            "--",
+            "Write a subagent"
+        ]
+    );
+    assert!(!s.log.join("ask.args").exists(), "Claude Code wasn't asked");
+
+    let refused = s
+        .client
+        .agent_defs
+        .ask(pb::AskRequest {
+            prompt: "Write a subagent".into(),
+            provider_id: "gemini".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code(), Code::InvalidArgument);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn ask_answers_in_plan_mode() {
     let mut s = Setup::new().await;
     let answer = s
         .client
         .agent_defs
-        .ask(pb::AskClaudeRequest {
+        .ask(pb::AskRequest {
             prompt: "Write a subagent".into(),
             cwd: String::new(),
+            ..Default::default()
         })
         .await
         .unwrap()

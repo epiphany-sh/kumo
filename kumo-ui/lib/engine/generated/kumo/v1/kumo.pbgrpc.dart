@@ -1745,9 +1745,10 @@ class AgentDefsClient extends $grpc.Client {
     return $createUnaryCall(_$listPlays, request, options: options);
   }
 
-  /// One-shot `claude -p`: drafts an agent, improves instructions.
-  $grpc.ResponseFuture<$0.AskClaudeResponse> ask(
-    $0.AskClaudeRequest request, {
+  /// One answer from a CLI, changing nothing: drafts an agent, improves
+  /// instructions.
+  $grpc.ResponseFuture<$0.AskResponse> ask(
+    $0.AskRequest request, {
     $grpc.CallOptions? options,
   }) {
     return $createUnaryCall(_$ask, request, options: options);
@@ -1797,11 +1798,10 @@ class AgentDefsClient extends $grpc.Client {
           '/kumo.v1.AgentDefs/ListPlays',
           ($0.ListPlaysRequest value) => value.writeToBuffer(),
           $0.PlayList.fromBuffer);
-  static final _$ask =
-      $grpc.ClientMethod<$0.AskClaudeRequest, $0.AskClaudeResponse>(
-          '/kumo.v1.AgentDefs/Ask',
-          ($0.AskClaudeRequest value) => value.writeToBuffer(),
-          $0.AskClaudeResponse.fromBuffer);
+  static final _$ask = $grpc.ClientMethod<$0.AskRequest, $0.AskResponse>(
+      '/kumo.v1.AgentDefs/Ask',
+      ($0.AskRequest value) => value.writeToBuffer(),
+      $0.AskResponse.fromBuffer);
   static final _$capabilities = $grpc.ClientMethod<
           $0.AgentDefCapabilitiesRequest, $0.AgentDefCapabilities>(
       '/kumo.v1.AgentDefs/Capabilities',
@@ -1868,13 +1868,13 @@ abstract class AgentDefsServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.ListPlaysRequest.fromBuffer(value),
         ($0.PlayList value) => value.writeToBuffer()));
-    $addMethod($grpc.ServiceMethod<$0.AskClaudeRequest, $0.AskClaudeResponse>(
+    $addMethod($grpc.ServiceMethod<$0.AskRequest, $0.AskResponse>(
         'Ask',
         ask_Pre,
         false,
         false,
-        ($core.List<$core.int> value) => $0.AskClaudeRequest.fromBuffer(value),
-        ($0.AskClaudeResponse value) => value.writeToBuffer()));
+        ($core.List<$core.int> value) => $0.AskRequest.fromBuffer(value),
+        ($0.AskResponse value) => value.writeToBuffer()));
     $addMethod($grpc.ServiceMethod<$0.AgentDefCapabilitiesRequest,
             $0.AgentDefCapabilities>(
         'Capabilities',
@@ -1942,13 +1942,13 @@ abstract class AgentDefsServiceBase extends $grpc.Service {
   $async.Future<$0.PlayList> listPlays(
       $grpc.ServiceCall call, $0.ListPlaysRequest request);
 
-  $async.Future<$0.AskClaudeResponse> ask_Pre($grpc.ServiceCall $call,
-      $async.Future<$0.AskClaudeRequest> $request) async {
+  $async.Future<$0.AskResponse> ask_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.AskRequest> $request) async {
     return ask($call, await $request);
   }
 
-  $async.Future<$0.AskClaudeResponse> ask(
-      $grpc.ServiceCall call, $0.AskClaudeRequest request);
+  $async.Future<$0.AskResponse> ask(
+      $grpc.ServiceCall call, $0.AskRequest request);
 
   $async.Future<$0.AgentDefCapabilities> capabilities_Pre(
       $grpc.ServiceCall $call,

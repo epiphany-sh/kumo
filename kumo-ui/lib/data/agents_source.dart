@@ -234,6 +234,15 @@ abstract class AgentsSource extends ChangeNotifier {
   /// The connected CLIs your agents can run on, the default first.
   List<AgentCli> get agentClis => [for (final p in connected) if (AgentCli.of(p.id) case final cli?) cli];
 
+  /// The CLI that drafts agents and improves their instructions: the first
+  /// of [agentClis] that's installed, else the first. Null: none is connected.
+  AgentCli? get askCli {
+    for (final p in connected) {
+      if (p.installed) if (AgentCli.of(p.id) case final cli?) return cli;
+    }
+    return agentClis.firstOrNull;
+  }
+
   /// CLIs are connected, but none your agents run on (Claude Code, Codex).
   bool get lacksAgentCli => connected.isNotEmpty && agentClis.isEmpty;
 

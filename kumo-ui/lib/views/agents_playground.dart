@@ -333,7 +333,7 @@ class _PlaygroundState extends State<_Playground> {
     );
   }
 
-  /// Claude's suggested change, as lines removed and added.
+  /// The suggested change, as lines removed and added.
   Widget _fixBox(BuildContext context, AppState s) {
     final c = context.c;
     final fix = _fix;
@@ -348,7 +348,7 @@ class _PlaygroundState extends State<_Playground> {
           const SizedBox(width: 7),
           Expanded(
             child: Text(
-              _applied ? 'Applied to the draft. Run it again to check.' : (_fixing ? 'Claude is reading the run…' : (fix == null ? 'Claude had nothing to suggest.' : 'Claude suggests:')),
+              _applied ? 'Applied to the draft. Run it again to check.' : (_fixing ? 'Reading the run…' : (fix == null ? 'Nothing to suggest.' : 'Suggested change:')),
               style: sans(12.5, weight: FontWeight.w600, color: c.acc),
             ),
           ),
