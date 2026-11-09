@@ -233,9 +233,9 @@ void main() {
       await tester.pump();
       expect(find.text('Runs with'), findsOneWidget);
       final pick = tester.widget<KSegmented<AgentCli>>(find.byType(KSegmented<AgentCli>));
-      expect([for (final i in pick.items) i.$2], ['Claude Code', 'Codex CLI'], reason: 'only connected CLIs it can run on: not Gemini');
+      expect([for (final i in pick.items) i.$2], ['Claude Code', 'Codex', 'Copilot'], reason: 'only connected CLIs it can run on: not Gemini');
       expect(find.textContaining('On Codex CLI'), findsNothing, reason: 'Claude Code first: nothing changes');
-      await tester.tap(find.descendant(of: find.byType(KSegmented<AgentCli>), matching: find.text('Codex CLI')));
+      await tester.tap(find.descendant(of: find.byType(KSegmented<AgentCli>), matching: find.text('Codex')));
       await tester.pump();
       expect(find.textContaining('Its file is Claude Code’s. On Codex CLI'), findsOneWidget);
       expect(find.textContaining('Read-only: it reads and runs commands'), findsOneWidget);

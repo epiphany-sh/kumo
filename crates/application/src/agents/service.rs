@@ -376,7 +376,7 @@ impl AgentService {
             args = usage::launch_args(source, &target, args).await;
         }
         let notice = provider.ask_notice();
-        let tells_asking = !notice.is_empty() && !own_settings;
+        let tells_asking = (!notice.is_empty() && !own_settings) || provider.tells_state();
         // Claude Code's usage settings ask for it too, and it takes one.
         let settings_given =
             notice.first() == Some(&SETTINGS_FLAG) && args.iter().any(|a| a == SETTINGS_FLAG);

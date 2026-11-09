@@ -161,12 +161,13 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  test('your agents need Claude Code or Codex: said only when other CLIs are what’s connected', () {
+  test('your agents need Claude Code, Codex or Copilot: said only when other CLIs are what’s connected', () {
     AgentProviderInfo cli(String id, {bool isDefault = false}) =>
         AgentProviderInfo(id: id, name: id, short: 'XX', program: id, args: '', custom: false, enabled: true, isDefault: isDefault, installed: true, resolvedPath: '', installHint: '', takesPrompt: true, hasLogin: false);
     expect(_FakeAgents().lacksAgentCli, isFalse, reason: 'nothing connected yet has its own message');
     expect(_FakeAgents(providers: [cli('gemini')]).lacksAgentCli, isTrue);
     expect(_FakeAgents(providers: [cli('codex')]).lacksAgentCli, isFalse, reason: 'Codex runs them too');
-    expect(_FakeAgents(providers: [cli('gemini'), cli('codex'), cli('claude', isDefault: true)]).agentClis, [AgentCli.claude, AgentCli.codex], reason: 'the default first; gemini can’t');
+    expect(_FakeAgents(providers: [cli('copilot')]).lacksAgentCli, isFalse, reason: 'and Copilot');
+    expect(_FakeAgents(providers: [cli('gemini'), cli('copilot'), cli('codex'), cli('claude', isDefault: true)]).agentClis, [AgentCli.claude, AgentCli.copilot, AgentCli.codex], reason: 'the default first; gemini can’t');
   });
 }

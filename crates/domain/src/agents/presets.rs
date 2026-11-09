@@ -23,6 +23,9 @@ pub struct AgentPreset {
     /// their own in a terminal they don't know, and they keep redrawing
     /// meanwhile. Empty: Kumo can't tell.
     pub ask_notice: &'static [&'static str],
+    /// It says on its own whether it's working, waiting or asking (OSC
+    /// 7501, which [`ActivityTracker`](super::ActivityTracker) reads).
+    pub tells_state: bool,
 }
 
 /// Known CLIs. Prompts go as arguments only where the CLI documents it
@@ -40,6 +43,7 @@ pub const PRESETS: &[AgentPreset] = &[
         compact_command: Some("/compact"),
         reads_usage: true,
         ask_notice: &["--settings", r#"{"preferredNotifChannel":"iterm2"}"#],
+        tells_state: false,
     },
     AgentPreset {
         id: "codex",
@@ -59,6 +63,7 @@ pub const PRESETS: &[AgentPreset] = &[
             "-c",
             r#"tui.notification_condition="always""#,
         ],
+        tells_state: false,
     },
     AgentPreset {
         id: "gemini",
@@ -71,6 +76,7 @@ pub const PRESETS: &[AgentPreset] = &[
         compact_command: Some("/compress"),
         reads_usage: false,
         ask_notice: &[],
+        tells_state: false,
     },
     AgentPreset {
         id: "copilot",
@@ -83,6 +89,7 @@ pub const PRESETS: &[AgentPreset] = &[
         compact_command: None,
         reads_usage: false,
         ask_notice: &[],
+        tells_state: true,
     },
     AgentPreset {
         id: "grok",
@@ -95,6 +102,7 @@ pub const PRESETS: &[AgentPreset] = &[
         compact_command: None,
         reads_usage: false,
         ask_notice: &[],
+        tells_state: false,
     },
     AgentPreset {
         id: "opencode",
@@ -107,6 +115,7 @@ pub const PRESETS: &[AgentPreset] = &[
         compact_command: None,
         reads_usage: false,
         ask_notice: &[],
+        tells_state: false,
     },
     AgentPreset {
         id: "cursor",
@@ -119,6 +128,7 @@ pub const PRESETS: &[AgentPreset] = &[
         compact_command: None,
         reads_usage: false,
         ask_notice: &[],
+        tells_state: false,
     },
     AgentPreset {
         id: "aider",
@@ -131,6 +141,7 @@ pub const PRESETS: &[AgentPreset] = &[
         compact_command: None,
         reads_usage: false,
         ask_notice: &[],
+        tells_state: false,
     },
     AgentPreset {
         id: "qwen",
@@ -143,6 +154,7 @@ pub const PRESETS: &[AgentPreset] = &[
         compact_command: None,
         reads_usage: false,
         ask_notice: &[],
+        tells_state: false,
     },
     AgentPreset {
         id: "amp",
@@ -155,6 +167,7 @@ pub const PRESETS: &[AgentPreset] = &[
         compact_command: None,
         reads_usage: false,
         ask_notice: &[],
+        tells_state: false,
     },
 ];
 

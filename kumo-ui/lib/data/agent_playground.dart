@@ -190,8 +190,80 @@ PlayRun foldStreamJson(PlayRun run, String line, {Duration? at}) {
 }
 
 /// Folds one line of [run]'s output, read the way its CLI writes it.
-PlayRun foldPlayLine(PlayRun run, String line, {Duration? at}) =>
-    run.cli == 'codex' ? foldCodexJson(run, line, at: at) : foldStreamJson(run, line, at: at);
+PlayRun foldPlayLine(PlayRun run, String line, {Duration? at}) => switch (run.cli) {
+      'codex' => foldCodexJson(run, line, at: at),
+      'copilot' => foldCopilotJson(run, line, at: at),
+      _ => foldStreamJson(run, line, at: at),
+    };
+
+/// Folds one line of `copilot -p --output-format json` into [run]. Its
+/// reasoning comes with each message (the separate `assistant.reasoning`
+/// repeats it, after); what it said last is the answer. Lines it can't read,
+/// and the ones that only stream text, are skipped.
+PlayRun foldCopilotJson(PlayRun run, String line, {Duration? at}) {
+  final Object? e;
+  try {
+    e = jsonDecode(line);
+  } on FormatException {
+    return run;
+  }
+  if (e is! Map) return run;
+  final when = at ?? DateTime.now().difference(run.startedAt);
+  final steps = run.steps.toList();
+  final d = e['data'] is Map ? e['data'] as Map : const {};
+  final meters = run.meters;
+  String toolName(String t) => switch (t) {
+        'bash' || 'powershell' => 'Shell',
+        'view' => 'Read',
+        'create' || 'edit' || 'str_replace' || 'apply_patch' => 'Edit',
+        'glob' => 'Glob',
+        'grep' || 'rg' => 'Search',
+        'web_fetch' => 'Web fetch',
+        _ => t,
+      };
+  switch (e['type']) {
+    case 'assistant.turn_start':
+      return run.copyWith(meters: PlayMeters(turns: meters.turns + 1, elapsed: when, tokensIn: meters.tokensIn, tokensOut: meters.tokensOut));
+    case 'assistant.message':
+      final thought = '${d['reasoningText'] ?? ''}'.trim();
+      if (thought.isNotEmpty) steps.add(PlayStep(kind: PlayStepKind.thinking, text: _short(thought, 600), at: when));
+      final said = '${d['content'] ?? ''}'.trim();
+      if (said.isNotEmpty) steps.add(PlayStep(kind: PlayStepKind.thinking, text: said, params: _said, at: when));
+      if (thought.isEmpty && said.isEmpty) return run;
+    case 'tool.execution_start':
+      final id = '${d['toolCallId'] ?? ''}';
+      if (steps.any((s) => s.kind == PlayStepKind.tool && s.toolId == id)) return run;
+      steps.add(PlayStep(kind: PlayStepKind.tool, text: toolName('${d['toolName'] ?? 'tool'}'), params: jsonEncode(d['arguments'] ?? const {}), toolId: id, at: when));
+    case 'tool.execution_complete':
+      final id = '${d['toolCallId'] ?? ''}';
+      final i = steps.lastIndexWhere((s) => s.kind == PlayStepKind.tool && s.toolId == id);
+      if (i < 0) return run;
+      final error = d['error'] is Map ? '${(d['error'] as Map)['message'] ?? ''}' : '';
+      final result = d['result'] is Map ? _short('${(d['result'] as Map)['content'] ?? ''}') : '';
+      steps[i] = steps[i].withResult(d['success'] == true ? result : 'Error: ${_short(error.isEmpty ? result : error)}');
+    case 'session.usage_checkpoint':
+      // Running totals, over every model it used.
+      final snapshot = d['accountingSnapshot'] is Map ? d['accountingSnapshot'] as Map : const {};
+      final models = snapshot['modelMetrics'] is Map ? (snapshot['modelMetrics'] as Map).values : const [];
+      int sum(String key) => models.fold(0, (n, m) => n + (m is Map && m['usage'] is Map && (m['usage'] as Map)[key] is int ? (m['usage'] as Map)[key] as int : 0));
+      return run.copyWith(meters: PlayMeters(turns: meters.turns, elapsed: when, tokensIn: sum('inputTokens'), tokensOut: sum('outputTokens')));
+    case 'result':
+      final code = e['exitCode'] is int ? e['exitCode'] as int : 0;
+      final error = e['error'] is Map ? '${(e['error'] as Map)['message'] ?? ''}'.trim() : '';
+      final ended = PlayMeters(turns: meters.turns, elapsed: when, tokensIn: meters.tokensIn, tokensOut: meters.tokensOut);
+      if (code != 0 || error.isNotEmpty) {
+        final text = error.isEmpty ? 'GitHub Copilot CLI exited with code $code.' : error;
+        steps.add(PlayStep(kind: PlayStepKind.error, text: text, at: when));
+        return run.copyWith(state: PlayState.failed, steps: steps, error: text, meters: ended);
+      }
+      final i = steps.lastIndexWhere((s) => s.kind == PlayStepKind.thinking && s.params == _said);
+      if (i >= 0 && i == steps.length - 1) steps[i] = PlayStep(kind: PlayStepKind.answer, text: steps[i].text, at: steps[i].at);
+      return run.copyWith(state: PlayState.done, steps: steps, meters: ended);
+    default:
+      return run;
+  }
+  return run.copyWith(steps: steps, meters: PlayMeters(turns: meters.turns, elapsed: when, tokensIn: meters.tokensIn, tokensOut: meters.tokensOut));
+}
 
 /// Marks a step that is something Codex said (not its reasoning): the last
 /// one becomes the answer.

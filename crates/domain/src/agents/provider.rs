@@ -102,6 +102,11 @@ impl AgentProvider {
         self.preset.map_or(&[], |p| p.ask_notice)
     }
 
+    /// It says when it's asking something without being told to.
+    pub fn tells_state(&self) -> bool {
+        self.preset.is_some_and(|p| p.tells_state)
+    }
+
     /// Arguments of the sign-in flow.
     pub fn login_args(&self) -> Vec<String> {
         self.preset
