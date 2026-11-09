@@ -31,6 +31,9 @@ class _Playground extends StatefulWidget {
 class _PlaygroundState extends State<_Playground> {
   final _task = TextEditingController();
   late bool _draft = widget.dirty || widget.saved == null;
+
+  /// The CLI it's tried on; null: the first connected one that can.
+  AgentCli? _cli;
   String? _worktree;
   String? _shown;
   _Show _filter = _Show.all;
@@ -62,7 +65,7 @@ class _PlaygroundState extends State<_Playground> {
   Future<void> _run(AppState s, AgentDef agent) async {
     final path = _worktree;
     if (path == null || _task.text.trim().isEmpty) return;
-    final run = await s.agentDefs.play(agent, task: _task.text.trim(), worktreePath: path, owner: widget.history, draft: _draft);
+    final run = await s.agentDefs.play(agent, task: _task.text.trim(), worktreePath: path, owner: widget.history, draft: _draft, cli: _pick(s));
     if (!mounted) return;
     if (run == null) {
       s.notify('The test run didn’t start: ${s.agentDefs.error ?? 'unknown error'}');
@@ -74,6 +77,13 @@ class _PlaygroundState extends State<_Playground> {
       _fix = null;
       _applied = false;
     });
+  }
+
+  /// The CLI it's tried on, kept while it stays connected.
+  AgentCli _pick(AppState s) {
+    final clis = s.agents.agentClis;
+    if (!clis.contains(_cli)) _cli = clis.firstOrNull;
+    return _cli ?? AgentCli.claude;
   }
 
   Future<void> _flagStep(AppState s, PlayRun run, int i) async {
@@ -141,7 +151,11 @@ class _PlaygroundState extends State<_Playground> {
     final c = context.c;
     final running = run?.state == PlayState.running;
     final writes = agentWrites(agent.tools);
+    final cli = _pick(s);
+    final clis = s.agents.agentClis;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _CliPick(clis: clis, cli: cli, agent: agent, onChanged: (v) => setState(() => _cli = v)),
+      const SizedBox(height: 12),
       _Block(title: 'Sample task', child: _Area(controller: _task, minLines: 3, maxLines: 6, label: 'Sample task', hint: 'Review PR #521 against main.', onChanged: (_) => setState(() {}))),
       const SizedBox(height: 12),
       if (wts.isNotEmpty)
@@ -173,10 +187,10 @@ class _PlaygroundState extends State<_Playground> {
         label: running ? 'Stop' : (_applied ? 'Run again with the fix' : (_draft || widget.saved == null ? 'Run the draft' : 'Run it')),
         icon: running ? KIcons.pause : KIcons.flask,
         expand: true,
-        onTap: running ? () => s.agentDefs.stopPlay(run!.id) : (_worktree == null || _task.text.trim().isEmpty ? null : () => _run(s, agent)),
+        onTap: running ? () => s.agentDefs.stopPlay(run!.id) : (_worktree == null || _task.text.trim().isEmpty || clis.isEmpty ? null : () => _run(s, agent)),
       ),
       const SizedBox(height: 6),
-      SelectableText(playgroundCommand(agent, task: _task.text), style: mono(10.5, color: c.text3, height: 1.5)),
+      SelectableText(playgroundCommand(agent, task: _task.text, cli: cli), style: mono(10.5, color: c.text3, height: 1.5)),
       const SizedBox(height: 12),
       Container(height: 1, color: c.divider),
       const SizedBox(height: 10),
@@ -200,7 +214,7 @@ class _PlaygroundState extends State<_Playground> {
               const SizedBox(width: 8),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Run ${runs.length - i} · ${r.draft ? 'draft' : 'saved'}', style: sans(12, color: c.text)),
+                  Text('Run ${runs.length - i} · ${r.draft ? 'draft' : 'saved'}${r.cli == AgentCli.claude.id ? '' : ' · ${AgentCli.of(r.cli)?.label ?? r.cli}'}', style: sans(12, color: c.text)),
                   Text(_playMeta(r), maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11, color: c.text3)),
                 ]),
               ),
@@ -235,9 +249,14 @@ class _PlaygroundState extends State<_Playground> {
     String fmt(Duration d) => '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Wrap(spacing: 14, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        _Meter(label: 'Turns', value: '${m.turns} / ${a.maxTurns ?? '∞'}', fraction: a.maxTurns == null ? null : m.turns / a.maxTurns!, tooltip: 'Claude Code’s turns'),
+        if (run.cli == AgentCli.claude.id)
+          _Meter(label: 'Turns', value: '${m.turns} / ${a.maxTurns ?? '∞'}', fraction: a.maxTurns == null ? null : m.turns / a.maxTurns!, tooltip: 'Claude Code’s turns')
+        else
+          _Meter(label: 'Steps', value: '${run.steps.length}', tooltip: '${AgentCli.of(run.cli)?.label ?? run.cli} has no turn limit'),
         _Meter(label: 'Time', value: '${fmt(m.elapsed)} / ${a.maxMinutes == null ? '∞' : '${a.maxMinutes}:00'}', fraction: a.maxMinutes == null ? null : m.elapsed.inSeconds / (a.maxMinutes! * 60)),
-        _Meter(label: 'Cost', value: m.costUsd == null ? '—' : '\$${m.costUsd!.toStringAsFixed(2)}', fraction: a.maxCostUsd == null || m.costUsd == null ? null : m.costUsd! / a.maxCostUsd!, tooltip: 'From Claude Code’s stream-json output'),
+        // Only Claude Code reports cost; the others, tokens.
+        if (run.cli == AgentCli.claude.id)
+          _Meter(label: 'Cost', value: m.costUsd == null ? '—' : '\$${m.costUsd!.toStringAsFixed(2)}', fraction: a.maxCostUsd == null || m.costUsd == null ? null : m.costUsd! / a.maxCostUsd!, tooltip: 'From Claude Code’s stream-json output'),
         _Meter(label: 'Tokens', value: m.tokensIn == 0 ? '—' : '${(m.tokensIn / 1000).toStringAsFixed(1)}k · ${(m.tokensOut / 1000).toStringAsFixed(1)}k'),
         KSegmented<_Show>(
           label: 'Show',

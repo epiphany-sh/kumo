@@ -5,6 +5,7 @@ use std::path::Path;
 
 use super::AgentCli;
 use crate::agent_defs::{PlayCommand, context_sentence, role_sentence};
+use crate::agents::AgentError;
 
 pub(super) const PROVIDER_ID: &str = "claude";
 
@@ -33,12 +34,12 @@ impl AgentCli for ClaudeCode {
         inline_json: &str,
         context_dir: Option<&Path>,
         prompt: &str,
-    ) -> Vec<String> {
-        run_args(name, inline_json, context_dir, prompt)
+    ) -> Result<Vec<String>, AgentError> {
+        Ok(run_args(name, inline_json, context_dir, prompt))
     }
 
-    fn play_args(&self, play: &PlayCommand, budget: bool) -> Vec<String> {
-        play_args(play, budget)
+    fn play_args(&self, play: &PlayCommand, budget: bool) -> Result<Vec<String>, AgentError> {
+        Ok(play_args(play, budget))
     }
 
     fn ask_args(&self, prompt: &str) -> Vec<String> {

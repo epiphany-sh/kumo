@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'agent_defs.dart' show AgentCli;
 import 'models.dart';
 
 /// A coding-agent CLI the user can run (known or custom).
@@ -230,8 +231,11 @@ abstract class AgentsSource extends ChangeNotifier {
   List<AgentProviderInfo> get connected =>
       [for (final p in providers) if (p.enabled && p.isDefault) p, for (final p in providers) if (p.enabled && !p.isDefault) p];
 
-  /// Other CLIs are connected but not Claude Code, which your agents run on.
-  bool get lacksClaude => connected.isNotEmpty && !connected.any((p) => p.id == 'claude');
+  /// The connected CLIs your agents can run on, the default first.
+  List<AgentCli> get agentClis => [for (final p in connected) if (AgentCli.of(p.id) case final cli?) cli];
+
+  /// CLIs are connected, but none your agents run on (Claude Code, Codex).
+  bool get lacksAgentCli => connected.isNotEmpty && agentClis.isEmpty;
 
   /// Re-reads providers (and whether they are installed).
   Future<void> loadProviders();

@@ -2,6 +2,8 @@ part of 'agents_library.dart';
 
 /// One agent's run form: where it works, what it knows, what it's told.
 class _RunForm {
+  /// The CLI it runs on; null: the first connected one that can.
+  AgentCli? cli;
   AgentWhereKind where = AgentWhereKind.worktree;
 
   /// The worktree picked (absolute path), or the repository for a new one.
@@ -161,8 +163,12 @@ class _RunTabState extends State<_RunTab> {
       AgentWhereKind.scratch => ('An empty folder kept for a week, for research or writing. Files can open it.', false),
     };
     final contextDir = context0.isEmpty && knowledge.isEmpty ? '' : '~/.kumo/runs/${a.name}-${widget.runs.length + 1}';
-    final cmd = agentCommand(a, contextDir: contextDir, prompt: f.prompt.text);
-    final canStart = !widget.fresh && !_starting && switch (f.where) {
+    final clis = s.agents.agentClis;
+    // Picked before, unless it's been disconnected since.
+    if (!clis.contains(f.cli)) f.cli = clis.firstOrNull;
+    final cli = f.cli ?? AgentCli.claude;
+    final cmd = agentCommand(a, contextDir: contextDir, prompt: f.prompt.text, cli: cli);
+    final canStart = !widget.fresh && !_starting && clis.isNotEmpty && switch (f.where) {
       AgentWhereKind.worktree => picked != null,
       AgentWhereKind.newWorktree => f.newIn != null,
       AgentWhereKind.link => link != null,
@@ -180,7 +186,7 @@ class _RunTabState extends State<_RunTab> {
         AgentWhereKind.scratch => const AgentWhere.scratch(),
       };
       setState(() => _starting = true);
-      final run = await s.agentDefs.run(a, where, prompt: f.prompt.text.trim(), context: context0);
+      final run = await s.agentDefs.run(a, where, prompt: f.prompt.text.trim(), context: context0, cli: cli);
       if (!mounted) return;
       setState(() => _starting = false);
       if (run == null) {
@@ -198,6 +204,8 @@ class _RunTabState extends State<_RunTab> {
       else if (widget.dirty)
         _Note(icon: KIcons.info, text: 'It runs as saved: your edits run once you save them (or try them in the playground).', color: c.text2, background: c.tile),
       if (widget.fresh || widget.dirty) const SizedBox(height: 14),
+      _CliPick(clis: clis, cli: cli, agent: a, onChanged: (v) => setState(() => f.cli = v)),
+      const SizedBox(height: 18),
       _Block(
         title: '1 · Where should it work?',
         hint: 'its terminal opens there',
@@ -249,7 +257,9 @@ class _RunTabState extends State<_RunTab> {
       const SizedBox(height: 18),
       _Block(
         title: '2 · What should it know?',
-        hint: 'saved next to the run and read with --add-dir: nothing lands in the repo',
+        hint: cli == AgentCli.codex
+            ? 'saved next to the run and pointed at in its first message: nothing lands in the repo'
+            : 'saved next to the run and read with --add-dir: nothing lands in the repo',
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Wrap(spacing: 6, runSpacing: 6, children: [
             for (final i in context0)
@@ -631,5 +641,47 @@ class _Option extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+/// Which CLI it runs on, and what changes on it. One connected: said, not
+/// asked. None: how to get one.
+class _CliPick extends StatelessWidget {
+  const _CliPick({required this.clis, required this.cli, required this.agent, required this.onChanged});
+
+  /// The connected CLIs it can run on.
+  final List<AgentCli> clis;
+  final AgentCli cli;
+  final AgentDef agent;
+  final ValueChanged<AgentCli> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    if (clis.isEmpty) {
+      return _Note(icon: KIcons.info, text: 'It runs on Claude Code or Codex: connect one in Settings › AI agents.', color: c.warn, background: c.warnSoft);
+    }
+    final notes = agentCliNotes(agent, cli);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      // Wraps in a narrow column (the playground's).
+      Wrap(spacing: 10, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        Text('Runs with', style: sans(12, weight: FontWeight.w500, color: c.text)),
+        if (clis.length > 1)
+          KSegmented<AgentCli>(label: 'Runs with', value: cli, height: 28, onChanged: onChanged, items: [for (final x in clis) (x, x.label, null)])
+        else
+          Text(cli.label, style: sans(12, color: c.text2)),
+      ]),
+      if (notes.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.fromLTRB(11, 7, 11, 9),
+          decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(10)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Its file is Claude Code’s. On ${cli.label}:', style: sans(11.5, weight: FontWeight.w500, color: c.text2)),
+            for (final n in notes) CheckLine(n),
+          ]),
+        ),
+      ],
+    ]);
   }
 }

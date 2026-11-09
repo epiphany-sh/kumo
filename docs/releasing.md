@@ -91,7 +91,11 @@ fix/…      ─┴─▶  release/X.Y.Z  ──▶  main  ──▶  vX.Y.Z pub
    `fmt`, `clippy (…)`, `test (…)`, `ui`); el job `macos` corre lo mismo en
    macOS pero no bloquea, porque los runners macOS arm64 de GitHub a veces
    pasan días sin capacidad.
-3. **Mergeá la release a `main`** con un PR (`release/0.3.0` → `main`). Es lo
+3. **Probá Your agents con las CLIs reales** antes de mergear la release: los
+   tests de siempre usan CLIs falsas y no ven si una cambió sus flags o su
+   salida. Necesita cada CLI instalada y con sesión, y gasta un poco de cuota:
+   `cargo test -p kumod --test real_clis -- --ignored --test-threads=1`.
+4. **Mergeá la release a `main`** con un PR (`release/0.3.0` → `main`). Es lo
    único que entra a `main`. Con el merge, el workflow `release` publica
    `0.3.0`: buildea, firma, arma el zip, el appcast y el `install.sh` en
    macOS; el zip y el `install.ps1` en Windows. Cada uno sube lo suyo al release

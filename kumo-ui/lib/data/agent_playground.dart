@@ -57,6 +57,7 @@ class PlayRun {
     required this.task,
     required this.draft,
     required this.startedAt,
+    this.cli = 'claude',
     this.state = PlayState.running,
     this.steps = const [],
     this.meters = const PlayMeters(),
@@ -70,6 +71,9 @@ class PlayRun {
   /// It ran the unsaved draft (not the saved file).
   final bool draft;
   final DateTime startedAt;
+
+  /// The CLI it ran on: how its lines read.
+  final String cli;
   final PlayState state;
   final List<PlayStep> steps;
   final PlayMeters meters;
@@ -87,6 +91,7 @@ class PlayRun {
         task: task,
         draft: draft,
         startedAt: startedAt,
+        cli: cli,
         state: state ?? this.state,
         steps: steps ?? this.steps,
         meters: meters ?? this.meters,
@@ -182,6 +187,110 @@ PlayRun foldStreamJson(PlayRun run, String line, {Duration? at}) {
       return run;
   }
   return run.copyWith(steps: steps, meters: meters, lastMessage: lastMessage);
+}
+
+/// Folds one line of [run]'s output, read the way its CLI writes it.
+PlayRun foldPlayLine(PlayRun run, String line, {Duration? at}) =>
+    run.cli == 'codex' ? foldCodexJson(run, line, at: at) : foldStreamJson(run, line, at: at);
+
+/// Marks a step that is something Codex said (not its reasoning): the last
+/// one becomes the answer.
+const _said = 'said';
+
+/// Folds one line of `codex exec --json` into [run]. Lines it can't read are
+/// skipped.
+PlayRun foldCodexJson(PlayRun run, String line, {Duration? at}) {
+  final Object? e;
+  try {
+    e = jsonDecode(line);
+  } on FormatException {
+    return run;
+  }
+  if (e is! Map) return run;
+  final when = at ?? DateTime.now().difference(run.startedAt);
+  final steps = run.steps.toList();
+  final item = e['item'] is Map ? e['item'] as Map : const {};
+  final id = '${item['id'] ?? ''}';
+  String toolName(Map i) => switch (i['type']) {
+        'command_execution' => 'Shell',
+        'file_change' => 'Edit',
+        'web_search' => 'Web search',
+        'mcp_tool_call' => '${i['server'] ?? 'mcp'}.${i['tool'] ?? 'tool'}',
+        _ => '${i['type']}',
+      };
+  String paramsOf(Map i) => jsonEncode(switch (i['type']) {
+        'command_execution' => {'command': i['command'] ?? ''},
+        'file_change' => {'files': [for (final c in (i['changes'] is List ? i['changes'] as List : const [])) if (c is Map) '${c['kind'] ?? 'change'} ${c['path'] ?? ''}']},
+        'web_search' => {'query': i['query'] ?? ''},
+        _ => i['arguments'] ?? const {},
+      });
+  String resultOf(Map i) => switch (i['type']) {
+        'command_execution' => i['exit_code'] is int && i['exit_code'] != 0 ? 'Error: exit ${i['exit_code']}. ${_short('${i['aggregated_output'] ?? ''}')}' : _short('${i['aggregated_output'] ?? ''}'),
+        'file_change' => '${i['status'] ?? ''}',
+        'mcp_tool_call' => i['error'] != null ? 'Error: ${i['error']}' : _short(_resultText(i['result'] is Map ? (i['result'] as Map)['content'] : i['result'])),
+        _ => '${i['status'] ?? ''}',
+      };
+  const tools = {'command_execution', 'file_change', 'web_search', 'mcp_tool_call'};
+  final meters = run.meters;
+  switch (e['type']) {
+    case 'item.started' when tools.contains(item['type']):
+      steps.add(PlayStep(kind: PlayStepKind.tool, text: toolName(item), params: paramsOf(item), toolId: id, at: when));
+    case 'item.completed':
+      switch (item['type']) {
+        case 'agent_message':
+          final t = '${item['text'] ?? ''}'.trim();
+          if (t.isNotEmpty) steps.add(PlayStep(kind: PlayStepKind.thinking, text: t, params: _said, at: when));
+        case 'reasoning':
+          final t = '${item['text'] ?? ''}'.trim();
+          if (t.isNotEmpty) steps.add(PlayStep(kind: PlayStepKind.thinking, text: _short(t, 600), at: when));
+        case 'error':
+          final t = '${item['message'] ?? ''}'.trim();
+          if (t.isNotEmpty) steps.add(PlayStep(kind: PlayStepKind.thinking, text: 'Codex warned: ${_short(t, 300)}', at: when));
+        case final String type when tools.contains(type):
+          final i = steps.lastIndexWhere((s) => s.kind == PlayStepKind.tool && s.toolId == id);
+          if (i >= 0) {
+            steps[i] = steps[i].withResult(resultOf(item));
+          } else {
+            steps.add(PlayStep(kind: PlayStepKind.tool, text: toolName(item), params: paramsOf(item), result: resultOf(item), toolId: id, at: when));
+          }
+        default:
+          return run;
+      }
+    case 'turn.completed':
+      // What it said last is the answer.
+      final i = steps.lastIndexWhere((s) => s.kind == PlayStepKind.thinking && s.params == _said);
+      if (i >= 0 && i == steps.length - 1) steps[i] = PlayStep(kind: PlayStepKind.answer, text: steps[i].text, at: steps[i].at);
+      final usage = e['usage'] is Map ? e['usage'] as Map : const {};
+      return run.copyWith(
+        state: PlayState.done,
+        steps: steps,
+        meters: PlayMeters(
+          turns: meters.turns + 1,
+          elapsed: when,
+          tokensIn: meters.tokensIn + (usage['input_tokens'] is int ? usage['input_tokens'] as int : 0),
+          tokensOut: meters.tokensOut + (usage['output_tokens'] is int ? usage['output_tokens'] as int : 0),
+        ),
+      );
+    case 'turn.failed':
+      final text = _codexError(e['error'] is Map ? '${(e['error'] as Map)['message'] ?? ''}' : '');
+      steps.add(PlayStep(kind: PlayStepKind.error, text: text, at: when));
+      return run.copyWith(state: PlayState.failed, steps: steps, error: text, meters: PlayMeters(turns: meters.turns, elapsed: when, tokensIn: meters.tokensIn, tokensOut: meters.tokensOut));
+    default:
+      return run;
+  }
+  return run.copyWith(steps: steps, meters: PlayMeters(turns: meters.turns, elapsed: when, tokensIn: meters.tokensIn, tokensOut: meters.tokensOut));
+}
+
+/// Codex's error, readable: its API errors come as JSON inside the message.
+String _codexError(String raw) {
+  final text = raw.trim();
+  try {
+    final inner = jsonDecode(text);
+    if (inner is Map && inner['error'] is Map && (inner['error'] as Map)['message'] != null) return '${(inner['error'] as Map)['message']}';
+  } on FormatException {
+    // Plain text.
+  }
+  return text.isEmpty ? 'The run failed.' : text;
 }
 
 /// A step as Claude reads it when asked to fix the instructions.

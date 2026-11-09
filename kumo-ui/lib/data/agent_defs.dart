@@ -680,20 +680,87 @@ Object? _inlineValue(String key, String written) {
 
 /// The command its terminal runs, as Kumo shows it (the engine builds the
 /// real argv from the same parts).
-String agentCommand(AgentDef a, {String contextDir = '', String prompt = ''}) {
+String agentCommand(AgentDef a, {String contextDir = '', String prompt = '', AgentCli cli = AgentCli.claude}) {
+  final p = prompt.trim();
+  final quoted = p.isEmpty ? '' : ' "${p.length > 70 ? '${p.substring(0, 68)}…' : p}"';
+  if (cli == AgentCli.codex) {
+    // The context folder is only named in its message: --add-dir would let
+    // Codex write there.
+    return 'codex -s ${codexSandbox(a)} -c developer_instructions="…"${quoted.isEmpty ? '' : ' --$quoted'}';
+  }
   // Always inline (agentInlineJson): by name, Claude Code goes by the file's
   // `name` line and Kumo by the file; and a file may not be where it runs.
   final agent = '--agents \'{"${a.name}": …}\' --agent ${a.name}';
-  final p = prompt.trim();
-  final quoted = p.isEmpty ? '' : ' "${p.length > 70 ? '${p.substring(0, 68)}…' : p}"';
   return 'claude $agent${contextDir.isEmpty ? '' : ' --add-dir $contextDir'}${quoted.isEmpty ? '' : ' --$quoted'}';
 }
 
 /// The headless run the playground starts.
-String playgroundCommand(AgentDef a, {String task = ''}) {
+String playgroundCommand(AgentDef a, {String task = '', AgentCli cli = AgentCli.claude}) {
   final p = task.trim();
+  final quoted = p.isEmpty ? '' : ' "${p.length > 40 ? '${p.substring(0, 38)}…' : p}"';
+  if (cli == AgentCli.codex) return 'codex exec --json -s ${codexSandbox(a)} -c developer_instructions="…"$quoted';
   return 'claude -p --agents \'{"${a.name}": …}\' --agent ${a.name} --output-format stream-json --verbose'
-      '${a.maxTurns == null ? '' : ' --max-turns ${a.maxTurns}'}${p.isEmpty ? '' : ' "${p.length > 40 ? '${p.substring(0, 38)}…' : p}"'}';
+      '${a.maxTurns == null ? '' : ' --max-turns ${a.maxTurns}'}$quoted';
+}
+
+// ---------------------------------------------------------------------------
+// The CLIs your agents run on
+// ---------------------------------------------------------------------------
+
+/// A CLI your agents can run on. The file is Claude Code's; the engine turns
+/// it into each CLI's flags (`crates/domain/src/agent_defs/cli`).
+enum AgentCli {
+  claude('claude', 'Claude Code'),
+  codex('codex', 'Codex CLI');
+
+  const AgentCli(this.id, this.label);
+
+  /// The provider it runs as.
+  final String id;
+  final String label;
+
+  static AgentCli? of(String id) => values.where((c) => c.id == id).firstOrNull;
+}
+
+bool _has(AgentDef a, String tool) => a.everyTool || a.tools.contains(tool);
+
+/// Codex's sandbox for [a]: it never gets more than the file gives.
+String codexSandbox(AgentDef a) {
+  final writes = a.approvals != AgentApprovals.plan && (_has(a, 'Bash') || ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].any((t) => _has(a, t)));
+  return writes ? 'workspace-write' : 'read-only';
+}
+
+/// What changes when [a] runs on [cli], as the run form shows it. Empty for
+/// Claude Code: the file is its own.
+List<AgentCheck> agentCliNotes(AgentDef a, AgentCli cli) {
+  if (cli == AgentCli.claude) return const [];
+  final plan = a.approvals == AgentApprovals.plan;
+  final bash = _has(a, 'Bash');
+  final model = a.model.toLowerCase();
+  final effort = model.contains('haiku') ? 'low' : (model.contains('sonnet') ? 'medium' : (model.contains('opus') ? 'high' : ''));
+  return [
+    if (codexSandbox(a) == 'read-only')
+      AgentCheck(CheckLevel.ok, '${plan ? 'Plan only, so read-only' : 'Read-only'}: it reads and runs commands in a sandbox that stops any change and the network.')
+    else
+      AgentCheck(CheckLevel.info, 'It can change files only in the folder it runs in${bash ? '' : ', not in temporary ones'}. The network stays off.'),
+    if (bash && !plan && a.approvals != AgentApprovals.dontAsk)
+      const AgentCheck(CheckLevel.info, 'It asks you before going beyond the sandbox.')
+    else
+      const AgentCheck(CheckLevel.info, 'It never asks: what the sandbox stops just fails.'),
+    if (a.approvals == AgentApprovals.bypass) const AgentCheck(CheckLevel.warn, 'Its file skips every approval: Codex doesn’t, it keeps the sandbox.'),
+    AgentCheck(
+      CheckLevel.info,
+      effort.isNotEmpty
+          ? 'Model: your Codex default, thinking with $effort effort (${agentModelLabel(a.model)}).'
+          : (model == 'inherit' || model.startsWith('claude') ? 'Model: your Codex default.' : 'Model: ${a.model}.'),
+    ),
+    if (_has(a, 'WebSearch')) const AgentCheck(CheckLevel.info, 'Web search on.') else if (_has(a, 'WebFetch')) const AgentCheck(CheckLevel.warn, 'WebFetch has no match in Codex: it can’t read pages.'),
+    if (a.mcpServers.isNotEmpty) AgentCheck(CheckLevel.warn, 'Its connectors don’t carry over yet: it runs without ${a.mcpServers.join(', ')}.'),
+    if (a.skills.isNotEmpty) AgentCheck(CheckLevel.warn, 'Its skills don’t carry over: it runs without ${a.skills.join(', ')}.'),
+    if (a.maxTurns != null) AgentCheck(CheckLevel.info, 'Codex has no turn limit: its ${a.maxTurns} turns don’t apply.'),
+    if (a.maxCostUsd != null) const AgentCheck(CheckLevel.info, 'Codex reports tokens, not cost: the cost limit doesn’t apply.'),
+    if (a.memory != AgentMemory.none) const AgentCheck(CheckLevel.info, 'Memory is Claude Code’s: on Codex it starts fresh.'),
+  ];
 }
 
 // ---------------------------------------------------------------------------
