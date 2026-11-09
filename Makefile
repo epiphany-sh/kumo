@@ -62,6 +62,7 @@ RELEASE_ORG  ?= epiphany-sh
 RELEASE_REPO ?= $(RELEASE_ORG)/kumo
 FEED_URL     := https://github.com/$(RELEASE_REPO)/releases/latest/download/appcast.xml
 SPARKLE_VERSION := 2.10.0
+SPARKLE_SHA256  := c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c
 SPARKLE_TOOLS   := target/sparkle-$(SPARKLE_VERSION)/bin
 SPARKLE_KEY     := $(shell cat packaging/sparkle-public-key 2>/dev/null)
 # CFBundleVersion: Sparkle compares it, so it only grows.
@@ -70,7 +71,7 @@ BUILD ?= $(shell git rev-list --count HEAD 2>/dev/null)
 # protoc: the one vendored by Cargo (crates/proto) if present, else the system one.
 PROTOC ?= $(firstword $(wildcard $(HOME)/.cargo/registry/src/*/protoc-bin-vendored-macos-*/bin/protoc) protoc)
 
-.PHONY: help all engine ui app release sparkle-keys run dev stop status sandbox sandbox-stop test check bench bench-ui proto clean signing-cert
+.PHONY: help all engine ui app bundle sign package release sparkle-keys run dev stop status sandbox sandbox-stop test check bench bench-ui proto clean signing-cert
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-8s\033[0m %s\n", $$1, $$2}'
@@ -82,13 +83,17 @@ engine: ## Build kumod (release)
 ifeq ($(PLATFORM),macos)
 	@# `make dev` runs this binary: with the stable identity, the keychain's
 	@# "Always Allow" survives rebuilds (ad-hoc it would be a new program).
-	$(if $(SIGN_ID),codesign --force --sign "$(SIGN_ID)" --identifier dev.kumo.kumod$(CHANNEL_ID) "$(KUMOD)")
+	$(if $(SIGN_ID),codesign --force --sign "$(SIGN_ID)" --options runtime --identifier dev.kumo.kumod$(CHANNEL_ID) "$(KUMOD)")
 endif
 
 ui: ## Build the Flutter app (release)
 	cd $(UI) && $(FLUTTER) pub get && $(FLUTTER) build $(PLATFORM) --release $(if $(VERSION),--build-name=$(VERSION) --build-number=$(BUILD)) --dart-define=KUMO_CHANNEL=$(CHANNEL)
 
-app: engine ui ## Release app with kumod bundled next to the UI executable
+app: bundle ## Release app with kumod bundled next to the UI executable
+	$(MAKE) sign CHANNEL=$(CHANNEL)
+	@echo "✓ $(APP)"
+
+bundle: engine ui ## The app, not signed yet: compiling needs no signing identity
 	cp "$(KUMOD)" "$(APP_BIN)/"
 ifeq ($(PLATFORM),macos)
 	@# Only release builds know where updates are (FEED): a local build
@@ -99,24 +104,32 @@ ifeq ($(PLATFORM),macos)
 	@# keeps only the digits of the version: the full one goes in here.
 	$(if $(CHANNEL),/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier dev.kumo.kumoUi$(CHANNEL_ID)" -c "Set :CFBundleName $(CHANNEL_NAME)" \
 		$(if $(VERSION),-c "Set :CFBundleShortVersionString $(VERSION)") "$(APP)/Contents/Info.plist")
+endif
+
+sign: ## Signs a built app. Runs nothing it signs: CI does this away from the build
+ifeq ($(PLATFORM),macos)
 	@# Sparkle's helpers carry the app's identity, inside out.
 	@set -e; S="$(APP)/Contents/Frameworks/Sparkle.framework"; if [ -d "$$S" ]; then \
 		for p in Versions/B/XPCServices/Installer.xpc Versions/B/XPCServices/Downloader.xpc Versions/B/Autoupdate Versions/B/Updater.app; do \
 			codesign --force --sign "$(SIGN)" --preserve-metadata=entitlements "$$S/$$p"; done; \
 		codesign --force --sign "$(SIGN)" "$$S"; fi
 	@# Adding a binary breaks the bundle seal: sign kumod (a fixed identifier,
-	@# so macOS knows it's the same program), then re-seal the app.
-	codesign --force --sign "$(SIGN)" --identifier dev.kumo.kumod$(CHANNEL_ID) "$(APP_BIN)/kumod"
-	codesign --force --sign "$(SIGN)" --preserve-metadata=entitlements,requirements,flags,runtime "$(APP)"
+	@# so macOS knows it's the same program), then re-seal the app. The hardened
+	@# runtime keeps other code out of them.
+	codesign --force --sign "$(SIGN)" --options runtime --identifier dev.kumo.kumod$(CHANNEL_ID) "$(APP_BIN)/kumod"
+	codesign --force --sign "$(SIGN)" --options runtime --preserve-metadata=entitlements,requirements,flags "$(APP)"
 	@$(if $(SIGN_ID),,echo "  (signed ad-hoc: macOS asks for permissions again after every build; run 'make signing-cert' once to stop that)")
 endif
-	@echo "✓ $(APP)"
 
 release: ## Release build: make release VERSION=0.2.0 → dist/Kumo-0.2.0.zip + dist/appcast.xml
 	@test -n "$(VERSION)" || { echo "make release VERSION=x.y.z"; exit 1; }
+	$(MAKE) app VERSION=$(VERSION) BUILD=$(BUILD) FEED="$(FEED_URL)"
+	$(MAKE) package VERSION=$(VERSION) BUILD=$(BUILD)
+
+package: ## From a signed app: dist/ with the zip, appcast, checksum, installers and cask
+	@test -n "$(VERSION)" || { echo "make package VERSION=x.y.z"; exit 1; }
 	@test -n "$(SPARKLE_KEY)" || { echo "packaging/sparkle-public-key is missing: run 'make sparkle-keys' once"; exit 1; }
 	@test -n "$(SIGN_ID)" || { echo "No '$(SIGN_NAME)' signing identity: releases must keep one identity (make signing-cert)"; exit 1; }
-	$(MAKE) app VERSION=$(VERSION) BUILD=$(BUILD) FEED="$(FEED_URL)"
 	$(MAKE) $(SPARKLE_TOOLS)/sign_update
 	mkdir -p dist
 	rm -f dist/Kumo-$(VERSION).zip
@@ -125,18 +138,21 @@ release: ## Release build: make release VERSION=0.2.0 → dist/Kumo-0.2.0.zip + 
 		packaging/appcast.sh $(VERSION) $(BUILD) dist/Kumo-$(VERSION).zip > dist/appcast.xml
 	@# install.sh downloads the latest one by a fixed name.
 	cp dist/Kumo-$(VERSION).zip dist/Kumo.zip
+	shasum -a 256 dist/Kumo.zip | cut -d' ' -f1 > dist/Kumo.zip.sha256
 	sed -e 's|@RELEASE_REPO@|$(RELEASE_REPO)|g' packaging/install.sh.in > dist/install.sh
 	@# "Latest" is macOS's release: it carries install.ps1 too, which finds
 	@# the newest Windows zip wherever it is.
 	sed -e 's|@RELEASE_REPO@|$(RELEASE_REPO)|g' packaging/install.ps1.in > dist/install.ps1
 	sed -e 's|@RELEASE_REPO@|$(RELEASE_REPO)|g' -e 's|@RELEASE_ORG@|$(RELEASE_ORG)|g' -e 's|@VERSION@|$(VERSION)|g' \
 		-e "s|@SHA256@|$$(shasum -a 256 dist/Kumo-$(VERSION).zip | cut -d' ' -f1)|g" packaging/homebrew/kumo.rb.in > dist/kumo.rb
-	@echo "✓ dist/: Kumo-$(VERSION).zip, Kumo.zip, appcast.xml, install.sh, install.ps1, kumo.rb"
+	@echo "✓ dist/: Kumo-$(VERSION).zip, Kumo.zip, Kumo.zip.sha256, appcast.xml, install.sh, install.ps1, kumo.rb"
 
 $(SPARKLE_TOOLS)/sign_update:
 	mkdir -p target/sparkle-$(SPARKLE_VERSION)
 	curl -fsSL https://github.com/sparkle-project/Sparkle/releases/download/$(SPARKLE_VERSION)/Sparkle-$(SPARKLE_VERSION).tar.xz \
-		| tar -xJ -C target/sparkle-$(SPARKLE_VERSION)
+		-o target/sparkle-$(SPARKLE_VERSION).tar.xz
+	echo "$(SPARKLE_SHA256)  target/sparkle-$(SPARKLE_VERSION).tar.xz" | shasum -a 256 -c -
+	tar -xJf target/sparkle-$(SPARKLE_VERSION).tar.xz -C target/sparkle-$(SPARKLE_VERSION)
 
 sparkle-keys: $(SPARKLE_TOOLS)/sign_update ## Once: Sparkle's update key (private: your Keychain; public: packaging/)
 	$(SPARKLE_TOOLS)/generate_keys

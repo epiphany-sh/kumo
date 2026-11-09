@@ -111,17 +111,40 @@ re-correlo desde Actions. Si falla uno solo, el otro ya creó el tag y el
 número quedó usado: re-corré el job que falló (no el workflow entero, que
 vería el tag y no haría nada).
 
-**A mano**, con el número que quieras:
+**Solo un merge a `main` publica.** Un tag no dispara nada, porque ejecutaría
+el workflow de su propio commit, sin pasar por el PR. El ruleset `release tags`
+impide mover o borrar los `v*` ya creados. Crearlos no se puede bloquear: en una
+cuenta personal, GitHub no acepta a Actions como excepción de un ruleset, y el
+workflow necesita crear el tag.
 
-```bash
-git tag v0.2.0
-git push origin v0.2.0
-```
+## Qué protege cada paso
 
-También se puede crear el release desde la web de GitHub: el workflow le
-sube los archivos (zips, appcast, `install.sh`, `install.ps1`) y actualiza el cask. Mientras
-corre (unos minutos), ese release queda como "Latest" sin appcast, y las apps
-instaladas no encuentran updates hasta que termina.
+Compilar ejecuta código de todas las dependencias, así que el workflow lo hace
+aparte:
+
+| Job | Secretos | Token | Qué hace |
+|---|---|---|---|
+| `macos-build`, `windows-build` | Ninguno | Solo lectura | Compilan y suben el resultado como artifact |
+| `macos-publish`, `windows-publish` | Los de firma y el tap | Escritura | Firman, empaquetan y publican, sin compilar |
+
+`make app` sigue haciendo todo junto en local: es `make bundle` y `make sign`.
+
+- **Acciones y descargas**: las acciones van fijadas por SHA, y Sparkle se
+  verifica contra `SPARKLE_SHA256`. Para actualizar una, cambiá el SHA y el
+  comentario de versión.
+- **Hardened runtime**: `Kumo.app` y `kumod` se firman con `--options runtime`.
+  La app necesita `disable-library-validation` porque sus frameworks no llevan
+  Team ID (no hay Developer ID).
+- **Checksums**: `install.sh` e `install.ps1` comparan la descarga con el
+  `.sha256` del mismo release. Eso detecta una descarga corrupta o incompleta,
+  pero **no** protege si el release entero está comprometido: para eso están
+  las atestaciones de build (`gh attestation verify <zip> --repo epiphany-sh/kumo`).
+- **Dependencias**: el job `audit` de `ci` corre `cargo audit` en cada PR. No es
+  obligatorio. Dependabot no puede abrir PRs acá porque `branch-policy` rechaza
+  sus ramas, así que solo se usan sus alertas.
+- **Si se filtra la clave de Sparkle**: las versiones publicadas no aceptan otra
+  clave, así que rotarla requiere publicar primero una versión firmada con la
+  vieja que incluya la pública nueva.
 
 El número de build (`CFBundleVersion`, lo que compara Sparkle) es la cantidad
 de commits: siempre crece.

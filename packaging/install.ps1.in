@@ -30,6 +30,10 @@ try {
     Write-Host "Downloading $($asset.name)..."
     $zip = Join-Path $tmp 'Kumo.zip'
     Invoke-WebRequest $asset.browser_download_url -OutFile $zip -UseBasicParsing
+    $expected = (Invoke-RestMethod "$($asset.browser_download_url).sha256").Trim()
+    if ((Get-FileHash $zip -Algorithm SHA256).Hash -ine $expected) {
+        throw "The download doesn't match its checksum: nothing was installed."
+    }
     Expand-Archive $zip -DestinationPath $tmp
 
     $ui = Get-Process -Name Kumo -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$dest\*" }
