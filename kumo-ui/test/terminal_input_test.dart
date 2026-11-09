@@ -270,6 +270,11 @@ void main() {
           (_) {},
         );
 
+    test('a paste is only text: it can neither act as keys nor end early', () {
+      expect(utf8.decode(terminalPaste('a\x1b[201~b\x03c\x7fd\u009be\tf\r\ng\nh', bracketed: true)), '\x1b[200~a[201~bcde\tf\rg\rh\x1b[201~');
+      expect(utf8.decode(terminalPaste('a\x1bb')), 'ab');
+    });
+
     test('paths are escaped as a shell takes them', () {
       expect(terminalPaths(['/tmp/a b/Screenshot (1).png', r"/x/it's $HOME"]), r"/tmp/a\ b/Screenshot\ \(1\).png /x/it\'s\ \$HOME");
     });

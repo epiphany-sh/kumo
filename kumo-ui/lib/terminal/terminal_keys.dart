@@ -67,11 +67,15 @@ List<int>? _macLineEdit(LogicalKeyboardKey key, HardwareKeyboard keys) {
   return null;
 }
 
-/// Text from the clipboard, wrapped when the program asked for it.
+/// Text from the clipboard, wrapped when the program asked for it. Only text,
+/// tabs and line breaks go in: an escape or another control character would
+/// act as a key, or end the paste early.
 List<int> terminalPaste(String text, {bool bracketed = false}) {
-  final normalized = text.replaceAll('\r\n', '\r').replaceAll('\n', '\r');
+  final normalized = text.replaceAll(_pasteControls, '').replaceAll('\r\n', '\r').replaceAll('\n', '\r');
   return utf8.encode(bracketed ? '\x1b[200~$normalized\x1b[201~' : normalized);
 }
+
+final _pasteControls = RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]');
 
 /// File paths as a shell takes them: backslash before blanks and
 /// metacharacters, separated by spaces, as Terminal and iTerm2 drop them.

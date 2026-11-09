@@ -244,6 +244,58 @@ async fn agent_gets_its_prompt_works_then_waits_and_exits() {
     assert!(stream.message().await.unwrap().unwrap().sessions.is_empty());
 }
 
+/// `.cmd` launchers are a Windows thing, but which path is taken goes by the
+/// name alone, so a fake one runs here.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_cmd_launcher_gets_the_prompt_typed_in() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    fake_cli(
+        &daemon.bin(),
+        "my-agent.cmd",
+        "echo \"args: $#\"; printf 'ready\\a'; read line; echo \"typed: $line\"; read again",
+    );
+    let save = |args: &str| pb::SaveProviderRequest {
+        name: "My agent".into(),
+        program: "my-agent.cmd".into(),
+        args: args.into(),
+        enabled: true,
+        ..Default::default()
+    };
+    let agent = client
+        .agents
+        .save_provider(save("{prompt}"))
+        .await
+        .unwrap()
+        .into_inner();
+
+    let prompt = "fix \"this\" & that";
+    let session = client
+        .agents
+        .start(start(&wt, &agent.id, prompt))
+        .await
+        .unwrap()
+        .into_inner();
+    let mut terminal = Attached::new(&mut client, &session.terminal_id, true).await;
+    terminal.read_until("args: 0").await;
+    terminal.read_until(&format!("typed: {prompt}")).await;
+
+    // What's left of the command line can't hold what `cmd.exe` acts on.
+    let unsafe_args = client
+        .agents
+        .save_provider(save("--x a&b"))
+        .await
+        .unwrap()
+        .into_inner();
+    let refused = client
+        .agents
+        .start(start(&wt, &unsafe_args.id, "go"))
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code(), tonic::Code::InvalidArgument, "{refused:?}");
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn timeline_and_context_follow_what_the_agent_does() {
     let daemon = TestDaemon::start().await;

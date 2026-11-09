@@ -68,7 +68,7 @@ impl UsageSource for ClaudeStatusLine {
         }
         let dir = self.dir(&target.session_id);
         std::fs::create_dir_all(&dir).map_err(io_error)?;
-        let theirs = user_status_line(&target.worktree, &self.config_dir);
+        let theirs = user_status_line(&self.config_dir);
         let settings = settings_for(&dir, theirs);
         let path = dir.join(SETTINGS);
         std::fs::write(&path, settings.to_string()).map_err(io_error)?;
@@ -126,24 +126,17 @@ pub fn claude_config_dir(home: &Path) -> PathBuf {
         .map_or_else(|| home.join(".claude"), PathBuf::from)
 }
 
-/// The user's own `statusLine`, from the file that wins for the project:
-/// project local, then shared project, then user settings (in
-/// `config_dir`, Claude Code's user folder).
-pub fn user_status_line(project: &Path, config_dir: &Path) -> Option<Map<String, Value>> {
-    [
-        project.join(".claude/settings.local.json"),
-        project.join(".claude/settings.json"),
-        config_dir.join("settings.json"),
-    ]
-    .iter()
-    .find_map(|file| {
-        let settings: Value = serde_json::from_str(&std::fs::read_to_string(file).ok()?).ok()?;
-        let line = settings.get("statusLine")?.as_object()?;
-        line.get("command")
-            .and_then(Value::as_str)
-            .is_some_and(|c| !c.trim().is_empty())
-            .then(|| line.clone())
-    })
+/// The user's own `statusLine`, from the user settings in `config_dir`
+/// (Claude Code's user folder). A project's settings aren't read: they come
+/// with the repo, and what's here runs as a command Kumo passes explicitly.
+pub fn user_status_line(config_dir: &Path) -> Option<Map<String, Value>> {
+    let file = config_dir.join("settings.json");
+    let settings: Value = serde_json::from_str(&std::fs::read_to_string(file).ok()?).ok()?;
+    let line = settings.get("statusLine")?.as_object()?;
+    line.get("command")
+        .and_then(Value::as_str)
+        .is_some_and(|c| !c.trim().is_empty())
+        .then(|| line.clone())
 }
 
 /// The session's settings: the user's status line (padding, refresh and
@@ -492,13 +485,9 @@ mod tests {
     }
 
     #[test]
-    fn keeps_the_user_s_status_line_from_the_winning_settings_file() {
+    fn keeps_the_user_s_own_status_line_and_ignores_the_project_s() {
         let home = tempfile::tempdir().unwrap();
-        let project = tempfile::tempdir().unwrap();
-        assert_eq!(
-            user_status_line(project.path(), &home.path().join(".claude")),
-            None
-        );
+        assert_eq!(user_status_line(&home.path().join(".claude")), None);
 
         std::fs::create_dir_all(home.path().join(".claude")).unwrap();
         std::fs::write(
@@ -506,19 +495,8 @@ mod tests {
             r#"{"statusLine":{"type":"command","command":"~/.claude/statusline.sh","padding":2}}"#,
         )
         .unwrap();
-        let theirs = user_status_line(project.path(), &home.path().join(".claude")).unwrap();
+        let theirs = user_status_line(&home.path().join(".claude")).unwrap();
         assert_eq!(theirs["command"], "~/.claude/statusline.sh");
-
-        std::fs::create_dir_all(project.path().join(".claude")).unwrap();
-        std::fs::write(
-            project.path().join(".claude/settings.json"),
-            r#"{"statusLine":{"type":"command","command":"project-line"}}"#,
-        )
-        .unwrap();
-        assert_eq!(
-            user_status_line(project.path(), &home.path().join(".claude")).unwrap()["command"],
-            "project-line"
-        );
 
         let dir = Path::new("/data/agents/s1");
         let settings = settings_for(dir, Some(theirs));
@@ -585,6 +563,31 @@ mod tests {
         let args = source.launch_args(&target).unwrap();
         let settings = std::fs::read_to_string(&args[1]).unwrap();
         assert!(settings.contains("workspace-1-line"), "{settings}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_repo_s_status_line_is_not_passed_to_the_session() {
+        let data = tempfile::tempdir().unwrap();
+        let home = tempfile::tempdir().unwrap();
+        let repo = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(repo.path().join(".claude")).unwrap();
+        for file in ["settings.json", "settings.local.json"] {
+            std::fs::write(
+                repo.path().join(".claude").join(file),
+                r#"{"statusLine":{"type":"command","command":"repo-line"}}"#,
+            )
+            .unwrap();
+        }
+        let source = ClaudeStatusLine::new(&data.path().join("agents"), home.path());
+        let target = UsageTarget {
+            session_id: AgentSessionId::parse("s1").unwrap(),
+            worktree: repo.path().to_owned(),
+            started_at: Timestamp::now(),
+        };
+        let args = source.launch_args(&target).unwrap();
+        let settings = std::fs::read_to_string(&args[1]).unwrap();
+        assert!(!settings.contains("repo-line"), "{settings}");
     }
 
     #[cfg(unix)]

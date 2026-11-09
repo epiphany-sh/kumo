@@ -117,3 +117,56 @@ impl PtyKiller for PortableKiller {
         Ok(())
     }
 }
+
+#[cfg(all(test, windows))]
+mod tests {
+    use std::io::{Read, Write};
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    use super::*;
+
+    /// Why an agent's prompt never reaches a batch file as an argument:
+    /// quoting it for the program doesn't quote it for `cmd.exe`.
+    #[test]
+    fn a_batch_file_s_arguments_are_read_by_cmd() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("agent.cmd");
+        std::fs::write(&program, "@echo off\r\nexit /b 0\r\n").unwrap();
+        let spec = LaunchSpec::new(program.display().to_string())
+            .unwrap()
+            .with_args([r#"x"&echo y>marker&"#])
+            .with_cwd(Some(dir.path().to_path_buf()));
+        let PtyProcess {
+            mut reader,
+            mut writer,
+            master,
+            mut child,
+            mut killer,
+        } = PortablePtySystem.spawn(&spec).unwrap();
+        // ConPTY asks where the cursor is, and holds the program until the
+        // terminal answers.
+        std::thread::spawn(move || {
+            let (mut seen, mut buffer, mut answered) = (Vec::new(), [0; 1024], false);
+            while let Ok(read @ 1..) = reader.read(&mut buffer) {
+                seen.extend_from_slice(&buffer[..read]);
+                if !answered && seen.windows(4).any(|w| w == b"\x1b[6n") {
+                    answered = true;
+                    let _ = writer.write_all(b"\x1b[1;1R");
+                    let _ = writer.flush();
+                }
+            }
+        });
+        let (done, finished) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = child.wait();
+            let _ = done.send(());
+        });
+        if finished.recv_timeout(Duration::from_secs(30)).is_err() {
+            let _ = killer.kill_tree();
+            panic!("the batch file never finished");
+        }
+        drop(master);
+        assert!(dir.path().join("marker").exists());
+    }
+}

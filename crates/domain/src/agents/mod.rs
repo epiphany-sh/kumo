@@ -22,7 +22,7 @@ pub use ports::{
     StoredProvider,
 };
 pub use presets::{AgentPreset, PRESETS};
-pub use provider::{AgentProvider, PromptStyle};
+pub use provider::{AgentProvider, PromptStyle, args_for_cmd, runs_through_cmd};
 pub use session::{
     AgentContext, AgentEvent, AgentEventKind, AgentSession, AgentSessionId, AgentState,
     ContextKind, TerminalAgent, agent_program,
