@@ -8,12 +8,12 @@ use std::time::Duration;
 
 use kumo_domain::agent_defs::{
     AgentDefFile, ContextFile, RepoLink, WrittenContext, check_agent_name, context_index,
-    file_name, next_free, pull_number, run_args, task_key,
+    file_name, next_free, pull_number, task_key,
 };
 use kumo_domain::agents::{AgentContext, AgentError, AgentSession, ContextKind};
 use kumo_domain::terminal::TerminalSize;
 
-use super::service::{AgentDefService, CLAUDE, blocking};
+use super::service::{AgentDefService, blocking, cli_for};
 use crate::agents::AgentLaunch;
 
 /// Run and scratch folders are removed after this long.
@@ -38,6 +38,8 @@ pub enum RunWhere {
 /// What a run is started with.
 #[derive(Debug, Clone)]
 pub struct RunStart {
+    /// The CLI it runs on; empty: the default.
+    pub provider_id: String,
     pub agent: AgentDefFile,
     /// Set when it isn't found by name where it runs.
     pub inline_json: String,
@@ -61,6 +63,7 @@ impl AgentDefService {
     pub async fn run(self: &Arc<Self>, start: RunStart) -> Result<AgentSession, AgentError> {
         let name = start.agent.name.clone();
         check_agent_name(&name)?;
+        let cli = cli_for(&start.provider_id)?;
         let (files, data) = (Arc::clone(&self.ports.files), self.places.data_dir.clone());
         blocking(move || {
             files.sweep(&data.join("runs"), KEEP_FOLDERS);
@@ -91,7 +94,7 @@ impl AgentDefService {
         } else {
             String::new()
         };
-        let args = run_args(
+        let args = cli.run_args(
             &name,
             &start.inline_json,
             context_dir.as_deref(),
@@ -99,7 +102,7 @@ impl AgentDefService {
         );
         self.agents
             .launch(AgentLaunch {
-                provider_id: Some(CLAUDE.to_owned()),
+                provider_id: Some(cli.provider_id().to_owned()),
                 cwd,
                 prompt: start.prompt.trim().to_owned(),
                 title,

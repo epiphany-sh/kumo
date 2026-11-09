@@ -101,6 +101,7 @@ pub fn play_record_to(record: PlayRecord) -> pb::PlayRecord {
             .map(|e| play_event_to(&id, e))
             .collect(),
         play_id: id,
+        provider_id: record.provider_id,
         task: record.task,
         draft: record.draft,
         started_unix_ms: record.started_unix_ms,
