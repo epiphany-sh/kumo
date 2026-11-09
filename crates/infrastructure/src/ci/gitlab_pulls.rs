@@ -314,9 +314,9 @@ mod tests {
         CiTarget {
             host: CiHost {
                 provider: CiProvider::GitLabCi,
-                host: "gitlab.fravega.com".into(),
+                host: "gitlab.example.com".into(),
                 api: api.into(),
-                web: "https://gitlab.fravega.com".into(),
+                web: "https://gitlab.example.com".into(),
             },
             repo: "pricing/price-reader-v2".into(),
             branch: branch.into(),
@@ -331,7 +331,7 @@ mod tests {
             ("GET", x) if x.starts_with(&format!("{p}/merge_requests?source_branch=perf%2Fcache-warmup")) => (200, include_str!("fixtures/gitlab_mrs.json").into()),
             ("GET", x) if x == format!("{p}/merge_requests/231") => (200, include_str!("fixtures/gitlab_mr_231.json").into()),
             ("GET", x) if x == format!("{p}/merge_requests/231/approvals") => (200, r#"{"approved":true,"approved_by":[{"user":{"username":"tomas"}}]}"#.into()),
-            ("GET", x) if x == format!("{p}/merge_requests/229") => (200, r#"{"iid":229,"title":"Draft: chore: bump pgx","state":"opened","draft":true,"source_branch":"chore/pgx","target_branch":"main","author":{"username":"nico","name":"Nico"},"reviewers":[],"web_url":"https://gitlab.fravega.com/pricing/price-reader-v2/-/merge_requests/229","user_notes_count":0,"head_pipeline":null}"#.into()),
+            ("GET", x) if x == format!("{p}/merge_requests/229") => (200, r#"{"iid":229,"title":"Draft: chore: bump pgx","state":"opened","draft":true,"source_branch":"chore/pgx","target_branch":"main","author":{"username":"nico","name":"Nico"},"reviewers":[],"web_url":"https://gitlab.example.com/pricing/price-reader-v2/-/merge_requests/229","user_notes_count":0,"head_pipeline":null}"#.into()),
             ("GET", x) if x == p => (200, r#"{"default_branch":"main"}"#.into()),
             ("POST", x) if x == format!("{p}/merge_requests") => (201, r#"{"iid":232,"title":"Draft: feat: x","draft":true,"state":"opened","source_branch":"feat/x","target_branch":"main","author":{"username":"mauri","name":"Mauri"},"reviewers":[],"web_url":"u"}"#.into()),
             _ => (404, r#"{"message":"404 Not Found"}"#.into()),

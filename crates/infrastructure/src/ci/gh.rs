@@ -283,8 +283,8 @@ mod tests {
 
     #[test]
     fn reads_the_account_from_both_status_formats() {
-        let new = "github.com\n  ✓ Logged in to github.com account MDellag (keyring)\n  - Active account: true\n  - Token: gho_************************************\n";
-        assert_eq!(account_in(new).as_deref(), Some("MDellag"));
+        let new = "github.com\n  ✓ Logged in to github.com account user-1 (keyring)\n  - Active account: true\n  - Token: gho_************************************\n";
+        assert_eq!(account_in(new).as_deref(), Some("user-1"));
         let old = "github.com\n  ✓ Logged in to github.com as ana (oauth_token)\n";
         assert_eq!(account_in(old).as_deref(), Some("ana"));
         assert_eq!(

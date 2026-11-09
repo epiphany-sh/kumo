@@ -125,9 +125,9 @@ void main() {
     });
 
     test('links', () {
-      final pr = parseRepoLink('https://github.com/fravega/price-admin/pull/521')!;
-      expect((pr.path, pr.number, pr.ref, pr.name), ('fravega/price-admin', 521, '#521', 'price-admin'));
-      final mr = parseRepoLink('https://gitlab.fravega.com/pricing/price-reader-v2/-/merge_requests/231')!;
+      final pr = parseRepoLink('https://github.com/workspace-1/price-admin/pull/521')!;
+      expect((pr.path, pr.number, pr.ref, pr.name), ('workspace-1/price-admin', 521, '#521', 'price-admin'));
+      final mr = parseRepoLink('https://gitlab.example.com/pricing/price-reader-v2/-/merge_requests/231')!;
       expect((mr.path, mr.ref), ('pricing/price-reader-v2', '!231'));
       expect(parseRepoLink('https://github.com/segmentio/kafka-go')!.number, isNull);
       expect(parseRepoLink('https://github.com/o/r/tree/feat/x')!.branch, 'feat/x');

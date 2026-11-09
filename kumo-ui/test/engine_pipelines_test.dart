@@ -80,11 +80,11 @@ void main() {
       host: 'github.com',
       provider: pb.CiProvider.CI_PROVIDER_GITHUB_ACTIONS,
       usesGh: true,
-      ghAccount: 'MDellag',
+      ghAccount: 'user-1',
       ghAvailable: true,
       repos: ['pricing/app'],
     ))!;
-    expect((host.ghAccount, host.ghAvailable), ('MDellag', true));
+    expect((host.ghAccount, host.ghAvailable), ('user-1', true));
     expect((host.host, host.provider, host.hasToken, host.usesGh), ('github.com', CiProvider.githubActions, false, true));
     expect(host.repos, ['pricing/app']);
     expect(ciHostFrom(pb.CiHostInfo(host: 'x', provider: pb.CiProvider.CI_PROVIDER_NONE)), isNull);
@@ -110,7 +110,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.widgetWithText(KButton, 'Save'));
     await tester.pump();
-    expect(hosts.saved, [('gitlab.fravega.com', 'glpat-new')]);
+    expect(hosts.saved, [('gitlab.example.com', 'glpat-new')]);
     expect(find.text('Token saved'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
@@ -132,11 +132,11 @@ void main() {
     await _pumpPanel(
       tester,
       MockCiHostsSource(hosts: const [
-        CiHostInfo(host: 'github.com', provider: CiProvider.githubActions, usesGh: true, ghAccount: 'MDellag', ghAvailable: true),
+        CiHostInfo(host: 'github.com', provider: CiProvider.githubActions, usesGh: true, ghAccount: 'user-1', ghAvailable: true),
         CiHostInfo(host: 'github.acme.dev', provider: CiProvider.githubActions),
       ]),
     );
-    expect(find.text('Signed in with gh as MDellag'), findsOneWidget);
+    expect(find.text('Signed in with gh as user-1'), findsOneWidget);
     await tester.tap(find.widgetWithText(KButton, 'Connect'));
     await tester.pump();
     expect(find.textContaining('brew install gh'), findsOneWidget);

@@ -262,9 +262,9 @@ mod tests {
         CiTarget {
             host: CiHost {
                 provider: CiProvider::GitLabCi,
-                host: "gitlab.fravega.com".into(),
+                host: "gitlab.example.com".into(),
                 api: api.into(),
-                web: "https://gitlab.fravega.com".into(),
+                web: "https://gitlab.example.com".into(),
             },
             repo: "pricing/price-admin".into(),
             branch: "feat/PRC-412-bulk-discounts".into(),
