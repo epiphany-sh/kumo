@@ -332,7 +332,7 @@ class MockAgentDefs extends AgentDefsSource {
   @override
   Future<AgentRun?> run(AgentDef agent, AgentWhere where, {String prompt = '', List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async {
     final r = AgentRun(
-      id: 'def-n${++_seq}', providerId: cli.id, providerName: cli.label, short: cli == AgentCli.codex ? 'CX' : 'CC', agent: agent.name,
+      id: 'def-n${++_seq}', providerId: cli.id, providerName: cli.label, short: switch (cli) { AgentCli.codex => 'CX', AgentCli.copilot => 'GH', AgentCli.claude => 'CC' }, agent: agent.name,
       worktreePath: where.path.isNotEmpty ? where.path : (where.url.isNotEmpty ? where.url : '~/.kumo/scratch/${agent.name}-$_seq'),
       terminalId: 'mock:new-$_seq', title: prompt.isEmpty ? 'Run ${runsOf(agent).length + 1}' : (prompt.length > 34 ? '${prompt.substring(0, 32)}…' : prompt),
       status: AgentStatus.running, startedAt: DateTime.now(), prompt: prompt, context: context,
@@ -410,13 +410,26 @@ class MockAgentDefs extends AgentDefsSource {
     jsonEncode({'type': 'turn.completed', 'usage': {'input_tokens': 24100, 'cached_input_tokens': 18000, 'output_tokens': 610}}),
   ];
 
+  /// The same review on Copilot: `copilot -p --output-format json`, as it
+  /// prints it (the lines that only stream text left out).
+  static final _copilotScript = <String>[
+    jsonEncode({'type': 'assistant.turn_start', 'data': {'turnId': '0'}}),
+    jsonEncode({'type': 'assistant.message', 'data': {'content': 'I’ll read the diff, then look for existing code for each new function.', 'toolRequests': []}}),
+    jsonEncode({'type': 'tool.execution_start', 'data': {'toolCallId': 'c1', 'toolName': 'grep', 'arguments': {'pattern': r'func (\w*Percent|[Rr]ound\w*)', 'path': 'internal/'}}}),
+    jsonEncode({'type': 'tool.execution_complete', 'data': {'toolCallId': 'c1', 'success': true, 'result': {'content': 'internal/discount/calc.go:48:func applyPercent(p Price, pct int) Price\ninternal/money/round.go:12:func RoundCents(v float64) int64'}}}),
+    jsonEncode({'type': 'assistant.turn_start', 'data': {'turnId': '1'}}),
+    jsonEncode({'type': 'assistant.message', 'data': {'content': 'Two reuse opportunities: bulkPercent repeats applyPercent (internal/discount/calc.go:48), and roundCents repeats money.RoundCents (internal/money/round.go:12). CategoryRule is new.', 'toolRequests': []}}),
+    jsonEncode({'type': 'session.usage_checkpoint', 'data': {'accountingSnapshot': {'modelMetrics': {'gpt-6-luna': {'usage': {'inputTokens': 21400, 'outputTokens': 540}}}}}}),
+    jsonEncode({'type': 'result', 'exitCode': 0, 'usage': {'premiumRequests': 1}}),
+  ];
+
   @override
   Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async {
     final id = 'play-${++_seq}';
     final list = playRuns(owner ?? agent);
     list.insert(0, PlayRun(id: id, agent: agent.name, task: task, draft: draft, startedAt: DateTime.now(), cli: cli.id));
     if (list.length > 10) list.removeRange(10, list.length);
-    final script = cli == AgentCli.codex ? _codexScript : _script;
+    final script = switch (cli) { AgentCli.codex => _codexScript, AgentCli.copilot => _copilotScript, AgentCli.claude => _script };
     var at = 0;
     _timers[id] = Timer.periodic(step, (t) {
       final i = list.indexWhere((r) => r.id == id);

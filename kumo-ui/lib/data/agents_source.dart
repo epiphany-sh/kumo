@@ -279,12 +279,13 @@ abstract class AgentsSource extends ChangeNotifier {
   Future<void> get ready;
 }
 
-/// The design canvas: Claude Code, Codex and Gemini connected, Aider not
+/// The design canvas: Claude Code, Codex, Copilot and Gemini connected, Aider not
 /// installed. No real sessions (the Agents view shows its own mock).
 class MockAgentsSource extends AgentsSource {
   List<AgentProviderInfo> _providers = const [
     AgentProviderInfo(id: 'claude', name: 'Claude Code', short: 'CC', program: 'claude', enabled: true, isDefault: true, installed: true, takesPrompt: true, hasLogin: true),
     AgentProviderInfo(id: 'codex', name: 'Codex CLI', short: 'CX', program: 'codex', enabled: true, installed: true, takesPrompt: true, hasLogin: true),
+    AgentProviderInfo(id: 'copilot', name: 'GitHub Copilot CLI', short: 'GH', program: 'copilot', enabled: true, installed: true, hasLogin: true),
     AgentProviderInfo(id: 'gemini', name: 'Gemini CLI', short: 'GM', program: 'gemini', enabled: true, installed: true, takesPrompt: true, hasLogin: true),
     AgentProviderInfo(id: 'aider', name: 'Aider', short: 'AD', program: 'aider', installHint: 'brew install aider', hasLogin: true),
   ];

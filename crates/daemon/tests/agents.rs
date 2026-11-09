@@ -970,15 +970,16 @@ async fn an_agent_keeps_asking_while_its_prompt_blinks_until_answered() {
     assert_ne!(answered.state(), pb::AgentState::Exited);
 }
 
-/// Claude Code and Codex are told to say when they ask; Kumo can't tell for
-/// other CLIs, and says so.
+/// Claude Code and Codex are told to say when they ask; GitHub Copilot CLI
+/// says it on its own (OSC 7501), untold; Kumo can't tell for other CLIs, and
+/// says so.
 #[tokio::test(flavor = "multi_thread")]
 async fn which_clis_say_when_they_ask() {
     let daemon = TestDaemon::start().await;
     let mut client = daemon.client().await;
     let wt = worktree(&daemon, &mut client).await;
-    for name in ["codex", "copilot"] {
-        fake_cli(&daemon.bin(), name, "echo \"args: $*\"; read a");
+    for name in ["codex", "copilot", "gemini"] {
+        fake_cli(&daemon.bin(), name, "echo \"args: [$*]\"; read a");
         connect(&mut client, name, true).await;
     }
     let codex = client
@@ -997,7 +998,17 @@ async fn which_clis_say_when_they_ask() {
         .await
         .unwrap()
         .into_inner();
-    assert!(!copilot.tells_asking);
+    assert!(copilot.tells_asking);
+    let mut terminal = Attached::new(&mut client, &copilot.terminal_id, true).await;
+    terminal.read_until("args: []").await;
+
+    let gemini = client
+        .agents
+        .start(start(&wt, "gemini", ""))
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(!gemini.tells_asking);
 }
 
 /// An agent that's only quiet isn't asking, and redrawing because its

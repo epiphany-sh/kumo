@@ -688,6 +688,11 @@ String agentCommand(AgentDef a, {String contextDir = '', String prompt = '', Age
     // Codex write there.
     return 'codex -s ${codexSandbox(a)} -c developer_instructions="…"${quoted.isEmpty ? '' : ' --$quoted'}';
   }
+  if (cli == AgentCli.copilot) {
+    // Copilot reads agents from files: Kumo writes this one for the run,
+    // under a name of its own.
+    return 'copilot --agent ${a.name}-… --add-dir <its copy>${contextDir.isEmpty ? '' : ' --add-dir $contextDir'}${quoted.isEmpty ? '' : ' -i$quoted'}';
+  }
   // Always inline (agentInlineJson): by name, Claude Code goes by the file's
   // `name` line and Kumo by the file; and a file may not be where it runs.
   final agent = '--agents \'{"${a.name}": …}\' --agent ${a.name}';
@@ -699,6 +704,7 @@ String playgroundCommand(AgentDef a, {String task = '', AgentCli cli = AgentCli.
   final p = task.trim();
   final quoted = p.isEmpty ? '' : ' "${p.length > 40 ? '${p.substring(0, 38)}…' : p}"';
   if (cli == AgentCli.codex) return 'codex exec --json -s ${codexSandbox(a)} -c developer_instructions="…"$quoted';
+  if (cli == AgentCli.copilot) return 'copilot -p$quoted --agent ${a.name}-… --output-format json';
   return 'claude -p --agents \'{"${a.name}": …}\' --agent ${a.name} --output-format stream-json --verbose'
       '${a.maxTurns == null ? '' : ' --max-turns ${a.maxTurns}'}$quoted';
 }
@@ -711,13 +717,17 @@ String playgroundCommand(AgentDef a, {String task = '', AgentCli cli = AgentCli.
 /// it into each CLI's flags (`crates/domain/src/agent_defs/cli`).
 enum AgentCli {
   claude('claude', 'Claude Code'),
-  codex('codex', 'Codex CLI');
+  codex('codex', 'Codex CLI'),
+  copilot('copilot', 'Copilot CLI');
 
   const AgentCli(this.id, this.label);
 
   /// The provider it runs as.
   final String id;
   final String label;
+
+  /// Its name where there's little room: a choice among them.
+  String get short => label.replaceAll(' CLI', '');
 
   static AgentCli? of(String id) => values.where((c) => c.id == id).firstOrNull;
 }
@@ -732,8 +742,71 @@ String codexSandbox(AgentDef a) {
 
 /// What changes when [a] runs on [cli], as the run form shows it. Empty for
 /// Claude Code: the file is its own.
-List<AgentCheck> agentCliNotes(AgentDef a, AgentCli cli) {
-  if (cli == AgentCli.claude) return const [];
+List<AgentCheck> agentCliNotes(AgentDef a, AgentCli cli) => switch (cli) {
+  AgentCli.claude => const [],
+  AgentCli.codex => _codexNotes(a),
+  AgentCli.copilot => _copilotNotes(a),
+};
+
+/// Claude Code's tools and the Copilot tool each one is (as the engine's
+/// `cli/copilot.rs`).
+const _copilotToolOf = {
+  'Read': 'read',
+  'NotebookRead': 'read',
+  'Grep': 'search',
+  'Glob': 'search',
+  'Edit': 'edit',
+  'Write': 'edit',
+  'MultiEdit': 'edit',
+  'NotebookEdit': 'edit',
+  'Bash': 'execute',
+  'WebFetch': 'web',
+  'WebSearch': 'web',
+  'TodoWrite': 'todo',
+};
+
+/// Copilot's tools for [a]: it never gets more than the file gives.
+List<String> copilotTools(AgentDef a) {
+  final plan = a.approvals == AgentApprovals.plan;
+  return [
+    for (final t in const ['read', 'search', 'edit', 'execute', 'web', 'todo'])
+      if ((a.everyTool || _copilotToolOf.entries.any((e) => e.value == t && a.tools.contains(e.key))) && !(plan && (t == 'edit' || t == 'execute'))) t,
+  ];
+}
+
+List<AgentCheck> _copilotNotes(AgentDef a) {
+  final plan = a.approvals == AgentApprovals.plan;
+  final tools = copilotTools(a);
+  final edits = tools.contains('edit');
+  final model = a.model.toLowerCase();
+  final own = model != 'inherit' && !model.startsWith('claude') && !['haiku', 'sonnet', 'opus'].any(model.contains);
+  final unmatched = [for (final t in a.tools) if (!t.startsWith('mcp__') && !_copilotToolOf.containsKey(t)) t];
+  return [
+    if (!edits && !tools.contains('execute'))
+      AgentCheck(CheckLevel.ok, '${plan ? 'Plan only, so it only reads' : 'It only reads'}: Copilot gets ${tools.isEmpty ? 'no tools' : tools.join(', ')}, as Kumo writes it for each run.')
+    else
+      AgentCheck(CheckLevel.info, 'Copilot gets ${tools.join(', ')}, as Kumo writes it for each run.'),
+    if (edits && a.approvals == AgentApprovals.acceptEdits)
+      const AgentCheck(CheckLevel.info, 'Edits go without asking.')
+    else if (edits || tools.contains('execute'))
+      const AgentCheck(CheckLevel.info, 'It asks you before each change in its terminal. A test run can’t ask, so it can’t change anything.'),
+    if (a.approvals == AgentApprovals.bypass) const AgentCheck(CheckLevel.warn, 'Its file skips every approval: Copilot doesn’t, it asks.'),
+    if (a.approvals == AgentApprovals.dontAsk && tools.any((t) => t == 'edit' || t == 'execute')) const AgentCheck(CheckLevel.info, 'Copilot can’t turn requests down on its own: it asks you instead.'),
+    AgentCheck(
+      CheckLevel.info,
+      own ? 'Model: ${a.model}.' : 'Model: your Copilot default. If that’s Auto it can change from run to run, and some models drift from the role: pick one with /model in Copilot.',
+    ),
+    if (unmatched.isNotEmpty) AgentCheck(CheckLevel.warn, '${unmatched.join(', ')} ${unmatched.length == 1 ? 'has' : 'have'} no match in Copilot: it runs without ${unmatched.length == 1 ? 'it' : 'them'}.'),
+    if (a.mcpServers.isNotEmpty) AgentCheck(CheckLevel.warn, 'Its connectors don’t carry over yet: it runs without ${a.mcpServers.join(', ')}.'),
+    if (a.skills.isNotEmpty) AgentCheck(CheckLevel.warn, 'Its skills don’t carry over: it runs without ${a.skills.join(', ')}.'),
+    if (a.maxTurns != null) AgentCheck(CheckLevel.info, 'Copilot has no turn limit: its ${a.maxTurns} turns don’t apply.'),
+    if (a.maxCostUsd != null) const AgentCheck(CheckLevel.info, 'Copilot counts premium requests, not cost: the cost limit doesn’t apply.'),
+    if (a.memory != AgentMemory.none) const AgentCheck(CheckLevel.info, 'Memory is Claude Code’s: on Copilot it starts fresh.'),
+    const AgentCheck(CheckLevel.info, 'The first time in a folder Copilot asks whether to trust it: answer in its terminal.'),
+  ];
+}
+
+List<AgentCheck> _codexNotes(AgentDef a) {
   final plan = a.approvals == AgentApprovals.plan;
   final bash = _has(a, 'Bash');
   final model = a.model.toLowerCase();

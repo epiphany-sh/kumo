@@ -22,6 +22,17 @@ pub fn role_sentence(name: &str) -> String {
     )
 }
 
+/// Where Kumo wrote an agent for a CLI that only reads agents from files
+/// (see [`AgentCli::agent_files`](super::AgentCli::agent_files)).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AgentFiles {
+    /// The folder they were written to, one per run.
+    pub dir: std::path::PathBuf,
+    /// The name the CLI knows the agent by in them: the agent's, then
+    /// something a repository can't guess, so its own agents can't stand in.
+    pub id: String,
+}
+
 /// What a headless test run takes.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PlayCommand {
@@ -29,6 +40,7 @@ pub struct PlayCommand {
     pub inline_json: String,
     pub task: String,
     pub context_dir: Option<std::path::PathBuf>,
+    pub agent_files: Option<AgentFiles>,
     pub max_turns: Option<u32>,
     /// Passed when the installed CLI has a budget flag.
     pub max_cost_usd: Option<f64>,

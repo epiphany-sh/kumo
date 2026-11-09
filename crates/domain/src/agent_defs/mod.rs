@@ -11,7 +11,7 @@ mod play;
 mod ports;
 
 pub use cli::{AgentCli, DEFAULT_CLI, agent_cli};
-pub use command::{PlayCommand, context_sentence, next_free, role_sentence};
+pub use command::{AgentFiles, PlayCommand, context_sentence, next_free, role_sentence};
 pub use context::{
     ContextFile, RepoLink, WrittenContext, context_index, file_name, html_text, pull_number,
     task_key,

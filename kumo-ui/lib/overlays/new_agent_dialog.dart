@@ -403,7 +403,7 @@ class _AgentList extends StatelessWidget {
         if (AppScope.of(context).agents.lacksAgentCli)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-            child: Text('Your agents run on Claude Code or Codex: connect one in Settings to pick one here.', style: sans(11.5, color: c.text3, height: 1.4)),
+            child: Text('Your agents run on Claude Code, Codex or Copilot: connect one in Settings to pick one here.', style: sans(11.5, color: c.text3, height: 1.4)),
           ),
         Container(height: 1, color: c.divider, margin: const EdgeInsets.symmetric(vertical: 4)),
         KPressable(

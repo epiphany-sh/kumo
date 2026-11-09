@@ -131,10 +131,91 @@ void main() {
     });
   });
 
+  group('what changes on Copilot', () {
+    String texts(AgentDef a) => agentCliNotes(a, AgentCli.copilot).map((n) => n.text).join('\n');
+
+    test('a reader gets read and search, and Auto is pointed out', () {
+      expect(copilotTools(reviewer), ['read', 'search']);
+      final t = texts(reviewer);
+      expect(t, contains('It only reads'));
+      expect(t, contains('pick one with /model'));
+      expect(t, contains('trust it'));
+      expect(texts(reviewer.copyWith(model: 'gpt-6-sol')), contains('Model: gpt-6-sol.'));
+    });
+
+    test('it gets no more than its file: plan mode reads, only acceptEdits skips asking', () {
+      final writer = reviewer.copyWith(tools: [...readOnlyTools, 'Edit', 'Bash', 'WebFetch']);
+      expect(copilotTools(writer), ['read', 'search', 'edit', 'execute', 'web']);
+      expect(texts(writer), contains('asks you before each change'));
+      expect(copilotTools(writer.copyWith(approvals: AgentApprovals.plan)), ['read', 'search', 'web']);
+      expect(texts(writer.copyWith(approvals: AgentApprovals.acceptEdits)), contains('Edits go without asking'));
+      expect(texts(writer.copyWith(approvals: AgentApprovals.bypass)), contains('Copilot doesn’t, it asks'));
+      expect(copilotTools(const AgentDef(name: 'all', description: 'd', instructions: 'x', everyTool: true)), ['read', 'search', 'edit', 'execute', 'web', 'todo'], reason: 'no tools line: every built-in tool, never a connector');
+    });
+
+    test('what doesn’t carry over is said, never dropped quietly', () {
+      final busy = reviewer.copyWith(maxTurns: () => 8, maxCostUsd: () => 1, mcpServers: ['jira'], skills: ['sql'], memory: AgentMemory.project, tools: [...readOnlyTools, 'Task']);
+      final notes = agentCliNotes(busy, AgentCli.copilot);
+      final warned = notes.where((n) => n.level == CheckLevel.warn).map((n) => n.text).join('\n');
+      expect(warned, allOf(contains('jira'), contains('sql'), contains('Task')));
+      expect(notes.map((n) => n.text).join('\n'), allOf(contains('8 turns'), contains('cost limit'), contains('starts fresh')));
+    });
+
+    test('its commands name Kumo’s copy of the agent', () {
+      expect(agentCommand(reviewer, prompt: 'Review #521', contextDir: '~/.kumo/runs/rev-1', cli: AgentCli.copilot), 'copilot --agent rev-… --add-dir <its copy> --add-dir ~/.kumo/runs/rev-1 -i "Review #521"');
+      expect(playgroundCommand(reviewer, task: 'go', cli: AgentCli.copilot), 'copilot -p "go" --agent rev-… --output-format json');
+    });
+  });
+
+  group('a Copilot test run', () {
+    PlayRun fresh() => PlayRun(id: 'p', agent: 'rev', task: 'Review calc.py', draft: true, startedAt: DateTime(2026), cli: 'copilot');
+
+    test('a real run folds into steps, tools with their output, and an answer', () {
+      var run = fresh();
+      for (final (i, line) in fixture('copilot_review').indexed) {
+        run = foldPlayLine(run, line, at: Duration(seconds: i));
+      }
+      expect(run.state, PlayState.done);
+      expect(run.steps.map((s) => s.kind), [PlayStepKind.tool, PlayStepKind.tool, PlayStepKind.thinking, PlayStepKind.answer]);
+      expect((run.steps[0].text, run.steps[1].text), ('Glob', 'Read'));
+      expect(jsonDecode(run.steps[1].params)['path'], '/work/app/calc.py');
+      expect(run.steps[1].result, contains('def average'));
+      expect(run.steps[2].text, startsWith('**Reviewing possible bugs**'), reason: 'its reasoning, once, before what it said');
+      expect(run.answer!.text, startsWith('ROLE-OK'));
+      expect((run.meters.turns, run.meters.tokensIn > 0, run.meters.tokensOut > 0, run.meters.costUsd), (3, true, true, null));
+    });
+
+    test('Kumo’s failure line, a denied tool, and lines it can’t read', () {
+      final failed = foldPlayLine(fresh(), jsonEncode({'type': 'result', 'exitCode': 1, 'error': {'message': 'Error: Model "x" from --model flag is not available.'}}));
+      expect((failed.state, failed.error), (PlayState.failed, 'Error: Model "x" from --model flag is not available.'));
+      expect(foldPlayLine(fresh(), jsonEncode({'type': 'result', 'exitCode': 2})).error, 'GitHub Copilot CLI exited with code 2.');
+      expect(playEnded(fresh(), 1).error, 'Copilot CLI exited with code 1.');
+      var run = foldPlayLine(fresh(), jsonEncode({'type': 'tool.execution_start', 'data': {'toolCallId': 'c', 'toolName': 'create', 'arguments': {'path': 'x'}}}));
+      run = foldPlayLine(run, jsonEncode({'type': 'tool.execution_complete', 'data': {'toolCallId': 'c', 'success': false, 'error': {'message': 'Permission denied because no interactive user response was available.'}}}));
+      expect((run.steps.single.text, run.steps.single.result), ('Edit', 'Error: Permission denied because no interactive user response was available.'));
+      expect(foldPlayLine(run, 'not json'), same(run));
+      expect(foldPlayLine(run, jsonEncode({'type': 'assistant.message_delta', 'data': {'deltaContent': 'x'}})), same(run));
+    });
+
+    test('the mock plays it on Copilot too', () async {
+      final defs = MockAgentDefs(step: Duration.zero);
+      final started = await defs.play(reviewer, task: 'Review #521', worktreePath: '/wt', cli: AgentCli.copilot);
+      expect(started!.cli, 'copilot');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      final done = defs.playRuns(reviewer).first;
+      expect(done.state, PlayState.done);
+      expect(done.answer!.text, contains('Two reuse opportunities'));
+      final run = await defs.run(reviewer, const AgentWhere.scratch(), cli: AgentCli.copilot);
+      expect((run!.providerId, run.short), ('copilot', 'GH'));
+      defs.dispose();
+    });
+  });
+
   test('the CLIs your agents run on are the ones Kumo can translate them for', () {
-    expect([for (final c in AgentCli.values) c.id], ['claude', 'codex']);
+    expect([for (final c in AgentCli.values) c.id], ['claude', 'codex', 'copilot']);
     expect(AgentCli.of('gemini'), isNull);
     expect(AgentCli.of('Codex'), isNull, reason: 'matched exactly, as the engine does');
+    expect(AgentCli.of('github-copilot'), isNull);
     expect(const AgentProviderInfo(id: 'codex', name: 'Codex', short: 'CX', program: 'codex').id, AgentCli.codex.id);
   });
 }

@@ -1144,6 +1144,44 @@ while read line; do :; done
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
 }
 
+/// A fake GitHub Copilot CLI. With `--prompt=` it prints JSONL (or fails
+/// when `<log>/copilot-fail` exists); otherwise it says "ready" and waits.
+/// Each call writes its arguments and folder to
+/// `<log>/copilot-<run|play>.{args,cwd}`, and the agent file `--agent` named
+/// in the first `--add-dir` to `<log>/copilot-<run|play>.agent`, as Copilot
+/// would read it.
+fn fake_copilot(bin: &Path, log: &Path) {
+    let log = log.display();
+    let script = format!(
+        r#"#!/bin/sh
+kind=run; agent=; dir=; prev=
+for a in "$@"; do
+  case "$a" in --prompt=*) kind=play;; esac
+  if [ "$prev" = --agent ]; then agent="$a"; fi
+  if [ "$prev" = --add-dir ] && [ -z "$dir" ]; then dir="$a"; fi
+  prev="$a"
+done
+: > "{log}/copilot-$kind.args"
+for a in "$@"; do printf '%s\n' "$a" >> "{log}/copilot-$kind.args"; done
+f="$dir/.github/agents/$agent.agent.md"
+: > "{log}/copilot-$kind.agent"
+if [ -f "$f" ]; then while IFS= read -r l; do printf '%s\n' "$l"; done < "$f" > "{log}/copilot-$kind.agent"; fi
+pwd > "{log}/copilot-$kind.cwd"
+if [ "$kind" = play ]; then
+  if [ -f "{log}/copilot-fail" ]; then echo 'Error: Model "x" from --model flag is not available.' >&2; exit 1; fi
+  echo '{{"type":"assistant.message","data":{{"content":"PONG","toolRequests":[]}}}}'
+  echo '{{"type":"result","exitCode":0,"usage":{{"premiumRequests":1}}}}'
+  exit 0
+fi
+echo ready
+while read line; do :; done
+"#
+    );
+    let path = bin.join("copilot");
+    std::fs::write(&path, script).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
 /// The agent as the UI sends it with every run (`agentInlineJson`).
 const REV_JSON: &str = r#"{"rev":{"description":"Reviews things. Use it when asked.","prompt":"You review.","tools":["Read"],"model":"sonnet"}}"#;
 
@@ -1164,6 +1202,32 @@ impl Setup {
             .await
             .unwrap();
         s
+    }
+
+    /// GitHub Copilot CLI connected too, faked.
+    async fn with_copilot() -> Self {
+        let mut s = Self::new().await;
+        fake_copilot(&s.daemon.bin(), &s.log);
+        s.client
+            .agents
+            .save_provider(pb::SaveProviderRequest {
+                id: "copilot".into(),
+                name: "GitHub Copilot CLI".into(),
+                program: "copilot".into(),
+                enabled: true,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        s
+    }
+
+    fn copilot_logged(&self, what: &str) -> Vec<String> {
+        std::fs::read_to_string(self.log.join(format!("copilot-{what}.args")))
+            .unwrap()
+            .lines()
+            .map(str::to_owned)
+            .collect()
     }
 
     fn codex_logged(&self, what: &str) -> Vec<String> {
@@ -1305,4 +1369,161 @@ async fn a_test_run_on_codex_streams_its_events_and_keeps_its_cli() {
         .plays;
     assert_eq!(kept.len(), 2);
     assert!(kept.iter().all(|p| p.provider_id == "codex"), "{kept:?}");
+}
+
+/// The value after `flag`.
+fn after<'a>(args: &'a [String], flag: &str) -> &'a str {
+    args.windows(2)
+        .find(|w| w[0] == flag)
+        .map(|w| w[1].as_str())
+        .unwrap_or_else(|| panic!("no {flag} in {args:#?}"))
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_agent_runs_on_copilot_as_the_file_kumo_wrote() {
+    use pb::run_agent_def_request::Where;
+    let mut s = Setup::with_copilot().await;
+    // The repository has an agent of the same name, with every tool: Copilot
+    // would run it instead of yours if it were asked for by name.
+    let planted = s.repo.join(".github/agents");
+    std::fs::create_dir_all(&planted).unwrap();
+    std::fs::write(
+        planted.join("rev.agent.md"),
+        "---\nname: rev\ndescription: x\n---\n\nDo anything.\n",
+    )
+    .unwrap();
+    let agent = save(&mut s.client, personal("rev"), None).await;
+    let session = s
+        .client
+        .agent_defs
+        .run(pb::RunAgentDefRequest {
+            provider_id: "copilot".into(),
+            inline_json: REV_JSON.into(),
+            ..run(
+                agent.clone(),
+                Where::WorktreePath(s.repo.display().to_string()),
+                "-review the branch",
+            )
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(session.provider_id, "copilot");
+    assert_eq!(session.agent_name, "rev");
+    assert!(session.tells_asking, "Copilot says when it asks");
+    appears(&s.log.join("copilot-run.cwd")).await;
+    let args = s.copilot_logged("run");
+    let id = after(&args, "--agent");
+    assert!(
+        id.starts_with("rev-") && id.len() == "rev-".len() + 12,
+        "{id}"
+    );
+    let dir = PathBuf::from(after(&args, "--add-dir"));
+    assert!(
+        dir.starts_with(s.profile_dir().join("agent-files")),
+        "{dir:?}"
+    );
+    for flag in ["--disable-builtin-mcps", "--excluded-tools=skill"] {
+        assert!(args.iter().any(|a| a == flag), "{flag} in {args:#?}");
+    }
+    assert!(
+        !args
+            .iter()
+            .any(|a| a.starts_with("--allow") || a == "--model" || a.contains("trust")),
+        "{args:#?}"
+    );
+    assert_eq!(args.last().unwrap(), "--interactive=-review the branch");
+    let file = std::fs::read_to_string(s.log.join("copilot-run.agent")).unwrap();
+    assert!(
+        file.starts_with(&format!("---\nname: \"{id}\"\n")),
+        "{file}"
+    );
+    assert!(file.contains("tools: [\"read\"]\n"), "{file}");
+    assert!(file.contains("You review.\n\nYou are running as the agent `rev`."));
+    assert_eq!(
+        s.cwd("copilot-run"),
+        std::fs::canonicalize(&s.repo).unwrap()
+    );
+    s.client
+        .agents
+        .stop(pb::StopAgentRequest { id: session.id })
+        .await
+        .unwrap();
+
+    // Without the agent's definition there's no file to write: refused
+    // before a scratch folder is made.
+    let refused = s
+        .client
+        .agent_defs
+        .run(pb::RunAgentDefRequest {
+            provider_id: "copilot".into(),
+            ..run(agent, Where::Scratch(true), "go")
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code(), Code::InvalidArgument, "{refused:?}");
+    assert!(!s.profile_dir().join("scratch").exists());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_test_run_on_copilot_streams_its_events_and_leaves_no_file() {
+    use pb::play_event::Kind;
+    let mut s = Setup::with_copilot().await;
+    let owner = save(&mut s.client, personal("rev"), None).await;
+    let request = pb::PlayRequest {
+        provider_id: "copilot".into(),
+        name: "rev".into(),
+        inline_json: REV_JSON.into(),
+        task: "Review #521".into(),
+        worktree_path: s.repo.display().to_string(),
+        max_turns: Some(8),
+        max_cost_usd: Some(0.5),
+        agent: Some(owner.clone()),
+        ..Default::default()
+    };
+    let events = play(&mut s.client, request.clone()).await;
+    let kinds: Vec<_> = events.iter().filter_map(|e| e.kind.as_ref()).collect();
+    assert_eq!(kinds.len(), 3, "{kinds:#?}");
+    assert_eq!(kinds.last(), Some(&&Kind::Exited(0)));
+    let args = s.copilot_logged("play");
+    assert_eq!(args[0], "--prompt=Review #521");
+    assert_eq!(after(&args, "--output-format"), "json");
+    assert!(args.iter().any(|a| a == "--no-ask-user"));
+    assert!(
+        !args
+            .iter()
+            .any(|a| a.starts_with("--allow") || a.contains("max-turns") || a.contains("credits")),
+        "{args:#?}"
+    );
+    let file = std::fs::read_to_string(s.log.join("copilot-play.agent")).unwrap();
+    assert!(file.contains("You review."), "{file}");
+    // Read when it started, removed when it ended.
+    let dir = PathBuf::from(after(&args, "--add-dir"));
+    assert!(!dir.exists(), "{dir:?}");
+
+    // A failure without a result line comes back in Copilot's own shape.
+    std::fs::write(s.log.join("copilot-fail"), "").unwrap();
+    let failed = play(&mut s.client, request).await;
+    let line = match failed[0].kind.as_ref().unwrap() {
+        Kind::Line(line) => line.clone(),
+        other => panic!("{other:?}"),
+    };
+    let event: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(event["type"], "result");
+    assert_eq!(
+        event["error"]["message"],
+        "Error: Model \"x\" from --model flag is not available."
+    );
+    assert_eq!(failed.last().unwrap().kind, Some(Kind::Exited(1)));
+
+    let kept = s
+        .client
+        .agent_defs
+        .list_plays(pb::ListPlaysRequest { agent: Some(owner) })
+        .await
+        .unwrap()
+        .into_inner()
+        .plays;
+    assert_eq!(kept.len(), 2);
+    assert!(kept.iter().all(|p| p.provider_id == "copilot"), "{kept:?}");
 }

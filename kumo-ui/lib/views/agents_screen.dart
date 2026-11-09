@@ -218,7 +218,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
             ),
           ),
           const Spacer(),
-          const StatusText('They run on Claude Code or Codex'),
+          const StatusText('They run on Claude Code, Codex or Copilot'),
         ],
       );
     }

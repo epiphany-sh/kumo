@@ -7,10 +7,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use kumo_domain::agent_defs::{
-    AgentDefFile, ContextFile, RepoLink, WrittenContext, check_agent_name, context_index,
-    file_name, next_free, pull_number, task_key,
+    AgentCli, AgentDefFile, AgentFiles, ContextFile, RepoLink, WrittenContext, check_agent_name,
+    context_index, file_name, next_free, pull_number, task_key,
 };
-use kumo_domain::agents::{AgentContext, AgentError, AgentSession, ContextKind};
+use kumo_domain::agents::{AgentContext, AgentError, AgentSession, AgentSessionId, ContextKind};
 use kumo_domain::terminal::TerminalSize;
 
 use super::service::{AgentDefService, blocking, cli_for};
@@ -18,6 +18,9 @@ use crate::agents::AgentLaunch;
 
 /// Run and scratch folders are removed after this long.
 const KEEP_FOLDERS: Duration = Duration::from_secs(7 * 24 * 3600);
+
+/// Where agents are written for CLIs that read them from files.
+pub(super) const AGENT_FILES: &str = "agent-files";
 
 /// Where a run works.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,11 +68,12 @@ impl AgentDefService {
         check_agent_name(&name)?;
         let cli = cli_for(&start.provider_id)?;
         // Refused before any worktree or folder is made for it.
-        cli.run_args(&name, &start.inline_json, None, &start.prompt)?;
+        cli.check(&name, &start.inline_json)?;
         let (files, data) = (Arc::clone(&self.ports.files), self.places.data_dir.clone());
         blocking(move || {
-            files.sweep(&data.join("runs"), KEEP_FOLDERS);
-            files.sweep(&data.join("scratch"), KEEP_FOLDERS);
+            for kept in ["runs", "scratch", AGENT_FILES] {
+                files.sweep(&data.join(kept), KEEP_FOLDERS);
+            }
             Ok(())
         })
         .await?;
@@ -96,11 +100,15 @@ impl AgentDefService {
         } else {
             String::new()
         };
+        let agent_files = self
+            .write_agent_files(cli, &name, &start.inline_json, context_dir.as_deref())
+            .await?;
         let args = cli.run_args(
             &name,
             &start.inline_json,
             context_dir.as_deref(),
             &start.prompt,
+            agent_files.as_ref(),
         )?;
         self.agents
             .launch(AgentLaunch {
@@ -337,6 +345,36 @@ impl AgentDefService {
             Ok(worktree)
         })
         .await
+    }
+
+    /// Writes the agent for a CLI that reads agents from files, in a folder
+    /// of its own under a name nobody can guess. None when it takes the
+    /// agent in its arguments.
+    pub(super) async fn write_agent_files(
+        &self,
+        cli: &'static dyn AgentCli,
+        name: &str,
+        inline_json: &str,
+        context_dir: Option<&Path>,
+    ) -> Result<Option<AgentFiles>, AgentError> {
+        let token = AgentSessionId::generate().to_string();
+        let id = format!("{name}-{}", &token[..12]);
+        let written = cli.agent_files(name, inline_json, &id, context_dir)?;
+        if written.is_empty() {
+            return Ok(None);
+        }
+        let dir = self.places.data_dir.join(AGENT_FILES).join(&id);
+        let (files, at) = (Arc::clone(&self.ports.files), dir.clone());
+        blocking(move || {
+            for (path, text) in written {
+                let path = at.join(path);
+                files.create_dir(path.parent().unwrap_or(&at))?;
+                files.write_file(&path, &text)?;
+            }
+            Ok(())
+        })
+        .await?;
+        Ok(Some(AgentFiles { dir, id }))
     }
 
     /// Writes each item into `dir`, then `context.md` listing them. What

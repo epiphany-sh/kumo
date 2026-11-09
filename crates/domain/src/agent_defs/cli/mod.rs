@@ -4,11 +4,12 @@
 
 mod claude;
 mod codex;
+mod copilot;
 mod spec;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use super::PlayCommand;
+use super::{AgentFiles, PlayCommand};
 use crate::agents::AgentError;
 
 /// The CLI a run uses when the request doesn't name one.
@@ -23,16 +24,42 @@ pub trait AgentCli: Send + Sync + std::fmt::Debug {
     fn name(&self) -> &'static str;
     /// What a sentence calls whoever answers ("… didn't answer").
     fn speaker(&self) -> &'static str;
+    /// The files a CLI reads the agent from when it can't take it on the
+    /// command line, as (path in their folder, contents), for the agent to be
+    /// known there as `id`, told about `context_dir`. None for most: the
+    /// agent goes in the arguments. What these files say is the agent's
+    /// limits, so they're written fresh for each run, never read back.
+    fn agent_files(
+        &self,
+        _name: &str,
+        _inline_json: &str,
+        _id: &str,
+        _context_dir: Option<&Path>,
+    ) -> Result<Vec<(PathBuf, String)>, AgentError> {
+        Ok(Vec::new())
+    }
     /// An agent in a terminal of its own. With no prompt the user types.
     /// `inline_json` is the agent as `claude --agents` takes it; a CLI that
-    /// can't run it refuses.
+    /// can't run it refuses. `files`: where [`Self::agent_files`] were
+    /// written, when there were any.
     fn run_args(
         &self,
         name: &str,
         inline_json: &str,
         context_dir: Option<&Path>,
         prompt: &str,
+        files: Option<&AgentFiles>,
     ) -> Result<Vec<String>, AgentError>;
+    /// Refuses an agent it can't run, before anything is made for it.
+    fn check(&self, name: &str, inline_json: &str) -> Result<(), AgentError> {
+        let files = self.agent_files(name, inline_json, name, None)?;
+        let written = AgentFiles {
+            dir: PathBuf::new(),
+            id: name.to_owned(),
+        };
+        let files = (!files.is_empty()).then_some(&written);
+        self.run_args(name, inline_json, None, "", files).map(drop)
+    }
     /// A headless test run. `budget`: the installed CLI takes
     /// [`Self::budget_flag`].
     fn play_args(&self, play: &PlayCommand, budget: bool) -> Result<Vec<String>, AgentError>;
@@ -53,6 +80,7 @@ pub fn agent_cli(provider_id: &str) -> Option<&'static dyn AgentCli> {
     match provider_id {
         "" | claude::PROVIDER_ID => Some(&claude::ClaudeCode),
         codex::PROVIDER_ID => Some(&codex::Codex),
+        copilot::PROVIDER_ID => Some(&copilot::Copilot),
         _ => None,
     }
 }
@@ -67,7 +95,9 @@ mod tests {
         assert_eq!(default.provider_id(), DEFAULT_CLI);
         assert_eq!(agent_cli("claude").unwrap().provider_id(), "claude");
         assert_eq!(agent_cli("codex").unwrap().provider_id(), "codex");
+        assert_eq!(agent_cli("copilot").unwrap().provider_id(), "copilot");
         assert!(agent_cli("my-own-cli").is_none());
+        assert!(agent_cli("gemini").is_none());
     }
 
     #[test]
@@ -86,6 +116,9 @@ mod tests {
             "Codex",
             "codex ",
             "../codex",
+            "Copilot",
+            "copilot\n",
+            "github-copilot",
             "claude;rm -rf /",
         ] {
             assert!(agent_cli(hostile).is_none(), "{hostile:?}");

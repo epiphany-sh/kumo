@@ -10,8 +10,8 @@ suyo. Así, quien se queda sin tokens en una IA sigue en otra sin recrear nada.
   puede replicar en esa IA, Run avisa o no arranca. `bypassPermissions` no se
   traduce.
 - **Solo los Connectors declarados.** En Codex y Copilot el agente no hereda
-  los MCP ni los plugins del usuario, y computer use nunca se hereda sin
-  pedirlo.
+  los MCP ni las skills del usuario, y computer use nunca se hereda sin
+  pedirlo. En Codex tampoco los plugins; en Copilot, ver "Sin confirmar".
 - **Sin límites por defecto.** Tiempo y créditos son opcionales en Codex y
   Copilot: cortar una tarea por un número estimado puede costar más que dejarla
   terminar. Se muestra el consumo en vivo y Stop queda a mano.
@@ -47,6 +47,61 @@ Probado con el `codex` real (`crates/daemon/tests/real_clis.rs`): un agente de
 solo lectura contesta, no puede escribir aunque se lo pidan, y su sesión en la
 terminal arranca y sigue viva.
 
+## Copilot: cómo se traduce
+
+Copilot solo lee agentes de archivos. Para cada corrida, Kumo escribe el agente
+en `agent-files/<nombre>-<12 hex>/.github/agents/` adentro de la carpeta del
+perfil, y lo arranca con `--agent <nombre>-<12 hex> --add-dir <esa carpeta>`.
+Lo arma `crates/domain/src/agent_defs/cli/copilot.rs`, y la UI muestra lo mismo
+antes de arrancar (`agentCliNotes`).
+
+El nombre lleva una parte al azar porque Copilot también lee los agentes del
+repo (`.github/agents/` y `.claude/agents/`) y, si se llaman igual, prefiere el
+del repo: un repo clonado podría reemplazar tu agente por uno con más
+herramientas. Las copias de las corridas de prueba se borran al terminar y las
+de las terminales a los 7 días, como `runs/`.
+
+| Del agente | En Copilot |
+|---|---|
+| Instrucciones | El cuerpo del archivo, con `role_sentence` al final |
+| Descripción, nombre, tools | La frontmatter, con los valores en JSON para que la descripción no pueda agregar campos |
+| `Read` | `read` |
+| `Grep`, `Glob` | `search` |
+| `Edit`, `Write`, `MultiEdit`, `NotebookEdit` | `edit` |
+| `Bash` | `execute` |
+| `WebFetch`, `WebSearch` | `web` |
+| Sin línea `tools` | Las herramientas propias de Copilot (`read`, `search`, `edit`, `execute`, `web`, `todo`), nunca las MCP del usuario |
+| `plan` | Saca `edit` y `execute` |
+| `acceptEdits` | `--allow-tool=write`. En el resto de los modos no se aprueba nada por adelantado: la terminal pregunta y la corrida de prueba lo deniega |
+| `bypassPermissions`, `dontAsk` | No se traducen: pregunta |
+| `haiku`, `sonnet`, `opus`, `inherit` | El modelo de Copilot del usuario. `--reasoning-effort` no va: con `auto` Copilot lo rechaza |
+| Otro modelo que no sea de Claude | `--model <modelo>` |
+| Siempre | `--disable-builtin-mcps` y `--excluded-tools=skill` |
+| Contexto de la corrida | `--add-dir <carpeta>`, la copia de Kumo; se nombra en el archivo y en el primer mensaje |
+| Primer mensaje | `--interactive=<texto>`, pegado al flag para que un texto que empieza con `-` siga siendo el texto |
+| Corrida de prueba | `--prompt=<tarea> … --no-ask-user --output-format json` |
+| Connectors, skills, `Task`, `maxTurns`, `memory`, tope de costo | No pasan: Run lo avisa |
+
+`--trust-folder` no va: carga los hooks, MCP y plugins del repo. Sin él, la
+corrida de prueba funciona igual en una carpeta que Copilot no conoce; la
+terminal pregunta si confiar en ella y se contesta ahí.
+
+Las terminales de Copilot dicen su estado con `OSC 7501`, sin flags: `blocked`
+es que pregunta algo, `working` que trabaja, `idle` y `done` que terminó su
+turno. Kumo lo lee en todas las sesiones de Copilot, no solo en los agentes
+(`ActivityTracker`).
+
+Probado con el `copilot` real (`crates/daemon/tests/real_clis.rs`):
+
+- Un agente del repo con el mismo nombre no lo reemplaza.
+- Un agente de solo lectura no puede escribir, ni con una herramienta de
+  archivos ni con un comando.
+- Una tarea que empieza con `-` llega como tarea.
+- La sesión en la terminal arranca y sigue viva.
+
+A mano: `--allow-tool=write` deja crear el archivo y `--excluded-tools=skill`
+saca `skill` de las herramientas.
+
 ## Qué se probó
 
 Con Codex CLI 0.157.0 y GitHub Copilot CLI 1.0.107, en un repo descartable.
@@ -72,8 +127,11 @@ Con Codex CLI 0.157.0 y GitHub Copilot CLI 1.0.107, en un repo descartable.
   figurar entre las que dice tener.
 - **El foco depende del modelo.** La selección automática de Copilot cambia de
   modelo entre corridas. `mai-code-1.1-flash` salió del rol las dos veces que le
-  tocó, aun con `role_sentence`; `gpt-6-luna` lo respetó las dos. Muestra chica,
-  pero alcanza para no usar `auto` en agentes.
+  tocó, aun con `role_sentence`, y una vez hizo 29 llamadas a herramientas para
+  contestar "Go."; `gpt-6-luna` lo respetó las dos. Muestra chica, pero alcanza
+  para avisar: Run sugiere fijar un modelo con `/model` en Copilot.
+- **Copilot aprueba solo algunos comandos.** En `-p`, sin `--allow-tool`, corrió
+  `echo` y `ls` en la carpeta y denegó escrituras y comandos fuera de ella.
 - **Copilot no tiene límite de turnos.** Un agente de solo lectura con una tarea
   imposible hizo unas 30 llamadas a tools.
 - **Primera vez en una carpeta.** En modo interactivo Copilot muestra "Confirm
@@ -84,8 +142,14 @@ Con Codex CLI 0.157.0 y GitHub Copilot CLI 1.0.107, en un repo descartable.
 
 ## Sin confirmar
 
-- `--available-tools` de Copilot, necesario para sacar `skill` y `sql`, que
-  siguen disponibles en un agente de solo lectura.
+- `sql` sigue disponible en Copilot: es su base de la sesión (lista de tareas),
+  no toca archivos del repo.
+- Los plugins que el usuario instaló en Copilot: no hay flag para dejarlos
+  afuera. Sus skills no llegan (`--excluded-tools=skill`) y sus herramientas
+  no están en la línea `tools`, pero falta ver si traen hooks.
+- Copilot instalado con npm en Windows arranca por `copilot.cmd`: un primer
+  mensaje con `&`, `|`, `%` o saltos de línea no pasa por `cmd.exe` y Run lo
+  rechaza con un aviso. El ejecutable nativo no tiene ese límite.
 - `skills.include_instructions=false` de Codex: bajó de 91k a 25k tokens, en una
   sola corrida.
 - Las listas de herramientas son lo que informó cada modelo, no una inspección

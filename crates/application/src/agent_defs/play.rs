@@ -124,15 +124,7 @@ impl AgentDefService {
             return Err(AgentError::Invalid("give it a task to try".into()));
         }
         // Refused before a throwaway worktree is made for it.
-        cli.play_args(
-            &PlayCommand {
-                name: start.name.clone(),
-                inline_json: start.inline_json.clone(),
-                task: start.task.clone(),
-                ..Default::default()
-            },
-            false,
-        )?;
+        cli.check(&start.name, &start.inline_json)?;
         let worktree = self
             .workspace
             .known_worktree(&start.worktree)
@@ -167,11 +159,16 @@ impl AgentDefService {
                     .await?;
                 Some(dir)
             };
+            let agent_files = self
+                .write_agent_files(cli, &start.name, &start.inline_json, context_dir.as_deref())
+                .await?;
+            let written = agent_files.as_ref().map(|f| f.dir.clone());
             let command = PlayCommand {
                 name: start.name.clone(),
                 inline_json: start.inline_json.clone(),
                 task: start.task.clone(),
                 context_dir,
+                agent_files,
                 max_turns: start.max_turns,
                 max_cost_usd: start.max_cost_usd,
             };
@@ -182,11 +179,17 @@ impl AgentDefService {
                 env,
             };
             let headless = Arc::clone(&self.ports.headless);
-            blocking(move || headless.start(&spec)).await
+            let process = blocking(move || headless.start(&spec)).await;
+            Ok((process, written))
         }
         .await;
-        let process = match started {
-            Ok(process) => process,
+        let (process, written) = match started {
+            Ok((Ok(process), written)) => (process, written),
+            Ok((Err(error), written)) => {
+                self.drop_agent_files(written).await;
+                self.drop_throwaway(throwaway).await;
+                return Err(error);
+            }
             Err(error) => {
                 self.drop_throwaway(throwaway).await;
                 return Err(error);
@@ -261,7 +264,9 @@ impl AgentDefService {
                 })
             };
             let (code, at_ms) = reading.await.unwrap_or((-1, 0));
-            service.finish_play(&play_id, code, at_ms, throwaway).await;
+            service
+                .finish_play(&play_id, code, at_ms, throwaway, written)
+                .await;
             let _ = tx
                 .send(PlayEvent {
                     kind: PlayEventKind::Exited(code),
@@ -284,7 +289,9 @@ impl AgentDefService {
         code: i32,
         at_ms: i64,
         throwaway: Option<(PathBuf, PathBuf)>,
+        written: Option<PathBuf>,
     ) {
+        self.drop_agent_files(written).await;
         self.drop_throwaway(throwaway).await;
         let Some(mut live) = self.plays_lock().remove(id) else {
             return;
@@ -296,6 +303,18 @@ impl AgentDefService {
             blocking(move || store.save_play(&live.key, &live.record, PlayRecord::KEEP)).await;
         if let Err(error) = saved {
             tracing::warn!(play = %id, %error, "test run not kept");
+        }
+    }
+
+    /// Removes the agent written for a test run: it's read when it starts.
+    async fn drop_agent_files(&self, dir: Option<PathBuf>) {
+        if let Some(dir) = dir {
+            let files = Arc::clone(&self.ports.files);
+            let _ = blocking(move || {
+                files.remove_dir(&dir);
+                Ok(())
+            })
+            .await;
         }
     }
 

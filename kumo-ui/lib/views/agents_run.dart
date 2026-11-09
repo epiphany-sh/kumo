@@ -659,18 +659,22 @@ class _CliPick extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     if (clis.isEmpty) {
-      return _Note(icon: KIcons.info, text: 'It runs on Claude Code or Codex: connect one in Settings › AI agents.', color: c.warn, background: c.warnSoft);
+      return _Note(icon: KIcons.info, text: 'It runs on Claude Code, Codex or Copilot: connect one in Settings › AI agents.', color: c.warn, background: c.warnSoft);
     }
     final notes = agentCliNotes(agent, cli);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      // Wraps in a narrow column (the playground's).
-      Wrap(spacing: 10, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        Text('Runs with', style: sans(12, weight: FontWeight.w500, color: c.text)),
-        if (clis.length > 1)
-          KSegmented<AgentCli>(label: 'Runs with', value: cli, height: 28, onChanged: onChanged, items: [for (final x in clis) (x, x.label, null)])
-        else
-          Text(cli.label, style: sans(12, color: c.text2)),
-      ]),
+      // In a narrow column (the playground's) the choices take a line of
+      // their own and share it.
+      LayoutBuilder(builder: (context, box) {
+        final title = Text('Runs with', style: sans(12, weight: FontWeight.w500, color: c.text));
+        if (clis.length < 2) {
+          return Wrap(spacing: 10, children: [title, Text(cli.label, style: sans(12, color: c.text2))]);
+        }
+        final narrow = box.maxWidth < 120.0 * clis.length + 80;
+        final pick = KSegmented<AgentCli>(label: 'Runs with', value: cli, height: 28, expand: narrow, onChanged: onChanged, items: [for (final x in clis) (x, x.short, null)]);
+        if (narrow) return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [title, const SizedBox(height: 6), pick]);
+        return Row(children: [title, const SizedBox(width: 10), pick]);
+      }),
       if (notes.isNotEmpty) ...[
         const SizedBox(height: 8),
         Container(

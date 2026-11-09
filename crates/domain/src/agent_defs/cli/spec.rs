@@ -12,6 +12,8 @@ use crate::agents::AgentError;
 pub(super) struct AgentSpec {
     /// Its instructions: the file's body.
     pub instructions: String,
+    /// When to use it, as its file says.
+    pub description: String,
     /// None: the file has no tools line, which means every tool.
     pub tools: Option<Vec<String>>,
     /// `inherit`, `haiku`, `sonnet`, `opus` or a model id.
@@ -80,6 +82,7 @@ impl AgentSpec {
         }
         Ok(Self {
             instructions,
+            description: text("description"),
             tools: listed.map(|tools| {
                 tools
                     .into_iter()
@@ -107,6 +110,29 @@ impl AgentSpec {
         ["Edit", "Write", "MultiEdit", "NotebookEdit"]
             .iter()
             .any(|t| self.has(t))
+    }
+
+    /// The Claude tier its model names (`haiku`, `sonnet`, `opus`), as an
+    /// alias or a full Claude id.
+    pub fn claude_tier(&self) -> Option<&'static str> {
+        let lower = self.model.to_ascii_lowercase();
+        ["haiku", "sonnet", "opus"]
+            .into_iter()
+            .find(|tier| lower.contains(tier))
+    }
+
+    /// A model of another CLI's, to give it as is: not `inherit`, not a
+    /// Claude model, nothing a flag could be read from.
+    pub fn own_model(&self) -> Option<String> {
+        let model = self.model.as_str();
+        let lower = model.to_ascii_lowercase();
+        let ok = !model.is_empty()
+            && !model.starts_with('-')
+            && model
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | ':' | '/'));
+        (ok && lower != "inherit" && !lower.starts_with("claude") && self.claude_tier().is_none())
+            .then(|| model.to_owned())
     }
 }
 
@@ -139,6 +165,35 @@ mod tests {
     fn no_tools_line_means_every_tool() {
         let spec = AgentSpec::from_inline("a", r#"{"a":{"prompt":"x"}}"#).unwrap();
         assert!(spec.tools.is_none() && spec.has("Bash") && spec.edits());
+    }
+
+    #[test]
+    fn claude_models_are_told_apart_from_others() {
+        let with = |model: &str| AgentSpec {
+            model: model.into(),
+            ..Default::default()
+        };
+        for (model, tier) in [
+            ("haiku", "haiku"),
+            ("Sonnet", "sonnet"),
+            ("claude-opus-5-5", "opus"),
+        ] {
+            assert_eq!(with(model).claude_tier(), Some(tier));
+            assert_eq!(with(model).own_model(), None, "{model}");
+        }
+        assert_eq!(with("gpt-6-sol").own_model().as_deref(), Some("gpt-6-sol"));
+        for none in [
+            "",
+            "inherit",
+            "claude-next",
+            "--yolo",
+            "-x",
+            "a b",
+            "a;b",
+            "a\nb",
+        ] {
+            assert_eq!(with(none).own_model(), None, "{none:?}");
+        }
     }
 
     #[test]
