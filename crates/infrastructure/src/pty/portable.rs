@@ -120,6 +120,10 @@ impl PtyKiller for PortableKiller {
 
 #[cfg(all(test, windows))]
 mod tests {
+    use std::io::{Read, Write};
+    use std::sync::mpsc;
+    use std::time::Duration;
+
     use super::*;
 
     /// Why an agent's prompt never reaches a batch file as an argument:
@@ -133,12 +137,36 @@ mod tests {
             .unwrap()
             .with_args([r#"x"&echo y>marker&"#])
             .with_cwd(Some(dir.path().to_path_buf()));
-        let mut process = PortablePtySystem.spawn(&spec).unwrap();
-        let mut reader = process.reader;
+        let PtyProcess {
+            mut reader,
+            mut writer,
+            master,
+            mut child,
+            mut killer,
+        } = PortablePtySystem.spawn(&spec).unwrap();
+        // ConPTY asks where the cursor is, and holds the program until the
+        // terminal answers.
         std::thread::spawn(move || {
-            let _ = std::io::copy(&mut reader, &mut std::io::sink());
+            let (mut seen, mut buffer, mut answered) = (Vec::new(), [0; 1024], false);
+            while let Ok(read @ 1..) = reader.read(&mut buffer) {
+                seen.extend_from_slice(&buffer[..read]);
+                if !answered && seen.windows(4).any(|w| w == b"\x1b[6n") {
+                    answered = true;
+                    let _ = writer.write_all(b"\x1b[1;1R");
+                    let _ = writer.flush();
+                }
+            }
         });
-        process.child.wait().unwrap();
+        let (done, finished) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = child.wait();
+            let _ = done.send(());
+        });
+        if finished.recv_timeout(Duration::from_secs(30)).is_err() {
+            let _ = killer.kill_tree();
+            panic!("the batch file never finished");
+        }
+        drop(master);
         assert!(dir.path().join("marker").exists());
     }
 }
