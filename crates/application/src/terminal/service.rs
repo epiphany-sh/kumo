@@ -94,6 +94,14 @@ impl TerminalService {
         Ok(())
     }
 
+    /// Like [`Self::close`], and what it started goes too (an agent's tools).
+    pub fn close_tree(&self, id: &TerminalId) -> Result<(), TerminalError> {
+        let session = self.registry.remove(id, self.scope.as_ref())?;
+        session.kill_tree()?;
+        tracing::info!(terminal = %id, "terminal closed with what it started");
+        Ok(())
+    }
+
     /// All sessions, oldest first.
     pub fn list(&self) -> Vec<TerminalInfo> {
         let mut infos: Vec<_> = self

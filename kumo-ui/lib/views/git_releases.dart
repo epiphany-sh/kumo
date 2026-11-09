@@ -65,7 +65,7 @@ class _ReleasesViewState extends State<_ReleasesView> {
     // look like tags with no release.
     final problem = source.releasesProblem;
     final provider = CiProvider.ofHost(source.repo.host);
-    final why = problem == null || provider == null ? null : describeCiProblem(problem, provider, repo: source.repo.name);
+    final why = problem == null || provider == null ? null : hostProblemText(problem, provider, what: 'releases', repo: source.repo.name);
     final list = _Panel(
       icon: KIcons.tag,
       title: 'Releases & tags',

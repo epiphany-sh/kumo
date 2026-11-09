@@ -470,8 +470,9 @@ fn recording_cli(bin: &Path, name: &str, before: &str) {
         bin,
         name,
         &format!(
-            "printf '%s\\n' \"$@\" > '{}'; {before} printf 'ready\\a'; while read line; do echo \"typed: $line\"; done",
-            args.display()
+            // Whole or not at all: whoever reads it waits for a last newline.
+            "printf '%s\\n' \"$@\" > '{args}.tmp'; /bin/mv '{args}.tmp' '{args}'; {before} printf 'ready\\a'; while read line; do echo \"typed: $line\"; done",
+            args = args.display()
         ),
     );
 }

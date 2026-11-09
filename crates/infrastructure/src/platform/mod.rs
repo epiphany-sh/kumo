@@ -50,6 +50,8 @@ pub trait ProcessTrees {
     /// Kills `pid`, started with [`ProcessTrees::own_group`], and what it
     /// started, even in groups of its own.
     fn kill_tree(pid: u32);
+    /// Kills what's left of the group of `pid`, which is gone already.
+    fn kill_group(pid: u32);
 }
 
 /// Where programs are found: the user's PATH and what counts as a program.
@@ -200,6 +202,11 @@ pub fn own_process_group(command: &mut Command) {
 /// See [`ProcessTrees::kill_tree`].
 pub fn kill_process_tree(pid: u32) {
     Current::kill_tree(pid);
+}
+
+/// See [`ProcessTrees::kill_group`].
+pub fn kill_process_group(pid: u32) {
+    Current::kill_group(pid);
 }
 
 /// See [`Processes::process`].

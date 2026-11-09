@@ -227,7 +227,7 @@ impl AgentDefService {
             let head = self
                 .ports
                 .sources
-                .pull_request(&repo, number)
+                .pull_request(&repo, None, number)
                 .await
                 .ok()
                 .map(|pr| pr.head);
@@ -464,6 +464,7 @@ impl AgentDefService {
         });
         // A link says whose pull request it is: never the same number of
         // the repository this runs in.
+        let mut outside_origin = None;
         let repo = match (&link, linked_repo) {
             (_, Some(linked)) => linked,
             (None, None) => repo
@@ -477,11 +478,16 @@ impl AgentDefService {
                 if !link.same_repo(&origin) {
                     return Err("its repository isn't in the workspace".to_owned());
                 }
+                outside_origin = Some(origin);
                 cwd.to_owned()
             }
         };
         let mut files = Vec::new();
-        let pr = self.ports.sources.pull_request(&repo, number).await;
+        let pr = self
+            .ports
+            .sources
+            .pull_request(&repo, outside_origin.as_deref(), number)
+            .await;
         let base = match &pr {
             Ok(pr) => {
                 files.push(ContextFile {
@@ -508,15 +514,33 @@ impl AgentDefService {
             } else {
                 base
             };
+            // A clone of Kumo's isn't fetched by anyone else.
+            if let Err(error) = git.update_branch(&repo, &base) {
+                tracing::warn!(%base, %error, "pull request base not updated");
+            }
             git.diff(&repo, &format!("origin/{base}"), &sha)
                 .map_err(launch_error)
         })
         .await;
         match (diff, pr) {
-            (Ok(diff), _) => files.push(ContextFile {
-                name: format!("pr-{number}.diff"),
-                text: diff,
-            }),
+            (Ok(diff), pr) => {
+                // Without it the diff is against the default branch, which
+                // may not be what it targets: the agent has to know.
+                if let Err(why) = pr {
+                    files.push(ContextFile {
+                        name: format!("pr-{number}.md"),
+                        text: format!(
+                            "Its title, description and threads couldn't be read: {why}\n\n\
+                             The diff next to this file is against the default branch, \
+                             which may not be what it targets.\n"
+                        ),
+                    });
+                }
+                files.push(ContextFile {
+                    name: format!("pr-{number}.diff"),
+                    text: diff,
+                });
+            }
             (Err(e), Ok(_)) => tracing::warn!(number, error = %e, "pull request diff not written"),
             (Err(e), Err(pr)) => return Err(format!("{pr}; its diff: {e}")),
         }

@@ -669,16 +669,84 @@ async fn a_linked_pull_request_is_read_from_its_own_repository() {
             url,
         ],
     );
-    push_to_pull(&origin);
+    // The default branch moved on after the clone, and the pull request
+    // came from there: what's on it isn't the pull request's.
+    let main = git(&origin, &["rev-parse", "--abbrev-ref", "HEAD"]);
+    std::fs::write(origin.join("on_main.txt"), "later\n").unwrap();
+    git(&origin, &["add", "."]);
+    git(&origin, &["commit", "-q", "-m", "on main"]);
+    git(&origin, &["checkout", "-q", "-b", "feature"]);
+    std::fs::write(origin.join("in_the_pr.txt"), "mine\n").unwrap();
+    git(&origin, &["add", "."]);
+    git(&origin, &["commit", "-q", "-m", "the change"]);
+    let head = git(&origin, &["rev-parse", "HEAD"]);
+    git(&origin, &["update-ref", "refs/pull/7/head", head.trim()]);
+    git(&origin, &["checkout", "-q", main.trim()]);
     let mut linked = run(personal("rev"), Where::LinkUrl(other.into()), "");
     linked.context = vec![item(other)];
     let session = s.client.agent_defs.run(linked).await.unwrap().into_inner();
     let context = PathBuf::from(&session.context_dir);
-    assert!(
-        context.join("pr-7.diff").exists(),
-        "{:?}",
-        std::fs::read_to_string(context.join("context.md"))
-    );
+    let diff = std::fs::read_to_string(context.join("pr-7.diff")).unwrap();
+    assert!(diff.contains("in_the_pr.txt"), "{diff}");
+    assert!(!diff.contains("on_main.txt"), "{diff}");
+    // No host to ask here: the agent is told, not left guessing.
+    let about = std::fs::read_to_string(context.join("pr-7.md")).unwrap();
+    assert!(about.contains("couldn't be read"), "{about}");
+}
+
+fn alive(pid: &str) -> bool {
+    std::process::Command::new("/bin/kill")
+        .args(["-0", pid.trim()])
+        .output()
+        .unwrap()
+        .status
+        .success()
+}
+
+/// Stop ends what the agent started, like Claude Code's tools: they run in
+/// process groups of their own, which killing the agent doesn't reach.
+#[tokio::test(flavor = "multi_thread")]
+async fn stopping_an_agent_ends_its_tools() {
+    use pb::run_agent_def_request::Where;
+    let mut s = Setup::new().await;
+    let pid_file = s.daemon.home().join("tool.pid");
+    std::fs::write(
+        s.daemon.bin().join("claude"),
+        format!(
+            "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"2.1.0 (Claude Code)\"; exit 0; fi\nif [ \"$1\" = \"--help\" ]; then echo '  --max-budget-usd <amount>'; exit 0; fi\nset -m\n/bin/sleep 300 &\necho $! > '{}'\nwait\n",
+            pid_file.display()
+        ),
+    )
+    .unwrap();
+    let session = s
+        .client
+        .agent_defs
+        .run(run(
+            personal("rev"),
+            Where::WorktreePath(s.repo.display().to_string()),
+            "",
+        ))
+        .await
+        .unwrap()
+        .into_inner();
+    appears(&pid_file).await;
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    let tool = std::fs::read_to_string(&pid_file).unwrap();
+    assert!(alive(&tool));
+    s.client
+        .agents
+        .stop(pb::StopAgentRequest {
+            id: session.id.clone(),
+        })
+        .await
+        .unwrap();
+    let ended = session_where(&mut s.client, &session.id, |x| {
+        x.state == pb::AgentState::Exited as i32
+    })
+    .await;
+    assert_eq!(ended.exit_code, 130);
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert!(!alive(&tool), "its tool is still running");
 }
 
 /// Stopping a test run isn't its failing.
@@ -748,10 +816,11 @@ while :; do /bin/sleep 0.05; printf .; done
 "#,
     )
     .unwrap();
-    // A minute lasts 300 ms in tests.
+    // A minute lasts 300 ms in tests: 3 s, so it gets to ask first (starting
+    // up counts as working).
     let agent = pb::AgentDefFile {
         settings: Some(pb::AgentDefSettings {
-            max_minutes: Some(1),
+            max_minutes: Some(10),
             ..Default::default()
         }),
         ..personal("patient")
@@ -769,8 +838,8 @@ while :; do /bin/sleep 0.05; printf .; done
         .into_inner();
     session_where(&mut s.client, &session.id, |x| x.asked).await;
 
-    // Three times its limit, waiting.
-    tokio::time::sleep(std::time::Duration::from_millis(900)).await;
+    // Past its whole limit, waiting.
+    tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
     let waiting = session_where(&mut s.client, &session.id, |_| true).await;
     assert_eq!(waiting.state(), pb::AgentState::NeedsInput, "{waiting:?}");
 
@@ -781,7 +850,7 @@ while :; do /bin/sleep 0.05; printf .; done
     })
     .await;
     assert_eq!(ended.exit_code, 124);
-    assert!(ended.worked_ms >= 250, "{ended:?}");
+    assert!(ended.worked_ms >= 2500, "{ended:?}");
 }
 
 async fn play(client: &mut KumoClient, request: pb::PlayRequest) -> Vec<pb::PlayEvent> {

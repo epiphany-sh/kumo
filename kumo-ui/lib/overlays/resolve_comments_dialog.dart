@@ -86,6 +86,9 @@ class _ResolveCommentsDialogState extends State<ResolveCommentsDialog> {
 
   /// Threads already answered: trying again after a failure skips them.
   final _answered = <String>{};
+
+  /// What went so far, across tries.
+  int _posted = 0, _resolved = 0;
   String? _provider;
   ResolveMode _mode = ResolveMode.replyAndResolve;
   String? _error;
@@ -271,7 +274,6 @@ class _ResolveCommentsDialogState extends State<ResolveCommentsDialog> {
         return;
       }
     }
-    var posted = 0, resolved = 0;
     if (posting && widget.source.threadsWritable) {
       final (p, r, failure) = await postThreadAnswers(
         widget.source,
@@ -281,13 +283,13 @@ class _ResolveCommentsDialogState extends State<ResolveCommentsDialog> {
         resolveOf: (t) => _resolve[t.id] == true,
         answered: _answered,
       );
-      posted = p;
-      resolved = r;
+      _posted += p;
+      _resolved += r;
       if (failure != null) {
         if (mounted) {
           setState(() {
             _applying = false;
-            _error = 'Posted $posted, then: $failure';
+            _error = 'Posted $_posted, then: $failure';
           });
         }
         return;
@@ -297,7 +299,7 @@ class _ResolveCommentsDialogState extends State<ResolveCommentsDialog> {
     navigator.maybePop();
     final parts = [
       if (commits.isNotEmpty) 'pushed ${commits.length} ${commits.length == 1 ? 'commit' : 'commits'}',
-      if (posting && widget.source.threadsWritable) '$posted ${posted == 1 ? 'reply' : 'replies'}${resolved > 0 ? ', $resolved resolved' : ''}',
+      if (posting && widget.source.threadsWritable) '$_posted ${_posted == 1 ? 'reply' : 'replies'}${_resolved > 0 ? ', $_resolved resolved' : ''}',
       if (posting && !widget.source.threadsWritable && s.agents.live) 'the agent posts the replies',
     ];
     final msg = parts.isEmpty ? 'Nothing to push or post' : parts.join(', ');
@@ -423,6 +425,7 @@ class _ResolveCommentsDialogState extends State<ResolveCommentsDialog> {
           status: working && run == null ? (i < _step ? true : (i == _step ? false : null)) : (_phase == _Phase.done ? true : null),
           answer: _answers[shown[i].id],
           reply: _mode == ResolveMode.codeOnly ? null : _replies[shown[i].id],
+          posted: _answered.contains(shown[i].id),
           resolve: _resolve[shown[i].id] ?? false,
           onResolve: (v) => setState(() => _resolve[shown[i].id] = v),
         ),
@@ -453,7 +456,7 @@ class _ResolveCommentsDialogState extends State<ResolveCommentsDialog> {
     final run = _runId == null ? null : s.agents.runs.where((r) => r.id == _runId).firstOrNull;
     final home = prAgentHome(s, widget.source.repo, pr);
     final commits = _commits;
-    final replies = _mode == ResolveMode.codeOnly ? 0 : [for (final t in _chosen) if ((_replies[t.id]?.text.trim() ?? '').isNotEmpty) t].length;
+    final replies = _mode == ResolveMode.codeOnly ? 0 : [for (final t in _chosen) if ((_replies[t.id]?.text.trim() ?? '').isNotEmpty && !_answered.contains(t.id)) t].length;
     final note = switch (_phase) {
       _Phase.loading || _Phase.setup => !s.agents.live
           ? 'Without Kumo’s engine the agent’s work is made up, to show the flow.'
@@ -544,7 +547,7 @@ class _ThreadCard extends StatelessWidget {
     required this.answer,
     required this.reply,
     required this.resolve,
-    required this.onResolve,
+    required this.onResolve, this.posted = false,
   });
   final ReviewThread thread;
   final String? me;
@@ -556,6 +559,9 @@ class _ThreadCard extends StatelessWidget {
   final bool? status;
   final ThreadAnswer? answer;
   final TextEditingController? reply;
+
+  /// Its answer went already: there's nothing left to edit.
+  final bool posted;
   final bool resolve;
   final ValueChanged<bool> onResolve;
 
@@ -654,7 +660,11 @@ class _ThreadCard extends StatelessWidget {
                       if (a.commit.isNotEmpty) Text(a.commit, style: mono(11, color: c.text3)),
                     ]),
                   ),
-                if (reply != null) ...[
+                if (reply != null && posted) ...[
+                  const SizedBox(height: 8),
+                  Text('Posted', style: sans(11, weight: FontWeight.w600, color: c.ok)),
+                  if (reply.text.trim().isNotEmpty) Text(reply.text.trim(), style: sans(12.5, color: c.text2, height: 1.45)),
+                ] else if (reply != null) ...[
                   const SizedBox(height: 8),
                   Text('Reply to ${t.author}', style: sans(11, color: c.text3)),
                   const SizedBox(height: 4),

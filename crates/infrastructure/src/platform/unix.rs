@@ -41,6 +41,12 @@ pub(super) fn kill_tree(pid: u32) {
         .output();
 }
 
+pub(super) fn kill_group(pid: u32) {
+    let _ = Command::new("/bin/kill")
+        .args(["-KILL", "--", &format!("-{pid}")])
+        .output();
+}
+
 /// Everything below `pid` in a `pid ppid` table.
 fn descendants(table: &str, pid: u32) -> Vec<u32> {
     let rows: Vec<(u32, u32)> = table

@@ -959,6 +959,23 @@ class _PullRequestsSection extends StatelessWidget {
 }
 
 /// Why pull requests can't be read, and the way out (Settings or retry).
+/// Why [what] (a host's pull requests, its releases) couldn't be read, and
+/// what to do about it.
+(String, String) hostProblemText(CiProblem problem, CiProvider provider, {required String what, required String repo}) {
+  final host = provider.hostName;
+  return switch (problem.kind) {
+    CiProblemKind.notConnected => ('$host isn’t connected', 'Add a token${provider == CiProvider.githubActions ? ' or sign in with the GitHub CLI' : ''} in Settings › Repositories to see the $what of $repo.'),
+    CiProblemKind.unauthorized => ('Your $host token stopped working', '$host rejected it. Paste a new one in Settings › Repositories.'),
+    CiProblemKind.forbidden => (
+        'Your $host token can’t read $what',
+        problem.missingScope.isNotEmpty ? 'Give it the “${problem.missingScope}” permission, then retry.' : 'Give it read access to $what of $repo, then retry.',
+      ),
+    CiProblemKind.notFound => ('$host has nothing for $repo', 'Either the repository moved, or the token can’t see it.'),
+    CiProblemKind.rateLimited => ('$host asked Kumo to slow down', 'Try again in a moment.'),
+    _ => ('$host isn’t answering', 'Try again in a moment.'),
+  };
+}
+
 class _PrProblem extends StatelessWidget {
   const _PrProblem({required this.problem, required this.provider, required this.terms, required this.repo, required this.onRetry});
   final CiProblem problem;
@@ -970,18 +987,7 @@ class _PrProblem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final host = provider.hostName;
-    final (title, body) = switch (problem.kind) {
-      CiProblemKind.notConnected => ('$host isn’t connected', 'Add a token${provider == CiProvider.githubActions ? ' or sign in with the GitHub CLI' : ''} in Settings › Repositories to see the ${terms.prs} of $repo.'),
-      CiProblemKind.unauthorized => ('Your $host token stopped working', '$host rejected it. Paste a new one in Settings › Repositories.'),
-      CiProblemKind.forbidden => (
-          'Your $host token can’t read ${terms.prs}',
-          problem.missingScope.isNotEmpty ? 'Give it the “${problem.missingScope}” permission, then retry.' : 'Give it read access to ${terms.prs} of $repo, then retry.',
-        ),
-      CiProblemKind.notFound => ('$host has nothing for $repo', 'Either the repository moved, or the token can’t see it.'),
-      CiProblemKind.rateLimited => ('$host asked Kumo to slow down', 'Try again in a moment.'),
-      _ => ('$host isn’t answering', 'Try again in a moment.'),
-    };
+    final (title, body) = hostProblemText(problem, provider, what: terms.prs, repo: repo);
     return Container(
       margin: const EdgeInsets.fromLTRB(4, 2, 4, 8),
       padding: const EdgeInsets.all(14),

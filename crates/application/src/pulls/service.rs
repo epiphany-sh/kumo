@@ -10,7 +10,7 @@ use kumo_domain::pipelines::{
 use kumo_domain::pulls::{
     NewPullRequest, PullRequest, PullRequestClient, ReviewThread, ThreadAnswer,
 };
-use kumo_domain::workspace::{Repo, WorkspaceSnapshot};
+use kumo_domain::workspace::{Remote, Repo, WorkspaceSnapshot};
 use tokio::sync::watch;
 
 pub struct PullRequestPorts {
@@ -54,6 +54,8 @@ pub struct PullRequestService {
     fresh: Duration,
     lists: Mutex<HashMap<PathBuf, (Instant, PullRequestList)>>,
     branches: Mutex<HashMap<PathBuf, (Instant, BranchPullRequest)>>,
+    /// Clones outside the workspace, by [`PullRequestService::adopt_clone`].
+    adopted: Mutex<HashMap<PathBuf, Repo>>,
 }
 
 impl std::fmt::Debug for PullRequestService {
@@ -74,7 +76,18 @@ impl PullRequestService {
             fresh,
             lists: Mutex::new(HashMap::new()),
             branches: Mutex::new(HashMap::new()),
+            adopted: Mutex::default(),
         }
+    }
+
+    /// Makes a clone outside the workspace readable, for the context of a
+    /// run on it: a pull request link can point anywhere.
+    pub fn adopt_clone(&self, path: &Path, origin: &str) {
+        let repo = Repo::new(path.to_owned(), Some(Remote::parse(origin)));
+        self.adopted
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(path.to_owned(), repo);
     }
 
     /// Open pull requests of the repository at `repo_path` (its main checkout).
@@ -254,7 +267,13 @@ impl PullRequestService {
     }
 
     fn repo(&self, path: &Path) -> Option<Repo> {
-        repo_at(&self.workspace, path)
+        repo_at(&self.workspace, path).or_else(|| {
+            self.adopted
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(path)
+                .cloned()
+        })
     }
 
     fn worktree(&self, path: &Path) -> Result<(Repo, PathBuf), PipelinesError> {

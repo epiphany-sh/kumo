@@ -177,6 +177,16 @@ impl TerminalSession {
         master.as_ref().and_then(|m| m.foreground())
     }
 
+    /// Kills the process and what it started. For agents, whose tools are
+    /// theirs: a shell's `nohup server &` is the user's, and [`Self::kill`]
+    /// leaves it. Killing an exited process is a no-op.
+    pub fn kill_tree(&self) -> Result<(), TerminalError> {
+        if matches!(self.status(), TerminalStatus::Exited(_)) {
+            return Ok(());
+        }
+        lock(&self.killer).kill_tree()
+    }
+
     /// Kills the process. Killing an exited process is a no-op.
     pub fn kill(&self) -> Result<(), TerminalError> {
         if matches!(self.status(), TerminalStatus::Exited(_)) {

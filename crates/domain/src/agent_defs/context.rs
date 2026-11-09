@@ -93,12 +93,31 @@ impl RepoLink {
     pub fn same_repo(&self, remote: &str) -> bool {
         let remote = remote.trim().trim_end_matches('/');
         let remote = remote.strip_suffix(".git").unwrap_or(remote);
-        let tail = remote
-            .rsplit_once(&format!("{}:", self.host))
-            .or_else(|| remote.rsplit_once(&format!("{}/", self.host)))
-            .map(|(_, t)| t.trim_start_matches('/'));
-        tail.is_some_and(|t| t.eq_ignore_ascii_case(&self.path))
+        let Some((host, path)) = remote_parts(remote) else {
+            return false;
+        };
+        // A host with no dot is an SSH alias (`github-work`) for who knows
+        // which: the path has to do.
+        (host.eq_ignore_ascii_case(&self.host) || !host.contains('.'))
+            && path.eq_ignore_ascii_case(&self.path)
     }
+}
+
+/// A remote's host, and its path without a port: `git@host:a/b`,
+/// `ssh://git@host:22/a/b`, `https://host/a/b`. None for a local path.
+fn remote_parts(remote: &str) -> Option<(&str, &str)> {
+    if let Some((_, rest)) = remote.split_once("://") {
+        let (authority, path) = rest.split_once('/')?;
+        let authority = authority.rsplit('@').next().unwrap_or(authority);
+        let host = authority.split(':').next().unwrap_or(authority);
+        return (!host.is_empty()).then_some((host, path.trim_start_matches('/')));
+    }
+    if remote.starts_with('/') || remote.starts_with('.') {
+        return None;
+    }
+    let (authority, path) = remote.split_once(':')?;
+    let host = authority.rsplit('@').next().unwrap_or(authority);
+    (!host.is_empty() && !host.contains('/')).then_some((host, path.trim_start_matches('/')))
 }
 
 /// One file of a run's context folder.
@@ -238,6 +257,30 @@ pub fn html_text(html: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_link_knows_its_repository_by_any_way_of_writing_its_remote() {
+        let link = RepoLink::parse("https://github.com/acme/app/pull/7").unwrap();
+        for remote in [
+            "https://github.com/acme/app.git",
+            "https://github.com/Acme/App",
+            "git@github.com:acme/app.git",
+            "ssh://git@github.com/acme/app.git",
+            "ssh://git@github.com:22/acme/app.git",
+            "git@github-work:acme/app.git",
+        ] {
+            assert!(link.same_repo(remote), "{remote}");
+        }
+        for remote in [
+            "https://github.com/other/thing.git",
+            "git@gitlab.com:acme/app.git",
+            "git@github-work:other/thing.git",
+            "/Users/someone/acme/app",
+            "",
+        ] {
+            assert!(!link.same_repo(remote), "{remote}");
+        }
+    }
 
     #[test]
     fn a_link_cannot_leave_the_clones_folder() {

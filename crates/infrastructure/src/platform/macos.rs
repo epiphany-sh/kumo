@@ -30,6 +30,9 @@ impl ProcessTrees for MacOs {
     fn kill_tree(pid: u32) {
         unix::kill_tree(pid);
     }
+    fn kill_group(pid: u32) {
+        unix::kill_group(pid);
+    }
 }
 
 impl ProgramSearch for MacOs {

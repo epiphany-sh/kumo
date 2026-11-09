@@ -11,6 +11,7 @@ import 'package:kumo_ui/data/repo_activity.dart';
 import 'package:kumo_ui/data/repo_history.dart';
 import 'package:kumo_ui/overlays/release_notes_dialog.dart';
 import 'package:kumo_ui/overlays/resolve_comments_dialog.dart';
+import 'package:kumo_ui/data/pipelines_source.dart';
 import 'package:kumo_ui/views/git_screen.dart';
 import 'package:kumo_ui/widgets/context_menu.dart';
 
@@ -263,6 +264,13 @@ void main() {
     expect(find.byTooltip('Every review thread is resolved'), findsOneWidget);
     state.dismissUndo();
     expect(tester.takeException(), isNull);
+  });
+
+  test('a host’s problem speaks of what couldn’t be read, not of pipelines', () {
+    final forbidden = hostProblemText(const CiProblem(CiProblemKind.forbidden), CiProvider.githubActions, what: 'releases', repo: 'app');
+    expect('${forbidden.$1} ${forbidden.$2}', allOf(contains('releases'), isNot(contains('pipeline')), isNot(contains('Actions'))));
+    final lost = hostProblemText(const CiProblem(CiProblemKind.notFound), CiProvider.githubActions, what: 'releases', repo: 'app');
+    expect('${lost.$1} ${lost.$2}', isNot(contains('Actions')));
   });
 
   test('trying again after a failure doesn’t post a reply twice', () async {
