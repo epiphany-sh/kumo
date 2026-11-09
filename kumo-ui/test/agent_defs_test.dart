@@ -109,7 +109,7 @@ void main() {
       expect(agentDescriptionCheck(ok.copyWith(description: 'Reviews Go pull requests for code that could have been reused.')).text, startsWith('Add when'));
       expect(agentSavable(ok.copyWith(tools: const [])), isFalse);
       final risky = ok.copyWith(tools: const ['Read', 'Bash'], approvals: AgentApprovals.dontAsk, maxTurns: () => null, maxMinutes: () => null);
-      expect(agentChecks(risky).map((c) => c.text), contains('It changes things without asking and has no limits.'));
+      expect(agentChecks(risky).where((c) => c.level != CheckLevel.ok).map((c) => c.text), isEmpty, reason: 'no limits is the default, not a warning');
       final triggered = ok.copyWith(tools: const ['Edit'], triggers: const [AgentTrigger.pullRequest]);
       expect(agentChecks(triggered).last.level, CheckLevel.warn);
       expect(agentToolsWarning(ok), isNull);
@@ -122,7 +122,8 @@ void main() {
       expect(agentCommand(a, contextDir: '~/.kumo/runs/x', prompt: 'Review #521'), 'claude --agents \'{"go-pr-reviewer": …}\' --agent go-pr-reviewer --add-dir ~/.kumo/runs/x -- "Review #521"');
       final inline = jsonDecode(agentInlineJson(a.copyWith(instructions: 'Hi.'))) as Map;
       expect((inline['go-pr-reviewer'] as Map)['prompt'], 'Hi.');
-      expect(playgroundCommand(a), contains('--output-format stream-json --verbose --max-turns 25'));
+      expect(playgroundCommand(a), endsWith('--output-format stream-json --verbose'), reason: 'no turn limit unless it has one');
+      expect(playgroundCommand(a.copyWith(maxTurns: () => 25)), endsWith('--verbose --max-turns 25'));
     });
 
     test('links', () {
@@ -141,7 +142,7 @@ void main() {
       expect(reviewer.isolation, isFalse);
       final tests = agentTemplates.firstWhere((t) => t.id == 'test-writer').draft();
       expect(tests.isolation, isTrue, reason: 'it changes files: its own worktree');
-      expect(tests.maxTurns, 25);
+      expect(tests.maxTurns, isNull, reason: 'no turn limit by default: a task cut short costs more');
       expect(tests.maxMinutes, isNull, reason: 'a clock would end a conversation that’s only waiting for you');
     });
   });
