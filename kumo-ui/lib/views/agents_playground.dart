@@ -82,7 +82,7 @@ class _PlaygroundState extends State<_Playground> {
   /// The CLI it's tried on, kept while it stays connected.
   AgentCli _pick(AppState s) {
     final clis = s.agents.agentClis;
-    if (!clis.contains(_cli)) _cli = clis.firstOrNull;
+    _cli = startWith(clis, _cli, usedUpClis(clis, s.usage, DateTime.now()));
     return _cli ?? AgentCli.claude;
   }
 
@@ -275,6 +275,7 @@ class _PlaygroundState extends State<_Playground> {
           const SizedBox(height: 6),
         ],
       if (run.state == PlayState.running && run.steps.isNotEmpty) Text('Running… step ${run.steps.length + 1}', style: sans(12, color: c.text3)),
+      if (_limitOffer(context, s, run) case final offer?) ...[const SizedBox(height: 6), offer],
       if (answer != null && _filter != _Show.tools) ...[
         const SizedBox(height: 6),
         _Card(
@@ -294,6 +295,42 @@ class _PlaygroundState extends State<_Playground> {
         ),
       ],
     ]);
+  }
+
+  /// A run that failed at its plan's limit: the same task on another CLI.
+  Widget? _limitOffer(BuildContext context, AppState s, PlayRun run) {
+    final from = AgentCli.of(run.cli);
+    if (run.state != PlayState.failed || from == null) return null;
+    final clis = s.agents.agentClis;
+    final now = DateTime.now();
+    final out = usedUpClis(clis, s.usage, now);
+    final spent = out[from];
+    if (spent == null && !saysLimitReached(run.error)) return null;
+    final other = goOnWith(clis, from, out);
+    final c = context.c;
+    final said = spent == null ? '${from.label} reached its plan’s limit.' : usedUpText(from, spent, resetLabel(spent.resets, now));
+    return _Note(
+      icon: KIcons.info,
+      text: other == null ? '$said Connect another CLI in Settings › AI agents to try it now.' : '$said The agent is one file: try the same task on ${other.label}.',
+      color: c.warn,
+      background: c.warnSoft,
+      action: other == null || _worktree == null
+          ? null
+          : KButton.primary(
+              label: 'Try it on ${other.short}',
+              height: 26,
+              fontSize: 11.5,
+              onTap: () {
+                // The same version it tried.
+                setState(() {
+                  _cli = other;
+                  _draft = run.draft;
+                  _task.text = run.task;
+                });
+                _run(s, run.draft || widget.saved == null ? widget.agent : widget.saved!);
+              },
+            ),
+    );
   }
 
   /// Claude's suggested change, as lines removed and added.

@@ -18,6 +18,31 @@ suyo. Así, quien se queda sin tokens en una IA sigue en otra sin recrear nada.
 - **Cada CLI en su archivo**, en `crates/domain/src/agent_defs/cli/`, detrás del
   trait `AgentCli`. Un cambio en una no alcanza a las otras.
 
+## Cuando se termina el plan
+
+Lo decide `kumo-ui/lib/data/plan_limits.dart`, con dos señales:
+
+- **El uso que Kumo ya lee** (Claude Code y Codex): una ventana sin nada que
+  le quede y que todavía no se renovó. Es la señal firme.
+- **Lo que dijo la CLI al parar**: el error de una corrida de prueba, o la
+  última línea de una terminal que ya no trabaja ("usage limit", "hit your
+  limit", "premium requests", "AI credits"…). Es lo único que hay para
+  Copilot, que no informa su uso.
+
+Lo que hace Kumo con eso:
+
+- **Run y el playground arrancan en una CLI con plan.** La agotada figura como
+  `out` en "Runs with" y no se elige por defecto. Si la elegís igual, Run dice
+  cuándo se renueva y ofrece usar otra.
+- **Una terminal que se quedó sin plan ofrece "Go on with …".** Arranca el
+  mismo agente en la otra CLI, en la misma carpeta y con el mismo primer
+  mensaje, más una nota para que revise lo que ya está hecho. La conversación
+  no pasa de una IA a otra; los cambios en la carpeta sí.
+- **Una corrida de prueba que falló por el límite ofrece "Try it on …"**, con
+  la misma tarea y la misma versión del agente.
+
+Nunca cambia de CLI sola: siempre lo ofrece.
+
 ## Codex: cómo se traduce
 
 Lo arma `crates/domain/src/agent_defs/cli/codex.rs` desde el JSON que la UI

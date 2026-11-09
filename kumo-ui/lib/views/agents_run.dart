@@ -164,8 +164,9 @@ class _RunTabState extends State<_RunTab> {
     };
     final contextDir = context0.isEmpty && knowledge.isEmpty ? '' : '~/.kumo/runs/${a.name}-${widget.runs.length + 1}';
     final clis = s.agents.agentClis;
-    // Picked before, unless it's been disconnected since.
-    if (!clis.contains(f.cli)) f.cli = clis.firstOrNull;
+    // Picked before, unless it's been disconnected since; else the first
+    // whose plan isn't used up.
+    f.cli = startWith(clis, f.cli, usedUpClis(clis, s.usage, DateTime.now()));
     final cli = f.cli ?? AgentCli.claude;
     final cmd = agentCommand(a, contextDir: contextDir, prompt: f.prompt.text, cli: cli);
     final canStart = !widget.fresh && !_starting && clis.isNotEmpty && switch (f.where) {
@@ -487,7 +488,16 @@ class _RunTerminal extends StatelessWidget {
     final s = AppScope.of(context);
     final r = run;
     final done = r.status == AgentStatus.done;
-    final worked = r.workedAt(DateTime.now());
+    final now = DateTime.now();
+    final worked = r.workedAt(now);
+    // Its plan ran out: by what Kumo reads of its usage, or by what it said
+    // last once it stopped working.
+    final clis = s.agents.agentClis;
+    final from = AgentCli.of(r.providerId);
+    final out = usedUpClis(clis, s.usage, now);
+    final spent = from == null ? null : out[from];
+    final stopped = spent != null || (from != null && r.status != AgentStatus.running && saysLimitReached(r.lastLine));
+    final other = from == null || !stopped ? null : goOnWith(clis, from, out);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _RunStrip(runs: runs, shown: r.id, onShow: onShow),
       const SizedBox(height: 10),
@@ -549,7 +559,19 @@ class _RunTerminal extends StatelessWidget {
                     },
                   ),
           ]),
-          footer: done
+          footer: other != null
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                  child: _Note(
+                    icon: KIcons.info,
+                    text: '${spent == null ? '${from!.label} says it reached its plan’s limit.' : usedUpText(from!, spent, resetLabel(spent.resets, now))} '
+                        'Go on with ${other.label}: ${agent.name} starts there in this folder, with the same first message. What’s done here stays.',
+                    color: c.warn,
+                    background: c.warnSoft,
+                    action: KButton.primary(label: 'Go on with ${other.short}', height: 26, fontSize: 11.5, onTap: () => _goOn(context, s, other)),
+                  ),
+                )
+              : done
               ? null
               : SizedBox(
                   height: kAgentNoteSpace,
@@ -569,13 +591,30 @@ class _RunTerminal extends StatelessWidget {
   }
 }
 
+extension on _RunTerminal {
+  /// Starts [agent] again on [to], where this run works: the CLI it ran on
+  /// stopped at its plan's limit.
+  Future<void> _goOn(BuildContext context, AppState s, AgentCli to) async {
+    final from = AgentCli.of(run.providerId) ?? AgentCli.claude;
+    final next = await s.agentDefs.run(agent, AgentWhere.folder(run.worktreePath), prompt: goOnPrompt(run.prompt, from), context: run.context, cli: to);
+    if (next == null) {
+      s.notify('${agent.name} didn’t start on ${to.label}: ${s.agentDefs.error ?? s.agents.error ?? 'unknown error'}');
+      return;
+    }
+    onShow(next.id);
+  }
+}
+
 /// A boxed note: an icon and a line.
 class _Note extends StatelessWidget {
-  const _Note({required this.icon, required this.text, required this.color, required this.background});
+  const _Note({required this.icon, required this.text, required this.color, required this.background, this.action});
   final IconData icon;
   final String text;
   final Color color;
   final Color background;
+
+  /// A button at its end, for what the note suggests.
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -585,6 +624,7 @@ class _Note extends StatelessWidget {
           Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 14, color: color)),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: sans(12, color: color, height: 1.45))),
+          if (action != null) ...[const SizedBox(width: 8), action!],
         ]),
       );
 }
@@ -662,6 +702,10 @@ class _CliPick extends StatelessWidget {
       return _Note(icon: KIcons.info, text: 'It runs on Claude Code, Codex or Copilot: connect one in Settings › AI agents.', color: c.warn, background: c.warnSoft);
     }
     final notes = agentCliNotes(agent, cli);
+    final now = DateTime.now();
+    final out = usedUpClis(clis, AppScope.of(context).usage, now);
+    final spent = out[cli];
+    final other = goOnWith(clis, cli, out);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       // In a narrow column (the playground's) the choices take a line of
       // their own and share it.
@@ -671,10 +715,20 @@ class _CliPick extends StatelessWidget {
           return Wrap(spacing: 10, children: [title, Text(cli.label, style: sans(12, color: c.text2))]);
         }
         final narrow = box.maxWidth < 120.0 * clis.length + 80;
-        final pick = KSegmented<AgentCli>(label: 'Runs with', value: cli, height: 28, expand: narrow, onChanged: onChanged, items: [for (final x in clis) (x, x.short, null)]);
+        final pick = KSegmented<AgentCli>(label: 'Runs with', value: cli, height: 28, expand: narrow, onChanged: onChanged, items: [for (final x in clis) (x, x.short, out.containsKey(x) ? 'out' : null)]);
         if (narrow) return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [title, const SizedBox(height: 6), pick]);
         return Row(children: [title, const SizedBox(width: 10), pick]);
       }),
+      if (spent != null) ...[
+        const SizedBox(height: 8),
+        _Note(
+          icon: KIcons.info,
+          text: '${usedUpText(cli, spent, resetLabel(spent.resets, now))}${other == null ? ' Connect another CLI in Settings › AI agents to run it now.' : ''}',
+          color: c.warn,
+          background: c.warnSoft,
+          action: other == null ? null : KButton(label: 'Use ${other.short}', height: 26, fontSize: 11.5, onTap: () => onChanged(other)),
+        ),
+      ],
       if (notes.isNotEmpty) ...[
         const SizedBox(height: 8),
         Container(

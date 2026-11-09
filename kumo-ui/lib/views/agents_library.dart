@@ -8,6 +8,7 @@ import '../data/agent_defs_source.dart';
 import '../data/agent_playground.dart';
 import '../data/agents_source.dart';
 import '../data/models.dart' show AgentStatus, Repo, Worktree;
+import '../data/plan_limits.dart';
 import '../data/tasks_source.dart';
 import '../overlays/create_agent_dialog.dart';
 import '../shell/screen_chrome.dart';
@@ -17,6 +18,7 @@ import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/controls.dart';
 import '../widgets/kicons.dart';
+import '../widgets/usage_meter.dart' show resetLabel;
 import 'agent_terminals.dart';
 
 part 'agents_run.dart';
