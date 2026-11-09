@@ -67,6 +67,12 @@ impl FileStore for LocalFileStore {
         bytes: &[u8],
     ) -> Result<(), ChangesError> {
         let target = Self::inside(worktree, path)?;
+        // A link to nothing resolves to nothing to check, and writing to it
+        // would create what it points to, wherever that is.
+        let is_link = std::fs::symlink_metadata(&target).is_ok_and(|m| m.is_symlink());
+        if is_link && !target.exists() {
+            return Err(ChangesError::InvalidPath(path.to_string()));
+        }
         if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent).map_err(|e| io_error(parent, e))?;
         }
@@ -219,5 +225,36 @@ mod tests {
             store.write(worktree.path(), &rel("link/new"), b"x"),
             Err(ChangesError::InvalidPath(_))
         ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn does_not_write_through_a_link_to_nothing() {
+        let outside = tempfile::tempdir().unwrap();
+        let missing = outside.path().join("missing");
+        let worktree = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink(&missing, worktree.path().join("link")).unwrap();
+        std::os::unix::fs::symlink(&missing, worktree.path().join("dir")).unwrap();
+        let store = LocalFileStore;
+        assert!(matches!(
+            store.write(worktree.path(), &rel("link"), b"x"),
+            Err(ChangesError::InvalidPath(_))
+        ));
+        assert!(store.write(worktree.path(), &rel("dir/new"), b"x").is_err());
+        assert!(!missing.exists());
+
+        // The link itself can still be removed.
+        store.remove(worktree.path(), &rel("link")).unwrap();
+        assert!(std::fs::symlink_metadata(worktree.path().join("link")).is_err());
+
+        // A link to a file inside still takes writes.
+        std::fs::write(worktree.path().join("real"), "a").unwrap();
+        std::os::unix::fs::symlink(worktree.path().join("real"), worktree.path().join("ok"))
+            .unwrap();
+        store.write(worktree.path(), &rel("ok"), b"b").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(worktree.path().join("real")).unwrap(),
+            "b"
+        );
     }
 }

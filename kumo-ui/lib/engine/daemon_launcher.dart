@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../platform/os/host_os.dart';
 
 /// Finds and starts `kumod` as a detached process, so it outlives the UI
@@ -10,17 +12,21 @@ class DaemonLauncher {
   static String get _exe => hostOs.daemonExecutable;
 
   /// Where to look, in order:
-  /// 1. `KUMOD_PATH`.
+  /// 1. `KUMOD_PATH` (development builds).
   /// 2. Next to the app executable (the release bundle ships it there).
   /// 3. A `target/release` (then `target/debug`) of an ancestor directory:
-  ///    the Cargo workspace when running from the repo (`flutter run`).
+  ///    the Cargo workspace when running from the repo (`flutter run`;
+  ///    development builds).
+  ///
+  /// A release build only runs the daemon it ships with.
   String? locate() {
     final override = Platform.environment['KUMOD_PATH'];
-    if (override != null && File(override).existsSync()) return override;
+    if (!kReleaseMode && override != null && File(override).existsSync()) return override;
 
     final appDir = File(Platform.resolvedExecutable).parent;
     final bundled = File('${appDir.path}${Platform.pathSeparator}$_exe');
     if (bundled.existsSync()) return bundled.path;
+    if (kReleaseMode) return null;
 
     for (final start in [appDir, Directory.current]) {
       var dir = start.absolute;
