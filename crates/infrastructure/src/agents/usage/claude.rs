@@ -147,7 +147,10 @@ pub fn user_status_line(project: &Path, config_dir: &Path) -> Option<Map<String,
 }
 
 /// The session's settings: the user's status line (padding, refresh and
-/// the rest kept) with its command wrapped by the hook, or Kumo's own.
+/// the rest kept) with its command wrapped by the hook, or Kumo's own; and
+/// notifications as OSC 9, which Claude Code doesn't send in a terminal it
+/// doesn't know: they tell when it's asking something while its prompt
+/// blinks.
 pub fn settings_for(dir: &Path, theirs: Option<Map<String, Value>>) -> Value {
     let mut line = theirs.unwrap_or_default();
     let command = line
@@ -159,7 +162,7 @@ pub fn settings_for(dir: &Path, theirs: Option<Map<String, Value>>) -> Value {
         "command".into(),
         json!(hook_command(dir, command.as_deref())),
     );
-    json!({ "statusLine": line })
+    json!({ "statusLine": line, "preferredNotifChannel": "iterm2" })
 }
 
 /// Saves stdin to `<dir>/status.json` (write, then rename, so a reader
@@ -599,6 +602,7 @@ mod tests {
         assert_eq!(args[0], "--settings");
         let settings: Value =
             serde_json::from_str(&std::fs::read_to_string(&args[1]).unwrap()).unwrap();
+        assert_eq!(settings["preferredNotifChannel"], "iterm2");
         let hook = settings["statusLine"]["command"].as_str().unwrap();
         assert_eq!(source.read(&target), None, "nothing reported yet");
 

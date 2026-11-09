@@ -7,8 +7,10 @@ use kumo_domain::pipelines::{
     BranchReader, CiHost, CiProblem, CiProblemKind, CiProvider, CiTarget, HostTokens,
     PipelinesError, TokenFallback,
 };
-use kumo_domain::pulls::{NewPullRequest, PullRequest, PullRequestClient};
-use kumo_domain::workspace::{Repo, WorkspaceSnapshot};
+use kumo_domain::pulls::{
+    NewPullRequest, PullRequest, PullRequestClient, ReviewThread, ThreadAnswer,
+};
+use kumo_domain::workspace::{Remote, Repo, WorkspaceSnapshot};
 use tokio::sync::watch;
 
 pub struct PullRequestPorts {
@@ -52,6 +54,8 @@ pub struct PullRequestService {
     fresh: Duration,
     lists: Mutex<HashMap<PathBuf, (Instant, PullRequestList)>>,
     branches: Mutex<HashMap<PathBuf, (Instant, BranchPullRequest)>>,
+    /// Clones outside the workspace, by [`PullRequestService::adopt_clone`].
+    adopted: Mutex<HashMap<PathBuf, Repo>>,
 }
 
 impl std::fmt::Debug for PullRequestService {
@@ -72,7 +76,18 @@ impl PullRequestService {
             fresh,
             lists: Mutex::new(HashMap::new()),
             branches: Mutex::new(HashMap::new()),
+            adopted: Mutex::default(),
         }
+    }
+
+    /// Makes a clone outside the workspace readable, for the context of a
+    /// run on it: a pull request link can point anywhere.
+    pub fn adopt_clone(&self, path: &Path, origin: &str) {
+        let repo = Repo::new(path.to_owned(), Some(Remote::parse(origin)));
+        self.adopted
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(path.to_owned(), repo);
     }
 
     /// Open pull requests of the repository at `repo_path` (its main checkout).
@@ -183,6 +198,60 @@ impl PullRequestService {
         Ok(created)
     }
 
+    /// Review threads of pull request `number` of the repository at
+    /// `repo_path`, oldest first.
+    pub async fn threads(
+        &self,
+        repo_path: &Path,
+        number: u64,
+    ) -> Result<Vec<ReviewThread>, PipelinesError> {
+        let (client, target, token) = self.repo_target(repo_path).await?;
+        blocking(move || client.threads(&target, &token, number))
+            .await?
+            .map_err(PipelinesError::Ci)
+    }
+
+    /// Replies to a review thread and/or resolves it; the next list reads
+    /// the host again (open thread counts).
+    pub async fn answer_thread(
+        &self,
+        repo_path: &Path,
+        number: u64,
+        answer: ThreadAnswer,
+    ) -> Result<ReviewThread, PipelinesError> {
+        if answer.thread_id.trim().is_empty() {
+            return Err(PipelinesError::Invalid("Which thread?".into()));
+        }
+        if answer.reply.trim().is_empty() && !answer.resolve {
+            return Err(PipelinesError::Invalid(
+                "Nothing to do: no reply and not resolving".into(),
+            ));
+        }
+        let repo = self
+            .repo(repo_path)
+            .ok_or_else(|| PipelinesError::UnknownWorktree(repo_path.display().to_string()))?;
+        let (client, target, token) = self.repo_target(repo_path).await?;
+        let thread = blocking(move || client.answer_thread(&target, &token, number, &answer))
+            .await?
+            .map_err(PipelinesError::Ci)?;
+        lock(&self.lists).remove(&repo.path);
+        Ok(thread)
+    }
+
+    /// Client, target and token of the repository at `repo_path`; a
+    /// problem is an error.
+    async fn repo_target(
+        &self,
+        repo_path: &Path,
+    ) -> Result<(Arc<dyn PullRequestClient>, CiTarget, String), PipelinesError> {
+        let repo = self
+            .repo(repo_path)
+            .ok_or_else(|| PipelinesError::UnknownWorktree(repo_path.display().to_string()))?;
+        self.target(&repo, String::new())
+            .await
+            .map_err(|(_, problem)| PipelinesError::Ci(problem))
+    }
+
     fn repos(&self) -> Vec<(Repo, Vec<PathBuf>)> {
         self.workspace
             .borrow()
@@ -198,12 +267,12 @@ impl PullRequestService {
     }
 
     fn repo(&self, path: &Path) -> Option<Repo> {
-        let canonical = std::fs::canonicalize(path).ok();
-        self.repos().into_iter().map(|(r, _)| r).find(|r| {
-            r.path == path
-                || canonical
-                    .as_ref()
-                    .is_some_and(|c| std::fs::canonicalize(&r.path).is_ok_and(|p| &p == c))
+        repo_at(&self.workspace, path).or_else(|| {
+            self.adopted
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(path)
+                .cloned()
         })
     }
 
@@ -287,21 +356,45 @@ impl PullRequestService {
         self.target(repo, branch.to_owned()).await
     }
 
-    /// The saved token, else the fallback's (gh). Never logged.
     async fn token(&self, host: &CiHost) -> Option<String> {
-        let (tokens, fallback, h) = (
-            Arc::clone(&self.ports.tokens),
-            Arc::clone(&self.ports.fallback),
-            host.clone(),
-        );
-        tokio::task::spawn_blocking(move || match tokens.get(&h.host) {
-            Ok(Some(token)) => Some(token),
-            _ => fallback.token(&h),
-        })
-        .await
-        .ok()
-        .flatten()
+        host_token(&self.ports.tokens, &self.ports.fallback, host).await
     }
+}
+
+/// The repository whose main checkout is `path`.
+pub(crate) fn repo_at(
+    workspace: &watch::Receiver<Arc<WorkspaceSnapshot>>,
+    path: &Path,
+) -> Option<Repo> {
+    let canonical = std::fs::canonicalize(path).ok();
+    let repos: Vec<Repo> = workspace
+        .borrow()
+        .repos
+        .iter()
+        .map(|r| r.repo.clone())
+        .collect();
+    repos.into_iter().find(|r| {
+        r.path == path
+            || canonical
+                .as_ref()
+                .is_some_and(|c| std::fs::canonicalize(&r.path).is_ok_and(|p| &p == c))
+    })
+}
+
+/// The saved token for `host`, else the fallback's (gh). Never logged.
+pub(crate) async fn host_token(
+    tokens: &Arc<dyn HostTokens>,
+    fallback: &Arc<dyn TokenFallback>,
+    host: &CiHost,
+) -> Option<String> {
+    let (tokens, fallback, h) = (Arc::clone(tokens), Arc::clone(fallback), host.clone());
+    tokio::task::spawn_blocking(move || match tokens.get(&h.host) {
+        Ok(Some(token)) => Some(token),
+        _ => fallback.token(&h),
+    })
+    .await
+    .ok()
+    .flatten()
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {

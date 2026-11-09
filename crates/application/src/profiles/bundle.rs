@@ -12,11 +12,13 @@ use kumo_domain::workspace::WorktreeLocation;
 use tokio::sync::broadcast::error::RecvError;
 
 use super::{GitEnvironment, ProfileBundle, ProfileService};
+use crate::agent_defs::AgentDefService;
 use crate::agents::AgentService;
 use crate::changes::ChangesService;
 use crate::docs::DocsService;
 use crate::pipelines::{GitCredential, PipelinesService};
 use crate::pulls::PullRequestService;
+use crate::releases::ReleaseService;
 use crate::tasks::TaskService;
 use crate::terminal::TerminalService;
 use crate::test_runs::TestService;
@@ -30,9 +32,12 @@ pub struct ProfileServices {
     pub workspace: Arc<WorkspaceService>,
     pub changes: Arc<ChangesService>,
     pub agents: Arc<AgentService>,
+    /// Your agents: their files, runs and test runs.
+    pub agent_defs: Arc<AgentDefService>,
     pub tasks: Arc<TaskService>,
     pub pipelines: Arc<PipelinesService>,
     pub pulls: Arc<PullRequestService>,
+    pub releases: Arc<ReleaseService>,
     pub docs: Arc<DocsService>,
     pub tests: Arc<TestService>,
     /// The daemon's terminals, scoped to this profile.

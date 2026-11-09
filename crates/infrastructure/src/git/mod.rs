@@ -4,7 +4,10 @@
 mod branch;
 mod changes;
 mod cli;
+mod history;
 mod repo_finder;
+mod runs;
+mod tags;
 
 pub use cli::GitCli;
 pub use repo_finder::FsRepoFinder;

@@ -12,11 +12,26 @@ use kumo_domain::terminal::{ExitStatus, TerminalEvent};
 use kumo_domain::time::Timestamp;
 
 use super::AgentService;
-use crate::terminal::Attachment;
+use super::service::{STOPPED, STOPPED_BY_TIME_LIMIT};
+use crate::terminal::{Attachment, TerminalSession};
 
 /// The last line on the card refreshes at most this often.
 const LINE_EVERY: Duration = Duration::from_secs(1);
 const TICK: Duration = Duration::from_millis(250);
+/// How it exited: 130 when Kumo stopped it, 124 when its time limit did.
+fn exit_of(service: &AgentService, id: &AgentSessionId, status: ExitStatus) -> ExitStatus {
+    service.stopped_with(id).map_or(status, ExitStatus::new)
+}
+
+/// Tells the tracker what was done to the terminal since it last looked.
+pub(super) fn read_input(tracker: &mut ActivityTracker, terminal: &TerminalSession) {
+    if let Some(at) = terminal.resized_at() {
+        tracker.resized(at);
+    }
+    if let Some(at) = terminal.answered_at() {
+        tracker.typed(at);
+    }
+}
 
 /// Runs until the agent exits. `typed` is a prompt to type in the first
 /// time the agent waits for input.
@@ -40,23 +55,34 @@ pub(super) async fn run(
     let mut ticker = tokio::time::interval(TICK);
 
     loop {
+        let (before, asked_before) = (tracker.state(), tracker.asked());
         let mut done = Vec::new();
-        let change = tokio::select! {
+        tokio::select! {
             event = events.next() => match event {
                 Some(TerminalEvent::Output(batch)) => {
+                    read_input(&mut tracker, &terminal);
                     last_line.push(&batch.data);
                     done = actions.push(&batch.data);
-                    tracker.on_output(&batch.data, Instant::now())
+                    tracker.on_output(&batch.data, Instant::now());
                 }
-                Some(TerminalEvent::Exited(status)) => tracker.exited(status),
-                None => tracker.exited(ExitStatus::UNKNOWN),
+                Some(TerminalEvent::Exited(status)) => {
+                    tracker.exited(exit_of(&service, &id, status));
+                }
+                None => {
+                    tracker.exited(exit_of(&service, &id, ExitStatus::UNKNOWN));
+                }
             },
-            _ = ticker.tick() => tracker.tick(Instant::now()),
+            _ = ticker.tick() => {
+                read_input(&mut tracker, &terminal);
+                tracker.tick(Instant::now());
+            }
         };
+        let change = (tracker.state() != before).then(|| tracker.state());
+        let asked = tracker.asked();
 
         let line = last_line.get();
         let line_due = line != shown && shown_at.elapsed() >= LINE_EVERY;
-        if change.is_some() || line_due || !done.is_empty() {
+        if change.is_some() || asked != asked_before || line_due || !done.is_empty() {
             shown.clone_from(&line);
             shown_at = Instant::now();
             service.update_session(&id, |session| {
@@ -71,7 +97,8 @@ pub(super) async fn run(
                     Some(AgentState::Exited(status)) => {
                         let how = match status.code() {
                             0 => "Finished".to_owned(),
-                            -1 => "Stopped".to_owned(),
+                            -1 | STOPPED => "Stopped".to_owned(),
+                            STOPPED_BY_TIME_LIMIT => "Stopped: its time limit".to_owned(),
                             code => format!("Exited with code {code}"),
                         };
                         session.record(AgentEventKind::Exited, how, now);
@@ -79,9 +106,9 @@ pub(super) async fn run(
                     _ => {}
                 }
                 if let Some(state) = change {
-                    session.state = state;
-                    session.state_since = now;
+                    session.enter(state, now);
                 }
+                session.asked = asked;
                 session.last_line = line;
             });
         }

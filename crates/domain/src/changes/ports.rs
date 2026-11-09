@@ -4,8 +4,8 @@
 use std::path::{Path, PathBuf};
 
 use super::{
-    ChangesError, CommitInfo, CommitOptions, DiffScope, FileContent, FileDiff, FileList,
-    RelativePath, WorktreeChanges,
+    ChangesError, CommitDetail, CommitInfo, CommitOptions, DiffScope, FileContent, FileDiff,
+    FileList, RelativePath, WorktreeChanges,
 };
 
 /// Git operations on one worktree (`worktree` is its absolute path).
@@ -30,7 +30,18 @@ pub trait GitChanges: Send + Sync + 'static {
     /// creates a merge commit.
     fn pull(&self, worktree: &Path) -> Result<(), ChangesError>;
     fn undo_last_commit(&self, worktree: &Path) -> Result<(), ChangesError>;
-    fn log(&self, worktree: &Path, limit: usize) -> Result<Vec<CommitInfo>, ChangesError>;
+    /// Newest first. With `all_branches`, main's history plus the commits
+    /// of every other branch (local and remote) not on main yet, each with
+    /// its [`branch`](CommitInfo::branch).
+    fn log(
+        &self,
+        worktree: &Path,
+        limit: usize,
+        all_branches: bool,
+    ) -> Result<Vec<CommitInfo>, ChangesError>;
+    /// What one commit changed, file by file (merges: against the first
+    /// parent).
+    fn show_commit(&self, worktree: &Path, sha: &str) -> Result<CommitDetail, ChangesError>;
     /// Folders whose changes affect the status: the worktree and its git dir.
     fn watched_paths(&self, worktree: &Path) -> Result<Vec<PathBuf>, ChangesError>;
 }

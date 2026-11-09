@@ -6,25 +6,34 @@
 //! - [`BitbucketPipelines`]: Bitbucket Cloud.
 //! - [`GitHubPulls`], [`GitLabPulls`], [`BitbucketPulls`]: pull (merge)
 //!   requests, with the same tokens.
+//! - [`GitHubReleases`], [`GitLabReleases`], [`BitbucketReleases`]:
+//!   releases (Bitbucket: tags only).
 //! - [`GhTokenFallback`]: the token of the user's `gh` sign-in.
 
 mod bitbucket;
 mod bitbucket_pulls;
+mod bitbucket_releases;
 mod gh;
 mod github;
 mod github_pulls;
+mod github_releases;
 mod gitlab;
 mod gitlab_pulls;
+mod gitlab_releases;
 pub(crate) mod http;
 
 pub use bitbucket::BitbucketPipelines;
 pub use bitbucket_pulls::BitbucketPulls;
+pub use bitbucket_releases::BitbucketReleases;
 pub use gh::GhTokenFallback;
 pub use github::GitHubActions;
 pub use github_pulls::GitHubPulls;
+pub use github_releases::GitHubReleases;
 pub use gitlab::GitLabCi;
 pub use gitlab_pulls::GitLabPulls;
+pub use gitlab_releases::GitLabReleases;
 
+use kumo_domain::pipelines::{CiProblem, CiProblemKind};
 use kumo_domain::time::Timestamp;
 use serde_json::Value;
 
@@ -54,4 +63,13 @@ fn id(value: &Value) -> String {
 fn first_line(text: &str) -> Option<String> {
     let line = text.lines().map(str::trim).find(|l| !l.is_empty())?;
     Some(line.chars().take(160).collect())
+}
+
+/// A 403 that doesn't name the permission: `permission` is what writing
+/// needs.
+fn needs(mut problem: CiProblem, permission: &str) -> CiProblem {
+    if problem.kind == CiProblemKind::Forbidden && problem.missing_scope.is_empty() {
+        permission.clone_into(&mut problem.missing_scope);
+    }
+    problem
 }

@@ -19,6 +19,53 @@ pub(super) fn command(program: &OsStr) -> Command {
 }
 
 /// `$PATH` as the user's login shell sets it up.
+pub(super) fn own_group(command: &mut Command) {
+    use std::os::unix::process::CommandExt;
+    command.process_group(0);
+}
+
+pub(super) fn kill_tree(pid: u32) {
+    // Read first: once it's dead its children move to another parent.
+    let table = Command::new("ps")
+        .args(["-axo", "pid=,ppid="])
+        .output()
+        .map(|out| String::from_utf8_lossy(&out.stdout).into_owned())
+        .unwrap_or_default();
+    // Its group, for what it left behind; each descendant by pid, because a
+    // CLI can start its tools in groups of their own (Claude Code does).
+    let mut targets = vec![format!("-{pid}")];
+    targets.extend(descendants(&table, pid).iter().map(u32::to_string));
+    let _ = Command::new("/bin/kill")
+        .args(["-KILL", "--"])
+        .args(&targets)
+        .output();
+}
+
+pub(super) fn kill_group(pid: u32) {
+    let _ = Command::new("/bin/kill")
+        .args(["-KILL", "--", &format!("-{pid}")])
+        .output();
+}
+
+/// Everything below `pid` in a `pid ppid` table.
+fn descendants(table: &str, pid: u32) -> Vec<u32> {
+    let rows: Vec<(u32, u32)> = table
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split_whitespace();
+            Some((fields.next()?.parse().ok()?, fields.next()?.parse().ok()?))
+        })
+        .collect();
+    let mut found = vec![pid];
+    let mut next = 0;
+    while let Some(&parent) = found.get(next) {
+        found.extend(rows.iter().filter(|r| r.1 == parent).map(|r| r.0));
+        next += 1;
+    }
+    found.remove(0);
+    found
+}
+
 pub(super) fn login_shell_path() -> Option<String> {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
     let mut command = command(OsStr::new(&shell));
@@ -95,6 +142,13 @@ pub(super) async fn shutdown() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn descendants_go_all_the_way_down() {
+        let table = " 10 1\n 11 10\n 12 11\n 13 12\n 20 1\n bad row\n";
+        assert_eq!(descendants(table, 10), [11, 12, 13]);
+        assert!(descendants(table, 13).is_empty());
+    }
 
     #[test]
     fn runs_background_programs_as_given() {

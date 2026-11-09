@@ -18,6 +18,10 @@ class EngineAgentsSource extends AgentsSource {
   bool _disposed = false;
   List<AgentProviderInfo> _providers = const [];
   List<AgentRun> _runs = const [];
+  List<TerminalAgent> _terminalAgents = const [];
+
+  /// Each terminal's program ("zsh"), for "in zsh" next to a CLI typed in it.
+  Map<String, String> _shells = const {};
   String? _error;
   final _ready = Completer<void>();
 
@@ -31,6 +35,8 @@ class EngineAgentsSource extends AgentsSource {
   @override
   List<AgentRun> get runs => _runs;
   @override
+  List<TerminalAgent> get terminalAgents => _terminalAgents;
+  @override
   String? get error => _error;
 
   Future<pb.AgentsClient> get _client async => (await _engine.connection()).agents;
@@ -41,6 +47,8 @@ class EngineAgentsSource extends AgentsSource {
         await for (final snapshot in (await _client).watch(pb.WatchAgentsRequest())) {
           if (_disposed) return;
           _runs = [for (final s in snapshot.sessions) _run(s)];
+          if (snapshot.terminalAgents.any((a) => !_shells.containsKey(a.terminalId))) await _readShells();
+          _terminalAgents = [for (final a in snapshot.terminalAgents) _terminalAgent(a)];
           if (!_ready.isCompleted) _ready.complete();
           notifyListeners();
         }
@@ -51,6 +59,32 @@ class EngineAgentsSource extends AgentsSource {
       }
       await Future<void>.delayed(const Duration(seconds: 2));
     }
+  }
+
+  /// The program of every terminal, from `Terminals.List`.
+  Future<void> _readShells() async {
+    try {
+      final list = await (await _engine.connection()).terminals.list(pb.ListRequest());
+      _shells = {for (final t in list.terminals) t.terminalId: t.program.split('/').last};
+    } on Object {
+      // Shown without the shell's name.
+    }
+  }
+
+  TerminalAgent _terminalAgent(pb.TerminalAgent a) => TerminalAgent(
+        terminalId: a.terminalId,
+        providerId: a.providerId,
+        name: a.program,
+        terminalTitle: _shells[a.terminalId] ?? 'a terminal',
+        cwd: a.cwd,
+        state: a.state == pb.AgentState.AGENT_STATE_NEEDS_INPUT ? AgentStatus.needsYou : AgentStatus.running,
+        busy: a.busy,
+      );
+
+  @override
+  Future<bool> sendToTerminal(String terminalId, String text, {bool submit = true}) async {
+    final sent = await _call((c) => c.sendToTerminal(pb.SendToTerminalRequest(terminalId: terminalId, text: text, submit: submit)));
+    return sent != null;
   }
 
   void _fail(Object error) {
@@ -132,16 +166,7 @@ class EngineAgentsSource extends AgentsSource {
     return session != null;
   }
 
-  static pb.AgentContext _contextTo(AgentContextItem item) => pb.AgentContext(
-        kind: switch (item.kind) {
-          AgentContextKind.task => pb.AgentContextKind.AGENT_CONTEXT_KIND_TASK,
-          AgentContextKind.doc => pb.AgentContextKind.AGENT_CONTEXT_KIND_DOC,
-          AgentContextKind.code => pb.AgentContextKind.AGENT_CONTEXT_KIND_CODE,
-        },
-        title: item.title,
-        detail: item.detail,
-        url: item.url,
-      );
+  static pb.AgentContext _contextTo(AgentContextItem item) => agentContextTo(item);
 
   @override
   Future<void> stop(String id) => _call((c) => c.stop(pb.StopAgentRequest(id: id)));
@@ -165,7 +190,17 @@ class EngineAgentsSource extends AgentsSource {
         hasLogin: p.hasLogin,
       );
 
-  static AgentRun _run(pb.AgentSession s) => AgentRun(
+  static AgentRun _run(pb.AgentSession s) => agentRunFrom(s);
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}
+
+/// A session as the views show it.
+AgentRun agentRunFrom(pb.AgentSession s) => AgentRun(
         id: s.id,
         providerId: s.providerId,
         providerName: s.providerName,
@@ -182,28 +217,14 @@ class EngineAgentsSource extends AgentsSource {
         exitCode: s.exitCode,
         startedAt: DateTime.fromMillisecondsSinceEpoch(s.startedUnixMs.toInt()),
         lastLine: s.lastLine,
-        context: [
-          for (final item in s.context)
-            AgentContextItem(
-              kind: switch (item.kind) {
-                pb.AgentContextKind.AGENT_CONTEXT_KIND_DOC => AgentContextKind.doc,
-                pb.AgentContextKind.AGENT_CONTEXT_KIND_CODE => AgentContextKind.code,
-                _ => AgentContextKind.task,
-              },
-              title: item.title,
-              detail: item.detail,
-              url: item.url,
-            ),
-        ],
+        context: [for (final item in s.context) agentContextFrom(item)],
         steps: [for (final e in s.events) agentStepFrom(e)],
+        agent: s.agentName,
+        asked: s.asked,
+        tellsAsking: s.tellsAsking,
+        worked: Duration(milliseconds: s.workedMs.toInt()),
+        stateSince: DateTime.fromMillisecondsSinceEpoch(s.stateSinceUnixMs.toInt()),
       );
-
-  @override
-  void dispose() {
-    _disposed = true;
-    super.dispose();
-  }
-}
 
 AgentStep agentStepFrom(pb.AgentEvent e) => AgentStep(
       at: DateTime.fromMillisecondsSinceEpoch(e.atUnixMs.toInt()),
@@ -219,4 +240,34 @@ AgentStep agentStepFrom(pb.AgentEvent e) => AgentStep(
         _ => AgentStepKind.started,
       },
       text: e.text,
+    );
+
+pb.AgentContext agentContextTo(AgentContextItem item) => pb.AgentContext(
+      kind: switch (item.kind) {
+        AgentContextKind.task => pb.AgentContextKind.AGENT_CONTEXT_KIND_TASK,
+        AgentContextKind.doc => pb.AgentContextKind.AGENT_CONTEXT_KIND_DOC,
+        AgentContextKind.code => pb.AgentContextKind.AGENT_CONTEXT_KIND_CODE,
+        AgentContextKind.pullRequest => pb.AgentContextKind.AGENT_CONTEXT_KIND_PULL_REQUEST,
+        AgentContextKind.files => pb.AgentContextKind.AGENT_CONTEXT_KIND_FILES,
+        AgentContextKind.link => pb.AgentContextKind.AGENT_CONTEXT_KIND_LINK,
+      },
+      title: item.title,
+      detail: item.detail,
+      url: item.url,
+      id: item.id,
+    );
+
+AgentContextItem agentContextFrom(pb.AgentContext item) => AgentContextItem(
+      kind: switch (item.kind) {
+        pb.AgentContextKind.AGENT_CONTEXT_KIND_DOC => AgentContextKind.doc,
+        pb.AgentContextKind.AGENT_CONTEXT_KIND_CODE => AgentContextKind.code,
+        pb.AgentContextKind.AGENT_CONTEXT_KIND_PULL_REQUEST => AgentContextKind.pullRequest,
+        pb.AgentContextKind.AGENT_CONTEXT_KIND_FILES => AgentContextKind.files,
+        pb.AgentContextKind.AGENT_CONTEXT_KIND_LINK => AgentContextKind.link,
+        _ => AgentContextKind.task,
+      },
+      title: item.title,
+      detail: item.detail,
+      url: item.url,
+      id: item.id,
     );

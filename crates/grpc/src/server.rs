@@ -9,6 +9,7 @@ use std::sync::Arc;
 use kumo_application::daemon::{DaemonControl, HelloService};
 use kumo_domain::daemon::{AuthToken, DaemonError, ListenAddress};
 use kumo_domain::profiles::MachineAccounts;
+use kumo_proto::v1::agent_defs_server::AgentDefsServer;
 use kumo_proto::v1::agents_server::AgentsServer;
 use kumo_proto::v1::core_server::CoreServer;
 use kumo_proto::v1::docs_server::DocsServer;
@@ -16,6 +17,7 @@ use kumo_proto::v1::git_server::GitServer;
 use kumo_proto::v1::pipelines_server::PipelinesServer;
 use kumo_proto::v1::profiles_server::ProfilesServer;
 use kumo_proto::v1::pull_requests_server::PullRequestsServer;
+use kumo_proto::v1::releases_server::ReleasesServer;
 use kumo_proto::v1::tasks_server::TasksServer;
 use kumo_proto::v1::terminals_server::TerminalsServer;
 use kumo_proto::v1::tests_server::TestsServer;
@@ -27,8 +29,8 @@ use tonic::transport::server::TcpIncoming;
 use crate::auth::RequireBearer;
 use crate::profile::Profiles;
 use crate::services::{
-    AgentsGrpc, CoreGrpc, DocsGrpc, GitGrpc, PipelinesGrpc, ProfilesGrpc, PullRequestsGrpc,
-    TasksGrpc, TerminalsGrpc, TestsGrpc, WorkspaceGrpc,
+    AgentDefsGrpc, AgentsGrpc, CoreGrpc, DocsGrpc, GitGrpc, PipelinesGrpc, ProfilesGrpc,
+    PullRequestsGrpc, ReleasesGrpc, TasksGrpc, TerminalsGrpc, TestsGrpc, WorkspaceGrpc,
 };
 
 /// Use cases the server exposes.
@@ -132,6 +134,14 @@ impl GrpcServer {
             ))
             .add_service(PullRequestsServer::with_interceptor(
                 PullRequestsGrpc::new(Arc::clone(&self.services.profiles)),
+                auth.clone(),
+            ))
+            .add_service(ReleasesServer::with_interceptor(
+                ReleasesGrpc::new(Arc::clone(&self.services.profiles)),
+                auth.clone(),
+            ))
+            .add_service(AgentDefsServer::with_interceptor(
+                AgentDefsGrpc::new(Arc::clone(&self.services.profiles)),
                 auth.clone(),
             ))
             .add_service(DocsServer::with_interceptor(

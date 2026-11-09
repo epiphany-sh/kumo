@@ -4,5 +4,5 @@
 mod model;
 mod ports;
 
-pub use model::{NewPullRequest, PrState, PullRequest, ReviewState};
+pub use model::{NewPullRequest, PrState, PullRequest, ReviewState, ReviewThread, ThreadAnswer};
 pub use ports::PullRequestClient;

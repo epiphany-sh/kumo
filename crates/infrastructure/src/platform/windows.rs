@@ -11,8 +11,8 @@ use std::sync::Arc;
 use keyring_core::{CredentialStore, Error as KeyringError};
 
 use super::{
-    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles,
-    ProgramSearch, ScriptShell, Signals,
+    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, ProcessTrees,
+    Processes, ProgramSearch, RunningProcess, ScriptShell, Signals,
 };
 
 /// The child gets a console nobody sees.
@@ -31,6 +31,20 @@ impl BackgroundPrograms for Windows {
         command.creation_flags(CREATE_NO_WINDOW);
         command
     }
+}
+
+impl ProcessTrees for Windows {
+    /// `taskkill /T` follows parents, not groups.
+    fn own_group(_command: &mut Command) {}
+
+    fn kill_tree(pid: u32) {
+        let _ = Self::command(OsStr::new("taskkill"))
+            .args(["/T", "/F", "/PID", &pid.to_string()])
+            .output();
+    }
+
+    /// No groups to look for; `taskkill /T` needs the parent alive.
+    fn kill_group(_pid: u32) {}
 }
 
 impl ProgramSearch for Windows {
@@ -114,6 +128,13 @@ impl Signals for Windows {
     /// Ctrl-C (Windows has no SIGTERM).
     async fn shutdown() {
         let _ = tokio::signal::ctrl_c().await;
+    }
+}
+
+impl Processes for Windows {
+    /// Not read yet: terminals on Windows don't report agent CLIs.
+    fn process(_pid: u32) -> Option<RunningProcess> {
+        None
     }
 }
 

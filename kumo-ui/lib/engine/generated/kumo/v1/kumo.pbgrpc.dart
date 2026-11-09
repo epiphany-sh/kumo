@@ -904,6 +904,14 @@ class GitClient extends $grpc.Client {
     return $createUnaryCall(_$log, request, options: options);
   }
 
+  /// What one commit changed, file by file, with its hunks.
+  $grpc.ResponseFuture<$0.CommitDetail> showCommit(
+    $0.ShowCommitRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$showCommit, request, options: options);
+  }
+
   // method descriptors
 
   static final _$watchStatus =
@@ -984,6 +992,11 @@ class GitClient extends $grpc.Client {
       '/kumo.v1.Git/Log',
       ($0.LogRequest value) => value.writeToBuffer(),
       $0.LogResponse.fromBuffer);
+  static final _$showCommit =
+      $grpc.ClientMethod<$0.ShowCommitRequest, $0.CommitDetail>(
+          '/kumo.v1.Git/ShowCommit',
+          ($0.ShowCommitRequest value) => value.writeToBuffer(),
+          $0.CommitDetail.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Git')
@@ -1104,6 +1117,13 @@ abstract class GitServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.LogRequest.fromBuffer(value),
         ($0.LogResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ShowCommitRequest, $0.CommitDetail>(
+        'ShowCommit',
+        showCommit_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.ShowCommitRequest.fromBuffer(value),
+        ($0.CommitDetail value) => value.writeToBuffer()));
   }
 
   $async.Stream<$0.WorktreeChanges> watchStatus_Pre($grpc.ServiceCall $call,
@@ -1234,6 +1254,14 @@ abstract class GitServiceBase extends $grpc.Service {
 
   $async.Future<$0.LogResponse> log(
       $grpc.ServiceCall call, $0.LogRequest request);
+
+  $async.Future<$0.CommitDetail> showCommit_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ShowCommitRequest> $request) async {
+    return showCommit($call, await $request);
+  }
+
+  $async.Future<$0.CommitDetail> showCommit(
+      $grpc.ServiceCall call, $0.ShowCommitRequest request);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Agents')
@@ -1347,6 +1375,16 @@ class AgentsClient extends $grpc.Client {
     return $createUnaryCall(_$compact, request, options: options);
   }
 
+  /// Types text into one of the profile's terminals (as a bracketed paste
+  /// when the terminal turned it on), then Enter when asked: for an agent
+  /// CLI started there by hand.
+  $grpc.ResponseFuture<$0.SendToTerminalResponse> sendToTerminal(
+    $0.SendToTerminalRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$sendToTerminal, request, options: options);
+  }
+
   // method descriptors
 
   static final _$listProviders =
@@ -1408,6 +1446,11 @@ class AgentsClient extends $grpc.Client {
           '/kumo.v1.Agents/Compact',
           ($0.CompactAgentRequest value) => value.writeToBuffer(),
           $0.AgentSession.fromBuffer);
+  static final _$sendToTerminal =
+      $grpc.ClientMethod<$0.SendToTerminalRequest, $0.SendToTerminalResponse>(
+          '/kumo.v1.Agents/SendToTerminal',
+          ($0.SendToTerminalRequest value) => value.writeToBuffer(),
+          $0.SendToTerminalResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Agents')
@@ -1513,6 +1556,15 @@ abstract class AgentsServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.CompactAgentRequest.fromBuffer(value),
         ($0.AgentSession value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.SendToTerminalRequest,
+            $0.SendToTerminalResponse>(
+        'SendToTerminal',
+        sendToTerminal_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.SendToTerminalRequest.fromBuffer(value),
+        ($0.SendToTerminalResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.ListProvidersResponse> listProviders_Pre(
@@ -1614,6 +1666,298 @@ abstract class AgentsServiceBase extends $grpc.Service {
 
   $async.Future<$0.AgentSession> compact(
       $grpc.ServiceCall call, $0.CompactAgentRequest request);
+
+  $async.Future<$0.SendToTerminalResponse> sendToTerminal_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.SendToTerminalRequest> $request) async {
+    return sendToTerminal($call, await $request);
+  }
+
+  $async.Future<$0.SendToTerminalResponse> sendToTerminal(
+      $grpc.ServiceCall call, $0.SendToTerminalRequest request);
+}
+
+@$pb.GrpcServiceName('kumo.v1.AgentDefs')
+class AgentDefsClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  AgentDefsClient(super.channel, {super.options, super.interceptors});
+
+  /// Every agent file of the workspace: personal, then each repository's.
+  $grpc.ResponseFuture<$0.AgentDefList> list(
+    $0.ListAgentDefsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$list, request, options: options);
+  }
+
+  /// Writes the file (and Kumo's settings for it). With `previous`, a rename
+  /// or move: the old file goes once the new one is written.
+  $grpc.ResponseFuture<$0.AgentDefFile> save(
+    $0.SaveAgentDefRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$save, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.DeleteAgentDefResponse> delete(
+    $0.DeleteAgentDefRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$delete, request, options: options);
+  }
+
+  /// Starts it in a terminal of its own; the session shows in Agents.Watch.
+  $grpc.ResponseFuture<$0.AgentSession> run(
+    $0.RunAgentDefRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$run, request, options: options);
+  }
+
+  /// A headless test run: Claude Code's stream-json lines, as they come.
+  $grpc.ResponseStream<$0.PlayEvent> play(
+    $0.PlayRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createStreamingCall(_$play, $async.Stream.fromIterable([request]),
+        options: options);
+  }
+
+  $grpc.ResponseFuture<$0.StopPlayResponse> stopPlay(
+    $0.StopPlayRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$stopPlay, request, options: options);
+  }
+
+  /// The last 10 test runs of an agent, kept across restarts.
+  $grpc.ResponseFuture<$0.PlayList> listPlays(
+    $0.ListPlaysRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$listPlays, request, options: options);
+  }
+
+  /// One-shot `claude -p`: drafts an agent, improves instructions.
+  $grpc.ResponseFuture<$0.AskClaudeResponse> ask(
+    $0.AskClaudeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$ask, request, options: options);
+  }
+
+  /// Skills and MCP servers an agent can be given; whether triggers run.
+  $grpc.ResponseFuture<$0.AgentDefCapabilities> capabilities(
+    $0.AgentDefCapabilitiesRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$capabilities, request, options: options);
+  }
+
+  // method descriptors
+
+  static final _$list =
+      $grpc.ClientMethod<$0.ListAgentDefsRequest, $0.AgentDefList>(
+          '/kumo.v1.AgentDefs/List',
+          ($0.ListAgentDefsRequest value) => value.writeToBuffer(),
+          $0.AgentDefList.fromBuffer);
+  static final _$save =
+      $grpc.ClientMethod<$0.SaveAgentDefRequest, $0.AgentDefFile>(
+          '/kumo.v1.AgentDefs/Save',
+          ($0.SaveAgentDefRequest value) => value.writeToBuffer(),
+          $0.AgentDefFile.fromBuffer);
+  static final _$delete =
+      $grpc.ClientMethod<$0.DeleteAgentDefRequest, $0.DeleteAgentDefResponse>(
+          '/kumo.v1.AgentDefs/Delete',
+          ($0.DeleteAgentDefRequest value) => value.writeToBuffer(),
+          $0.DeleteAgentDefResponse.fromBuffer);
+  static final _$run =
+      $grpc.ClientMethod<$0.RunAgentDefRequest, $0.AgentSession>(
+          '/kumo.v1.AgentDefs/Run',
+          ($0.RunAgentDefRequest value) => value.writeToBuffer(),
+          $0.AgentSession.fromBuffer);
+  static final _$play = $grpc.ClientMethod<$0.PlayRequest, $0.PlayEvent>(
+      '/kumo.v1.AgentDefs/Play',
+      ($0.PlayRequest value) => value.writeToBuffer(),
+      $0.PlayEvent.fromBuffer);
+  static final _$stopPlay =
+      $grpc.ClientMethod<$0.StopPlayRequest, $0.StopPlayResponse>(
+          '/kumo.v1.AgentDefs/StopPlay',
+          ($0.StopPlayRequest value) => value.writeToBuffer(),
+          $0.StopPlayResponse.fromBuffer);
+  static final _$listPlays =
+      $grpc.ClientMethod<$0.ListPlaysRequest, $0.PlayList>(
+          '/kumo.v1.AgentDefs/ListPlays',
+          ($0.ListPlaysRequest value) => value.writeToBuffer(),
+          $0.PlayList.fromBuffer);
+  static final _$ask =
+      $grpc.ClientMethod<$0.AskClaudeRequest, $0.AskClaudeResponse>(
+          '/kumo.v1.AgentDefs/Ask',
+          ($0.AskClaudeRequest value) => value.writeToBuffer(),
+          $0.AskClaudeResponse.fromBuffer);
+  static final _$capabilities = $grpc.ClientMethod<
+          $0.AgentDefCapabilitiesRequest, $0.AgentDefCapabilities>(
+      '/kumo.v1.AgentDefs/Capabilities',
+      ($0.AgentDefCapabilitiesRequest value) => value.writeToBuffer(),
+      $0.AgentDefCapabilities.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.AgentDefs')
+abstract class AgentDefsServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.AgentDefs';
+
+  AgentDefsServiceBase() {
+    $addMethod($grpc.ServiceMethod<$0.ListAgentDefsRequest, $0.AgentDefList>(
+        'List',
+        list_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ListAgentDefsRequest.fromBuffer(value),
+        ($0.AgentDefList value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.SaveAgentDefRequest, $0.AgentDefFile>(
+        'Save',
+        save_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.SaveAgentDefRequest.fromBuffer(value),
+        ($0.AgentDefFile value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.DeleteAgentDefRequest,
+            $0.DeleteAgentDefResponse>(
+        'Delete',
+        delete_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.DeleteAgentDefRequest.fromBuffer(value),
+        ($0.DeleteAgentDefResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.RunAgentDefRequest, $0.AgentSession>(
+        'Run',
+        run_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.RunAgentDefRequest.fromBuffer(value),
+        ($0.AgentSession value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.PlayRequest, $0.PlayEvent>(
+        'Play',
+        play_Pre,
+        false,
+        true,
+        ($core.List<$core.int> value) => $0.PlayRequest.fromBuffer(value),
+        ($0.PlayEvent value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.StopPlayRequest, $0.StopPlayResponse>(
+        'StopPlay',
+        stopPlay_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.StopPlayRequest.fromBuffer(value),
+        ($0.StopPlayResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ListPlaysRequest, $0.PlayList>(
+        'ListPlays',
+        listPlays_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.ListPlaysRequest.fromBuffer(value),
+        ($0.PlayList value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.AskClaudeRequest, $0.AskClaudeResponse>(
+        'Ask',
+        ask_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.AskClaudeRequest.fromBuffer(value),
+        ($0.AskClaudeResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.AgentDefCapabilitiesRequest,
+            $0.AgentDefCapabilities>(
+        'Capabilities',
+        capabilities_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.AgentDefCapabilitiesRequest.fromBuffer(value),
+        ($0.AgentDefCapabilities value) => value.writeToBuffer()));
+  }
+
+  $async.Future<$0.AgentDefList> list_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ListAgentDefsRequest> $request) async {
+    return list($call, await $request);
+  }
+
+  $async.Future<$0.AgentDefList> list(
+      $grpc.ServiceCall call, $0.ListAgentDefsRequest request);
+
+  $async.Future<$0.AgentDefFile> save_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.SaveAgentDefRequest> $request) async {
+    return save($call, await $request);
+  }
+
+  $async.Future<$0.AgentDefFile> save(
+      $grpc.ServiceCall call, $0.SaveAgentDefRequest request);
+
+  $async.Future<$0.DeleteAgentDefResponse> delete_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.DeleteAgentDefRequest> $request) async {
+    return delete($call, await $request);
+  }
+
+  $async.Future<$0.DeleteAgentDefResponse> delete(
+      $grpc.ServiceCall call, $0.DeleteAgentDefRequest request);
+
+  $async.Future<$0.AgentSession> run_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.RunAgentDefRequest> $request) async {
+    return run($call, await $request);
+  }
+
+  $async.Future<$0.AgentSession> run(
+      $grpc.ServiceCall call, $0.RunAgentDefRequest request);
+
+  $async.Stream<$0.PlayEvent> play_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.PlayRequest> $request) async* {
+    yield* play($call, await $request);
+  }
+
+  $async.Stream<$0.PlayEvent> play(
+      $grpc.ServiceCall call, $0.PlayRequest request);
+
+  $async.Future<$0.StopPlayResponse> stopPlay_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.StopPlayRequest> $request) async {
+    return stopPlay($call, await $request);
+  }
+
+  $async.Future<$0.StopPlayResponse> stopPlay(
+      $grpc.ServiceCall call, $0.StopPlayRequest request);
+
+  $async.Future<$0.PlayList> listPlays_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ListPlaysRequest> $request) async {
+    return listPlays($call, await $request);
+  }
+
+  $async.Future<$0.PlayList> listPlays(
+      $grpc.ServiceCall call, $0.ListPlaysRequest request);
+
+  $async.Future<$0.AskClaudeResponse> ask_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.AskClaudeRequest> $request) async {
+    return ask($call, await $request);
+  }
+
+  $async.Future<$0.AskClaudeResponse> ask(
+      $grpc.ServiceCall call, $0.AskClaudeRequest request);
+
+  $async.Future<$0.AgentDefCapabilities> capabilities_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.AgentDefCapabilitiesRequest> $request) async {
+    return capabilities($call, await $request);
+  }
+
+  $async.Future<$0.AgentDefCapabilities> capabilities(
+      $grpc.ServiceCall call, $0.AgentDefCapabilitiesRequest request);
 }
 
 /// Tasks from the tools the user already works with. The board is served
@@ -2206,6 +2550,23 @@ class PullRequestsClient extends $grpc.Client {
     return $createUnaryCall(_$create, request, options: options);
   }
 
+  /// A pull request's review threads, open and resolved, oldest first.
+  $grpc.ResponseFuture<$0.ThreadList> threads(
+    $0.PullRequestThreadsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$threads, request, options: options);
+  }
+
+  /// Replies to a thread (when `reply` isn't empty) and resolves it (when
+  /// `resolve`).
+  $grpc.ResponseFuture<$0.ReviewThread> answerThread(
+    $0.AnswerThreadRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$answerThread, request, options: options);
+  }
+
   // method descriptors
 
   static final _$list =
@@ -2223,6 +2584,16 @@ class PullRequestsClient extends $grpc.Client {
           '/kumo.v1.PullRequests/Create',
           ($0.CreatePullRequestRequest value) => value.writeToBuffer(),
           $0.PullRequest.fromBuffer);
+  static final _$threads =
+      $grpc.ClientMethod<$0.PullRequestThreadsRequest, $0.ThreadList>(
+          '/kumo.v1.PullRequests/Threads',
+          ($0.PullRequestThreadsRequest value) => value.writeToBuffer(),
+          $0.ThreadList.fromBuffer);
+  static final _$answerThread =
+      $grpc.ClientMethod<$0.AnswerThreadRequest, $0.ReviewThread>(
+          '/kumo.v1.PullRequests/AnswerThread',
+          ($0.AnswerThreadRequest value) => value.writeToBuffer(),
+          $0.ReviewThread.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.PullRequests')
@@ -2256,6 +2627,22 @@ abstract class PullRequestsServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.CreatePullRequestRequest.fromBuffer(value),
         ($0.PullRequest value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.PullRequestThreadsRequest, $0.ThreadList>(
+        'Threads',
+        threads_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.PullRequestThreadsRequest.fromBuffer(value),
+        ($0.ThreadList value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.AnswerThreadRequest, $0.ReviewThread>(
+        'AnswerThread',
+        answerThread_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.AnswerThreadRequest.fromBuffer(value),
+        ($0.ReviewThread value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.PullRequestList> list_Pre($grpc.ServiceCall $call,
@@ -2281,6 +2668,134 @@ abstract class PullRequestsServiceBase extends $grpc.Service {
 
   $async.Future<$0.PullRequest> create(
       $grpc.ServiceCall call, $0.CreatePullRequestRequest request);
+
+  $async.Future<$0.ThreadList> threads_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.PullRequestThreadsRequest> $request) async {
+    return threads($call, await $request);
+  }
+
+  $async.Future<$0.ThreadList> threads(
+      $grpc.ServiceCall call, $0.PullRequestThreadsRequest request);
+
+  $async.Future<$0.ReviewThread> answerThread_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.AnswerThreadRequest> $request) async {
+    return answerThread($call, await $request);
+  }
+
+  $async.Future<$0.ReviewThread> answerThread(
+      $grpc.ServiceCall call, $0.AnswerThreadRequest request);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Releases')
+class ReleasesClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  ReleasesClient(super.channel, {super.options, super.interceptors});
+
+  /// Newest version first: releases and bare tags. Answers are reused for a
+  /// minute unless `refresh`.
+  $grpc.ResponseFuture<$0.ReleaseList> list(
+    $0.ListReleasesRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$list, request, options: options);
+  }
+
+  /// What changed in `tag` since `since` (empty: since the first commit).
+  $grpc.ResponseFuture<$0.ReleaseRange> range(
+    $0.ReleaseRangeRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$range, request, options: options);
+  }
+
+  /// Sets a release's name and/or notes; for a bare tag, creates its
+  /// release; `publish` turns a pre-release or draft into the latest.
+  $grpc.ResponseFuture<$0.Release> edit(
+    $0.EditReleaseRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$edit, request, options: options);
+  }
+
+  // method descriptors
+
+  static final _$list =
+      $grpc.ClientMethod<$0.ListReleasesRequest, $0.ReleaseList>(
+          '/kumo.v1.Releases/List',
+          ($0.ListReleasesRequest value) => value.writeToBuffer(),
+          $0.ReleaseList.fromBuffer);
+  static final _$range =
+      $grpc.ClientMethod<$0.ReleaseRangeRequest, $0.ReleaseRange>(
+          '/kumo.v1.Releases/Range',
+          ($0.ReleaseRangeRequest value) => value.writeToBuffer(),
+          $0.ReleaseRange.fromBuffer);
+  static final _$edit = $grpc.ClientMethod<$0.EditReleaseRequest, $0.Release>(
+      '/kumo.v1.Releases/Edit',
+      ($0.EditReleaseRequest value) => value.writeToBuffer(),
+      $0.Release.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Releases')
+abstract class ReleasesServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.Releases';
+
+  ReleasesServiceBase() {
+    $addMethod($grpc.ServiceMethod<$0.ListReleasesRequest, $0.ReleaseList>(
+        'List',
+        list_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ListReleasesRequest.fromBuffer(value),
+        ($0.ReleaseList value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.ReleaseRangeRequest, $0.ReleaseRange>(
+        'Range',
+        range_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.ReleaseRangeRequest.fromBuffer(value),
+        ($0.ReleaseRange value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.EditReleaseRequest, $0.Release>(
+        'Edit',
+        edit_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.EditReleaseRequest.fromBuffer(value),
+        ($0.Release value) => value.writeToBuffer()));
+  }
+
+  $async.Future<$0.ReleaseList> list_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ListReleasesRequest> $request) async {
+    return list($call, await $request);
+  }
+
+  $async.Future<$0.ReleaseList> list(
+      $grpc.ServiceCall call, $0.ListReleasesRequest request);
+
+  $async.Future<$0.ReleaseRange> range_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.ReleaseRangeRequest> $request) async {
+    return range($call, await $request);
+  }
+
+  $async.Future<$0.ReleaseRange> range(
+      $grpc.ServiceCall call, $0.ReleaseRangeRequest request);
+
+  $async.Future<$0.Release> edit_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.EditReleaseRequest> $request) async {
+    return edit($call, await $request);
+  }
+
+  $async.Future<$0.Release> edit(
+      $grpc.ServiceCall call, $0.EditReleaseRequest request);
 }
 
 /// Pages of the knowledge bases behind the task sources, read only:

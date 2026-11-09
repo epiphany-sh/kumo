@@ -11,8 +11,8 @@ use std::sync::Arc;
 use keyring_core::{CredentialStore, Error as KeyringError};
 
 use super::{
-    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles,
-    ProgramSearch, ScriptShell, Signals, unix,
+    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, ProcessTrees,
+    Processes, ProgramSearch, RunningProcess, ScriptShell, Signals, unix,
 };
 
 pub struct Linux;
@@ -20,6 +20,18 @@ pub struct Linux;
 impl BackgroundPrograms for Linux {
     fn command(program: &OsStr) -> Command {
         unix::command(program)
+    }
+}
+
+impl ProcessTrees for Linux {
+    fn own_group(command: &mut Command) {
+        unix::own_group(command);
+    }
+    fn kill_tree(pid: u32) {
+        unix::kill_tree(pid);
+    }
+    fn kill_group(pid: u32) {
+        unix::kill_group(pid);
     }
 }
 
@@ -86,5 +98,22 @@ impl AgentHooks for Linux {
 impl Signals for Linux {
     fn shutdown() -> impl Future<Output = ()> + Send {
         unix::shutdown()
+    }
+}
+
+impl Processes for Linux {
+    fn process(pid: u32) -> Option<RunningProcess> {
+        let dir = PathBuf::from(format!("/proc/{pid}"));
+        let exe = std::fs::read_link(dir.join("exe")).ok()?;
+        let args = std::fs::read(dir.join("cmdline"))
+            .map(|raw| {
+                raw.split(|b| *b == 0)
+                    .filter(|a| !a.is_empty())
+                    .map(|a| String::from_utf8_lossy(a).into_owned())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let cwd = std::fs::read_link(dir.join("cwd")).unwrap_or_default();
+        Some(RunningProcess { exe, args, cwd })
     }
 }

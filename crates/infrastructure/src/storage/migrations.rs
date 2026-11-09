@@ -92,6 +92,25 @@ const STEPS: &[&str] = &[
         windows     TEXT NOT NULL,
         read_at     INTEGER NOT NULL
     );",
+    // 6: your agents: Kumo's settings for each, and their test runs
+    "CREATE TABLE agent_def_settings (
+        scope       TEXT NOT NULL,
+        repo_path   TEXT NOT NULL,
+        name        TEXT NOT NULL,
+        settings    TEXT NOT NULL,
+        PRIMARY KEY (scope, repo_path, name)
+    );
+    CREATE TABLE agent_def_plays (
+        id          TEXT PRIMARY KEY,
+        scope       TEXT NOT NULL,
+        repo_path   TEXT NOT NULL,
+        name        TEXT NOT NULL,
+        task        TEXT NOT NULL,
+        draft       INTEGER NOT NULL,
+        started     INTEGER NOT NULL,
+        events      TEXT NOT NULL
+    );
+    CREATE INDEX agent_def_plays_by_agent ON agent_def_plays (scope, repo_path, name, started);",
 ];
 
 #[cfg(test)]

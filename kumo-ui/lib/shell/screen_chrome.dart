@@ -60,8 +60,9 @@ class ScreenToolbar extends StatelessWidget {
           KIconButton(icon: KIcons.sidebar, label: 'Show sidebar (⌥⌘S)', onTap: s.toggleSidebar, size: 36, filled: true),
           const SizedBox(width: 8),
         ],
-        Flexible(child: Capsule(child: breadcrumb)),
-        const Spacer(),
+        // All the free room is the breadcrumb's (it hugs its content, on the
+        // left): a view can put a switch in it without squeezing the rest.
+        Expanded(child: Align(alignment: Alignment.centerLeft, child: Capsule(child: breadcrumb))),
         const SizedBox(width: 8),
         // An update waiting takes some of the search field's room.
         SizedBox(width: s.updates.ready == null ? 300 : 220, child: _SearchField(hint: searchHint, shortcut: searchKey, onTap: onSearch)),

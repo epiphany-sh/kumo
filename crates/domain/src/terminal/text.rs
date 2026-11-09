@@ -1,3 +1,40 @@
+/// Whether the program turned bracketed paste on (`ESC[?2004h`) or off
+/// (`ESC[?2004l`), by the last of them in `output`; None when neither is
+/// there.
+pub fn bracketed_paste(output: &[u8]) -> Option<bool> {
+    let on = find_last(output, b"\x1b[?2004h");
+    let off = find_last(output, b"\x1b[?2004l");
+    match (on, off) {
+        (None, None) => None,
+        (Some(_), None) => Some(true),
+        (None, Some(_)) => Some(false),
+        (Some(on), Some(off)) => Some(on > off),
+    }
+}
+
+fn find_last(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack.windows(needle.len()).rposition(|w| w == needle)
+}
+
+/// Whether input to a terminal is someone answering: keys that type, Enter,
+/// Ctrl-something or Esc. Other escape sequences aren't: arrows only move a
+/// selection, and mouse, focus and the terminal's own replies aren't typing.
+pub fn is_answer(input: &[u8]) -> bool {
+    !input.is_empty() && (input[0] != 0x1b || input.len() == 1)
+}
+
+/// `text` as typed into a terminal: escapes dropped, and wrapped as a
+/// bracketed paste when `bracketed` (several lines then go in as one
+/// message instead of one per line).
+pub fn typed_text(text: &str, bracketed: bool) -> String {
+    let text = text.replace('\x1b', "");
+    if bracketed {
+        format!("\x1b[200~{text}\x1b[201~")
+    } else {
+        text
+    }
+}
+
 /// Terminal output as plain text: escape sequences dropped, cursor jumps
 /// read as line breaks and cursor-forward as a space, so lines drawn by
 /// TUIs still come out as lines.
@@ -76,6 +113,34 @@ impl LineSplitter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn typing_answers_and_escape_sequences_do_not() {
+        for typed in [&b"1"[..], b"\r", b"yes\r", b"\x03", b"\x1b"] {
+            assert!(is_answer(typed), "{typed:?}");
+        }
+        for other in [
+            &b""[..],
+            b"\x1b[A",
+            b"\x1b[I",
+            b"\x1b[O",
+            b"\x1b[<0;10;5M",
+            b"\x1b[?1;2c",
+            b"\x1b[200~text\x1b[201~",
+        ] {
+            assert!(!is_answer(other), "{other:?}");
+        }
+    }
+
+    #[test]
+    fn paste_mode_is_the_last_one_set() {
+        assert_eq!(bracketed_paste(b"plain"), None);
+        assert_eq!(bracketed_paste(b"\x1b[?2004h> "), Some(true));
+        assert_eq!(bracketed_paste(b"\x1b[?2004h..\x1b[?2004l$ "), Some(false));
+        assert_eq!(bracketed_paste(b"\x1b[?2004l..\x1b[?2004h"), Some(true));
+        assert_eq!(typed_text("a\x1b[2Jb", true), "\x1b[200~a[2Jb\x1b[201~");
+        assert_eq!(typed_text("ab", false), "ab");
+    }
 
     #[test]
     fn drops_escapes_and_keeps_tui_lines_apart() {

@@ -186,3 +186,41 @@ async fn list_reports_where_each_terminal_started() {
     assert_eq!(cwd_of(&response.terminal_id), Some(cwd));
     assert_eq!(cwd_of(&elsewhere), Some(String::new()));
 }
+
+/// The Terminal view and the Agents view on one terminal: both see all of
+/// it, input from either goes in, and the last resize wins.
+#[tokio::test(flavor = "multi_thread")]
+async fn two_attachments_share_a_terminal() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let id = open(
+        &mut client,
+        "sh",
+        &[
+            "-c",
+            "stty -echo; printf READY; read a; echo first:$a; read b; echo second:$b; read _; stty size",
+        ],
+    )
+    .await;
+
+    let mut terminal_view = Attached::new(&mut client, &id, true).await;
+    terminal_view.read_until("READY").await;
+    let mut agents_view = Attached::new(&mut client, &id, true).await;
+    agents_view.read_until("READY").await;
+
+    terminal_view.send(b"one\n").await;
+    agents_view.read_until("first:one").await;
+    agents_view.send(b"two\n").await;
+    terminal_view.read_until("second:two").await;
+    agents_view.read_until("second:two").await;
+
+    // Last to arrive wins (two streams sent at once may arrive either way).
+    terminal_view.resize(90, 20).await;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    agents_view.resize(120, 40).await;
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    terminal_view.send(b"\n").await;
+    terminal_view.read_until("40 120").await;
+    agents_view.read_until("40 120").await;
+    assert_eq!(terminal_view.read_to_exit().await, 0);
+}

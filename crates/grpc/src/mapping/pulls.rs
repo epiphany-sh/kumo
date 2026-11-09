@@ -1,5 +1,5 @@
 use kumo_application::pulls::{BranchPullRequest, PullRequestList};
-use kumo_domain::pulls::{PrState, PullRequest, ReviewState};
+use kumo_domain::pulls::{PrState, PullRequest, ReviewState, ReviewThread};
 use kumo_proto::v1 as pb;
 
 use super::pipelines::{ci_problem_to, ci_provider_to, ms, state_to};
@@ -36,6 +36,22 @@ pub fn pull_request_to(pr: &PullRequest) -> pb::PullRequest {
         created_at: ms(pr.created_at),
         updated_at: ms(pr.updated_at),
         comment_count: pr.comment_count,
+        open_threads: pr.open_threads.unwrap_or_default(),
+        has_threads: pr.open_threads.is_some(),
+    }
+}
+
+pub fn review_thread_to(thread: &ReviewThread) -> pb::ReviewThread {
+    pb::ReviewThread {
+        id: thread.id.clone(),
+        author: thread.author.clone(),
+        path: thread.path.clone(),
+        line: thread.line.unwrap_or_default(),
+        body: thread.body.clone(),
+        time_unix: thread
+            .created_at
+            .map_or(0, |t| t.as_unix_nanos() / 1_000_000_000),
+        resolved: thread.resolved,
     }
 }
 

@@ -25,12 +25,13 @@ impl PtySystem for PortablePtySystem {
         let reader = pair.master.try_clone_reader().map_err(spawn_error)?;
         let writer = pair.master.take_writer().map_err(spawn_error)?;
         let killer = child.clone_killer();
+        let pid = child.process_id();
         Ok(PtyProcess {
             reader,
             writer,
             master: Box::new(PortableMaster(pair.master)),
             child: Box::new(PortableChild(child)),
-            killer: Box::new(PortableKiller(killer)),
+            killer: Box::new(PortableKiller { killer, pid }),
         })
     }
 }
@@ -70,6 +71,13 @@ impl PtyMaster for PortableMaster {
             .resize(pty_size(size))
             .map_err(|e| TerminalError::Io(e.to_string()))
     }
+
+    #[cfg(unix)]
+    fn foreground(&self) -> Option<u32> {
+        self.0
+            .process_group_leader()
+            .and_then(|pid| u32::try_from(pid).ok())
+    }
 }
 
 struct PortableChild(Box<dyn portable_pty::Child + Send + Sync>);
@@ -86,10 +94,26 @@ impl PtyChild for PortableChild {
     }
 }
 
-struct PortableKiller(Box<dyn ChildKiller + Send + Sync>);
+struct PortableKiller {
+    killer: Box<dyn ChildKiller + Send + Sync>,
+    pid: Option<u32>,
+}
 
 impl PtyKiller for PortableKiller {
     fn kill(&mut self) -> Result<(), TerminalError> {
-        self.0.kill().map_err(|e| TerminalError::Io(e.to_string()))
+        self.killer
+            .kill()
+            .map_err(|e| TerminalError::Io(e.to_string()))
+    }
+
+    fn kill_tree(&mut self) -> Result<(), TerminalError> {
+        let Some(pid) = self.pid else {
+            return self.kill();
+        };
+        crate::platform::kill_process_tree(pid);
+        // Already dead, most likely, and that's no failure: it can be gone
+        // by now ("no such process").
+        let _ = self.kill();
+        Ok(())
     }
 }

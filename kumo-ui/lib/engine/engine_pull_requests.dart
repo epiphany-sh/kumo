@@ -84,4 +84,5 @@ PullRequestInfo pullRequestFrom(pb.PullRequest p) => PullRequestInfo(
       created: _time(p.createdAt),
       updated: _time(p.updatedAt),
       commentCount: p.commentCount,
+      openThreads: p.hasThreads ? p.openThreads : null,
     );

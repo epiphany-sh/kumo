@@ -18,6 +18,10 @@ class _Agents extends MockAgentsSource {
   String worktree = '';
   final sent = <String>[];
 
+  /// Nothing started by hand in a terminal here.
+  @override
+  List<TerminalAgent> get terminalAgents => const [];
+
   @override
   List<AgentRun> get runs => [
         AgentRun(

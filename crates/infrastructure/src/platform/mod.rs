@@ -43,6 +43,17 @@ pub trait BackgroundPrograms {
     fn command(program: &OsStr) -> Command;
 }
 
+/// Stopping a program along with everything it started (an agent's tools).
+pub trait ProcessTrees {
+    /// Sets `command` up for [`ProcessTrees::kill_tree`].
+    fn own_group(command: &mut Command);
+    /// Kills `pid`, started with [`ProcessTrees::own_group`], and what it
+    /// started, even in groups of its own.
+    fn kill_tree(pid: u32);
+    /// Kills what's left of the group of `pid`, which is gone already.
+    fn kill_group(pid: u32);
+}
+
 /// Where programs are found: the user's PATH and what counts as a program.
 pub trait ProgramSearch {
     /// The PATH the user's own shell sets up, when it isn't the one Kumo
@@ -95,6 +106,21 @@ pub trait AgentHooks {
     /// Whether Claude Code runs a POSIX `sh` status line command (Kumo's
     /// usage hook is one).
     fn sh_status_line() -> bool;
+}
+
+/// A running process, as seen from outside.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunningProcess {
+    pub exe: PathBuf,
+    /// Its arguments, the program first.
+    pub args: Vec<String>,
+    pub cwd: PathBuf,
+}
+
+/// Reading other processes (an agent CLI started by hand in a terminal).
+pub trait Processes {
+    /// What `pid` runs and where; None when the OS can't tell.
+    fn process(pid: u32) -> Option<RunningProcess>;
 }
 
 /// How the OS asks the daemon to stop.
@@ -166,6 +192,26 @@ pub fn obsidian_settings(home: &Path) -> PathBuf {
 /// See [`AgentHooks::sh_status_line`].
 pub fn sh_status_line() -> bool {
     Current::sh_status_line()
+}
+
+/// See [`ProcessTrees::own_group`].
+pub fn own_process_group(command: &mut Command) {
+    Current::own_group(command);
+}
+
+/// See [`ProcessTrees::kill_tree`].
+pub fn kill_process_tree(pid: u32) {
+    Current::kill_tree(pid);
+}
+
+/// See [`ProcessTrees::kill_group`].
+pub fn kill_process_group(pid: u32) {
+    Current::kill_group(pid);
+}
+
+/// See [`Processes::process`].
+pub fn process(pid: u32) -> Option<RunningProcess> {
+    Current::process(pid)
 }
 
 /// See [`Signals::shutdown`].

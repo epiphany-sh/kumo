@@ -478,6 +478,8 @@ service Git {
   // `git reset --soft HEAD~1`: the changes stay, staged.
   rpc UndoLastCommit(WorktreeRequest) returns (GitActionResponse);
   rpc Log(LogRequest) returns (LogResponse);
+  // What one commit changed, file by file, with its hunks.
+  rpc ShowCommit(ShowCommitRequest) returns (CommitDetail);
 }
 
 message WorktreeRequest {
@@ -613,6 +615,9 @@ message CommitResponse {
 message LogRequest {
   string worktree_path = 1;
   uint32 limit = 2;
+  // Main plus the commits of every other branch (local and remote) that
+  // aren't on main yet, each with `branch` set. Newest first.
+  bool all_branches = 3;
 }
 
 message Commit {
@@ -621,10 +626,55 @@ message Commit {
   string subject = 3;
   string author = 4;
   uint64 time_unix = 5;
+  // The branch it's on when it isn't on main yet (all_branches only).
+  string branch = 6;
+  // The pull request it came from: `#518` (GitHub/Bitbucket), `!228`
+  // (GitLab), read from the message; empty when none.
+  string pr_ref = 7;
 }
 
 message LogResponse {
   repeated Commit commits = 1;
+}
+
+message ShowCommitRequest {
+  string worktree_path = 1;
+  // A commit sha (full or abbreviated).
+  string sha = 2;
+}
+
+message DiffHunk {
+  uint32 old_start = 1;
+  uint32 new_start = 2;
+  // What git prints after the second @@ (the enclosing function).
+  string section = 3;
+  repeated DiffLine lines = 4;
+}
+
+message CommitFile {
+  string path = 1;
+  // Renames: where it was.
+  string old_path = 2;
+  // ADDED, MODIFIED, DELETED, RENAMED or TYPE_CHANGED.
+  ChangeKind kind = 3;
+  uint32 added = 4;
+  uint32 deleted = 5;
+  bool binary = 6;
+  // Empty for binaries or when cut.
+  repeated DiffHunk hunks = 7;
+  // Hunks left out (the file changed too much).
+  bool cut = 8;
+}
+
+message CommitDetail {
+  string sha = 1;
+  // The message after the subject line.
+  string body = 2;
+  // Short shas.
+  repeated string parents = 3;
+  uint64 time_unix = 4;
+  // At most 300; merges against their first parent.
+  repeated CommitFile files = 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -662,6 +712,10 @@ service Agents {
   rpc Usage(UsageRequest) returns (UsageReport);
   // Types the agent's own compact command (/compact, /compress) and submits it.
   rpc Compact(CompactAgentRequest) returns (AgentSession);
+  // Types text into one of the profile's terminals (as a bracketed paste
+  // when the terminal turned it on), then Enter when asked: for an agent
+  // CLI started there by hand.
+  rpc SendToTerminal(SendToTerminalRequest) returns (SendToTerminalResponse);
 }
 
 message AgentProvider {
@@ -753,6 +807,12 @@ enum AgentContextKind {
   AGENT_CONTEXT_KIND_DOC = 1;
   // Code selected in a file.
   AGENT_CONTEXT_KIND_CODE = 2;
+  // A pull request: its diff and description, saved for the run.
+  AGENT_CONTEXT_KIND_PULL_REQUEST = 3;
+  // Files or a folder of a worktree: their paths are listed.
+  AGENT_CONTEXT_KIND_FILES = 4;
+  // A web page, fetched once and saved as text.
+  AGENT_CONTEXT_KIND_LINK = 5;
 }
 
 // A ticket, page or piece of code an agent was given.
@@ -763,6 +823,9 @@ message AgentContext {
   // Where it lives, e.g. "Jira" or "Confluence · Pricing".
   string detail = 3;
   string url = 4;
+  // Its id where it comes from (a task's or a page's), when Kumo has one:
+  // a run reads it whole from there.
+  string id = 5;
 }
 
 enum AgentEventKind {
@@ -815,6 +878,20 @@ message AgentSession {
   repeated AgentContext context = 14;
   // Oldest first; the last 80.
   repeated AgentEvent events = 15;
+  // The agent of yours it runs (`claude --agent <name>`); empty: the CLI
+  // itself.
+  string agent_name = 16;
+  // What it was given for the run, written as files (`--add-dir`); empty
+  // when it was given nothing.
+  string context_dir = 17;
+  // NEEDS_INPUT because it asked something (an approval), so what's typed
+  // now answers it; false when it's only quiet.
+  bool asked = 18;
+  // How long it worked before state_since; waiting for you doesn't count.
+  uint64 worked_ms = 19;
+  // Its CLI says when it asks something. False: `asked` is never set, and
+  // what's typed could be taken as an answer.
+  bool tells_asking = 20;
 }
 
 message StopAgentRequest {
@@ -841,7 +918,36 @@ message WatchAgentsRequest {}
 message AgentsSnapshot {
   uint64 version = 1;
   repeated AgentSession sessions = 2;
+  // Agent CLIs someone started by hand in one of the profile's terminals
+  // (typed `claude` in a shell). Empty where the daemon can't tell
+  // (Windows).
+  repeated TerminalAgent terminal_agents = 3;
 }
+
+// A known agent CLI in the foreground of a terminal Kumo runs.
+message TerminalAgent {
+  string terminal_id = 1;
+  // The provider it matches (claude, codex…).
+  string provider_id = 2;
+  // The program as it runs, e.g. "claude".
+  string program = 3;
+  // Its working directory.
+  string cwd = 4;
+  // Read from its screen, like a session's: NEEDS_INPUT while it asks
+  // something (text typed now would answer it).
+  AgentState state = 5;
+  // Mid-turn: producing output.
+  bool busy = 6;
+}
+
+message SendToTerminalRequest {
+  string terminal_id = 1;
+  string text = 2;
+  // Press Enter after the text.
+  bool submit = 3;
+}
+
+message SendToTerminalResponse {}
 
 // Usage: only what an agent's CLI itself reports (Claude Code's status
 // line, Codex's session files). What can't be read is left out, never
@@ -901,6 +1007,195 @@ message UsageReport {
 
 message CompactAgentRequest {
   string id = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Agent definitions: your own agents (Claude Code subagents)
+// ---------------------------------------------------------------------------
+//
+// The files Claude Code reads (`.claude/agents/<name>.md`), personal and per
+// repository, plus Kumo's own settings for each. The daemon never parses
+// them: it moves the Markdown, runs `claude` and streams what it prints. The
+// UI owns the format (kumo-ui/lib/data/agent_defs.dart).
+
+service AgentDefs {
+  // Every agent file of the workspace: personal, then each repository's.
+  rpc List(ListAgentDefsRequest) returns (AgentDefList);
+  // Writes the file (and Kumo's settings for it). With `previous`, a rename
+  // or move: the old file goes once the new one is written.
+  rpc Save(SaveAgentDefRequest) returns (AgentDefFile);
+  rpc Delete(DeleteAgentDefRequest) returns (DeleteAgentDefResponse);
+  // Starts it in a terminal of its own; the session shows in Agents.Watch.
+  rpc Run(RunAgentDefRequest) returns (AgentSession);
+  // A headless test run: Claude Code's stream-json lines, as they come.
+  rpc Play(PlayRequest) returns (stream PlayEvent);
+  rpc StopPlay(StopPlayRequest) returns (StopPlayResponse);
+  // The last 10 test runs of an agent, kept across restarts.
+  rpc ListPlays(ListPlaysRequest) returns (PlayList);
+  // One-shot `claude -p`: drafts an agent, improves instructions.
+  rpc Ask(AskClaudeRequest) returns (AskClaudeResponse);
+  // Skills and MCP servers an agent can be given; whether triggers run.
+  rpc Capabilities(AgentDefCapabilitiesRequest) returns (AgentDefCapabilities);
+}
+
+enum AgentDefScope {
+  // The workspace's Claude Code folder: `<CLAUDE_CONFIG_DIR>/agents`.
+  AGENT_DEF_SCOPE_PERSONAL = 0;
+  // `<repo main checkout>/.claude/agents`.
+  AGENT_DEF_SCOPE_PROJECT = 1;
+}
+
+enum AgentDefTrigger {
+  AGENT_DEF_TRIGGER_PULL_REQUEST = 0;
+  AGENT_DEF_TRIGGER_SCHEDULE = 1;
+}
+
+// Kumo's own settings for an agent: not subagent fields, kept by the daemon.
+message AgentDefSettings {
+  // The daemon stops a run when it's up.
+  optional uint32 max_minutes = 1;
+  // Headless runs only, where Claude Code takes a budget.
+  optional double max_cost_usd = 2;
+  // Saved; they don't run yet (AgentDefCapabilities.triggers_supported).
+  repeated AgentDefTrigger triggers = 3;
+}
+
+message AgentDefFile {
+  AgentDefScope scope = 1;
+  // Project agents: the repository (main checkout path and name).
+  string repo_path = 2;
+  string repo_name = 3;
+  // The file's stem: what `claude --agent <name>` takes.
+  string name = 4;
+  // The whole file, as is.
+  string markdown = 5;
+  AgentDefSettings settings = 6;
+  string file_path = 7;
+  int64 modified_unix_ms = 8;
+}
+
+message ListAgentDefsRequest {}
+
+message AgentDefList {
+  repeated AgentDefFile agents = 1;
+}
+
+message SaveAgentDefRequest {
+  // Its markdown and settings; file_path is ignored.
+  AgentDefFile agent = 1;
+  // Where it was saved before (a rename or a move).
+  optional AgentDefFile previous = 2;
+}
+
+message DeleteAgentDefRequest {
+  AgentDefFile agent = 1;
+}
+
+message DeleteAgentDefResponse {}
+
+message RunAgentDefRequest {
+  AgentDefFile agent = 1;
+  // Set when it isn't found by name where it runs (a project agent outside
+  // its repo): passed as `--agents`. Built by the UI (agentInlineJson).
+  string inline_json = 2;
+  oneof where {
+    // A worktree of the workspace.
+    string worktree_path = 3;
+    // A repository's main checkout: a new worktree from its default branch.
+    string new_worktree_repo = 4;
+    // A repository, branch or pull/merge request link.
+    string link_url = 5;
+    // Any existing folder.
+    string folder = 6;
+    // An empty folder Kumo makes (removed after 7 days).
+    bool scratch = 7;
+  }
+  // Its first message; empty: the user types.
+  string prompt = 8;
+  // Written into the run's folder (`--add-dir`).
+  repeated AgentContext context = 9;
+  uint32 cols = 10;
+  uint32 rows = 11;
+}
+
+message PlayRequest {
+  string name = 1;
+  // The draft as the UI has it (unsaved edits included).
+  string inline_json = 2;
+  string task = 3;
+  string worktree_path = 4;
+  // It can change files: it runs in a detached worktree of HEAD, removed
+  // after.
+  bool throwaway = 5;
+  repeated AgentContext context = 6;
+  optional uint32 max_turns = 7;
+  optional uint32 max_minutes = 8;
+  // Which agent's history it goes in (as saved; a draft may have another
+  // name).
+  AgentDefFile agent = 9;
+  // Passed to Claude Code's budget flag when it has one.
+  optional double max_cost_usd = 10;
+  // The unsaved draft ran (not the saved file).
+  bool draft = 11;
+}
+
+message PlayEvent {
+  string play_id = 1;
+  oneof kind {
+    // One stdout line of stream-json, as is.
+    string line = 2;
+    // The exit code; the stream ends after it.
+    int32 exited = 3;
+  }
+  // Since the start.
+  int64 at_ms = 4;
+}
+
+message StopPlayRequest {
+  string play_id = 1;
+}
+
+message StopPlayResponse {}
+
+message ListPlaysRequest {
+  AgentDefFile agent = 1;
+}
+
+message PlayRecord {
+  string play_id = 1;
+  string task = 2;
+  bool draft = 3;
+  int64 started_unix_ms = 4;
+  repeated PlayEvent events = 5;
+  // Still running (its events so far).
+  bool running = 6;
+}
+
+message PlayList {
+  // Newest first.
+  repeated PlayRecord plays = 1;
+}
+
+message AskClaudeRequest {
+  string prompt = 1;
+  // Where it reads from; empty: an empty folder.
+  string cwd = 2;
+}
+
+message AskClaudeResponse {
+  string text = 1;
+}
+
+message AgentDefCapabilitiesRequest {}
+
+message AgentDefCapabilities {
+  // Folder names under `<CLAUDE_CONFIG_DIR>/skills` and each repository's
+  // `.claude/skills`.
+  repeated string skills = 1;
+  // The MCP servers Claude Code is configured with.
+  repeated string mcp_servers = 2;
+  // False until triggers run; saving them works either way.
+  bool triggers_supported = 3;
 }
 
 // ---------------------------------------------------------------------------
@@ -1452,6 +1747,11 @@ service PullRequests {
   rpc ForBranch(BranchPullRequestRequest) returns (BranchPullRequest);
   // Opens a pull request from a worktree's (pushed) branch.
   rpc Create(CreatePullRequestRequest) returns (PullRequest);
+  // A pull request's review threads, open and resolved, oldest first.
+  rpc Threads(PullRequestThreadsRequest) returns (ThreadList);
+  // Replies to a thread (when `reply` isn't empty) and resolves it (when
+  // `resolve`).
+  rpc AnswerThread(AnswerThreadRequest) returns (ReviewThread);
 }
 
 enum PrState {
@@ -1494,6 +1794,9 @@ message PullRequest {
   int64 created_at = 16;
   int64 updated_at = 17;
   uint32 comment_count = 18;
+  // Unresolved review threads, when `has_threads` (the host's list said).
+  uint32 open_threads = 19;
+  bool has_threads = 20;
 }
 
 message ListPullRequestsRequest {
@@ -1529,6 +1832,144 @@ message CreatePullRequestRequest {
   // Target branch; empty = the repository's default branch.
   string base = 4;
   bool draft = 5;
+}
+
+message PullRequestThreadsRequest {
+  // The repository's main checkout.
+  string repo_path = 1;
+  uint64 number = 2;
+}
+
+message ReviewThread {
+  // The host's thread (GitLab: discussion; Bitbucket: comment) id.
+  string id = 1;
+  // Of its first comment.
+  string author = 2;
+  string path = 3;
+  // 0 = not on a line.
+  uint32 line = 4;
+  // Its first comment, Markdown.
+  string body = 5;
+  uint64 time_unix = 6;
+  bool resolved = 7;
+}
+
+message ThreadList {
+  repeated ReviewThread threads = 1;
+}
+
+message AnswerThreadRequest {
+  string repo_path = 1;
+  uint64 number = 2;
+  string thread_id = 3;
+  // Posted as a reply first, when not empty.
+  string reply = 4;
+  bool resolve = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Releases and tags
+// ---------------------------------------------------------------------------
+//
+// Tags come from git; releases from the host, with the same tokens as pull
+// requests. Bitbucket has tags only.
+
+service Releases {
+  // Newest version first: releases and bare tags. Answers are reused for a
+  // minute unless `refresh`.
+  rpc List(ListReleasesRequest) returns (ReleaseList);
+  // What changed in `tag` since `since` (empty: since the first commit).
+  rpc Range(ReleaseRangeRequest) returns (ReleaseRange);
+  // Sets a release's name and/or notes; for a bare tag, creates its
+  // release; `publish` turns a pre-release or draft into the latest.
+  rpc Edit(EditReleaseRequest) returns (Release);
+}
+
+enum ReleaseKind {
+  RELEASE_KIND_RELEASE = 0;
+  RELEASE_KIND_PRE_RELEASE = 1;
+  RELEASE_KIND_DRAFT = 2;
+  // A tag nobody turned into a release.
+  RELEASE_KIND_TAG_ONLY = 3;
+}
+
+message ReleaseAsset {
+  string name = 1;
+  // Bytes; 0 when the host doesn't say.
+  uint64 size = 2;
+}
+
+message Release {
+  string tag = 1;
+  ReleaseKind kind = 2;
+  string name = 3;
+  // Markdown; empty = none.
+  string notes = 4;
+  // Display name (or login).
+  string author = 5;
+  // The tagged commit; empty for a draft without a tag yet.
+  string sha = 6;
+  // Published, else tagged.
+  uint64 time_unix = 7;
+  // The release page, else the tag's.
+  string url = 8;
+  // Latest run on the tagged commit; unset when unknown.
+  optional CiState checks = 9;
+  reserved 10;
+  repeated ReleaseAsset assets = 11;
+}
+
+message ListReleasesRequest {
+  // The repository's main checkout.
+  string repo_path = 1;
+  // 0 = 50.
+  uint32 limit = 2;
+  // Fetch tags and ask the host even if the last answer is recent.
+  bool refresh = 3;
+}
+
+message ReleaseList {
+  repeated Release releases = 1;
+  // How many more there are beyond `limit`.
+  uint32 older = 2;
+  // Why the host's releases couldn't be read: tags are listed alone.
+  optional CiProblem problem = 3;
+}
+
+message ReleaseRangeRequest {
+  string repo_path = 1;
+  string tag = 2;
+  // Empty: since the first commit.
+  string since = 3;
+}
+
+message MergedPr {
+  // `#518`, `!228`.
+  string ref = 1;
+  string title = 2;
+  string author = 3;
+  // `PRC-412`; empty when none.
+  string ticket = 4;
+}
+
+message ReleaseRange {
+  // As asked; when it isn't an ancestor of `tag`, counts start at their
+  // merge base.
+  string since = 1;
+  uint32 commits = 2;
+  uint32 added = 3;
+  uint32 deleted = 4;
+  uint32 files = 5;
+  // Newest first.
+  repeated MergedPr prs = 6;
+}
+
+message EditReleaseRequest {
+  string repo_path = 1;
+  string tag = 2;
+  optional string name = 3;
+  optional string notes = 4;
+  bool publish = 5;
 }
 
 // ---------------------------------------------------------------------------

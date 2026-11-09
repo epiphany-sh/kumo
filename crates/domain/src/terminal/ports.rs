@@ -34,6 +34,11 @@ impl fmt::Debug for PtyProcess {
 /// Master side of the PTY. Dropping it releases the pseudo-terminal.
 pub trait PtyMaster: Send {
     fn resize(&self, size: TerminalSize) -> Result<(), TerminalError>;
+    /// The process in the foreground (the leader of the terminal's
+    /// foreground process group); None where the OS can't tell.
+    fn foreground(&self) -> Option<u32> {
+        None
+    }
 }
 
 /// The spawned process, for waiting on its exit.
@@ -45,4 +50,6 @@ pub trait PtyChild: Send {
 /// Kills the spawned process from any thread.
 pub trait PtyKiller: Send + Sync {
     fn kill(&mut self) -> Result<(), TerminalError>;
+    /// Kills it and what it started, even in process groups of their own.
+    fn kill_tree(&mut self) -> Result<(), TerminalError>;
 }

@@ -5,6 +5,7 @@ import 'package:kumo_ui/data/agents_source.dart';
 import 'package:kumo_ui/data/models.dart';
 import 'package:kumo_ui/overlays/agent_settings.dart';
 import 'package:kumo_ui/overlays/new_agent_dialog.dart';
+import 'package:kumo_ui/terminal/terminal_view.dart';
 import 'package:kumo_ui/theme/kumo_theme.dart';
 import 'package:kumo_ui/theme/palette.dart';
 import 'package:kumo_ui/views/agents_screen.dart';
@@ -19,6 +20,11 @@ class _FakeAgents extends AgentsSource {
   List<AgentRun> runs;
   final saved = <(String?, bool)>[];
   final stopped = <String>[];
+
+  set runsNow(List<AgentRun> value) {
+    runs = value;
+    notifyListeners();
+  }
 
   @override
   bool get live => true;
@@ -118,5 +124,46 @@ void main() {
     await tester.tap(find.text('Stop'));
     await tester.pump();
     expect(agents.stopped, ['a1']);
+  });
+
+  testWidgets('the note about a question shows only when it asked, and doesn’t resize its terminal', (tester) async {
+    AgentRun run({required AgentStatus status, bool asked = false}) => AgentRun(
+          id: 'a1',
+          providerId: 'claude',
+          providerName: 'Claude Code',
+          short: 'CC',
+          worktreePath: '/wt/app/x',
+          terminalId: 't1',
+          title: 'Fix the flaky test',
+          status: status,
+          asked: asked,
+          startedAt: DateTime.now(),
+        );
+    const note = 'It’s asking you something: answer it in its terminal.';
+    final agents = _FakeAgents(runs: [run(status: AgentStatus.running)]);
+    await pump(tester, const AgentsScreen(), agents);
+    await tester.tap(find.byTooltip('See its whole output here, and type into it').first);
+    await tester.pump();
+    final terminal = find.byType(TerminalCanvas);
+    final size = tester.getSize(terminal);
+
+    // Only quiet: its turn, but it isn't asking anything.
+    agents.runsNow = [run(status: AgentStatus.needsYou)];
+    await tester.pump();
+    expect(find.text(note), findsNothing);
+    expect(tester.getSize(terminal), size);
+
+    agents.runsNow = [run(status: AgentStatus.needsYou, asked: true)];
+    await tester.pump();
+    expect(find.text(note), findsOneWidget);
+    expect(tester.getSize(terminal), size, reason: 'a resize makes the agent redraw');
+    expect(tester.takeException(), isNull);
+  });
+
+  test('your agents need Claude Code: said only when another CLI is what’s connected', () {
+    AgentProviderInfo cli(String id) => AgentProviderInfo(id: id, name: id, short: 'XX', program: id, args: '', custom: false, enabled: true, isDefault: false, installed: true, resolvedPath: '', installHint: '', takesPrompt: true, hasLogin: false);
+    expect(_FakeAgents().lacksClaude, isFalse, reason: 'nothing connected yet has its own message');
+    expect(_FakeAgents(providers: [cli('codex')]).lacksClaude, isTrue);
+    expect(_FakeAgents(providers: [cli('codex'), cli('claude')]).lacksClaude, isFalse);
   });
 }

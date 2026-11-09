@@ -4,6 +4,7 @@
 //! - [`pty`]: pseudo-terminals via `portable-pty` (ConPTY on Windows).
 //! - [`channel`]: the release channel a build belongs to (stable, beta).
 //! - [`agents`]: finding coding-agent CLIs on the user's PATH.
+//! - [`agent_defs`]: your agents' files, headless runs and pages they read.
 //! - [`discovery`]: the `daemon.json` discovery file.
 //! - [`security`]: secure randomness for auth tokens.
 //! - [`git`]: git repositories through the `git` command line.
@@ -14,6 +15,7 @@
 //! - [`tasks`]: connectors to the tools tasks come from.
 //! - [`secrets`]: API tokens in the OS keychain.
 
+pub mod agent_defs;
 pub mod agents;
 pub mod channel;
 pub mod ci;

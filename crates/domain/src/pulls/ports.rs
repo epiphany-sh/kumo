@@ -1,6 +1,6 @@
 use crate::pipelines::{CiProblem, CiProvider, CiTarget};
 
-use super::{NewPullRequest, PullRequest};
+use super::{NewPullRequest, PullRequest, ReviewThread, ThreadAnswer};
 
 /// One host's pull requests. Blocking: callers run it off the async
 /// runtime. `target.branch` is ignored by [`list`](Self::list).
@@ -25,4 +25,22 @@ pub trait PullRequestClient: Send + Sync + 'static {
         token: &str,
         new: &NewPullRequest,
     ) -> Result<PullRequest, CiProblem>;
+
+    /// Review threads of pull request `number`, open and resolved, oldest
+    /// first.
+    fn threads(
+        &self,
+        target: &CiTarget,
+        token: &str,
+        number: u64,
+    ) -> Result<Vec<ReviewThread>, CiProblem>;
+
+    /// Replies to a thread and/or resolves it; the thread as it is then.
+    fn answer_thread(
+        &self,
+        target: &CiTarget,
+        token: &str,
+        number: u64,
+        answer: &ThreadAnswer,
+    ) -> Result<ReviewThread, CiProblem>;
 }

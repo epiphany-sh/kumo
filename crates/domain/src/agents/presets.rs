@@ -18,6 +18,11 @@ pub struct AgentPreset {
     /// Kumo can read its plan limits and context window (a
     /// [`UsageSource`](super::UsageSource) reads it).
     pub reads_usage: bool,
+    /// Arguments that make the CLI say when it's asking something (see
+    /// [`ActivityTracker`](super::ActivityTracker)): none print a sign on
+    /// their own in a terminal they don't know, and they keep redrawing
+    /// meanwhile. Empty: Kumo can't tell.
+    pub ask_notice: &'static [&'static str],
 }
 
 /// Known CLIs. Prompts go as arguments only where the CLI documents it
@@ -34,6 +39,7 @@ pub const PRESETS: &[AgentPreset] = &[
         install_hint: "npm install -g @anthropic-ai/claude-code",
         compact_command: Some("/compact"),
         reads_usage: true,
+        ask_notice: &["--settings", r#"{"preferredNotifChannel":"iterm2"}"#],
     },
     AgentPreset {
         id: "codex",
@@ -45,6 +51,14 @@ pub const PRESETS: &[AgentPreset] = &[
         install_hint: "npm install -g @openai/codex",
         compact_command: Some("/compact"),
         reads_usage: true,
+        ask_notice: &[
+            "-c",
+            r#"tui.notifications=["approval-requested"]"#,
+            "-c",
+            r#"tui.notification_method="osc9""#,
+            "-c",
+            r#"tui.notification_condition="always""#,
+        ],
     },
     AgentPreset {
         id: "gemini",
@@ -56,6 +70,7 @@ pub const PRESETS: &[AgentPreset] = &[
         install_hint: "npm install -g @google/gemini-cli",
         compact_command: Some("/compress"),
         reads_usage: false,
+        ask_notice: &[],
     },
     AgentPreset {
         id: "copilot",
@@ -67,6 +82,7 @@ pub const PRESETS: &[AgentPreset] = &[
         install_hint: "npm install -g @github/copilot",
         compact_command: None,
         reads_usage: false,
+        ask_notice: &[],
     },
     AgentPreset {
         id: "grok",
@@ -78,6 +94,7 @@ pub const PRESETS: &[AgentPreset] = &[
         install_hint: "Install a Grok coding CLI (xAI's Grok Build or a community grok-cli) so `grok` is on your PATH",
         compact_command: None,
         reads_usage: false,
+        ask_notice: &[],
     },
     AgentPreset {
         id: "opencode",
@@ -89,6 +106,7 @@ pub const PRESETS: &[AgentPreset] = &[
         install_hint: "npm install -g opencode-ai",
         compact_command: None,
         reads_usage: false,
+        ask_notice: &[],
     },
     AgentPreset {
         id: "cursor",
@@ -100,6 +118,7 @@ pub const PRESETS: &[AgentPreset] = &[
         install_hint: "curl https://cursor.com/install -fsS | bash",
         compact_command: None,
         reads_usage: false,
+        ask_notice: &[],
     },
     AgentPreset {
         id: "aider",
@@ -111,6 +130,7 @@ pub const PRESETS: &[AgentPreset] = &[
         install_hint: "brew install aider",
         compact_command: None,
         reads_usage: false,
+        ask_notice: &[],
     },
     AgentPreset {
         id: "qwen",
@@ -122,6 +142,7 @@ pub const PRESETS: &[AgentPreset] = &[
         install_hint: "npm install -g @qwen-code/qwen-code",
         compact_command: None,
         reads_usage: false,
+        ask_notice: &[],
     },
     AgentPreset {
         id: "amp",
@@ -133,6 +154,7 @@ pub const PRESETS: &[AgentPreset] = &[
         install_hint: "npm install -g @sourcegraph/amp",
         compact_command: None,
         reads_usage: false,
+        ask_notice: &[],
     },
 ];
 
