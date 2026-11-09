@@ -107,9 +107,13 @@ impl PtyKiller for PortableKiller {
     }
 
     fn kill_tree(&mut self) -> Result<(), TerminalError> {
-        if let Some(pid) = self.pid {
-            crate::platform::kill_process_tree(pid);
-        }
-        self.kill()
+        let Some(pid) = self.pid else {
+            return self.kill();
+        };
+        crate::platform::kill_process_tree(pid);
+        // Already dead, most likely, and that's no failure: it can be gone
+        // by now ("no such process").
+        let _ = self.kill();
+        Ok(())
     }
 }

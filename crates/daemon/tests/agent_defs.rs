@@ -816,10 +816,11 @@ while :; do /bin/sleep 0.05; printf .; done
 "#,
     )
     .unwrap();
-    // A minute lasts 300 ms in tests.
+    // A minute lasts 300 ms in tests: 3 s, so it gets to ask first (starting
+    // up counts as working).
     let agent = pb::AgentDefFile {
         settings: Some(pb::AgentDefSettings {
-            max_minutes: Some(1),
+            max_minutes: Some(10),
             ..Default::default()
         }),
         ..personal("patient")
@@ -837,8 +838,8 @@ while :; do /bin/sleep 0.05; printf .; done
         .into_inner();
     session_where(&mut s.client, &session.id, |x| x.asked).await;
 
-    // Three times its limit, waiting.
-    tokio::time::sleep(std::time::Duration::from_millis(900)).await;
+    // Past its whole limit, waiting.
+    tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
     let waiting = session_where(&mut s.client, &session.id, |_| true).await;
     assert_eq!(waiting.state(), pb::AgentState::NeedsInput, "{waiting:?}");
 
@@ -849,7 +850,7 @@ while :; do /bin/sleep 0.05; printf .; done
     })
     .await;
     assert_eq!(ended.exit_code, 124);
-    assert!(ended.worked_ms >= 250, "{ended:?}");
+    assert!(ended.worked_ms >= 2500, "{ended:?}");
 }
 
 async fn play(client: &mut KumoClient, request: pb::PlayRequest) -> Vec<pb::PlayEvent> {
