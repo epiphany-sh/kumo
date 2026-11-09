@@ -8,7 +8,7 @@
       "uuid": "{6b1e0a52-3a4f-4f0e-9a9c-2b5d0f1e7c11}",
       "build_number": 132,
       "creator": { "display_name": "Ana" },
-      "repository": { "full_name": "fravega-identity/users-api" },
+      "repository": { "full_name": "workspace-1-identity/users-api" },
       "target": {
         "type": "pipeline_ref_target",
         "ref_type": "branch",

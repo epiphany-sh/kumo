@@ -11,6 +11,7 @@ import 'package:kumo_ui/data/agents_source.dart';
 import 'package:kumo_ui/data/models.dart' show AgentStatus;
 import 'package:kumo_ui/views/agents_library.dart' show lineDiff;
 import 'package:kumo_ui/views/agents_screen.dart';
+import 'package:kumo_ui/widgets/controls.dart' show KSegmented;
 
 Future<AppState> _pumpAgents(WidgetTester tester, {AgentsMode mode = AgentsMode.library}) async {
   tester.view.physicalSize = const Size(1440, 1000);
@@ -108,7 +109,7 @@ void main() {
       expect(agentDescriptionCheck(ok.copyWith(description: 'Reviews Go pull requests for code that could have been reused.')).text, startsWith('Add when'));
       expect(agentSavable(ok.copyWith(tools: const [])), isFalse);
       final risky = ok.copyWith(tools: const ['Read', 'Bash'], approvals: AgentApprovals.dontAsk, maxTurns: () => null, maxMinutes: () => null);
-      expect(agentChecks(risky).map((c) => c.text), contains('It changes things without asking and has no limits.'));
+      expect(agentChecks(risky).where((c) => c.level != CheckLevel.ok).map((c) => c.text), isEmpty, reason: 'no limits is the default, not a warning');
       final triggered = ok.copyWith(tools: const ['Edit'], triggers: const [AgentTrigger.pullRequest]);
       expect(agentChecks(triggered).last.level, CheckLevel.warn);
       expect(agentToolsWarning(ok), isNull);
@@ -121,13 +122,14 @@ void main() {
       expect(agentCommand(a, contextDir: '~/.kumo/runs/x', prompt: 'Review #521'), 'claude --agents \'{"go-pr-reviewer": …}\' --agent go-pr-reviewer --add-dir ~/.kumo/runs/x -- "Review #521"');
       final inline = jsonDecode(agentInlineJson(a.copyWith(instructions: 'Hi.'))) as Map;
       expect((inline['go-pr-reviewer'] as Map)['prompt'], 'Hi.');
-      expect(playgroundCommand(a), contains('--output-format stream-json --verbose --max-turns 25'));
+      expect(playgroundCommand(a), endsWith('--output-format stream-json --verbose'), reason: 'no turn limit unless it has one');
+      expect(playgroundCommand(a.copyWith(maxTurns: () => 25)), endsWith('--verbose --max-turns 25'));
     });
 
     test('links', () {
-      final pr = parseRepoLink('https://github.com/fravega/price-admin/pull/521')!;
-      expect((pr.path, pr.number, pr.ref, pr.name), ('fravega/price-admin', 521, '#521', 'price-admin'));
-      final mr = parseRepoLink('https://gitlab.fravega.com/pricing/price-reader-v2/-/merge_requests/231')!;
+      final pr = parseRepoLink('https://github.com/workspace-1/price-admin/pull/521')!;
+      expect((pr.path, pr.number, pr.ref, pr.name), ('workspace-1/price-admin', 521, '#521', 'price-admin'));
+      final mr = parseRepoLink('https://gitlab.example.com/pricing/price-reader-v2/-/merge_requests/231')!;
       expect((mr.path, mr.ref), ('pricing/price-reader-v2', '!231'));
       expect(parseRepoLink('https://github.com/segmentio/kafka-go')!.number, isNull);
       expect(parseRepoLink('https://github.com/o/r/tree/feat/x')!.branch, 'feat/x');
@@ -140,7 +142,7 @@ void main() {
       expect(reviewer.isolation, isFalse);
       final tests = agentTemplates.firstWhere((t) => t.id == 'test-writer').draft();
       expect(tests.isolation, isTrue, reason: 'it changes files: its own worktree');
-      expect(tests.maxTurns, 25);
+      expect(tests.maxTurns, isNull, reason: 'no turn limit by default: a task cut short costs more');
       expect(tests.maxMinutes, isNull, reason: 'a clock would end a conversation that’s only waiting for you');
     });
   });
@@ -219,6 +221,33 @@ void main() {
       await tester.pump();
       expect(state.agentDefs.runsOf(state.agentDefs.agents.firstWhere((a) => a.name == 'go-pr-reviewer')).first.prompt, 'Review #519');
       expect(find.text('Terminal view'), findsOneWidget, reason: 'the new run opens in its terminal');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Run with Codex: what changes shows before it starts, and it starts on Codex', (tester) async {
+      final state = await _pumpAgents(tester);
+      await tester.tap(find.text('go-pr-reviewer').first);
+      await tester.pump();
+      await tester.ensureVisible(find.text('New run'));
+      await tester.pump();
+      await tester.tap(find.text('New run'));
+      await tester.pump();
+      expect(find.text('Runs with'), findsOneWidget);
+      final pick = tester.widget<KSegmented<AgentCli>>(find.byType(KSegmented<AgentCli>));
+      expect([for (final i in pick.items) i.$2], ['Claude Code', 'Codex', 'Copilot'], reason: 'only connected CLIs it can run on: not Gemini');
+      expect(find.textContaining('On Codex CLI'), findsNothing, reason: 'Claude Code first: nothing changes');
+      await tester.tap(find.descendant(of: find.byType(KSegmented<AgentCli>), matching: find.text('Codex')));
+      await tester.pump();
+      expect(find.textContaining('Its file is Claude Code’s. On Codex CLI'), findsOneWidget);
+      expect(find.textContaining('Read-only: it reads and runs commands'), findsOneWidget);
+      expect(find.textContaining('codex -s read-only'), findsOneWidget);
+      await tester.ensureVisible(find.text('Start in its own terminal'));
+      await tester.pump();
+      await tester.tap(find.text('Start in its own terminal'));
+      await tester.pump();
+      await tester.pump();
+      final run = state.agentDefs.runsOf(state.agentDefs.agents.firstWhere((a) => a.name == 'go-pr-reviewer')).first;
+      expect(run.providerId, 'codex');
       expect(tester.takeException(), isNull);
     });
 

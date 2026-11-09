@@ -134,9 +134,9 @@ abstract class AgentDefsSource extends ChangeNotifier {
   /// New instructions for [agent], from a test step that went wrong.
   Future<String?> improve(AgentDef agent, {String step = '', String answer = ''});
 
-  /// Starts [agent] in its own terminal at [where], with [prompt] as its
-  /// first message and [context] saved next to the run (`--add-dir`).
-  Future<AgentRun?> run(AgentDef agent, AgentWhere where, {String prompt = '', List<AgentContextItem> context = const []});
+  /// Starts [agent] on [cli] in its own terminal at [where], with [prompt]
+  /// as its first message and [context] saved next to the run.
+  Future<AgentRun?> run(AgentDef agent, AgentWhere where, {String prompt = '', List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude});
 
   /// Runs of [agent] (newest first); the daemon's sessions that ran it.
   List<AgentRun> runsOf(AgentDef agent);
@@ -145,7 +145,7 @@ abstract class AgentDefsSource extends ChangeNotifier {
   /// [worktreePath] (or a throwaway worktree of it when it can change
   /// files). The run fills in as it goes and joins [owner]'s test runs (the
   /// agent as saved: a draft may have another name); see [playRuns].
-  Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const []});
+  Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude});
 
   Future<void> stopPlay(String id);
 
@@ -330,9 +330,9 @@ class MockAgentDefs extends AgentDefsSource {
   }
 
   @override
-  Future<AgentRun?> run(AgentDef agent, AgentWhere where, {String prompt = '', List<AgentContextItem> context = const []}) async {
+  Future<AgentRun?> run(AgentDef agent, AgentWhere where, {String prompt = '', List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async {
     final r = AgentRun(
-      id: 'def-n${++_seq}', providerId: 'claude', providerName: 'Claude Code', short: 'CC', agent: agent.name,
+      id: 'def-n${++_seq}', providerId: cli.id, providerName: cli.label, short: switch (cli) { AgentCli.codex => 'CX', AgentCli.copilot => 'GH', AgentCli.claude => 'CC' }, agent: agent.name,
       worktreePath: where.path.isNotEmpty ? where.path : (where.url.isNotEmpty ? where.url : '~/.kumo/scratch/${agent.name}-$_seq'),
       terminalId: 'mock:new-$_seq', title: prompt.isEmpty ? 'Run ${runsOf(agent).length + 1}' : (prompt.length > 34 ? '${prompt.substring(0, 32)}…' : prompt),
       status: AgentStatus.running, startedAt: DateTime.now(), prompt: prompt, context: context,
@@ -399,21 +399,46 @@ class MockAgentDefs extends AgentDefsSource {
     }),
   ];
 
+  /// The same review on Codex: `codex exec --json`, as it prints it.
+  static final _codexScript = <String>[
+    jsonEncode({'type': 'thread.started', 'thread_id': 'mock'}),
+    jsonEncode({'type': 'turn.started'}),
+    jsonEncode({'type': 'item.completed', 'item': {'id': 'item_0', 'type': 'agent_message', 'text': 'I’ll read the diff, then look for existing code for each new function.'}}),
+    jsonEncode({'type': 'item.started', 'item': {'id': 'item_1', 'type': 'command_execution', 'command': "rg -n 'func (\\w*Percent|[Rr]ound\\w*)' internal/", 'aggregated_output': '', 'exit_code': null, 'status': 'in_progress'}}),
+    jsonEncode({'type': 'item.completed', 'item': {'id': 'item_1', 'type': 'command_execution', 'command': "rg -n 'func (\\w*Percent|[Rr]ound\\w*)' internal/", 'aggregated_output': 'internal/discount/calc.go:48:func applyPercent(p Price, pct int) Price\ninternal/money/round.go:12:func RoundCents(v float64) int64', 'exit_code': 0, 'status': 'completed'}}),
+    jsonEncode({'type': 'item.completed', 'item': {'id': 'item_2', 'type': 'agent_message', 'text': 'Two reuse opportunities: bulkPercent repeats applyPercent (internal/discount/calc.go:48), and roundCents repeats money.RoundCents (internal/money/round.go:12). CategoryRule is new.'}}),
+    jsonEncode({'type': 'turn.completed', 'usage': {'input_tokens': 24100, 'cached_input_tokens': 18000, 'output_tokens': 610}}),
+  ];
+
+  /// The same review on Copilot: `copilot -p --output-format json`, as it
+  /// prints it (the lines that only stream text left out).
+  static final _copilotScript = <String>[
+    jsonEncode({'type': 'assistant.turn_start', 'data': {'turnId': '0'}}),
+    jsonEncode({'type': 'assistant.message', 'data': {'content': 'I’ll read the diff, then look for existing code for each new function.', 'toolRequests': []}}),
+    jsonEncode({'type': 'tool.execution_start', 'data': {'toolCallId': 'c1', 'toolName': 'grep', 'arguments': {'pattern': r'func (\w*Percent|[Rr]ound\w*)', 'path': 'internal/'}}}),
+    jsonEncode({'type': 'tool.execution_complete', 'data': {'toolCallId': 'c1', 'success': true, 'result': {'content': 'internal/discount/calc.go:48:func applyPercent(p Price, pct int) Price\ninternal/money/round.go:12:func RoundCents(v float64) int64'}}}),
+    jsonEncode({'type': 'assistant.turn_start', 'data': {'turnId': '1'}}),
+    jsonEncode({'type': 'assistant.message', 'data': {'content': 'Two reuse opportunities: bulkPercent repeats applyPercent (internal/discount/calc.go:48), and roundCents repeats money.RoundCents (internal/money/round.go:12). CategoryRule is new.', 'toolRequests': []}}),
+    jsonEncode({'type': 'session.usage_checkpoint', 'data': {'accountingSnapshot': {'modelMetrics': {'gpt-6-luna': {'usage': {'inputTokens': 21400, 'outputTokens': 540}}}}}}),
+    jsonEncode({'type': 'result', 'exitCode': 0, 'usage': {'premiumRequests': 1}}),
+  ];
+
   @override
-  Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const []}) async {
+  Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async {
     final id = 'play-${++_seq}';
     final list = playRuns(owner ?? agent);
-    list.insert(0, PlayRun(id: id, agent: agent.name, task: task, draft: draft, startedAt: DateTime.now()));
+    list.insert(0, PlayRun(id: id, agent: agent.name, task: task, draft: draft, startedAt: DateTime.now(), cli: cli.id));
     if (list.length > 10) list.removeRange(10, list.length);
+    final script = switch (cli) { AgentCli.codex => _codexScript, AgentCli.copilot => _copilotScript, AgentCli.claude => _script };
     var at = 0;
     _timers[id] = Timer.periodic(step, (t) {
       final i = list.indexWhere((r) => r.id == id);
-      if (i < 0 || at >= _script.length) {
+      if (i < 0 || at >= script.length) {
         t.cancel();
         _timers.remove(id);
         return;
       }
-      list[i] = foldStreamJson(list[i], _script[at], at: Duration(milliseconds: step.inMilliseconds * (at + 1)));
+      list[i] = foldPlayLine(list[i], script[at], at: Duration(milliseconds: step.inMilliseconds * (at + 1)));
       at++;
       notifyListeners();
     });
@@ -465,11 +490,11 @@ class UnsupportedAgentDefs extends AgentDefsSource {
   @override
   Future<String?> improve(AgentDef agent, {String step = '', String answer = ''}) async => null;
   @override
-  Future<AgentRun?> run(AgentDef agent, AgentWhere where, {String prompt = '', List<AgentContextItem> context = const []}) async => null;
+  Future<AgentRun?> run(AgentDef agent, AgentWhere where, {String prompt = '', List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async => null;
   @override
   List<AgentRun> runsOf(AgentDef agent) => const [];
   @override
-  Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const []}) async => null;
+  Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async => null;
   @override
   Future<void> stopPlay(String id) async {}
   @override

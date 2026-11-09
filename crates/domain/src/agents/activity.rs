@@ -21,6 +21,9 @@ pub struct ActivityTracker {
     asked: bool,
     /// The output being read told it's only waiting for its next message.
     told_idle: bool,
+    /// The output being read told it's working (an answer it got, maybe
+    /// elsewhere).
+    told_working: bool,
     osc: OscState,
 }
 
@@ -54,6 +57,7 @@ impl ActivityTracker {
             resized_at: None,
             asked: false,
             told_idle: false,
+            told_working: false,
             osc: OscState::Ground,
         }
     }
@@ -74,7 +78,11 @@ impl ActivityTracker {
             return None;
         }
         self.last_output = now;
-        if self.scan(bytes) {
+        let attention = self.scan(bytes);
+        if std::mem::take(&mut self.told_working) {
+            return self.set(AgentState::Working);
+        }
+        if attention {
             self.attention_at = Some(now);
             self.asked = true;
             return self.set(AgentState::NeedsInput);
@@ -184,8 +192,22 @@ impl ActivityTracker {
     }
 
     /// Whether an OSC asks for attention. "Waiting for your input" is only
-    /// its turn ending, and `9;4;` is a progress bar.
+    /// its turn ending, and `9;4;` is a progress bar. `7501;state=…` says
+    /// what it's doing (GitHub Copilot CLI): `blocked` is asking, `working`
+    /// is working, `idle` and `done` are its turn ending.
     fn notified(&mut self, head: &[u8]) -> bool {
+        if let Some(state) = head.strip_prefix(b"7501;state=") {
+            let is = |s: &[u8]| {
+                state.starts_with(s) && matches!(state.get(s.len()), None | Some(b':' | b';'))
+            };
+            self.told_working = is(b"working");
+            if is(b"idle") || is(b"done") {
+                // Answered or turned down: it isn't asking anymore.
+                self.told_idle = true;
+                self.asked = false;
+            }
+            return is(b"blocked");
+        }
         let notification = head.starts_with(b"9;") || head.starts_with(b"777;notify");
         if !notification || head.starts_with(b"9;4;") {
             return false;
@@ -282,6 +304,54 @@ mod tests {
         asking.typed(t0 + Duration::from_secs(1));
         assert!(!asking.asked());
         assert_eq!(asking.state(), AgentState::Working);
+    }
+
+    /// What GitHub Copilot CLI 1.0.107 wrote in a terminal: OSC 7501, ended
+    /// by `ESC \`, with its redraw after it.
+    #[test]
+    fn copilot_says_when_it_works_asks_and_ends_its_turn() {
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        let mut tracker = ActivityTracker::new(t0, QUIET);
+        tracker.tick(at(3000));
+        let working = b"h\x1b]7501;state=working:app=copilot\x1b\\\x1b[?25l\x1b[24A";
+        assert_eq!(
+            tracker.on_output(working, at(3100)),
+            Some(AgentState::Working)
+        );
+        // Split across chunks, with its prompt drawn after it.
+        assert_eq!(
+            tracker.on_output(b"\x1b]7501;state=blocked:app=co", at(3200)),
+            None
+        );
+        assert_eq!(
+            tracker.on_output(b"pilot:kind=permission\x1b\\\x1b[90m\xe2\x95\xad", at(3200)),
+            Some(AgentState::NeedsInput)
+        );
+        assert!(tracker.asked());
+        assert_eq!(tracker.on_output(&[b'x'; 40], at(3900)), None);
+        assert!(tracker.asked(), "its prompt redrawing isn't an answer");
+        // Answered in the terminal: it says it's working, however little it
+        // printed.
+        assert_eq!(
+            tracker.on_output(b"\x1b]7501;state=working:app=copilot\x1b\\", at(5000)),
+            Some(AgentState::Working)
+        );
+        assert!(!tracker.asked());
+        // Its turn ends: waiting, not asking.
+        assert_eq!(
+            tracker.on_output(b"\x1b]7501;state=done:app=copilot\x1b\\ok", at(6000)),
+            None
+        );
+        assert_eq!(tracker.tick(at(6000) + QUIET), Some(AgentState::NeedsInput));
+        assert!(!tracker.asked());
+        // Lookalikes aren't states.
+        let mut other = ActivityTracker::new(t0, QUIET);
+        other.tick(at(3000));
+        other.on_output(b"\x1b]7501;state=blockedish\x07", at(3100));
+        assert!(!other.asked());
+        other.on_output(b"\x1b]7502;state=blocked\x07", at(3200));
+        assert!(!other.asked());
     }
 
     #[test]

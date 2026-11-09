@@ -2,6 +2,8 @@ part of 'agents_library.dart';
 
 /// One agent's run form: where it works, what it knows, what it's told.
 class _RunForm {
+  /// The CLI it runs on; null: the first connected one that can.
+  AgentCli? cli;
   AgentWhereKind where = AgentWhereKind.worktree;
 
   /// The worktree picked (absolute path), or the repository for a new one.
@@ -161,8 +163,13 @@ class _RunTabState extends State<_RunTab> {
       AgentWhereKind.scratch => ('An empty folder kept for a week, for research or writing. Files can open it.', false),
     };
     final contextDir = context0.isEmpty && knowledge.isEmpty ? '' : '~/.kumo/runs/${a.name}-${widget.runs.length + 1}';
-    final cmd = agentCommand(a, contextDir: contextDir, prompt: f.prompt.text);
-    final canStart = !widget.fresh && !_starting && switch (f.where) {
+    final clis = s.agents.agentClis;
+    // Picked before, unless it's been disconnected since; else the first
+    // whose plan isn't used up.
+    f.cli = startWith(clis, f.cli, usedUpClis(clis, s.usage, DateTime.now()));
+    final cli = f.cli ?? AgentCli.claude;
+    final cmd = agentCommand(a, contextDir: contextDir, prompt: f.prompt.text, cli: cli);
+    final canStart = !widget.fresh && !_starting && clis.isNotEmpty && switch (f.where) {
       AgentWhereKind.worktree => picked != null,
       AgentWhereKind.newWorktree => f.newIn != null,
       AgentWhereKind.link => link != null,
@@ -180,7 +187,7 @@ class _RunTabState extends State<_RunTab> {
         AgentWhereKind.scratch => const AgentWhere.scratch(),
       };
       setState(() => _starting = true);
-      final run = await s.agentDefs.run(a, where, prompt: f.prompt.text.trim(), context: context0);
+      final run = await s.agentDefs.run(a, where, prompt: f.prompt.text.trim(), context: context0, cli: cli);
       if (!mounted) return;
       setState(() => _starting = false);
       if (run == null) {
@@ -198,6 +205,8 @@ class _RunTabState extends State<_RunTab> {
       else if (widget.dirty)
         _Note(icon: KIcons.info, text: 'It runs as saved: your edits run once you save them (or try them in the playground).', color: c.text2, background: c.tile),
       if (widget.fresh || widget.dirty) const SizedBox(height: 14),
+      _CliPick(clis: clis, cli: cli, agent: a, onChanged: (v) => setState(() => f.cli = v)),
+      const SizedBox(height: 18),
       _Block(
         title: '1 · Where should it work?',
         hint: 'its terminal opens there',
@@ -249,7 +258,9 @@ class _RunTabState extends State<_RunTab> {
       const SizedBox(height: 18),
       _Block(
         title: '2 · What should it know?',
-        hint: 'saved next to the run and read with --add-dir: nothing lands in the repo',
+        hint: cli == AgentCli.codex
+            ? 'saved next to the run and pointed at in its first message: nothing lands in the repo'
+            : 'saved next to the run and read with --add-dir: nothing lands in the repo',
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Wrap(spacing: 6, runSpacing: 6, children: [
             for (final i in context0)
@@ -347,7 +358,7 @@ class _RunTabState extends State<_RunTab> {
       ('Tools', a.tools.isEmpty ? 'none' : [...a.tools, ...a.mcpServers].join(', '), a.tools.isEmpty ? c.err : c.text),
       ('Model', a.model == 'inherit' ? 'Inherits the session’s' : agentModelLabel(a.model), c.text),
       ('Approvals', a.approvals.label, c.text),
-      ('Limits', [if (a.maxTurns != null) '${a.maxTurns} turns', if (a.maxMinutes != null) '${a.maxMinutes} min', if (a.maxCostUsd != null) '\$${a.maxCostUsd}'].join(' · ').ifEmpty('none'), a.maxTurns == null && a.maxMinutes == null ? c.warn : c.text),
+      ('Limits', [if (a.maxTurns != null) '${a.maxTurns} turns', if (a.maxMinutes != null) '${a.maxMinutes} min', if (a.maxCostUsd != null) '\$${a.maxCostUsd}'].join(' · ').ifEmpty('none'), c.text),
       ('Isolation', a.isolation ? 'Own worktree each run' : 'Where you start it', c.text),
       ('Knowledge', a.knowledge.isEmpty ? 'none' : a.knowledge.join(', '), c.text),
     ];
@@ -477,7 +488,16 @@ class _RunTerminal extends StatelessWidget {
     final s = AppScope.of(context);
     final r = run;
     final done = r.status == AgentStatus.done;
-    final worked = r.workedAt(DateTime.now());
+    final now = DateTime.now();
+    final worked = r.workedAt(now);
+    // Its plan ran out: by what Kumo reads of its usage, or by what it said
+    // last once it stopped working.
+    final clis = s.agents.agentClis;
+    final from = AgentCli.of(r.providerId);
+    final out = usedUpClis(clis, s.usage, now);
+    final spent = from == null ? null : out[from];
+    final stopped = spent != null || (from != null && r.status != AgentStatus.running && saysLimitReached(r.lastLine));
+    final other = from == null || !stopped ? null : goOnWith(clis, from, out);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _RunStrip(runs: runs, shown: r.id, onShow: onShow),
       const SizedBox(height: 10),
@@ -539,7 +559,19 @@ class _RunTerminal extends StatelessWidget {
                     },
                   ),
           ]),
-          footer: done
+          footer: other != null
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                  child: _Note(
+                    icon: KIcons.info,
+                    text: '${spent == null ? '${from!.label} says it reached its plan’s limit.' : usedUpText(from!, spent, resetLabel(spent.resets, now))} '
+                        'Go on with ${other.label}: ${agent.name} starts there in this folder, with the same first message. What’s done here stays.',
+                    color: c.warn,
+                    background: c.warnSoft,
+                    action: KButton.primary(label: 'Go on with ${other.short}', height: 26, fontSize: 11.5, onTap: () => _goOn(context, s, other)),
+                  ),
+                )
+              : done
               ? null
               : SizedBox(
                   height: kAgentNoteSpace,
@@ -559,13 +591,30 @@ class _RunTerminal extends StatelessWidget {
   }
 }
 
+extension on _RunTerminal {
+  /// Starts [agent] again on [to], where this run works: the CLI it ran on
+  /// stopped at its plan's limit.
+  Future<void> _goOn(BuildContext context, AppState s, AgentCli to) async {
+    final from = AgentCli.of(run.providerId) ?? AgentCli.claude;
+    final next = await s.agentDefs.run(agent, AgentWhere.folder(run.worktreePath), prompt: goOnPrompt(run.prompt, from), context: run.context, cli: to);
+    if (next == null) {
+      s.notify('${agent.name} didn’t start on ${to.label}: ${s.agentDefs.error ?? s.agents.error ?? 'unknown error'}');
+      return;
+    }
+    onShow(next.id);
+  }
+}
+
 /// A boxed note: an icon and a line.
 class _Note extends StatelessWidget {
-  const _Note({required this.icon, required this.text, required this.color, required this.background});
+  const _Note({required this.icon, required this.text, required this.color, required this.background, this.action});
   final IconData icon;
   final String text;
   final Color color;
   final Color background;
+
+  /// A button at its end, for what the note suggests.
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -575,6 +624,7 @@ class _Note extends StatelessWidget {
           Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 14, color: color)),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: sans(12, color: color, height: 1.45))),
+          if (action != null) ...[const SizedBox(width: 8), action!],
         ]),
       );
 }
@@ -631,5 +681,65 @@ class _Option extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+/// Which CLI it runs on, and what changes on it. One connected: said, not
+/// asked. None: how to get one.
+class _CliPick extends StatelessWidget {
+  const _CliPick({required this.clis, required this.cli, required this.agent, required this.onChanged});
+
+  /// The connected CLIs it can run on.
+  final List<AgentCli> clis;
+  final AgentCli cli;
+  final AgentDef agent;
+  final ValueChanged<AgentCli> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    if (clis.isEmpty) {
+      return _Note(icon: KIcons.info, text: 'It runs on Claude Code, Codex or Copilot: connect one in Settings › AI agents.', color: c.warn, background: c.warnSoft);
+    }
+    final notes = agentCliNotes(agent, cli);
+    final now = DateTime.now();
+    final out = usedUpClis(clis, AppScope.of(context).usage, now);
+    final spent = out[cli];
+    final other = goOnWith(clis, cli, out);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      // In a narrow column (the playground's) the choices take a line of
+      // their own and share it.
+      LayoutBuilder(builder: (context, box) {
+        final title = Text('Runs with', style: sans(12, weight: FontWeight.w500, color: c.text));
+        if (clis.length < 2) {
+          return Wrap(spacing: 10, children: [title, Text(cli.label, style: sans(12, color: c.text2))]);
+        }
+        final narrow = box.maxWidth < 120.0 * clis.length + 80;
+        final pick = KSegmented<AgentCli>(label: 'Runs with', value: cli, height: 28, expand: narrow, onChanged: onChanged, items: [for (final x in clis) (x, x.short, out.containsKey(x) ? 'out' : null)]);
+        if (narrow) return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [title, const SizedBox(height: 6), pick]);
+        return Row(children: [title, const SizedBox(width: 10), pick]);
+      }),
+      if (spent != null) ...[
+        const SizedBox(height: 8),
+        _Note(
+          icon: KIcons.info,
+          text: '${usedUpText(cli, spent, resetLabel(spent.resets, now))}${other == null ? ' Connect another CLI in Settings › AI agents to run it now.' : ''}',
+          color: c.warn,
+          background: c.warnSoft,
+          action: other == null ? null : KButton(label: 'Use ${other.short}', height: 26, fontSize: 11.5, onTap: () => onChanged(other)),
+        ),
+      ],
+      if (notes.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.fromLTRB(11, 7, 11, 9),
+          decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(10)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Its file is Claude Code’s. On ${cli.label}:', style: sans(11.5, weight: FontWeight.w500, color: c.text2)),
+            for (final n in notes) CheckLine(n),
+          ]),
+        ),
+      ],
+    ]);
   }
 }

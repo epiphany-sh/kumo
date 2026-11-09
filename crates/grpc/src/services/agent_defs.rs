@@ -107,6 +107,7 @@ impl pb::agent_defs_server::AgentDefs for AgentDefsGrpc {
         let size = size_from(request.cols, request.rows).map_err(status_from)?;
         let session = service
             .run(RunStart {
+                provider_id: request.provider_id,
                 agent: agent_of(request.agent)?,
                 inline_json: request.inline_json,
                 place: place_from(request.r#where)?,
@@ -134,6 +135,7 @@ impl pb::agent_defs_server::AgentDefs for AgentDefsGrpc {
         let owner = agent_of(request.agent)?;
         let (id, events) = service
             .play(PlayStart {
+                provider_id: request.provider_id,
                 name: request.name,
                 inline_json: request.inline_json,
                 task: request.task,

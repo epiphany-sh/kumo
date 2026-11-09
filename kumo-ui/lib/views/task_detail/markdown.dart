@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../editor/syntax.dart';
-import '../../platform/open_url.dart';
+import '../../widgets/open_link.dart';
 import '../../theme/kumo_theme.dart';
 import '../../theme/palette.dart';
 import '../../widgets/controls.dart';
@@ -517,7 +517,7 @@ List<InlineSpan> inlineSpans(BuildContext context, String text, MdStyle style, T
   final spans = <InlineSpan>[];
   void open(String target) {
     if (style.onOpenLink?.call(target) ?? false) return;
-    openUrl(target);
+    openDocumentLink(context, target);
   }
 
   InlineSpan link(String t, String target) => WidgetSpan(

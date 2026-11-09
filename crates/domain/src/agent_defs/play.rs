@@ -18,6 +18,8 @@ pub struct PlayEvent {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct PlayRecord {
     pub id: String,
+    /// The CLI it ran on.
+    pub provider_id: String,
     pub task: String,
     /// The unsaved draft ran.
     pub draft: bool,

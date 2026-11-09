@@ -98,6 +98,10 @@ impl FileIdentity for Windows {
 impl PrivateFiles for Windows {
     /// Files under the user's profile are already theirs alone.
     fn owner_only(_options: &mut OpenOptions) {}
+
+    fn owner_only_dir(_dir: &Path) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 /// The Credential Manager.

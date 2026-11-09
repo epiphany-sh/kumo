@@ -186,7 +186,7 @@ abstract class ProfilesSource extends ChangeNotifier {
   Future<List<(String, String)>> ghAccounts() async => const [];
 }
 
-/// The design canvas: Fravega (where everything so far lives), Personal
+/// The design canvas: workspace-1 (where everything so far lives), Personal
 /// and Acme Consulting.
 class MockProfilesSource extends ProfilesSource {
   MockProfilesSource({List<AppProfile>? profiles, String? current}) : _profiles = profiles ?? designProfiles {
@@ -194,7 +194,7 @@ class MockProfilesSource extends ProfilesSource {
   }
 
   static const designProfiles = [
-    AppProfile(id: 'default', name: 'Fravega', color: Color(0xFF8C9BFF), worktreesDir: '~/wt/{repo}/{key}', isDefault: true, agentsRunning: 3, agentsWaiting: 1, namespaces: 2, repos: 3),
+    AppProfile(id: 'default', name: 'workspace-1', color: Color(0xFF8C9BFF), worktreesDir: '~/wt/{repo}/{key}', isDefault: true, agentsRunning: 3, agentsWaiting: 1, namespaces: 2, repos: 3),
     AppProfile(id: 'personal', name: 'Personal', color: Color(0xFF4CC38A), worktreesDir: '~/wt/personal/{repo}/{key}', agentsRunning: 1, agentsWaiting: 1, namespaces: 2, repos: 3),
     AppProfile(id: 'acme', name: 'Acme Consulting', color: Color(0xFFF2A65A), worktreesDir: '~/wt/acme/{repo}/{key}', namespaces: 1, repos: 1),
   ];
@@ -261,7 +261,7 @@ class MockProfilesSource extends ProfilesSource {
       ];
 
   @override
-  Future<List<(String, String)>> ghAccounts() async => const [('github.com', 'mauri-fravega'), ('github.com', 'mauri')];
+  Future<List<(String, String)>> ghAccounts() async => const [('github.com', 'mauri-workspace-1'), ('github.com', 'mauri')];
 
   @override
   Future<void> delete(String id) async {

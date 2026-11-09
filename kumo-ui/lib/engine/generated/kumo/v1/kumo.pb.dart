@@ -9301,6 +9301,7 @@ class RunAgentDefRequest extends $pb.GeneratedMessage {
     $core.Iterable<AgentContext>? context,
     $core.int? cols,
     $core.int? rows,
+    $core.String? providerId,
   }) {
     final result = RunAgentDefRequest._();
     if (agent != null) result.agent = agent;
@@ -9314,6 +9315,7 @@ class RunAgentDefRequest extends $pb.GeneratedMessage {
     if (context != null) result.context.addAll(context);
     if (cols != null) result.cols = cols;
     if (rows != null) result.rows = rows;
+    if (providerId != null) result.providerId = providerId;
     return result;
   }
 
@@ -9353,6 +9355,7 @@ class RunAgentDefRequest extends $pb.GeneratedMessage {
         subBuilder: AgentContext.$_createMessage)
     ..aI(10, _omitFieldNames ? '' : 'cols', fieldType: $pb.PbFieldType.OU3)
     ..aI(11, _omitFieldNames ? '' : 'rows', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(12, _omitFieldNames ? '' : 'providerId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -9494,6 +9497,16 @@ class RunAgentDefRequest extends $pb.GeneratedMessage {
   $core.bool hasRows() => $_has(10);
   @$pb.TagNumber(11)
   void clearRows() => $_clearField(11);
+
+  /// The CLI it runs on; empty: Claude Code.
+  @$pb.TagNumber(12)
+  $core.String get providerId => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set providerId($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasProviderId() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearProviderId() => $_clearField(12);
 }
 
 class PlayRequest extends $pb.GeneratedMessage {
@@ -9509,6 +9522,7 @@ class PlayRequest extends $pb.GeneratedMessage {
     AgentDefFile? agent,
     $core.double? maxCostUsd,
     $core.bool? draft,
+    $core.String? providerId,
   }) {
     final result = PlayRequest._();
     if (name != null) result.name = name;
@@ -9522,6 +9536,7 @@ class PlayRequest extends $pb.GeneratedMessage {
     if (agent != null) result.agent = agent;
     if (maxCostUsd != null) result.maxCostUsd = maxCostUsd;
     if (draft != null) result.draft = draft;
+    if (providerId != null) result.providerId = providerId;
     return result;
   }
 
@@ -9551,6 +9566,7 @@ class PlayRequest extends $pb.GeneratedMessage {
         subBuilder: AgentDefFile.$_createMessage)
     ..aD(10, _omitFieldNames ? '' : 'maxCostUsd')
     ..aOB(11, _omitFieldNames ? '' : 'draft')
+    ..aOS(12, _omitFieldNames ? '' : 'providerId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -9676,6 +9692,16 @@ class PlayRequest extends $pb.GeneratedMessage {
   $core.bool hasDraft() => $_has(10);
   @$pb.TagNumber(11)
   void clearDraft() => $_clearField(11);
+
+  /// The CLI it runs on; empty: Claude Code.
+  @$pb.TagNumber(12)
+  $core.String get providerId => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set providerId($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasProviderId() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearProviderId() => $_clearField(12);
 }
 
 enum PlayEvent_Kind { line, exited, notSet }
@@ -9953,6 +9979,7 @@ class PlayRecord extends $pb.GeneratedMessage {
     $fixnum.Int64? startedUnixMs,
     $core.Iterable<PlayEvent>? events,
     $core.bool? running,
+    $core.String? providerId,
   }) {
     final result = PlayRecord._();
     if (playId != null) result.playId = playId;
@@ -9961,6 +9988,7 @@ class PlayRecord extends $pb.GeneratedMessage {
     if (startedUnixMs != null) result.startedUnixMs = startedUnixMs;
     if (events != null) result.events.addAll(events);
     if (running != null) result.running = running;
+    if (providerId != null) result.providerId = providerId;
     return result;
   }
 
@@ -9984,6 +10012,7 @@ class PlayRecord extends $pb.GeneratedMessage {
     ..pPM<PlayEvent>(5, _omitFieldNames ? '' : 'events',
         subBuilder: PlayEvent.$_createMessage)
     ..aOB(6, _omitFieldNames ? '' : 'running')
+    ..aOS(7, _omitFieldNames ? '' : 'providerId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -10054,6 +10083,16 @@ class PlayRecord extends $pb.GeneratedMessage {
   $core.bool hasRunning() => $_has(5);
   @$pb.TagNumber(6)
   void clearRunning() => $_clearField(6);
+
+  /// The CLI it ran on.
+  @$pb.TagNumber(7)
+  $core.String get providerId => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set providerId($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasProviderId() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearProviderId() => $_clearField(7);
 }
 
 class PlayList extends $pb.GeneratedMessage {

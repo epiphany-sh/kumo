@@ -8,6 +8,7 @@ use kumo_domain::agents::{
     AgentContext, AgentError, AgentEventKind, AgentPreset, AgentProvider, AgentSession,
     AgentSessionId, AgentState, AgentStore, CliHomes, PRESETS, PlanUsage, PlanUsageStore,
     ProgramLocator, StoredProvider, TerminalAgent, UsageReport, UsageSource, UsageTarget,
+    args_for_cmd, runs_through_cmd,
 };
 use kumo_domain::terminal::{
     LaunchSpec, TerminalError, TerminalId, TerminalSize, bracketed_paste, typed_text,
@@ -347,10 +348,20 @@ impl AgentService {
             )));
         }
         let program = self.installed(&provider).await?;
+        let through_cmd = runs_through_cmd(&program);
         let (mut args, prompt_passed) = match given_args {
             Some(args) => (args, true),
+            // Through `cmd.exe` the prompt is typed in, whatever the CLI takes.
+            None if through_cmd => (provider.launch_args("")?.0, false),
             None => provider.launch_args(prompt)?,
         };
+        let mut typed_prompt =
+            (!prompt_passed && !prompt.trim().is_empty()).then(|| prompt.to_owned());
+        if through_cmd {
+            let (safe, typed) = args_for_cmd(args)?;
+            args = safe;
+            typed_prompt = typed_prompt.or(typed);
+        }
         let id = AgentSessionId::generate();
         // Before it starts: a session's files are matched by start time.
         let target = UsageTarget {
@@ -365,7 +376,7 @@ impl AgentService {
             args = usage::launch_args(source, &target, args).await;
         }
         let notice = provider.ask_notice();
-        let tells_asking = !notice.is_empty() && !own_settings;
+        let tells_asking = (!notice.is_empty() && !own_settings) || provider.tells_state();
         // Claude Code's usage settings ask for it too, and it takes one.
         let settings_given =
             notice.first() == Some(&SETTINGS_FLAG) && args.iter().any(|a| a == SETTINGS_FLAG);
@@ -420,7 +431,7 @@ impl AgentService {
         tracing::info!(agent = provider.id, session = %session.id, worktree = %session.worktree.display(), "agent started");
 
         // CLIs that don't take the prompt as an argument get it typed in.
-        let typed = (!prompt_passed && !prompt.trim().is_empty()).then(|| prompt.to_owned());
+        let typed = typed_prompt;
         tokio::spawn(monitor::run(
             Arc::clone(self),
             session.id.clone(),

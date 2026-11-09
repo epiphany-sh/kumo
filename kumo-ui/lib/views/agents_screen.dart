@@ -218,7 +218,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
             ),
           ),
           const Spacer(),
-          const StatusText('Only Claude Code: other CLIs have no agent files'),
+          const StatusText('They run on Claude Code, Codex or Copilot'),
         ],
       );
     }

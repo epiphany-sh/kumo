@@ -8,6 +8,7 @@ import '../data/agent_defs_source.dart';
 import '../data/agent_playground.dart';
 import '../data/agents_source.dart';
 import '../data/models.dart' show AgentStatus, Repo, Worktree;
+import '../data/plan_limits.dart';
 import '../data/tasks_source.dart';
 import '../overlays/create_agent_dialog.dart';
 import '../shell/screen_chrome.dart';
@@ -17,6 +18,7 @@ import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/controls.dart';
 import '../widgets/kicons.dart';
+import '../widgets/usage_meter.dart' show resetLabel;
 import 'agent_terminals.dart';
 
 part 'agents_run.dart';
@@ -341,10 +343,10 @@ class AgentLibraryState extends State<AgentLibrary> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Text(
-            s.agents.lacksClaude
-                ? 'Your agents run on Claude Code, which isn’t connected: connect it in Settings to run them. Other CLIs run as plain sessions, from New agent.'
-                : 'Claude Code subagent files: ${s.workspace.repos.isEmpty ? '' : '.claude/agents/*.md. '}Ones you add by hand show up here too.',
-            style: sans(11, color: s.agents.lacksClaude ? c.warn : c.text3, height: 1.4),
+            s.agents.lacksAgentCli
+                ? 'Your agents run on Claude Code, Codex or Copilot, and none is connected: connect one in Settings to run them. Other CLIs run as plain sessions, from New agent.'
+                : 'Claude Code subagent files: ${s.workspace.repos.isEmpty ? '' : '.claude/agents/*.md. '}Ones you add by hand show up here too. They run on Claude Code, Codex or Copilot.',
+            style: sans(11, color: s.agents.lacksAgentCli ? c.warn : c.text3, height: 1.4),
           ),
         ),
       ]),

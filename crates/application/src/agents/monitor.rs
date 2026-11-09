@@ -8,7 +8,7 @@ use futures::StreamExt;
 use kumo_domain::agents::{
     ActionReader, ActivityTracker, AgentEventKind, AgentSessionId, AgentState, LastLine,
 };
-use kumo_domain::terminal::{ExitStatus, TerminalEvent};
+use kumo_domain::terminal::{ExitStatus, TerminalEvent, typed_text};
 use kumo_domain::time::Timestamp;
 
 use super::AgentService;
@@ -18,6 +18,8 @@ use crate::terminal::{Attachment, TerminalSession};
 /// The last line on the card refreshes at most this often.
 const LINE_EVERY: Duration = Duration::from_secs(1);
 const TICK: Duration = Duration::from_millis(250);
+/// A typed prompt settles before Enter, so a TUI reads them apart.
+const SUBMIT_AFTER: Duration = Duration::from_millis(80);
 /// How it exited: 130 when Kumo stopped it, 124 when its time limit did.
 fn exit_of(service: &AgentService, id: &AgentSessionId, status: ExitStatus) -> ExitStatus {
     service.stopped_with(id).map_or(status, ExitStatus::new)
@@ -116,7 +118,12 @@ pub(super) async fn run(
         match change {
             Some(AgentState::NeedsInput) => {
                 if let Some(prompt) = typed.take() {
-                    let _ = terminal.write(Bytes::from(format!("{prompt}\r"))).await;
+                    // As `AgentService::type_in`: as text, then submitted on
+                    // its own.
+                    let text = typed_text(&prompt, prompt.contains('\n'));
+                    let _ = terminal.write(Bytes::from(text)).await;
+                    tokio::time::sleep(SUBMIT_AFTER).await;
+                    let _ = terminal.write(Bytes::from_static(b"\r")).await;
                 }
             }
             Some(AgentState::Exited(status)) => {

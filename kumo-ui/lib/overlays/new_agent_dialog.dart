@@ -102,7 +102,10 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
     final prompt = _prompt.text.trim();
     if (agent.startsWith('def:')) {
       final def = s.agentDefs.agents.where((a) => 'def:${a.key}' == agent).firstOrNull;
-      final run = def == null ? null : await s.agentDefs.run(def, AgentWhere.worktree(worktree.$1, repo: worktree.$3), prompt: prompt, context: context);
+      // The default CLI if it can run agents, else the first that can; the
+      // run form in Agents lets you pick another.
+      final cli = s.agents.agentClis.firstOrNull ?? AgentCli.claude;
+      final run = def == null ? null : await s.agentDefs.run(def, AgentWhere.worktree(worktree.$1, repo: worktree.$3), prompt: prompt, context: context, cli: cli);
       if (!mounted) return;
       if (run == null) {
         setState(() {
@@ -141,7 +144,7 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
     final c = context.c;
     final s = AppScope.of(context);
     final connected = s.agents.connected;
-    final mine = s.agentDefs.supported && connected.any((p) => p.id == 'claude') ? s.agentDefs.agents : const <AgentDef>[];
+    final mine = s.agentDefs.supported && s.agents.agentClis.isNotEmpty ? s.agentDefs.agents : const <AgentDef>[];
     final worktrees = _worktrees(s);
     final active = s.activeWorktreeEntry;
     final agent = _agent ?? (connected.isEmpty ? null : 'cli:${connected.first.id}');
@@ -385,7 +388,7 @@ class _AgentList extends StatelessWidget {
         for (final p in connected) row(id: 'cli:${p.id}', lead: SourceTile(p.short, size: 22), name: p.name, hint: 'A plain session, with your prompt'),
         if (mine.isNotEmpty) ...[
           const SizedBox(height: 4),
-          head('Your agents · Claude Code'),
+          head('Your agents · on ${AppScope.of(context).agents.agentClis.first.label}'),
           for (final a in mine)
             row(
               id: 'def:${a.key}',
@@ -397,10 +400,10 @@ class _AgentList extends StatelessWidget {
               monospace: true,
             ),
         ],
-        if (AppScope.of(context).agents.lacksClaude)
+        if (AppScope.of(context).agents.lacksAgentCli)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-            child: Text('Your agents run on Claude Code: connect it in Settings to pick one here.', style: sans(11.5, color: c.text3, height: 1.4)),
+            child: Text('Your agents run on Claude Code, Codex or Copilot: connect one in Settings to pick one here.', style: sans(11.5, color: c.text3, height: 1.4)),
           ),
         Container(height: 1, color: c.divider, margin: const EdgeInsets.symmetric(vertical: 4)),
         KPressable(

@@ -62,7 +62,7 @@ void main() {
   testWidgets('Docs lists each source’s pages and reads the one picked', (tester) async {
     final docs = _Docs();
     await _pump(tester, const DocsScreen(), docs: docs);
-    expect(find.text('fravega.atlassian.net'), findsOneWidget);
+    expect(find.text('workspace-1.atlassian.net'), findsOneWidget);
     expect(find.text('PRC-412 scratchpad'), findsOneWidget);
     // The first page opens by itself, rendered from Markdown.
     expect(docs.reads, ['jira1/98311']);

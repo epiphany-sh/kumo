@@ -24,6 +24,12 @@ trap 'rm -rf "$tmp"' EXIT
 
 echo "Downloading Kumo…"
 curl -fsSL "https://github.com/$repo/releases/latest/download/Kumo.zip" -o "$tmp/Kumo.zip"
+expected=$(curl -fsSL "https://github.com/$repo/releases/latest/download/Kumo.zip.sha256")
+actual=$(shasum -a 256 "$tmp/Kumo.zip" | cut -d' ' -f1)
+if [ "$actual" != "$expected" ]; then
+	echo "The download doesn't match its checksum: nothing was installed." >&2
+	exit 1
+fi
 ditto -x -k "$tmp/Kumo.zip" "$tmp"
 
 if pgrep -xq Kumo; then

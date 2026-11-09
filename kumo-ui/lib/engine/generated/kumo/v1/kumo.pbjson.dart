@@ -2830,6 +2830,7 @@ const RunAgentDefRequest$json = {
     },
     {'1': 'cols', '3': 10, '4': 1, '5': 13, '10': 'cols'},
     {'1': 'rows', '3': 11, '4': 1, '5': 13, '10': 'rows'},
+    {'1': 'provider_id', '3': 12, '4': 1, '5': 9, '10': 'providerId'},
   ],
   '8': [
     {'1': 'where'},
@@ -2844,8 +2845,8 @@ final $typed_data.Uint8List runAgentDefRequestDescriptor = $convert.base64Decode
     'IPbmV3V29ya3RyZWVSZXBvEhsKCGxpbmtfdXJsGAUgASgJSABSB2xpbmtVcmwSGAoGZm9sZGVy'
     'GAYgASgJSABSBmZvbGRlchIaCgdzY3JhdGNoGAcgASgISABSB3NjcmF0Y2gSFgoGcHJvbXB0GA'
     'ggASgJUgZwcm9tcHQSLwoHY29udGV4dBgJIAMoCzIVLmt1bW8udjEuQWdlbnRDb250ZXh0Ugdj'
-    'b250ZXh0EhIKBGNvbHMYCiABKA1SBGNvbHMSEgoEcm93cxgLIAEoDVIEcm93c0IHCgV3aGVyZQ'
-    '==');
+    'b250ZXh0EhIKBGNvbHMYCiABKA1SBGNvbHMSEgoEcm93cxgLIAEoDVIEcm93cxIfCgtwcm92aW'
+    'Rlcl9pZBgMIAEoCVIKcHJvdmlkZXJJZEIHCgV3aGVyZQ==');
 
 @$core.Deprecated('Use playRequestDescriptor instead')
 const PlayRequest$json = {
@@ -2900,6 +2901,7 @@ const PlayRequest$json = {
       '17': true
     },
     {'1': 'draft', '3': 11, '4': 1, '5': 8, '10': 'draft'},
+    {'1': 'provider_id', '3': 12, '4': 1, '5': 9, '10': 'providerId'},
   ],
   '8': [
     {'1': '_max_turns'},
@@ -2916,8 +2918,9 @@ final $typed_data.Uint8List playRequestDescriptor = $convert.base64Decode(
     'ADKAsyFS5rdW1vLnYxLkFnZW50Q29udGV4dFIHY29udGV4dBIgCgltYXhfdHVybnMYByABKA1I'
     'AFIIbWF4VHVybnOIAQESJAoLbWF4X21pbnV0ZXMYCCABKA1IAVIKbWF4TWludXRlc4gBARIrCg'
     'VhZ2VudBgJIAEoCzIVLmt1bW8udjEuQWdlbnREZWZGaWxlUgVhZ2VudBIlCgxtYXhfY29zdF91'
-    'c2QYCiABKAFIAlIKbWF4Q29zdFVzZIgBARIUCgVkcmFmdBgLIAEoCFIFZHJhZnRCDAoKX21heF'
-    '90dXJuc0IOCgxfbWF4X21pbnV0ZXNCDwoNX21heF9jb3N0X3VzZA==');
+    'c2QYCiABKAFIAlIKbWF4Q29zdFVzZIgBARIUCgVkcmFmdBgLIAEoCFIFZHJhZnQSHwoLcHJvdm'
+    'lkZXJfaWQYDCABKAlSCnByb3ZpZGVySWRCDAoKX21heF90dXJuc0IOCgxfbWF4X21pbnV0ZXNC'
+    'DwoNX21heF9jb3N0X3VzZA==');
 
 @$core.Deprecated('Use playEventDescriptor instead')
 const PlayEvent$json = {
@@ -2997,6 +3000,7 @@ const PlayRecord$json = {
       '10': 'events'
     },
     {'1': 'running', '3': 6, '4': 1, '5': 8, '10': 'running'},
+    {'1': 'provider_id', '3': 7, '4': 1, '5': 9, '10': 'providerId'},
   ],
 };
 
@@ -3005,7 +3009,7 @@ final $typed_data.Uint8List playRecordDescriptor = $convert.base64Decode(
     'CgpQbGF5UmVjb3JkEhcKB3BsYXlfaWQYASABKAlSBnBsYXlJZBISCgR0YXNrGAIgASgJUgR0YX'
     'NrEhQKBWRyYWZ0GAMgASgIUgVkcmFmdBImCg9zdGFydGVkX3VuaXhfbXMYBCABKANSDXN0YXJ0'
     'ZWRVbml4TXMSKgoGZXZlbnRzGAUgAygLMhIua3Vtby52MS5QbGF5RXZlbnRSBmV2ZW50cxIYCg'
-    'dydW5uaW5nGAYgASgIUgdydW5uaW5n');
+    'dydW5uaW5nGAYgASgIUgdydW5uaW5nEh8KC3Byb3ZpZGVyX2lkGAcgASgJUgpwcm92aWRlcklk');
 
 @$core.Deprecated('Use playListDescriptor instead')
 const PlayList$json = {

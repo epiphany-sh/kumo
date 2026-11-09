@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'agent_defs.dart' show AgentCli;
 import 'models.dart';
 
 /// A coding-agent CLI the user can run (known or custom).
@@ -230,8 +231,11 @@ abstract class AgentsSource extends ChangeNotifier {
   List<AgentProviderInfo> get connected =>
       [for (final p in providers) if (p.enabled && p.isDefault) p, for (final p in providers) if (p.enabled && !p.isDefault) p];
 
-  /// Other CLIs are connected but not Claude Code, which your agents run on.
-  bool get lacksClaude => connected.isNotEmpty && !connected.any((p) => p.id == 'claude');
+  /// The connected CLIs your agents can run on, the default first.
+  List<AgentCli> get agentClis => [for (final p in connected) if (AgentCli.of(p.id) case final cli?) cli];
+
+  /// CLIs are connected, but none your agents run on (Claude Code, Codex).
+  bool get lacksAgentCli => connected.isNotEmpty && agentClis.isEmpty;
 
   /// Re-reads providers (and whether they are installed).
   Future<void> loadProviders();
@@ -275,12 +279,13 @@ abstract class AgentsSource extends ChangeNotifier {
   Future<void> get ready;
 }
 
-/// The design canvas: Claude Code, Codex and Gemini connected, Aider not
+/// The design canvas: Claude Code, Codex, Copilot and Gemini connected, Aider not
 /// installed. No real sessions (the Agents view shows its own mock).
 class MockAgentsSource extends AgentsSource {
   List<AgentProviderInfo> _providers = const [
     AgentProviderInfo(id: 'claude', name: 'Claude Code', short: 'CC', program: 'claude', enabled: true, isDefault: true, installed: true, takesPrompt: true, hasLogin: true),
     AgentProviderInfo(id: 'codex', name: 'Codex CLI', short: 'CX', program: 'codex', enabled: true, installed: true, takesPrompt: true, hasLogin: true),
+    AgentProviderInfo(id: 'copilot', name: 'GitHub Copilot CLI', short: 'GH', program: 'copilot', enabled: true, installed: true, hasLogin: true),
     AgentProviderInfo(id: 'gemini', name: 'Gemini CLI', short: 'GM', program: 'gemini', enabled: true, installed: true, takesPrompt: true, hasLogin: true),
     AgentProviderInfo(id: 'aider', name: 'Aider', short: 'AD', program: 'aider', installHint: 'brew install aider', hasLogin: true),
   ];

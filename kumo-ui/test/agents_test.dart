@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/app/app_state.dart';
+import 'package:kumo_ui/data/agent_defs.dart' show AgentCli;
 import 'package:kumo_ui/data/agents_source.dart';
 import 'package:kumo_ui/data/models.dart';
 import 'package:kumo_ui/overlays/agent_settings.dart';
@@ -160,10 +161,13 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  test('your agents need Claude Code: said only when another CLI is what’s connected', () {
-    AgentProviderInfo cli(String id) => AgentProviderInfo(id: id, name: id, short: 'XX', program: id, args: '', custom: false, enabled: true, isDefault: false, installed: true, resolvedPath: '', installHint: '', takesPrompt: true, hasLogin: false);
-    expect(_FakeAgents().lacksClaude, isFalse, reason: 'nothing connected yet has its own message');
-    expect(_FakeAgents(providers: [cli('codex')]).lacksClaude, isTrue);
-    expect(_FakeAgents(providers: [cli('codex'), cli('claude')]).lacksClaude, isFalse);
+  test('your agents need Claude Code, Codex or Copilot: said only when other CLIs are what’s connected', () {
+    AgentProviderInfo cli(String id, {bool isDefault = false}) =>
+        AgentProviderInfo(id: id, name: id, short: 'XX', program: id, args: '', custom: false, enabled: true, isDefault: isDefault, installed: true, resolvedPath: '', installHint: '', takesPrompt: true, hasLogin: false);
+    expect(_FakeAgents().lacksAgentCli, isFalse, reason: 'nothing connected yet has its own message');
+    expect(_FakeAgents(providers: [cli('gemini')]).lacksAgentCli, isTrue);
+    expect(_FakeAgents(providers: [cli('codex')]).lacksAgentCli, isFalse, reason: 'Codex runs them too');
+    expect(_FakeAgents(providers: [cli('copilot')]).lacksAgentCli, isFalse, reason: 'and Copilot');
+    expect(_FakeAgents(providers: [cli('gemini'), cli('copilot'), cli('codex'), cli('claude', isDefault: true)]).agentClis, [AgentCli.claude, AgentCli.copilot, AgentCli.codex], reason: 'the default first; gemini can’t');
   });
 }

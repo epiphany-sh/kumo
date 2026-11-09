@@ -1,23 +1,23 @@
-//! Test runs (headless, step by step) and one-shot questions to Claude.
+//! Test runs (headless, step by step) and one-shot questions to a CLI.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::{Arc, PoisonError};
 use std::time::{Duration, Instant};
 
 use kumo_domain::agent_defs::{
-    AgentDefFile, AgentDefKey, HeadlessKiller, HeadlessSpec, PlayCommand, PlayEvent, PlayEventKind,
-    PlayRecord, ask_args, check_agent_name, play_args,
+    AgentCli, AgentDefFile, AgentDefKey, DEFAULT_CLI, HeadlessKiller, HeadlessSpec, PlayCommand,
+    PlayEvent, PlayEventKind, PlayRecord, check_agent_name,
 };
 use kumo_domain::agents::{AgentContext, AgentError, AgentSessionId};
 use kumo_domain::time::Timestamp;
 use tokio::sync::mpsc;
 
-use super::service::{AgentDefService, CLAUDE, blocking};
+use super::service::{AgentDefService, blocking, cli_for};
 use crate::agents::{STOPPED, STOPPED_BY_TIME_LIMIT};
 
-/// How long a question to Claude may take.
+/// How long a question to a CLI may take.
 const ASK_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// A test run going on.
@@ -40,6 +40,8 @@ impl std::fmt::Debug for LivePlay {
 /// What a test run is started with.
 #[derive(Debug, Clone, Default)]
 pub struct PlayStart {
+    /// The CLI it runs on; empty: the default.
+    pub provider_id: String,
     /// The name it runs under (the draft's).
     pub name: String,
     /// The draft as `--agents` takes it.
@@ -65,37 +67,45 @@ fn elapsed_ms(since: Instant) -> i64 {
     i64::try_from(since.elapsed().as_millis()).unwrap_or(i64::MAX)
 }
 
-/// What the timeline shows when Claude Code ended without a result line
-/// (it refused a flag, it wasn't signed in): its error, as a failed result.
-fn failure_line(code: i32, stderr: &str) -> String {
-    let text = if stderr.trim().is_empty() {
-        format!("Claude Code exited with code {code}.")
-    } else {
-        stderr.trim().to_owned()
-    };
-    serde_json::json!({ "type": "result", "subtype": "error", "is_error": true, "result": text })
-        .to_string()
-}
-
 impl AgentDefService {
-    /// Whether the installed Claude Code takes a budget; asked once.
-    async fn budget_flag(&self, program: &std::path::Path, env: &[(String, String)]) -> bool {
-        if let Some(known) = self.budget_flag.get() {
-            return *known;
+    /// Whether the installed CLI takes a budget; asked once.
+    async fn budget_flag(
+        &self,
+        cli: &'static dyn AgentCli,
+        program: &std::path::Path,
+        env: &[(String, String)],
+    ) -> bool {
+        let Some(flag) = cli.budget_flag() else {
+            return false;
+        };
+        let known = self
+            .budget_flags
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(cli.provider_id())
+            .copied();
+        if let Some(known) = known {
+            return known;
         }
         let (headless, program, env) = (
             Arc::clone(&self.ports.headless),
             program.to_owned(),
             env.to_vec(),
         );
-        let has = blocking(move || Ok(headless.has_flag(&program, "--max-budget-usd", &env)))
+        let has = blocking(move || Ok(headless.has_flag(&program, flag, &env)))
             .await
             .unwrap_or(None);
         match has {
-            Some(has) => *self.budget_flag.get_or_init(|| has),
+            Some(has) => {
+                self.budget_flags
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .insert(cli.provider_id(), has);
+                has
+            }
             // Asked again next time: a hiccup isn't its answer.
             None => {
-                tracing::warn!("couldn't tell if Claude Code takes a budget");
+                tracing::warn!("couldn't tell if {} takes a budget", cli.name());
                 false
             }
         }
@@ -109,16 +119,19 @@ impl AgentDefService {
         start: PlayStart,
     ) -> Result<(String, mpsc::Receiver<PlayEvent>), AgentError> {
         check_agent_name(&start.name)?;
+        let cli = cli_for(&start.provider_id)?;
         if start.task.trim().is_empty() {
             return Err(AgentError::Invalid("give it a task to try".into()));
         }
+        // Refused before a throwaway worktree is made for it.
+        cli.check(&start.name, &start.inline_json)?;
         let worktree = self
             .workspace
             .known_worktree(&start.worktree)
             .await
             .ok_or_else(|| AgentError::UnknownWorktree(start.worktree.clone()))?;
-        let (program, env) = self.agents.program_env(CLAUDE).await?;
-        let budget = self.budget_flag(&program, &env).await;
+        let (program, env) = self.agents.program_env(cli.provider_id()).await?;
+        let budget = self.budget_flag(cli, &program, &env).await;
         let id = format!("play-{}", AgentSessionId::generate());
 
         let cwd = if start.throwaway {
@@ -146,26 +159,37 @@ impl AgentDefService {
                     .await?;
                 Some(dir)
             };
+            let agent_files = self
+                .write_agent_files(cli, &start.name, &start.inline_json, context_dir.as_deref())
+                .await?;
+            let written = agent_files.as_ref().map(|f| f.dir.clone());
             let command = PlayCommand {
                 name: start.name.clone(),
                 inline_json: start.inline_json.clone(),
                 task: start.task.clone(),
                 context_dir,
+                agent_files,
                 max_turns: start.max_turns,
                 max_cost_usd: start.max_cost_usd,
             };
             let spec = HeadlessSpec {
                 program,
-                args: play_args(&command, budget),
+                args: cli.play_args(&command, budget)?,
                 cwd: cwd.clone(),
                 env,
             };
             let headless = Arc::clone(&self.ports.headless);
-            blocking(move || headless.start(&spec)).await
+            let process = blocking(move || headless.start(&spec)).await;
+            Ok((process, written))
         }
         .await;
-        let process = match started {
-            Ok(process) => process,
+        let (process, written) = match started {
+            Ok((Ok(process), written)) => (process, written),
+            Ok((Err(error), written)) => {
+                self.drop_agent_files(written).await;
+                self.drop_throwaway(throwaway).await;
+                return Err(error);
+            }
             Err(error) => {
                 self.drop_throwaway(throwaway).await;
                 return Err(error);
@@ -175,6 +199,7 @@ impl AgentDefService {
         let killer: Arc<dyn HeadlessKiller> = Arc::from(process.killer);
         let record = PlayRecord {
             id: id.clone(),
+            provider_id: cli.provider_id().to_owned(),
             task: start.task.trim().to_owned(),
             draft: start.draft,
             started_unix_ms: now_ms(),
@@ -215,7 +240,7 @@ impl AgentDefService {
                         if line.trim().is_empty() {
                             continue;
                         }
-                        result_seen |= line.contains("\"type\":\"result\"");
+                        result_seen |= cli.is_result_line(&line);
                         let at_ms = elapsed_ms(since);
                         service.push_line(&play_id, line.clone(), at_ms);
                         let _ = tx.blocking_send(PlayEvent {
@@ -228,7 +253,7 @@ impl AgentDefService {
                     let stopped = service.stopped_play(&play_id);
                     let code = stopped.unwrap_or(code);
                     if code != 0 && !result_seen && stopped.is_none() {
-                        let line = failure_line(code, &stderr);
+                        let line = cli.failure_line(code, &stderr);
                         service.push_line(&play_id, line.clone(), at_ms);
                         let _ = tx.blocking_send(PlayEvent {
                             kind: PlayEventKind::Line(line),
@@ -239,7 +264,9 @@ impl AgentDefService {
                 })
             };
             let (code, at_ms) = reading.await.unwrap_or((-1, 0));
-            service.finish_play(&play_id, code, at_ms, throwaway).await;
+            service
+                .finish_play(&play_id, code, at_ms, throwaway, written)
+                .await;
             let _ = tx
                 .send(PlayEvent {
                     kind: PlayEventKind::Exited(code),
@@ -262,7 +289,9 @@ impl AgentDefService {
         code: i32,
         at_ms: i64,
         throwaway: Option<(PathBuf, PathBuf)>,
+        written: Option<PathBuf>,
     ) {
+        self.drop_agent_files(written).await;
         self.drop_throwaway(throwaway).await;
         let Some(mut live) = self.plays_lock().remove(id) else {
             return;
@@ -274,6 +303,18 @@ impl AgentDefService {
             blocking(move || store.save_play(&live.key, &live.record, PlayRecord::KEEP)).await;
         if let Err(error) = saved {
             tracing::warn!(play = %id, %error, "test run not kept");
+        }
+    }
+
+    /// Removes the agent written for a test run: it's read when it starts.
+    async fn drop_agent_files(&self, dir: Option<PathBuf>) {
+        if let Some(dir) = dir {
+            let files = Arc::clone(&self.ports.files);
+            let _ = blocking(move || {
+                files.remove_dir(&dir);
+                Ok(())
+            })
+            .await;
         }
     }
 
@@ -338,13 +379,14 @@ impl AgentDefService {
         Ok(live)
     }
 
-    /// One answer from Claude (`claude -p`, plan mode: it changes nothing),
-    /// run in `cwd` or an empty folder.
+    /// One answer from the default CLI, changing nothing, run in `cwd` or an
+    /// empty folder.
     pub async fn ask(&self, prompt: &str, cwd: Option<PathBuf>) -> Result<String, AgentError> {
         if prompt.trim().is_empty() {
             return Err(AgentError::Invalid("nothing to ask".into()));
         }
-        let (program, env) = self.agents.program_env(CLAUDE).await?;
+        let cli = cli_for(DEFAULT_CLI)?;
+        let (program, env) = self.agents.program_env(cli.provider_id()).await?;
         let files = Arc::clone(&self.ports.files);
         let (cwd, temp) = match cwd {
             Some(cwd) if files.exists(&cwd) => (cwd, None),
@@ -366,7 +408,7 @@ impl AgentDefService {
         };
         let spec = HeadlessSpec {
             program,
-            args: ask_args(prompt),
+            args: cli.ask_args(prompt),
             cwd,
             env,
         };
@@ -394,12 +436,13 @@ impl AgentDefService {
                 timer.abort();
                 let timed_out = timer.await.unwrap_or(false);
                 match read {
-                    Ok(_) if timed_out => Err(AgentError::Launch(
-                        "Claude didn't answer within 2 minutes".into(),
-                    )),
+                    Ok(_) if timed_out => Err(AgentError::Launch(format!(
+                        "{} didn't answer within 2 minutes",
+                        cli.speaker()
+                    ))),
                     Ok((text, 0, _)) => Ok(text.trim().to_owned()),
                     Ok((_, code, stderr)) => Err(AgentError::Launch(if stderr.is_empty() {
-                        format!("Claude Code exited with code {code}")
+                        format!("{} exited with code {code}", cli.name())
                     } else {
                         stderr
                     })),

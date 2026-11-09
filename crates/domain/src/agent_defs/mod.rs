@@ -3,15 +3,15 @@
 //! and their test runs. The daemon never parses the files: the UI owns the
 //! format.
 
+mod cli;
 mod command;
 mod context;
 mod model;
 mod play;
 mod ports;
 
-pub use command::{
-    PlayCommand, ask_args, context_sentence, next_free, play_args, role_sentence, run_args,
-};
+pub use cli::{AgentCli, DEFAULT_CLI, agent_cli};
+pub use command::{AgentFiles, PlayCommand, context_sentence, next_free, role_sentence};
 pub use context::{
     ContextFile, RepoLink, WrittenContext, context_index, file_name, html_text, pull_number,
     task_key,

@@ -151,7 +151,7 @@ class AgentDef {
     this.tools = readOnlyTools,
     this.model = 'inherit',
     this.approvals = AgentApprovals.ask,
-    this.maxTurns = 25,
+    this.maxTurns,
     this.skills = const [],
     this.mcpServers = const [],
     this.memory = AgentMemory.none,
@@ -183,7 +183,8 @@ class AgentDef {
   final String model;
   final AgentApprovals approvals;
 
-  /// Claude Code's `maxTurns`; null: no limit.
+  /// Claude Code's `maxTurns`; null: no limit, the default (a task cut
+  /// short by a guess costs more than letting it finish: Stop is at hand).
   final int? maxTurns;
   final List<String> skills;
   final List<String> mcpServers;
@@ -614,8 +615,6 @@ List<AgentCheck> agentChecks(AgentDef a, {Set<String> taken = const {}}) {
       const AgentCheck(CheckLevel.warn, 'Its file skips every approval (bypassPermissions): it runs everything without asking.'),
     if (a.everyTool)
       const AgentCheck(CheckLevel.warn, 'Its file has no tools line: it has every tool, MCP ones too. Pick some in Edit to limit it.'),
-    if (writes && (a.approvals == AgentApprovals.acceptEdits || a.approvals == AgentApprovals.dontAsk) && a.maxTurns == null && a.maxMinutes == null)
-      const AgentCheck(CheckLevel.warn, 'It changes things without asking and has no limits.'),
     if (writes && a.triggers.isNotEmpty && !a.isolation)
       const AgentCheck(CheckLevel.warn, 'A trigger runs it on its own with tools that change things: turn Isolation on.'),
   ];
@@ -680,20 +679,160 @@ Object? _inlineValue(String key, String written) {
 
 /// The command its terminal runs, as Kumo shows it (the engine builds the
 /// real argv from the same parts).
-String agentCommand(AgentDef a, {String contextDir = '', String prompt = ''}) {
+String agentCommand(AgentDef a, {String contextDir = '', String prompt = '', AgentCli cli = AgentCli.claude}) {
+  final p = prompt.trim();
+  final quoted = p.isEmpty ? '' : ' "${p.length > 70 ? '${p.substring(0, 68)}…' : p}"';
+  if (cli == AgentCli.codex) {
+    // The context folder is only named in its message: --add-dir would let
+    // Codex write there.
+    return 'codex -s ${codexSandbox(a)} -c developer_instructions="…"${quoted.isEmpty ? '' : ' --$quoted'}';
+  }
+  if (cli == AgentCli.copilot) {
+    // Copilot reads agents from files: Kumo writes this one for the run,
+    // under a name of its own.
+    return 'copilot --agent ${a.name}-… --add-dir <its copy>${contextDir.isEmpty ? '' : ' --add-dir $contextDir'}${quoted.isEmpty ? '' : ' -i$quoted'}';
+  }
   // Always inline (agentInlineJson): by name, Claude Code goes by the file's
   // `name` line and Kumo by the file; and a file may not be where it runs.
   final agent = '--agents \'{"${a.name}": …}\' --agent ${a.name}';
-  final p = prompt.trim();
-  final quoted = p.isEmpty ? '' : ' "${p.length > 70 ? '${p.substring(0, 68)}…' : p}"';
   return 'claude $agent${contextDir.isEmpty ? '' : ' --add-dir $contextDir'}${quoted.isEmpty ? '' : ' --$quoted'}';
 }
 
 /// The headless run the playground starts.
-String playgroundCommand(AgentDef a, {String task = ''}) {
+String playgroundCommand(AgentDef a, {String task = '', AgentCli cli = AgentCli.claude}) {
   final p = task.trim();
+  final quoted = p.isEmpty ? '' : ' "${p.length > 40 ? '${p.substring(0, 38)}…' : p}"';
+  if (cli == AgentCli.codex) return 'codex exec --json -s ${codexSandbox(a)} -c developer_instructions="…"$quoted';
+  if (cli == AgentCli.copilot) return 'copilot -p$quoted --agent ${a.name}-… --output-format json';
   return 'claude -p --agents \'{"${a.name}": …}\' --agent ${a.name} --output-format stream-json --verbose'
-      '${a.maxTurns == null ? '' : ' --max-turns ${a.maxTurns}'}${p.isEmpty ? '' : ' "${p.length > 40 ? '${p.substring(0, 38)}…' : p}"'}';
+      '${a.maxTurns == null ? '' : ' --max-turns ${a.maxTurns}'}$quoted';
+}
+
+// ---------------------------------------------------------------------------
+// The CLIs your agents run on
+// ---------------------------------------------------------------------------
+
+/// A CLI your agents can run on. The file is Claude Code's; the engine turns
+/// it into each CLI's flags (`crates/domain/src/agent_defs/cli`).
+enum AgentCli {
+  claude('claude', 'Claude Code'),
+  codex('codex', 'Codex CLI'),
+  copilot('copilot', 'Copilot CLI');
+
+  const AgentCli(this.id, this.label);
+
+  /// The provider it runs as.
+  final String id;
+  final String label;
+
+  /// Its name where there's little room: a choice among them.
+  String get short => label.replaceAll(' CLI', '');
+
+  static AgentCli? of(String id) => values.where((c) => c.id == id).firstOrNull;
+}
+
+bool _has(AgentDef a, String tool) => a.everyTool || a.tools.contains(tool);
+
+/// Codex's sandbox for [a]: it never gets more than the file gives.
+String codexSandbox(AgentDef a) {
+  final writes = a.approvals != AgentApprovals.plan && (_has(a, 'Bash') || ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].any((t) => _has(a, t)));
+  return writes ? 'workspace-write' : 'read-only';
+}
+
+/// What changes when [a] runs on [cli], as the run form shows it. Empty for
+/// Claude Code: the file is its own.
+List<AgentCheck> agentCliNotes(AgentDef a, AgentCli cli) => switch (cli) {
+  AgentCli.claude => const [],
+  AgentCli.codex => _codexNotes(a),
+  AgentCli.copilot => _copilotNotes(a),
+};
+
+/// Claude Code's tools and the Copilot tool each one is (as the engine's
+/// `cli/copilot.rs`).
+const _copilotToolOf = {
+  'Read': 'read',
+  'NotebookRead': 'read',
+  'Grep': 'search',
+  'Glob': 'search',
+  'Edit': 'edit',
+  'Write': 'edit',
+  'MultiEdit': 'edit',
+  'NotebookEdit': 'edit',
+  'Bash': 'execute',
+  'WebFetch': 'web',
+  'WebSearch': 'web',
+  'TodoWrite': 'todo',
+};
+
+/// Copilot's tools for [a]: it never gets more than the file gives.
+List<String> copilotTools(AgentDef a) {
+  final plan = a.approvals == AgentApprovals.plan;
+  return [
+    for (final t in const ['read', 'search', 'edit', 'execute', 'web', 'todo'])
+      if ((a.everyTool || _copilotToolOf.entries.any((e) => e.value == t && a.tools.contains(e.key))) && !(plan && (t == 'edit' || t == 'execute'))) t,
+  ];
+}
+
+List<AgentCheck> _copilotNotes(AgentDef a) {
+  final plan = a.approvals == AgentApprovals.plan;
+  final tools = copilotTools(a);
+  final edits = tools.contains('edit');
+  final model = a.model.toLowerCase();
+  final own = model != 'inherit' && !model.startsWith('claude') && !['haiku', 'sonnet', 'opus'].any(model.contains);
+  final unmatched = [for (final t in a.tools) if (!t.startsWith('mcp__') && !_copilotToolOf.containsKey(t)) t];
+  return [
+    if (!edits && !tools.contains('execute'))
+      AgentCheck(CheckLevel.ok, '${plan ? 'Plan only, so it only reads' : 'It only reads'}: Copilot gets ${tools.isEmpty ? 'no tools' : tools.join(', ')}, as Kumo writes it for each run.')
+    else
+      AgentCheck(CheckLevel.info, 'Copilot gets ${tools.join(', ')}, as Kumo writes it for each run.'),
+    if (edits && a.approvals == AgentApprovals.acceptEdits)
+      const AgentCheck(CheckLevel.info, 'Edits go without asking.')
+    else if (edits || tools.contains('execute'))
+      const AgentCheck(CheckLevel.info, 'It asks you before each change in its terminal. A test run can’t ask, so it can’t change anything.'),
+    if (a.approvals == AgentApprovals.bypass) const AgentCheck(CheckLevel.warn, 'Its file skips every approval: Copilot doesn’t, it asks.'),
+    if (a.approvals == AgentApprovals.dontAsk && tools.any((t) => t == 'edit' || t == 'execute')) const AgentCheck(CheckLevel.info, 'Copilot can’t turn requests down on its own: it asks you instead.'),
+    AgentCheck(
+      CheckLevel.info,
+      own ? 'Model: ${a.model}.' : 'Model: your Copilot default. If that’s Auto it can change from run to run, and some models drift from the role: pick one with /model in Copilot.',
+    ),
+    if (unmatched.isNotEmpty) AgentCheck(CheckLevel.warn, '${unmatched.join(', ')} ${unmatched.length == 1 ? 'has' : 'have'} no match in Copilot: it runs without ${unmatched.length == 1 ? 'it' : 'them'}.'),
+    if (a.mcpServers.isNotEmpty) AgentCheck(CheckLevel.warn, 'Its connectors don’t carry over yet: it runs without ${a.mcpServers.join(', ')}.'),
+    if (a.skills.isNotEmpty) AgentCheck(CheckLevel.warn, 'Its skills don’t carry over: it runs without ${a.skills.join(', ')}.'),
+    if (a.maxTurns != null) AgentCheck(CheckLevel.info, 'Copilot has no turn limit: its ${a.maxTurns} turns don’t apply.'),
+    if (a.maxCostUsd != null) const AgentCheck(CheckLevel.info, 'Copilot counts premium requests, not cost: the cost limit doesn’t apply.'),
+    if (a.memory != AgentMemory.none) const AgentCheck(CheckLevel.info, 'Memory is Claude Code’s: on Copilot it starts fresh.'),
+    const AgentCheck(CheckLevel.info, 'The first time in a folder Copilot asks whether to trust it: answer in its terminal.'),
+  ];
+}
+
+List<AgentCheck> _codexNotes(AgentDef a) {
+  final plan = a.approvals == AgentApprovals.plan;
+  final bash = _has(a, 'Bash');
+  final model = a.model.toLowerCase();
+  final effort = model.contains('haiku') ? 'low' : (model.contains('sonnet') ? 'medium' : (model.contains('opus') ? 'high' : ''));
+  return [
+    if (codexSandbox(a) == 'read-only')
+      AgentCheck(CheckLevel.ok, '${plan ? 'Plan only, so read-only' : 'Read-only'}: it reads and runs commands in a sandbox that stops any change and the network.')
+    else
+      AgentCheck(CheckLevel.info, 'It can change files only in the folder it runs in${bash ? '' : ', not in temporary ones'}. The network stays off.'),
+    if (bash && !plan && a.approvals != AgentApprovals.dontAsk)
+      const AgentCheck(CheckLevel.info, 'It asks you before going beyond the sandbox.')
+    else
+      const AgentCheck(CheckLevel.info, 'It never asks: what the sandbox stops just fails.'),
+    if (a.approvals == AgentApprovals.bypass) const AgentCheck(CheckLevel.warn, 'Its file skips every approval: Codex doesn’t, it keeps the sandbox.'),
+    AgentCheck(
+      CheckLevel.info,
+      effort.isNotEmpty
+          ? 'Model: your Codex default, thinking with $effort effort (${agentModelLabel(a.model)}).'
+          : (model == 'inherit' || model.startsWith('claude') ? 'Model: your Codex default.' : 'Model: ${a.model}.'),
+    ),
+    if (_has(a, 'WebSearch')) const AgentCheck(CheckLevel.info, 'Web search on.') else if (_has(a, 'WebFetch')) const AgentCheck(CheckLevel.warn, 'WebFetch has no match in Codex: it can’t read pages.'),
+    if (a.mcpServers.isNotEmpty) AgentCheck(CheckLevel.warn, 'Its connectors don’t carry over yet: it runs without ${a.mcpServers.join(', ')}.'),
+    if (a.skills.isNotEmpty) AgentCheck(CheckLevel.warn, 'Its skills don’t carry over: it runs without ${a.skills.join(', ')}.'),
+    if (a.maxTurns != null) AgentCheck(CheckLevel.info, 'Codex has no turn limit: its ${a.maxTurns} turns don’t apply.'),
+    if (a.maxCostUsd != null) const AgentCheck(CheckLevel.info, 'Codex reports tokens, not cost: the cost limit doesn’t apply.'),
+    if (a.memory != AgentMemory.none) const AgentCheck(CheckLevel.info, 'Memory is Claude Code’s: on Codex it starts fresh.'),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -751,7 +890,7 @@ const agentTemplates = [
       role: 'a test writer', step: 'Write tests for every function the branch changed, then run them.', dont: 'Don’t change code outside test files. Don’t push.'),
   AgentTemplate('bug-fixer', 'Bug fixer', 'Reproduces a bug from a ticket, fixes it and proves it with a test.', [...readOnlyTools, 'Edit', 'Bash'], 'red',
       role: 'a bug fixer', step: 'Reproduce the bug with a failing test, fix it, and run the tests around it.', dont: 'Don’t push. Don’t change unrelated code.'),
-  AgentTemplate('blank', 'Blank', 'Only the safe defaults: read-only, 25 turns.', readOnlyTools, 'yellow'),
+  AgentTemplate('blank', 'Blank', 'Only the safe defaults: read-only.', readOnlyTools, 'yellow'),
 ];
 
 /// What Kumo asks Claude to draft an agent from [description] (the engine

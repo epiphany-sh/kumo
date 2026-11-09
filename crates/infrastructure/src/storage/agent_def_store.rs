@@ -175,8 +175,8 @@ impl AgentDefStore for SqliteAgentStore {
     ) -> Result<(), AgentError> {
         let conn = self.conn.lock().unwrap_or_else(PoisonError::into_inner);
         conn.execute(
-            "INSERT INTO agent_def_plays (id, scope, repo_path, name, task, draft, started, events)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "INSERT INTO agent_def_plays (id, scope, repo_path, name, task, draft, started, events, provider)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
              ON CONFLICT (id) DO UPDATE SET events = excluded.events",
             params![
                 play.id,
@@ -186,7 +186,8 @@ impl AgentDefStore for SqliteAgentStore {
                 play.task,
                 play.draft,
                 play.started_unix_ms,
-                events_json(&play.events)
+                events_json(&play.events),
+                play.provider_id
             ],
         )
         .map_err(store_error)?;
@@ -204,7 +205,7 @@ impl AgentDefStore for SqliteAgentStore {
         let conn = self.conn.lock().unwrap_or_else(PoisonError::into_inner);
         let mut statement = conn
             .prepare(
-                "SELECT id, task, draft, started, events FROM agent_def_plays
+                "SELECT id, task, draft, started, events, provider FROM agent_def_plays
                  WHERE scope = ?1 AND repo_path = ?2 AND name = ?3 ORDER BY started DESC, rowid DESC",
             )
             .map_err(store_error)?;
@@ -212,6 +213,7 @@ impl AgentDefStore for SqliteAgentStore {
             .query_map(params![key.scope.key(), key.repo_path, key.name], |row| {
                 Ok(PlayRecord {
                     id: row.get(0)?,
+                    provider_id: row.get(5)?,
                     task: row.get(1)?,
                     draft: row.get(2)?,
                     started_unix_ms: row.get(3)?,
@@ -306,5 +308,38 @@ mod tests {
         assert_eq!(plays[9].id, "p2");
         assert_eq!(plays[0].events, play("p11", 11).events);
         assert!(store.plays(&key("other")).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_test_run_keeps_the_cli_it_ran_on() {
+        let store = SqliteAgentStore::in_memory().unwrap();
+        let on_codex = PlayRecord {
+            provider_id: "codex".into(),
+            ..play("p1", 1)
+        };
+        store.save_play(&key("rev"), &on_codex, 10).unwrap();
+        assert_eq!(store.plays(&key("rev")).unwrap()[0].provider_id, "codex");
+    }
+
+    #[test]
+    fn test_runs_kept_before_there_were_other_clis_ran_on_claude_code() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kumo.db");
+        {
+            let conn = rusqlite::Connection::open(&path).unwrap();
+            // Schema step 6, as the previous version left it.
+            for step in &super::super::migrations::steps()[..6] {
+                conn.execute_batch(step).unwrap();
+            }
+            conn.pragma_update(None, "user_version", 6).unwrap();
+            conn.execute_batch(
+                "INSERT INTO agent_def_plays VALUES ('p1', 'project', '/w/app', 'rev', 'Review', 0, 1, '[]');",
+            )
+            .unwrap();
+        }
+        let store = SqliteAgentStore::open(&path).unwrap();
+        let plays = store.plays(&key("rev")).unwrap();
+        assert_eq!(plays.len(), 1);
+        assert_eq!(plays[0].provider_id, "claude");
     }
 }
