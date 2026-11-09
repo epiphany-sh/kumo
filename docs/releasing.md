@@ -111,11 +111,11 @@ re-correlo desde Actions. Si falla uno solo, el otro ya creó el tag y el
 número quedó usado: re-corré el job que falló (no el workflow entero, que
 vería el tag y no haría nada).
 
-**Tags**: los `v*` los crea el workflow. El ruleset `release tags` no deja
-crearlos, moverlos ni borrarlos a nadie más, ni desde `git push` ni desde la web
-de GitHub. Si algún día hace falta publicar a mano, desactivá ese ruleset un
-momento; el workflow igual rechaza un tag que no sea `vX.Y.Z` o que no esté
-en `main`.
+**Solo un merge a `main` publica.** Un tag no dispara nada, porque ejecutaría
+el workflow de su propio commit, sin pasar por el PR. El ruleset `release tags`
+impide mover o borrar los `v*` ya creados. Crearlos no se puede bloquear: en una
+cuenta personal, GitHub no acepta a Actions como excepción de un ruleset, y el
+workflow necesita crear el tag.
 
 ## Qué protege cada paso
 
