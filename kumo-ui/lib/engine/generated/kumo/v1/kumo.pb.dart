@@ -10146,55 +10146,56 @@ class PlayList extends $pb.GeneratedMessage {
   $pb.PbList<PlayRecord> get plays => $_getList(0);
 }
 
-class AskClaudeRequest extends $pb.GeneratedMessage {
-  factory AskClaudeRequest({
+class AskRequest extends $pb.GeneratedMessage {
+  factory AskRequest({
     $core.String? prompt,
     $core.String? cwd,
+    $core.String? providerId,
   }) {
-    final result = AskClaudeRequest._();
+    final result = AskRequest._();
     if (prompt != null) result.prompt = prompt;
     if (cwd != null) result.cwd = cwd;
+    if (providerId != null) result.providerId = providerId;
     return result;
   }
 
-  AskClaudeRequest._();
+  AskRequest._();
 
-  factory AskClaudeRequest.fromBuffer($core.List<$core.int> data,
+  factory AskRequest.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      AskClaudeRequest()..mergeFromBuffer(data, registry);
-  factory AskClaudeRequest.fromJson($core.String json,
+      AskRequest()..mergeFromBuffer(data, registry);
+  factory AskRequest.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      AskClaudeRequest()..mergeFromJson(json, registry);
+      AskRequest()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'AskClaudeRequest',
+      _omitMessageNames ? '' : 'AskRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
-      createEmptyInstance: AskClaudeRequest.$_createMessage)
+      createEmptyInstance: AskRequest.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'prompt')
     ..aOS(2, _omitFieldNames ? '' : 'cwd')
+    ..aOS(3, _omitFieldNames ? '' : 'providerId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  AskClaudeRequest clone() => deepCopy();
+  AskRequest clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  AskClaudeRequest copyWith(void Function(AskClaudeRequest) updates) =>
-      super.copyWith((message) => updates(message as AskClaudeRequest))
-          as AskClaudeRequest;
+  AskRequest copyWith(void Function(AskRequest) updates) =>
+      super.copyWith((message) => updates(message as AskRequest)) as AskRequest;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  @$core.Deprecated('Use AskClaudeRequest() / AskClaudeRequest.new instead')
-  static AskClaudeRequest create() => AskClaudeRequest._();
-  static $pb.GeneratedMessage $_createMessage() => AskClaudeRequest._();
+  @$core.Deprecated('Use AskRequest() / AskRequest.new instead')
+  static AskRequest create() => AskRequest._();
+  static $pb.GeneratedMessage $_createMessage() => AskRequest._();
   @$core.override
-  AskClaudeRequest createEmptyInstance() => AskClaudeRequest._();
+  AskRequest createEmptyInstance() => AskRequest._();
   @$core.pragma('dart2js:noInline')
-  static AskClaudeRequest getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AskClaudeRequest>(
-          AskClaudeRequest.$_createMessage);
-  static AskClaudeRequest? _defaultInstance;
+  static AskRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<AskRequest>(AskRequest.$_createMessage);
+  static AskRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
   $core.String get prompt => $_getSZ(0);
@@ -10214,54 +10215,64 @@ class AskClaudeRequest extends $pb.GeneratedMessage {
   $core.bool hasCwd() => $_has(1);
   @$pb.TagNumber(2)
   void clearCwd() => $_clearField(2);
+
+  /// The CLI that answers; empty: Claude Code.
+  @$pb.TagNumber(3)
+  $core.String get providerId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set providerId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasProviderId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearProviderId() => $_clearField(3);
 }
 
-class AskClaudeResponse extends $pb.GeneratedMessage {
-  factory AskClaudeResponse({
+class AskResponse extends $pb.GeneratedMessage {
+  factory AskResponse({
     $core.String? text,
   }) {
-    final result = AskClaudeResponse._();
+    final result = AskResponse._();
     if (text != null) result.text = text;
     return result;
   }
 
-  AskClaudeResponse._();
+  AskResponse._();
 
-  factory AskClaudeResponse.fromBuffer($core.List<$core.int> data,
+  factory AskResponse.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      AskClaudeResponse()..mergeFromBuffer(data, registry);
-  factory AskClaudeResponse.fromJson($core.String json,
+      AskResponse()..mergeFromBuffer(data, registry);
+  factory AskResponse.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      AskClaudeResponse()..mergeFromJson(json, registry);
+      AskResponse()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'AskClaudeResponse',
+      _omitMessageNames ? '' : 'AskResponse',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
-      createEmptyInstance: AskClaudeResponse.$_createMessage)
+      createEmptyInstance: AskResponse.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'text')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  AskClaudeResponse clone() => deepCopy();
+  AskResponse clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  AskClaudeResponse copyWith(void Function(AskClaudeResponse) updates) =>
-      super.copyWith((message) => updates(message as AskClaudeResponse))
-          as AskClaudeResponse;
+  AskResponse copyWith(void Function(AskResponse) updates) =>
+      super.copyWith((message) => updates(message as AskResponse))
+          as AskResponse;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  @$core.Deprecated('Use AskClaudeResponse() / AskClaudeResponse.new instead')
-  static AskClaudeResponse create() => AskClaudeResponse._();
-  static $pb.GeneratedMessage $_createMessage() => AskClaudeResponse._();
+  @$core.Deprecated('Use AskResponse() / AskResponse.new instead')
+  static AskResponse create() => AskResponse._();
+  static $pb.GeneratedMessage $_createMessage() => AskResponse._();
   @$core.override
-  AskClaudeResponse createEmptyInstance() => AskClaudeResponse._();
+  AskResponse createEmptyInstance() => AskResponse._();
   @$core.pragma('dart2js:noInline')
-  static AskClaudeResponse getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AskClaudeResponse>(
-          AskClaudeResponse.$_createMessage);
-  static AskClaudeResponse? _defaultInstance;
+  static AskResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AskResponse>(
+          AskResponse.$_createMessage);
+  static AskResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
   $core.String get text => $_getSZ(0);

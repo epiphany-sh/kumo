@@ -13,7 +13,8 @@ import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
 
-/// "Create an agent": from a template, from a description Claude drafts,
+/// "Create an agent": from a template, from a description a connected CLI
+/// drafts,
 /// or from a .md file (dropped, chosen, or pasted). Returns the unsaved
 /// agent and where it came from, for Edit to open; null when cancelled.
 Future<(AgentDef, String)?> showCreateAgentDialog(BuildContext context, {bool import = false}) {
@@ -115,16 +116,17 @@ class _CreateAgentDialogState extends State<CreateAgentDialog> {
       return;
     }
     final text = _describe.text.trim();
-    if (text.isNotEmpty) {
+    final writer = s.agents.askCli?.short;
+    if (text.isNotEmpty && writer != null) {
       setState(() => _drafting = true);
       final draft = await s.agentDefs.draft(text, scope: _scope, repo: repo);
       if (!mounted) return;
       setState(() => _drafting = false);
       if (draft == null) {
-        s.notify('Claude couldn’t draft it: ${s.agentDefs.error ?? 'try again'}');
+        s.notify('$writer couldn’t draft it: ${s.agentDefs.error ?? 'try again'}');
         return;
       }
-      Navigator.of(context).pop((draft, 'Claude drafted this from your description. Check every field: nothing is saved yet.'));
+      Navigator.of(context).pop((draft, '$writer drafted this from your description. Check every field: nothing is saved yet.'));
       return;
     }
     final t = agentTemplates.firstWhere((x) => x.id == _template);
@@ -141,6 +143,7 @@ class _CreateAgentDialogState extends State<CreateAgentDialog> {
     final c = context.c;
     final s = AppScope.of(context);
     _repo ??= s.activeRepo?.name ?? s.workspace.repos.firstOrNull?.name;
+    final writer = s.agents.askCli?.short;
     final read = _import ? readAgentFile(_paste.text, scope: _scope, repo: _repo ?? '', taken: _taken(s)) : null;
     final canGo = !_drafting && (!_import || (read?.usable ?? false)) && (_scope == AgentScope.personal || _repo != null);
     return CallbackShortcuts(
@@ -167,7 +170,7 @@ class _CreateAgentDialogState extends State<CreateAgentDialog> {
                 Text(
                   _import
                       ? 'A Claude Code agent file: from a repo, a teammate, or a post. Nothing is saved until you check it in Edit.'
-                      : 'A Claude Code subagent: other CLIs have no agent files, so they aren’t offered here.',
+                      : 'One agent for every CLI you’ve connected: you choose which one each time you run it.',
                   style: sans(11.5, color: c.text3),
                 ),
               ]),
@@ -175,7 +178,7 @@ class _CreateAgentDialogState extends State<CreateAgentDialog> {
             KIconButton(icon: KIcons.close, label: 'Close', onTap: () => Navigator.of(context).maybePop()),
           ]),
           const SizedBox(height: 16),
-          Flexible(child: SingleChildScrollView(child: _import ? _importBody(context, read) : _pickBody(context))),
+          Flexible(child: SingleChildScrollView(child: _import ? _importBody(context, read) : _pickBody(context, writer))),
           const SizedBox(height: 12),
           Container(height: 1, color: c.divider),
           const SizedBox(height: 12),
@@ -217,7 +220,7 @@ class _CreateAgentDialogState extends State<CreateAgentDialog> {
             KButton(label: 'Cancel', height: 32, fontSize: 12.5, onTap: () => Navigator.of(context).maybePop()),
             const SizedBox(width: 8),
             KButton.primary(
-              label: _drafting ? 'Drafting…' : (_import ? 'Open in Edit' : (_describe.text.trim().isNotEmpty ? 'Draft it with Claude' : 'Continue')),
+              label: _drafting ? 'Drafting…' : (_import ? 'Open in Edit' : (writer != null && _describe.text.trim().isNotEmpty ? 'Draft it with $writer' : 'Continue')),
               height: 32,
               fontSize: 12.5,
               onTap: canGo ? () => _go(s) : null,
@@ -229,9 +232,10 @@ class _CreateAgentDialogState extends State<CreateAgentDialog> {
     );
   }
 
-  Widget _pickBody(BuildContext context) {
+  /// [writer]: the connected CLI that drafts; null when there's none.
+  Widget _pickBody(BuildContext context, String? writer) {
     final c = context.c;
-    final describing = _describe.text.trim().isNotEmpty;
+    final describing = writer != null && _describe.text.trim().isNotEmpty;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text('START FROM', style: sans(10.5, weight: FontWeight.w600, color: c.text3, letterSpacing: 0.5)),
       const SizedBox(height: 8),
@@ -254,7 +258,7 @@ class _CreateAgentDialogState extends State<CreateAgentDialog> {
           Row(children: [
             Icon(KIcons.sparkle, size: 13, color: c.acc),
             const SizedBox(width: 7),
-            Text('Or describe it, and Claude drafts it', style: sans(12.5, weight: FontWeight.w600, color: c.text)),
+            Text(writer == null ? 'Or describe it, and have it drafted' : 'Or describe it, and $writer drafts it', style: sans(12.5, weight: FontWeight.w600, color: c.text)),
           ]),
           const SizedBox(height: 6),
           Container(
@@ -262,6 +266,7 @@ class _CreateAgentDialogState extends State<CreateAgentDialog> {
             decoration: BoxDecoration(color: c.chip, borderRadius: BorderRadius.circular(10), border: Border.all(color: c.chipBorder)),
             child: TextField(
               controller: _describe,
+              enabled: writer != null,
               minLines: 2,
               maxLines: 4,
               style: sans(12.5, color: c.text, height: 1.45),
@@ -270,7 +275,12 @@ class _CreateAgentDialogState extends State<CreateAgentDialog> {
             ),
           ),
           const SizedBox(height: 6),
-          Text('Claude writes the name, description, instructions and a tool list to match. You check every field before it’s saved.', style: sans(11, color: c.text3)),
+          Text(
+            writer == null
+                ? 'Connect Claude Code, Codex or Copilot in Settings › AI agents, and it writes the agent from what you describe.'
+                : '$writer writes the name, description, instructions and a tool list to match. You check every field before it’s saved.',
+            style: sans(11, color: c.text3),
+          ),
         ]),
       ),
     ]);

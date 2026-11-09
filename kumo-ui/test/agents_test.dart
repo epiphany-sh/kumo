@@ -169,5 +169,8 @@ void main() {
     expect(_FakeAgents(providers: [cli('codex')]).lacksAgentCli, isFalse, reason: 'Codex runs them too');
     expect(_FakeAgents(providers: [cli('copilot')]).lacksAgentCli, isFalse, reason: 'and Copilot');
     expect(_FakeAgents(providers: [cli('gemini'), cli('copilot'), cli('codex'), cli('claude', isDefault: true)]).agentClis, [AgentCli.claude, AgentCli.copilot, AgentCli.codex], reason: 'the default first; gemini can’t');
+    expect(_FakeAgents().askCli, isNull, reason: 'nothing connected: nothing drafts');
+    expect(_FakeAgents(providers: [cli('gemini'), cli('codex')]).askCli, AgentCli.codex, reason: 'drafting doesn’t need Claude Code');
+    expect(_FakeAgents(providers: [cli('copilot'), cli('claude', isDefault: true)]).askCli, AgentCli.claude, reason: 'the default when it can');
   });
 }

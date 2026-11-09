@@ -94,7 +94,7 @@ class _AgentEditorState extends State<_AgentEditor> {
     if (!mounted) return;
     setState(() => _drafting = false);
     if (text == null || text.trim().isEmpty) {
-      s.notify('Claude couldn’t draft them: ${s.agentDefs.error ?? 'try again'}');
+      s.notify('${s.agents.askCli?.short ?? 'No connected CLI'} couldn’t draft them: ${s.agentDefs.error ?? 'try again'}');
       return;
     }
     _body.text = text;
@@ -104,6 +104,7 @@ class _AgentEditorState extends State<_AgentEditor> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final writer = AppScope.of(context).agents.askCli?.short;
     final checks = agentChecks(a, taken: widget.taken);
     final errors = checks.where((x) => x.level == CheckLevel.error).length;
     final dirty = widget.saved == null || widget.saved != a;
@@ -155,12 +156,12 @@ class _AgentEditorState extends State<_AgentEditor> {
         title: 'Instructions',
         hint: 'its role, what it does and doesn’t, how',
         trailing: KButton(
-          label: _drafting ? 'Drafting…' : (a.instructions.trim().isEmpty ? 'Draft with Claude' : 'Improve with Claude'),
+          label: _drafting ? 'Drafting…' : (writer == null ? 'Connect a CLI to draft' : '${a.instructions.trim().isEmpty ? 'Draft' : 'Improve'} with $writer'),
           icon: KIcons.sparkle,
           height: 26,
           fontSize: 11.5,
           kind: KButtonKind.ghost,
-          onTap: _drafting ? null : _draftInstructions,
+          onTap: _drafting || writer == null ? null : _draftInstructions,
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _Area(controller: _body, minLines: 9, maxLines: 22, monospace: true, label: 'Instructions', onChanged: (v) => _set(a.copyWith(instructions: v))),

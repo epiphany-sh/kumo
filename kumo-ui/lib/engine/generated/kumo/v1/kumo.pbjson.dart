@@ -3030,31 +3030,32 @@ const PlayList$json = {
 final $typed_data.Uint8List playListDescriptor = $convert.base64Decode(
     'CghQbGF5TGlzdBIpCgVwbGF5cxgBIAMoCzITLmt1bW8udjEuUGxheVJlY29yZFIFcGxheXM=');
 
-@$core.Deprecated('Use askClaudeRequestDescriptor instead')
-const AskClaudeRequest$json = {
-  '1': 'AskClaudeRequest',
+@$core.Deprecated('Use askRequestDescriptor instead')
+const AskRequest$json = {
+  '1': 'AskRequest',
   '2': [
     {'1': 'prompt', '3': 1, '4': 1, '5': 9, '10': 'prompt'},
     {'1': 'cwd', '3': 2, '4': 1, '5': 9, '10': 'cwd'},
+    {'1': 'provider_id', '3': 3, '4': 1, '5': 9, '10': 'providerId'},
   ],
 };
 
-/// Descriptor for `AskClaudeRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List askClaudeRequestDescriptor = $convert.base64Decode(
-    'ChBBc2tDbGF1ZGVSZXF1ZXN0EhYKBnByb21wdBgBIAEoCVIGcHJvbXB0EhAKA2N3ZBgCIAEoCV'
-    'IDY3dk');
+/// Descriptor for `AskRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List askRequestDescriptor = $convert.base64Decode(
+    'CgpBc2tSZXF1ZXN0EhYKBnByb21wdBgBIAEoCVIGcHJvbXB0EhAKA2N3ZBgCIAEoCVIDY3dkEh'
+    '8KC3Byb3ZpZGVyX2lkGAMgASgJUgpwcm92aWRlcklk');
 
-@$core.Deprecated('Use askClaudeResponseDescriptor instead')
-const AskClaudeResponse$json = {
-  '1': 'AskClaudeResponse',
+@$core.Deprecated('Use askResponseDescriptor instead')
+const AskResponse$json = {
+  '1': 'AskResponse',
   '2': [
     {'1': 'text', '3': 1, '4': 1, '5': 9, '10': 'text'},
   ],
 };
 
-/// Descriptor for `AskClaudeResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List askClaudeResponseDescriptor = $convert
-    .base64Decode('ChFBc2tDbGF1ZGVSZXNwb25zZRISCgR0ZXh0GAEgASgJUgR0ZXh0');
+/// Descriptor for `AskResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List askResponseDescriptor =
+    $convert.base64Decode('CgtBc2tSZXNwb25zZRISCgR0ZXh0GAEgASgJUgR0ZXh0');
 
 @$core.Deprecated('Use agentDefCapabilitiesRequestDescriptor instead')
 const AgentDefCapabilitiesRequest$json = {

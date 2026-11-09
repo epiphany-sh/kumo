@@ -7,8 +7,8 @@ use std::sync::{Arc, PoisonError};
 use std::time::{Duration, Instant};
 
 use kumo_domain::agent_defs::{
-    AgentCli, AgentDefFile, AgentDefKey, DEFAULT_CLI, HeadlessKiller, HeadlessSpec, PlayCommand,
-    PlayEvent, PlayEventKind, PlayRecord, check_agent_name,
+    AgentCli, AgentDefFile, AgentDefKey, HeadlessKiller, HeadlessSpec, PlayCommand, PlayEvent,
+    PlayEventKind, PlayRecord, check_agent_name,
 };
 use kumo_domain::agents::{AgentContext, AgentError, AgentSessionId};
 use kumo_domain::time::Timestamp;
@@ -379,13 +379,18 @@ impl AgentDefService {
         Ok(live)
     }
 
-    /// One answer from the default CLI, changing nothing, run in `cwd` or an
-    /// empty folder.
-    pub async fn ask(&self, prompt: &str, cwd: Option<PathBuf>) -> Result<String, AgentError> {
+    /// One answer from a CLI (empty: the default), changing nothing, run in
+    /// `cwd` or an empty folder.
+    pub async fn ask(
+        &self,
+        prompt: &str,
+        cwd: Option<PathBuf>,
+        provider_id: &str,
+    ) -> Result<String, AgentError> {
         if prompt.trim().is_empty() {
             return Err(AgentError::Invalid("nothing to ask".into()));
         }
-        let cli = cli_for(DEFAULT_CLI)?;
+        let cli = cli_for(provider_id)?;
         let (program, env) = self.agents.program_env(cli.provider_id()).await?;
         let files = Arc::clone(&self.ports.files);
         let (cwd, temp) = match cwd {

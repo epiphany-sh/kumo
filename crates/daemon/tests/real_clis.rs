@@ -132,9 +132,10 @@ async fn claude_code_takes_what_kumo_starts_it_with() {
     let answer = s
         .client
         .agent_defs
-        .ask(pb::AskClaudeRequest {
+        .ask(pb::AskRequest {
             prompt: "Reply with exactly the word PONG.".into(),
             cwd: String::new(),
+            ..Default::default()
         })
         .await
         .unwrap()

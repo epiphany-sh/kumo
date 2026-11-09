@@ -321,7 +321,7 @@ void main() {
       await tester.tap(find.text('Went wrong here').at(4));
       await tester.pump();
       await tester.pump();
-      expect(find.text('Claude suggests:'), findsOneWidget);
+      expect(find.text('Suggested change:'), findsOneWidget);
       await tester.ensureVisible(find.text('Apply to the draft'));
       await tester.pump();
       await tester.tap(find.text('Apply to the draft'));
