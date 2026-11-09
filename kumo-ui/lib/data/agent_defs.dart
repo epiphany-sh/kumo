@@ -151,7 +151,7 @@ class AgentDef {
     this.tools = readOnlyTools,
     this.model = 'inherit',
     this.approvals = AgentApprovals.ask,
-    this.maxTurns = 25,
+    this.maxTurns,
     this.skills = const [],
     this.mcpServers = const [],
     this.memory = AgentMemory.none,
@@ -183,7 +183,8 @@ class AgentDef {
   final String model;
   final AgentApprovals approvals;
 
-  /// Claude Code's `maxTurns`; null: no limit.
+  /// Claude Code's `maxTurns`; null: no limit, the default (a task cut
+  /// short by a guess costs more than letting it finish: Stop is at hand).
   final int? maxTurns;
   final List<String> skills;
   final List<String> mcpServers;
@@ -614,8 +615,6 @@ List<AgentCheck> agentChecks(AgentDef a, {Set<String> taken = const {}}) {
       const AgentCheck(CheckLevel.warn, 'Its file skips every approval (bypassPermissions): it runs everything without asking.'),
     if (a.everyTool)
       const AgentCheck(CheckLevel.warn, 'Its file has no tools line: it has every tool, MCP ones too. Pick some in Edit to limit it.'),
-    if (writes && (a.approvals == AgentApprovals.acceptEdits || a.approvals == AgentApprovals.dontAsk) && a.maxTurns == null && a.maxMinutes == null)
-      const AgentCheck(CheckLevel.warn, 'It changes things without asking and has no limits.'),
     if (writes && a.triggers.isNotEmpty && !a.isolation)
       const AgentCheck(CheckLevel.warn, 'A trigger runs it on its own with tools that change things: turn Isolation on.'),
   ];
@@ -891,7 +890,7 @@ const agentTemplates = [
       role: 'a test writer', step: 'Write tests for every function the branch changed, then run them.', dont: 'Don’t change code outside test files. Don’t push.'),
   AgentTemplate('bug-fixer', 'Bug fixer', 'Reproduces a bug from a ticket, fixes it and proves it with a test.', [...readOnlyTools, 'Edit', 'Bash'], 'red',
       role: 'a bug fixer', step: 'Reproduce the bug with a failing test, fix it, and run the tests around it.', dont: 'Don’t push. Don’t change unrelated code.'),
-  AgentTemplate('blank', 'Blank', 'Only the safe defaults: read-only, 25 turns.', readOnlyTools, 'yellow'),
+  AgentTemplate('blank', 'Blank', 'Only the safe defaults: read-only.', readOnlyTools, 'yellow'),
 ];
 
 /// What Kumo asks Claude to draft an agent from [description] (the engine

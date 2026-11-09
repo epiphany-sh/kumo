@@ -290,7 +290,7 @@ class _AgentEditorState extends State<_AgentEditor> {
         if (a.skills.isNotEmpty) '${a.skills.length} skill${a.skills.length == 1 ? '' : 's'}',
         if (a.knowledge.isNotEmpty) '${a.knowledge.length} doc${a.knowledge.length == 1 ? '' : 's'}',
         if (a.mcpServers.isNotEmpty) a.mcpServers.join(', '),
-        a.maxTurns == null ? 'no turn limit' : '${a.maxTurns} turns',
+        if (a.maxTurns != null) '${a.maxTurns} turns',
         if (a.maxMinutes != null) '${a.maxMinutes} min',
         a.approvals.label,
         if (a.isolation) 'own worktree',
@@ -342,7 +342,6 @@ class _AgentEditorState extends State<_AgentEditor> {
     final s = AppScope.read(context);
     final defs = s.agentDefs;
     int? toInt(String v) => int.tryParse(v.trim());
-    final noLimits = a.maxTurns == null && a.maxMinutes == null;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _Section(title: 'Capabilities', hint: 'what it can reach besides its tools', rows: [
         _Row(
@@ -419,9 +418,7 @@ class _AgentEditorState extends State<_AgentEditor> {
               _LimitField(label: 'Time', unit: 'min', controller: _minutes, onChanged: (v) => _set(a.copyWith(maxMinutes: () => toInt(v)))),
               _LimitField(label: 'Cost', unit: 'USD', controller: _cost, onChanged: (v) => _set(a.copyWith(maxCostUsd: () => double.tryParse(v.trim())))),
             ]),
-            CheckLine(noLimits
-                ? const AgentCheck(CheckLevel.warn, 'No turn or time limit: a run that gets stuck goes on until you stop it.')
-                : const AgentCheck(CheckLevel.info, 'Cost counts in headless runs (playground, triggers), from Claude Code’s own report.')),
+            const CheckLine(AgentCheck(CheckLevel.info, 'Optional, and off by default: a task cut short by a guess often costs more than letting it finish. Stop is always at hand. Cost counts in headless runs (playground, triggers), from Claude Code’s own report.')),
           ]),
         ),
         _Row(

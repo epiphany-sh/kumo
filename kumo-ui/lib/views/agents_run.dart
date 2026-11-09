@@ -358,7 +358,7 @@ class _RunTabState extends State<_RunTab> {
       ('Tools', a.tools.isEmpty ? 'none' : [...a.tools, ...a.mcpServers].join(', '), a.tools.isEmpty ? c.err : c.text),
       ('Model', a.model == 'inherit' ? 'Inherits the session’s' : agentModelLabel(a.model), c.text),
       ('Approvals', a.approvals.label, c.text),
-      ('Limits', [if (a.maxTurns != null) '${a.maxTurns} turns', if (a.maxMinutes != null) '${a.maxMinutes} min', if (a.maxCostUsd != null) '\$${a.maxCostUsd}'].join(' · ').ifEmpty('none'), a.maxTurns == null && a.maxMinutes == null ? c.warn : c.text),
+      ('Limits', [if (a.maxTurns != null) '${a.maxTurns} turns', if (a.maxMinutes != null) '${a.maxMinutes} min', if (a.maxCostUsd != null) '\$${a.maxCostUsd}'].join(' · ').ifEmpty('none'), c.text),
       ('Isolation', a.isolation ? 'Own worktree each run' : 'Where you start it', c.text),
       ('Knowledge', a.knowledge.isEmpty ? 'none' : a.knowledge.join(', '), c.text),
     ];
