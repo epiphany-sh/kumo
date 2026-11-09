@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use kumo_domain::agent_defs::{
-    AgentDefFile, AgentDefFiles, AgentDefKey, AgentDefScope, AgentDefSettings, AgentDefStore,
-    HeadlessRunner, PageReader, RunGit, agents_dir, check_agent_name,
+    AgentCli, AgentDefFile, AgentDefFiles, AgentDefKey, AgentDefScope, AgentDefSettings,
+    AgentDefStore, HeadlessRunner, PageReader, RunGit, agent_cli, agents_dir, check_agent_name,
 };
 use kumo_domain::agents::AgentError;
 
@@ -14,8 +14,11 @@ use super::sources::RunSources;
 use crate::agents::AgentService;
 use crate::workspace::WorkspaceService;
 
-/// The provider your agents run with: only Claude Code has subagents.
-pub(super) const CLAUDE: &str = "claude";
+/// The CLI a run asked for; empty: the default.
+pub(super) fn cli_for(provider_id: &str) -> Result<&'static dyn AgentCli, AgentError> {
+    agent_cli(provider_id)
+        .ok_or_else(|| AgentError::Invalid(format!("your agents can't run on “{provider_id}” yet")))
+}
 
 #[derive(Clone)]
 pub struct AgentDefPorts {
@@ -62,8 +65,8 @@ pub struct AgentDefService {
     pub(super) agents: Arc<AgentService>,
     pub(super) workspace: Arc<WorkspaceService>,
     pub(super) plays: Mutex<HashMap<String, LivePlay>>,
-    /// Whether the installed Claude Code takes `--max-budget-usd`.
-    pub(super) budget_flag: OnceLock<bool>,
+    /// Per CLI, whether the installed version takes its budget flag.
+    pub(super) budget_flags: Mutex<HashMap<&'static str, bool>>,
     /// How long a minute of the time limits lasts (shorter in tests).
     pub(super) minute: Duration,
 }
@@ -81,7 +84,7 @@ impl AgentDefService {
             agents,
             workspace,
             plays: Mutex::default(),
-            budget_flag: OnceLock::new(),
+            budget_flags: Mutex::default(),
             minute: Duration::from_secs(60),
         }
     }

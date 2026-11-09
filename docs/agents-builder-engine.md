@@ -9,7 +9,7 @@ Branch `feat/git-history` (same branch as the Git work) adds to kumo-ui, built a
 3. **New agent** lists your agents next to the CLIs, shows the context it will get (the branch's PR and tickets), and opens the run in Agents.
 4. **Ask agent** (selected code) can send to a CLI the user **typed by hand** in one of the worktree's terminals (e.g. `claude` in zsh 2), and holds a message for an agent waiting on an approval until it's answered.
 
-Only Claude Code: other CLIs have no subagent files.
+Only Claude Code at first. Running them on other CLIs: see [agents-en-otras-clis.md](agents-en-otras-clis.md).
 
 What the UI reads:
 - `AgentDefsSource` (`kumo-ui/lib/data/agent_defs_source.dart`): today `main.dart` gets `UnsupportedAgentDefs`, so a real build shows "Your agents need a newer engine". The design uses `MockAgentDefs`.

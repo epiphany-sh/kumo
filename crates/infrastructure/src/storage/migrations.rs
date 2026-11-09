@@ -111,6 +111,8 @@ const STEPS: &[&str] = &[
         events      TEXT NOT NULL
     );
     CREATE INDEX agent_def_plays_by_agent ON agent_def_plays (scope, repo_path, name, started);",
+    // 7: the CLI a test run ran on; until now they all ran on Claude Code
+    "ALTER TABLE agent_def_plays ADD COLUMN provider TEXT NOT NULL DEFAULT 'claude';",
 ];
 
 #[cfg(test)]

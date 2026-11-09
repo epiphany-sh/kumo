@@ -1116,6 +1116,8 @@ message RunAgentDefRequest {
   repeated AgentContext context = 9;
   uint32 cols = 10;
   uint32 rows = 11;
+  // The CLI it runs on; empty: Claude Code.
+  string provider_id = 12;
 }
 
 message PlayRequest {
@@ -1137,6 +1139,8 @@ message PlayRequest {
   optional double max_cost_usd = 10;
   // The unsaved draft ran (not the saved file).
   bool draft = 11;
+  // The CLI it runs on; empty: Claude Code.
+  string provider_id = 12;
 }
 
 message PlayEvent {
@@ -1169,6 +1173,8 @@ message PlayRecord {
   repeated PlayEvent events = 5;
   // Still running (its events so far).
   bool running = 6;
+  // The CLI it ran on.
+  string provider_id = 7;
 }
 
 message PlayList {

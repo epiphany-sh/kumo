@@ -959,6 +959,69 @@ async fn a_test_run_streams_its_lines_and_keeps_them() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn runs_say_the_cli_they_ran_on_and_refuse_one_that_cant_run_agents() {
+    let mut s = Setup::new().await;
+    let owner = save(&mut s.client, personal("rev"), None).await;
+    let request = pb::PlayRequest {
+        name: "rev".into(),
+        inline_json: r#"{"rev":{}}"#.into(),
+        task: "Review #521".into(),
+        worktree_path: s.repo.display().to_string(),
+        agent: Some(owner.clone()),
+        ..Default::default()
+    };
+
+    // Naming the default is the same as not naming one.
+    play(&mut s.client, request.clone()).await;
+    play(
+        &mut s.client,
+        pb::PlayRequest {
+            provider_id: "claude".into(),
+            ..request.clone()
+        },
+    )
+    .await;
+    let kept = s
+        .client
+        .agent_defs
+        .list_plays(pb::ListPlaysRequest {
+            agent: Some(owner.clone()),
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .plays;
+    assert_eq!(kept.len(), 2);
+    assert!(kept.iter().all(|p| p.provider_id == "claude"), "{kept:?}");
+    assert_eq!(s.logged("play")[..2], ["-p", "--agents"]);
+
+    let refused = s
+        .client
+        .agent_defs
+        .play(pb::PlayRequest {
+            provider_id: "not-a-cli".into(),
+            ..request
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code(), Code::InvalidArgument);
+    let refused = s
+        .client
+        .agent_defs
+        .run(pb::RunAgentDefRequest {
+            provider_id: "not-a-cli".into(),
+            ..run(owner, pb::run_agent_def_request::Where::Scratch(true), "go")
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code(), Code::InvalidArgument);
+    assert!(
+        !s.profile_dir().join("scratch").exists(),
+        "refused before doing anything"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn ask_answers_in_plan_mode() {
     let mut s = Setup::new().await;
     let answer = s
