@@ -398,7 +398,7 @@ class _CommitSheetState extends State<CommitSheet> {
   late int _index = widget.index;
   final _details = <String, Future<CommitDetail>>{};
   final _folded = <String>{};
-  final _fileKeys = <String, GlobalKey>{};
+  final _rowsByFile = <CommitFile, List<_DiffRow>>{};
   final _scroll = ScrollController();
   final _focus = FocusNode(debugLabel: 'commit sheet');
   String? _current;
@@ -406,6 +406,8 @@ class _CommitSheetState extends State<CommitSheet> {
 
   /// Lines per file before "View file" takes over.
   static const _maxLines = 400;
+  static const _listTop = 12.0;
+  static const _fileGap = 12.0;
 
   RepoCommit get commit => widget.commits[_index];
 
@@ -433,15 +435,25 @@ class _CommitSheetState extends State<CommitSheet> {
       _index = next;
       _current = null;
       _note = null;
-      _fileKeys.clear();
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
-  void _jumpTo(String path) {
+  List<_DiffRow> _rows(CommitFile f) => _rowsByFile.putIfAbsent(f, () => _rowsOf(f, _maxLines));
+
+  double _extentOf(CommitFile f) => _fileHeaderExtent + (_folded.contains(f.path) ? 0 : _rows(f).fold(0.0, (sum, r) => sum + r.extent));
+
+  void _jumpTo(CommitDetail d, String path) {
     setState(() => _current = path);
-    final ctx = _fileKeys[path]?.currentContext;
-    if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+    if (!_scroll.hasClients) return;
+    // Add up instead of asking the file: off screen, it isn't built.
+    var top = _listTop;
+    for (final f in d.files) {
+      if (f.path == path) break;
+      top += _extentOf(f) + _fileGap;
+    }
+    final position = _scroll.position;
+    _scroll.animateTo(top.clamp(position.minScrollExtent, position.maxScrollExtent), duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
   }
 
   void _say(String note) => setState(() => _note = note);
@@ -483,6 +495,7 @@ class _CommitSheetState extends State<CommitSheet> {
         focusNode: _focus,
         child: GlassOverlay(
           padding: EdgeInsets.zero,
+          blur: false,
           child: FutureBuilder<CommitDetail>(
             // Keyed: the previous commit's files never show under this one.
             key: ValueKey(k.sha),
@@ -643,27 +656,28 @@ class _CommitSheetState extends State<CommitSheet> {
             padding: const EdgeInsets.fromLTRB(6, 2, 6, 6),
             child: Text('${d.files.length} ${d.files.length == 1 ? 'FILE' : 'FILES'}', style: microLabel(c)),
           ),
-          for (final f in d.files) _FileListItem(file: f, selected: f.path == current, onTap: () => _jumpTo(f.path)),
+          for (final f in d.files) _FileListItem(file: f, selected: f.path == current, onTap: () => _jumpTo(d, f.path)),
         ]),
       ),
       Container(width: 1, color: c.divider),
       Expanded(
-        child: SingleChildScrollView(
+        child: CustomScrollView(
           controller: _scroll,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            for (final f in d.files) ...[
-              _FileDiff(
-                key: _fileKeys.putIfAbsent(f.path, GlobalKey.new),
-                file: f,
-                selected: f.path == current,
-                folded: _folded.contains(f.path),
-                maxLines: _maxLines,
-                onFold: () => setState(() => _folded.contains(f.path) ? _folded.remove(f.path) : _folded.add(f.path)),
+          slivers: [
+            for (final (i, f) in d.files.indexed)
+              SliverPadding(
+                key: ValueKey(f.path),
+                padding: EdgeInsets.fromLTRB(14, i == 0 ? _listTop : 0, 14, i == d.files.length - 1 ? 28 : _fileGap),
+                sliver: _FileDiff(
+                  file: f,
+                  rows: _rows(f),
+                  extent: _extentOf(f),
+                  selected: f.path == current,
+                  folded: _folded.contains(f.path),
+                  onFold: () => setState(() => _folded.contains(f.path) ? _folded.remove(f.path) : _folded.add(f.path)),
+                ),
               ),
-              const SizedBox(height: 12),
-            ],
-          ]),
+          ],
         ),
       ),
     ]);
@@ -696,7 +710,8 @@ class _FileListItem extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 34),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: selected ? c.navActive : (hover ? c.tile : null),
+          // Not navActive: in light it's white, and so is this surface.
+          color: selected ? c.accSoft : (hover ? c.tile : null),
           borderRadius: BorderRadius.circular(8),
           border: focus ? Border.all(color: c.acc, width: 1.5) : null,
         ),
@@ -720,96 +735,169 @@ class _FileListItem extends StatelessWidget {
   }
 }
 
+/// One row of a file's diff. Each knows its height up front: the list lays
+/// out only what's on screen, and a file's position is a sum.
+sealed class _DiffRow {
+  const _DiffRow(this.extent);
+  final double extent;
+}
+
+final class _BlankRow extends _DiffRow {
+  const _BlankRow(super.extent);
+}
+
+final class _HunkRow extends _DiffRow {
+  const _HunkRow(this.hunk) : super(27);
+  final DiffHunk hunk;
+}
+
+final class _LineRow extends _DiffRow {
+  const _LineRow(this.line) : super(19);
+  final HunkLine line;
+}
+
+final class _NoteRow extends _DiffRow {
+  const _NoteRow(this.text, super.extent);
+  final String text;
+}
+
+/// What a file shows under its header, at most [maxLines] lines of it.
+List<_DiffRow> _rowsOf(CommitFile f, int maxLines) {
+  if (f.binary) return const [_NoteRow('Binary file', 42)];
+  if (f.cut) return const [_NoteRow('Too many lines changed to show here', 42)];
+  if (f.hunks.isEmpty) return [_NoteRow(f.kind == CommitFileKind.renamed ? 'Renamed, content unchanged' : 'No changes to show', 42)];
+  final rows = <_DiffRow>[const _BlankRow(2)];
+  var shown = 0, total = 0;
+  for (final h in f.hunks) {
+    total += h.lines.length + 1;
+    if (shown >= maxLines) continue;
+    rows.add(_HunkRow(h));
+    shown++;
+    for (final l in h.lines) {
+      if (shown >= maxLines) break;
+      shown++;
+      rows.add(_LineRow(l));
+    }
+  }
+  rows.add(const _BlankRow(6));
+  if (total > shown) rows.add(_NoteRow('${total - shown} more lines', 26));
+  return rows;
+}
+
+const _fileHeaderExtent = 34.0;
+const _fileRadius = 12.0;
+
+/// A file's whole height, built or not. The list would otherwise guess it
+/// from the rows it has built, and every file below would sit elsewhere than
+/// [_CommitSheetState._jumpTo]'s sum says.
+class _FileRowsDelegate extends SliverChildBuilderDelegate {
+  _FileRowsDelegate(super.builder, {required this.extent, required super.childCount});
+  final double extent;
+
+  @override
+  double? estimateMaxScrollOffset(int firstIndex, int lastIndex, double leadingScrollOffset, double trailingScrollOffset) => extent;
+}
+
+/// A file's header and rows, as a sliver: only the rows on screen are built.
 class _FileDiff extends StatelessWidget {
-  const _FileDiff({super.key, required this.file, required this.selected, required this.folded, required this.maxLines, required this.onFold});
+  const _FileDiff({required this.file, required this.rows, required this.extent, required this.selected, required this.folded, required this.onFold});
   final CommitFile file;
+  final List<_DiffRow> rows;
+  final double extent;
   final bool selected;
   final bool folded;
-  final int maxLines;
   final VoidCallback onFold;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final dc = DiffColors.of(c);
-    final f = file;
-    final rows = <Widget>[];
-    var shown = 0, total = 0;
-    for (final h in f.hunks) {
-      total += h.lines.length + 1;
-      if (shown >= maxLines) continue;
-      rows.add(Container(
-        margin: const EdgeInsets.symmetric(vertical: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-        color: c.accSoft,
-        child: Text(h.header, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11, color: c.text3)),
-      ));
-      shown++;
-      for (final l in h.lines) {
-        if (shown >= maxLines) break;
-        shown++;
-        final (bg, sign, fg) = switch (l.kind) {
-          DiffKind.added => (dc.add, '+', c.ok),
-          DiffKind.deleted => (dc.del, '−', c.err),
-          DiffKind.context => (const Color(0x00000000), '', c.text),
-        };
-        rows.add(Container(
-          color: bg,
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            SizedBox(width: 44, child: Text(l.oldNo?.toString() ?? '', textAlign: TextAlign.right, style: mono(11, color: c.text3))),
-            SizedBox(width: 44, child: Text(l.newNo?.toString() ?? '', textAlign: TextAlign.right, style: mono(11, color: c.text3))),
-            SizedBox(width: 22, child: Text(sign, textAlign: TextAlign.center, style: mono(11.5, color: fg))),
-            Expanded(child: Text(l.text.replaceAll('\t', '    '), softWrap: false, overflow: TextOverflow.fade, style: mono(11.5, color: l.kind == DiffKind.context ? c.text : fg, height: 1.6))),
-          ]),
-        ));
-      }
-    }
-    final more = total - shown;
-    return Container(
-      decoration: BoxDecoration(
-        color: c.panel,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: selected ? c.acc : c.divider),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Container(
-          height: 34,
-          padding: const EdgeInsets.only(left: 4, right: 10),
-          color: c.tile,
-          child: Row(children: [
-            KIconButton(icon: folded ? KIcons.chevronRight : KIcons.chevronDown, label: folded ? 'Unfold ${f.name}' : 'Fold ${f.name}', size: 24, iconSize: 14, color: c.text3, onTap: onFold),
-            const SizedBox(width: 4),
-            Text(f.kind.letter, style: mono(10.5, weight: FontWeight.w700, color: _kindColor(c, f.kind))),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text.rich(
-                TextSpan(children: [
-                  if (f.dir.isNotEmpty) TextSpan(text: '${f.dir}/', style: mono(12, color: c.text3)),
-                  TextSpan(text: f.name, style: mono(12, color: c.text)),
-                  if (f.oldPath case final from?) TextSpan(text: '  ← $from', style: mono(12, color: c.text3)),
-                ]),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Text.rich(TextSpan(children: [
-              TextSpan(text: '+${f.added}', style: mono(11, color: c.ok)),
-              TextSpan(text: ' −${f.deleted}', style: mono(11, color: c.err)),
-            ])),
-          ]),
+    final radius = BorderRadius.circular(_fileRadius);
+    return DecoratedSliver(
+      decoration: BoxDecoration(color: c.panel, borderRadius: radius),
+      sliver: DecoratedSliver(
+        // Over the rows: they run the file's full width.
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(borderRadius: radius, border: Border.all(color: selected ? c.acc : c.divider)),
+        sliver: SliverVariedExtentList(
+          itemExtentBuilder: (i, _) {
+            if (i == 0) return _fileHeaderExtent;
+            if (folded || i > rows.length) return null;
+            return rows[i - 1].extent;
+          },
+          delegate: _FileRowsDelegate(
+            childCount: folded ? 1 : rows.length + 1,
+            extent: extent,
+            (context, i) {
+              if (i == 0) return _header(c);
+              return switch (rows[i - 1]) {
+                _BlankRow() => const SizedBox.shrink(),
+                _HunkRow(:final hunk) => Container(
+                    margin: const EdgeInsets.symmetric(vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.centerLeft,
+                    color: c.accSoft,
+                    child: Text(hunk.header, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11, color: c.text3)),
+                  ),
+                _LineRow(:final line) => _line(c, dc, line),
+                _NoteRow(:final text) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Align(alignment: Alignment.centerLeft, child: Text(text, style: sans(11.5, color: c.text3))),
+                  ),
+              };
+            },
+          ),
         ),
-        if (!folded) ...[
-          if (f.binary)
-            Padding(padding: const EdgeInsets.all(12), child: Text('Binary file', style: sans(12, color: c.text3)))
-          else if (f.cut)
-            Padding(padding: const EdgeInsets.all(12), child: Text('Too many lines changed to show here', style: sans(12, color: c.text3)))
-          else if (f.hunks.isEmpty)
-            Padding(padding: const EdgeInsets.all(12), child: Text(f.kind == CommitFileKind.renamed ? 'Renamed, content unchanged' : 'No changes to show', style: sans(12, color: c.text3)))
-          else
-            Padding(padding: const EdgeInsets.only(top: 2, bottom: 6), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows)),
-          if (more > 0) Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 8), child: Text('$more more lines', style: sans(11.5, color: c.text3))),
-        ],
+      ),
+    );
+  }
+
+  Widget _line(KumoPalette c, DiffColors dc, HunkLine l) {
+    final (bg, sign, fg) = switch (l.kind) {
+      DiffKind.added => (dc.add, '+', c.ok),
+      DiffKind.deleted => (dc.del, '−', c.err),
+      DiffKind.context => (const Color(0x00000000), '', c.text),
+    };
+    return ColoredBox(
+      color: bg,
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(width: 44, child: Text(l.oldNo?.toString() ?? '', textAlign: TextAlign.right, style: mono(11, color: c.text3))),
+        SizedBox(width: 44, child: Text(l.newNo?.toString() ?? '', textAlign: TextAlign.right, style: mono(11, color: c.text3))),
+        SizedBox(width: 22, child: Text(sign, textAlign: TextAlign.center, style: mono(11.5, color: fg))),
+        // Clipped, not faded: a fade takes a layer per long line.
+        Expanded(child: Text(l.text.replaceAll('\t', '    '), softWrap: false, overflow: TextOverflow.clip, style: mono(11.5, color: l.kind == DiffKind.context ? c.text : fg, height: 1.6))),
+      ]),
+    );
+  }
+
+  Widget _header(KumoPalette c) {
+    final f = file;
+    return Container(
+      padding: const EdgeInsets.only(left: 4, right: 10),
+      decoration: BoxDecoration(
+        color: c.tile,
+        borderRadius: folded ? BorderRadius.circular(_fileRadius) : const BorderRadius.vertical(top: Radius.circular(_fileRadius)),
+      ),
+      child: Row(children: [
+        KIconButton(icon: folded ? KIcons.chevronRight : KIcons.chevronDown, label: folded ? 'Unfold ${f.name}' : 'Fold ${f.name}', size: 24, iconSize: 14, color: c.text3, onTap: onFold),
+        const SizedBox(width: 4),
+        Text(f.kind.letter, style: mono(10.5, weight: FontWeight.w700, color: _kindColor(c, f.kind))),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text.rich(
+            TextSpan(children: [
+              if (f.dir.isNotEmpty) TextSpan(text: '${f.dir}/', style: mono(12, color: c.text3)),
+              TextSpan(text: f.name, style: mono(12, color: c.text)),
+              if (f.oldPath case final from?) TextSpan(text: '  ← $from', style: mono(12, color: c.text3)),
+            ]),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Text.rich(TextSpan(children: [
+          TextSpan(text: '+${f.added}', style: mono(11, color: c.ok)),
+          TextSpan(text: ' −${f.deleted}', style: mono(11, color: c.err)),
+        ])),
       ]),
     );
   }

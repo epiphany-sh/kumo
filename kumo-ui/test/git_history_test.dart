@@ -12,6 +12,8 @@ import 'package:kumo_ui/data/repo_history.dart';
 import 'package:kumo_ui/overlays/release_notes_dialog.dart';
 import 'package:kumo_ui/overlays/resolve_comments_dialog.dart';
 import 'package:kumo_ui/data/pipelines_source.dart';
+import 'package:kumo_ui/theme/kumo_theme.dart';
+import 'package:kumo_ui/theme/palette.dart';
 import 'package:kumo_ui/views/git_screen.dart';
 import 'package:kumo_ui/widgets/context_menu.dart';
 import 'package:kumo_ui/widgets/glass.dart';
@@ -28,6 +30,19 @@ Future<AppState> _pumpGit(WidgetTester tester) async {
 }
 
 RepoRelease _r(String tag, ReleaseKind kind) => RepoRelease(tag: tag, kind: kind, time: DateTime(2026, 11, 1));
+
+/// 30 files of 400 lines each.
+class _LargeCommit extends MockRepoActivity {
+  _LargeCommit(super.repo, super.worktrees);
+
+  @override
+  Future<CommitDetail> commitDetail(RepoCommit commit) async => CommitDetail(sha: commit.sha, files: [
+        for (var f = 0; f < 30; f++)
+          CommitFile(path: 'src/file_$f.rs', kind: CommitFileKind.modified, hunks: [
+            DiffHunk.parse(1, 1, [for (var l = 0; l < 400; l++) ' file $f line $l']),
+          ]),
+      ]);
+}
 
 Finder _inMenu(String text) => find.descendant(of: find.byType(KMenuPanel), matching: find.text(text));
 
@@ -194,6 +209,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(CommitSheet), findsOneWidget);
     expect(find.descendant(of: find.byType(CommitSheet), matching: find.byType(GlassOverlay)), findsOneWidget, reason: 'an overlay’s surface: the Git view must not read through the diff');
+    expect(find.descendant(of: find.byType(CommitSheet), matching: find.byType(BackdropFilter)), findsNothing, reason: 'scrolling a diff never re-blurs the window');
     expect(find.text('history.go'), findsWidgets);
     expect(find.text('router.go'), findsWidgets);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
@@ -202,6 +218,51 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
     expect(find.byType(CommitSheet), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a large commit builds what’s on screen, and a file off screen is one click away', (tester) async {
+    tester.view.physicalSize = const Size(1440, 960);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final state = AppState(demoWallpaper: true);
+    final repo = Mock.repoNamed('price-admin')!;
+    final source = _LargeCommit(repo, repo.worktrees);
+    addTearDown(source.dispose);
+    await tester.pumpWidget(AppScope(
+      state: state,
+      child: KumoTheme(
+        mode: KumoThemeMode.dark,
+        palette: KumoPalette.dark,
+        terminalPalette: KumoPalette.dark,
+        child: MaterialApp(home: Scaffold(body: CommitSheet(source: source, commits: source.commits(), index: 0))),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('file 0 line 0'), findsOneWidget);
+    expect(find.text('file 29 line 0', skipOffstage: false), findsNothing, reason: 'not built');
+    final built = find.descendant(of: find.byType(CommitSheet), matching: find.byType(Text), skipOffstage: false).evaluate().length;
+    expect(built, lessThan(1000), reason: '12000 lines in the commit');
+
+    final scroll = tester.state<ScrollableState>(find.descendant(of: find.byType(CommitSheet), matching: find.byType(Scrollable)).last).position;
+    // 30 files: a header, 401 rows and a note each.
+    final file = 34 + 2 + 27 + 399 * 19 + 6 + 26 + 12.0;
+    expect(scroll.maxScrollExtent + scroll.viewportDimension, 12 + 30 * file + 16, reason: 'the real height, not a guess from what’s built');
+
+    final top = tester.getTopLeft(find.byType(CustomScrollView)).dy;
+    await tester.tap(find.text('file_15.rs').first);
+    await tester.pumpAndSettle();
+    expect(scroll.pixels, 12 + 15 * file);
+    expect(tester.getTopLeft(find.byTooltip('Fold file_15.rs')).dy - top, 5, reason: 'its header at the top: the sum is where the file really is');
+    expect(find.text('file 15 line 0'), findsOneWidget);
+    expect(find.text('file 0 line 0', skipOffstage: false), findsNothing);
+
+    await tester.tap(find.byTooltip('Fold file_15.rs'));
+    await tester.pumpAndSettle();
+    expect(find.text('file 15 line 0'), findsNothing);
+    await tester.tap(find.text('file_16.rs').first);
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.byTooltip('Fold file_16.rs')).dy - top, 5, reason: 'positions follow what’s folded');
     expect(tester.takeException(), isNull);
   });
 

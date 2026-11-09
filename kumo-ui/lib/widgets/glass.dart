@@ -93,19 +93,36 @@ BoxDecoration chipDecoration(KumoPalette c, {double radius = 18, bool selected =
 }
 
 /// Popover / sheet surface. This is the one place we allow a real blur,
-/// because it is transient and small.
+/// because it is transient and small. A large one with content that scrolls
+/// sets [blur] off: its surface is opaque, and no frame pays for a re-blur.
 class GlassOverlay extends StatelessWidget {
-  const GlassOverlay({super.key, required this.child, this.radius = 22, this.padding = const EdgeInsets.all(18), this.width});
+  const GlassOverlay({super.key, required this.child, this.radius = 22, this.padding = const EdgeInsets.all(18), this.width, this.blur = true});
 
   final Widget child;
   final double radius;
   final EdgeInsetsGeometry padding;
   final double? width;
+  final bool blur;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
     final r = BorderRadius.circular(radius);
+    final fill = blur ? c.pop : Color.alphaBlend(c.pop, c.isDark ? const Color(0xFF10121A) : const Color(0xFFFFFFFF));
+    final surface = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        borderRadius: r,
+        border: Border.all(color: c.popBorder),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color.alphaBlend(c.panelSheen, fill), fill],
+          stops: const [0.0, 0.12],
+        ),
+      ),
+      child: child,
+    );
     return Container(
       width: width,
       decoration: BoxDecoration(
@@ -116,23 +133,7 @@ class GlassOverlay extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: r,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(
-            padding: padding,
-            decoration: BoxDecoration(
-              borderRadius: r,
-              border: Border.all(color: c.popBorder),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color.alphaBlend(c.panelSheen, c.pop), c.pop],
-                stops: const [0.0, 0.12],
-              ),
-            ),
-            child: child,
-          ),
-        ),
+        child: blur ? BackdropFilter(filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24), child: surface) : surface,
       ),
     );
   }
