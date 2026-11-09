@@ -6,5 +6,9 @@
 	     incompatible with the App Sandbox. -->
 	<key>com.apple.security.app-sandbox</key>
 	<false/>
+	<!-- Its frameworks aren't signed by a team (Kumo has no Developer ID), which
+	     the hardened runtime would otherwise refuse to load. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
 </dict>
 </plist>

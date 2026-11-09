@@ -31,4 +31,5 @@ rm -f "dist/Kumo-$version-windows-x64.zip"
 (cd "$staging" && 7z a -tzip -bso0 Kumo.zip Kumo)
 cp "$staging/Kumo.zip" "dist/Kumo-$version-windows-x64.zip"
 sed -e "s|@RELEASE_REPO@|$repo|g" packaging/install.ps1.in > dist/install.ps1
-echo "✓ dist/: Kumo-$version-windows-x64.zip, install.ps1"
+sha256sum "dist/Kumo-$version-windows-x64.zip" | cut -d' ' -f1 > "dist/Kumo-$version-windows-x64.zip.sha256"
+echo "✓ dist/: Kumo-$version-windows-x64.zip and its .sha256, install.ps1"

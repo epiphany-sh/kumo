@@ -4,8 +4,13 @@ name: release
 # install.sh; the Windows zip and install.ps1) and the Homebrew cask. macOS
 # and Windows publish on their own (GitHub's macOS runners can go days
 # without capacity): only macOS makes the release "Latest", which is what
-# Sparkle, install.sh and brew download from (packaging/github-release.sh). A release/X.Y.Z branch merged into main (the only kind
-# `ci` lets in) publishes X.Y.Z; so does a tag vX.Y.Z pushed by hand.
+# Sparkle, install.sh and brew download from (packaging/github-release.sh). A
+# release/X.Y.Z branch merged into main (the only kind `ci` lets in) publishes
+# X.Y.Z; so does a tag vX.Y.Z on a commit of main.
+#
+# Compiling runs code from every dependency, so it happens apart: *-build jobs
+# have no secrets and a read-only token. *-publish jobs have the keys and write
+# access, on another machine, and compile nothing: they don't run what they sign.
 # One-time setup: docs/releasing.md.
 
 on:
@@ -14,8 +19,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
-  pull-requests: read # which branch a merge came from
+  contents: read
 
 # One at a time.
 concurrency:
@@ -25,6 +29,9 @@ concurrency:
 jobs:
   version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read # which branch a merge came from
     outputs:
       version: ${{ steps.version.outputs.version }}
       sha: ${{ steps.version.outputs.sha }}
@@ -33,13 +40,21 @@ jobs:
       SHA: ${{ github.sha }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0 # tags
+          persist-credentials: false
       - id: version
         run: |
           if [ "$GITHUB_REF_TYPE" = tag ]; then
-            version="${GITHUB_REF_NAME#v}"
+            version=$(packaging/release-version.sh "release/${GITHUB_REF_NAME#v}") || {
+              echo "::error::$GITHUB_REF_NAME isn't vX.Y.Z"
+              exit 1
+            }
+            git merge-base --is-ancestor "$SHA" origin/main || {
+              echo "::error::$GITHUB_REF_NAME isn't on main"
+              exit 1
+            }
           else
             # The pull request this merge closed, and its branch.
             branch=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/pulls" \
@@ -56,25 +71,67 @@ jobs:
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "Kumo ${version:-: nothing to release}"
 
-  macos:
+  macos-build:
     needs: version
     if: needs.version.outputs.version != ''
     runs-on: macos-latest
     env:
       VERSION: ${{ needs.version.outputs.version }}
-      SHA: ${{ needs.version.outputs.sha }}
+      FEED: https://github.com/${{ github.repository }}/releases/latest/download/appcast.xml
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ needs.version.outputs.sha }}
           fetch-depth: 0 # the build number counts commits
+          persist-credentials: false
 
       - run: rustup show active-toolchain
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: 3.47.5
           channel: stable
+
+      - name: Build
+        run: make bundle VERSION="$VERSION" FEED="$FEED"
+
+      # tar: an artifact alone loses the bundle's symlinks and modes.
+      - name: Pack the app
+        run: tar -czf Kumo.app.tar.gz -C kumo-ui/build/macos/Build/Products/Release Kumo.app
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-app
+          path: Kumo.app.tar.gz
+          retention-days: 7
+          if-no-files-found: error
+
+  macos-publish:
+    needs: [version, macos-build]
+    runs-on: macos-latest
+    permissions:
+      contents: write # the release and its tag
+      id-token: write # the attestation
+      attestations: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      SHA: ${{ needs.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          fetch-depth: 0 # the build number counts commits
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: macos-app
+
+      - name: Unpack the app
+        run: |
+          mkdir -p kumo-ui/build/macos/Build/Products/Release
+          tar -xzf Kumo.app.tar.gz -C kumo-ui/build/macos/Build/Products/Release
+          rm Kumo.app.tar.gz
 
       - name: Signing identity ("Kumo Development")
         env:
@@ -91,14 +148,21 @@ jobs:
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           rm "$RUNNER_TEMP/signing.p12"
 
-      - name: Build, sign and package
+      - name: Sign
+        run: make sign
+
+      - name: Package
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          RELEASE_ORG: ${{ github.repository_owner }}
         run: |
           echo "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle-key"
-          SPARKLE_KEY_FILE="$RUNNER_TEMP/sparkle-key" \
-            make release VERSION="$VERSION" RELEASE_ORG="${{ github.repository_owner }}"
+          SPARKLE_KEY_FILE="$RUNNER_TEMP/sparkle-key" make package VERSION="$VERSION" RELEASE_ORG="$RELEASE_ORG"
           rm "$RUNNER_TEMP/sparkle-key"
+
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: dist/Kumo-${{ needs.version.outputs.version }}.zip
 
       # Tags the commit (for a merge) only once it's built: a failed build
       # leaves no tag, and its number is used again (unless Windows already
@@ -111,14 +175,14 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           packaging/github-release.sh --latest "$VERSION" "$SHA" \
-            "dist/Kumo-$VERSION.zip" dist/Kumo.zip dist/appcast.xml dist/install.sh dist/install.ps1
+            "dist/Kumo-$VERSION.zip" dist/Kumo.zip dist/Kumo.zip.sha256 dist/appcast.xml dist/install.sh dist/install.ps1
 
       - name: Homebrew cask
         env:
           TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAP: ${{ github.repository_owner }}/homebrew-kumo
         run: |
-          tap="${{ github.repository_owner }}/homebrew-kumo"
-          git clone "https://x-access-token:$TAP_TOKEN@github.com/$tap.git" "$RUNNER_TEMP/tap"
+          git clone "https://x-access-token:$TAP_TOKEN@github.com/$TAP.git" "$RUNNER_TEMP/tap"
           mkdir -p "$RUNNER_TEMP/tap/Casks"
           cp dist/kumo.rb "$RUNNER_TEMP/tap/Casks/kumo.rb"
           cd "$RUNNER_TEMP/tap"
@@ -128,7 +192,7 @@ jobs:
           git commit -m "kumo $VERSION"
           git push origin HEAD:main
 
-  windows:
+  windows-build:
     needs: version
     if: needs.version.outputs.version != ''
     runs-on: windows-latest
@@ -137,27 +201,63 @@ jobs:
         shell: bash
     env:
       VERSION: ${{ needs.version.outputs.version }}
-      SHA: ${{ needs.version.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ needs.version.outputs.sha }}
           fetch-depth: 0 # the build number counts commits
+          persist-credentials: false
 
       - run: rustup show active-toolchain
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: 3.47.5
           channel: stable
 
       - name: Build and package
-        run: RELEASE_REPO="${{ github.repository }}" packaging/windows-zip.sh "$VERSION"
+        env:
+          RELEASE_REPO: ${{ github.repository }}
+        run: packaging/windows-zip.sh "$VERSION"
 
-      # Doesn't wait for macOS, and doesn't make the release "Latest":
-      # install.ps1 finds the newest release with a Windows zip.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-app
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error
+
+  # Doesn't wait for macOS, and doesn't make the release "Latest":
+  # install.ps1 finds the newest release with a Windows zip.
+  windows-publish:
+    needs: [version, windows-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the release and its tag
+      id-token: write # the attestation
+      attestations: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      SHA: ${{ needs.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: windows-app
+          path: dist
+
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: dist/Kumo-${{ needs.version.outputs.version }}-windows-x64.zip
+
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: packaging/github-release.sh "$VERSION" "$SHA" "dist/Kumo-$VERSION-windows-x64.zip" dist/install.ps1
+        run: |
+          packaging/github-release.sh "$VERSION" "$SHA" \
+            "dist/Kumo-$VERSION-windows-x64.zip" "dist/Kumo-$VERSION-windows-x64.zip.sha256" dist/install.ps1
