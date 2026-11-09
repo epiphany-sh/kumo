@@ -4,7 +4,7 @@
 
 Branch `feat/git-history` (same branch as the Git work) adds to kumo-ui, built and tested against mocks:
 
-1. **Agents › Your agents**: Claude Code subagents (`.claude/agents/<name>.md`) to list, create (template, "describe it", import a `.md`), edit (all subagent fields plus Kumo's own: time and cost limits, triggers), **run in a terminal of their own inside Agents** (where: a worktree, a new worktree, a repo/PR link, a folder or a scratch folder; context saved next to the run), and **try in a playground** (headless run, step by step, flag a step and Claude suggests a change to the instructions).
+1. **Agents › Your agents**: Claude Code subagents (`.claude/agents/<name>.md`) to list, create (template, "describe it", import a `.md`), edit (all subagent fields plus Kumo's own: time and cost limits, triggers), **run in a terminal of their own inside Agents** (where: a worktree, a new worktree, a repo/PR link, a folder or a scratch folder; context saved next to the run), and **try in a playground** (headless run, step by step, flag a step and a connected CLI suggests a change to the instructions).
 2. **Agents › Sessions**: "Terminal" on a card now opens the session's terminal **inside Agents** (tabs for every session, approvals, Stop/Dismiss). The Terminal view still has it; opening it there is optional.
 3. **New agent** lists your agents next to the CLIs, shows the context it will get (the branch's PR and tickets), and opens the run in Agents.
 4. **Ask agent** (selected code) can send to a CLI the user **typed by hand** in one of the worktree's terminals (e.g. `claude` in zsh 2), and holds a message for an agent waiting on an approval until it's answered.
@@ -37,7 +37,7 @@ service AgentDefs {
   // The last 10 test runs of an agent, kept across restarts.
   rpc ListPlays(ListPlaysRequest) returns (PlayList);
   // One-shot `claude -p`: drafts an agent, improves instructions.
-  rpc Ask(AskClaudeRequest) returns (AskClaudeResponse);
+  rpc Ask(AskRequest) returns (AskResponse);
   // Skills and MCP servers an agent can be given; whether triggers run.
   rpc Capabilities(AgentDefCapabilitiesRequest) returns (AgentDefCapabilities);
 }
@@ -210,10 +210,11 @@ claude -p "<task>" --agents '<inline_json>' --agent <name> --output-format strea
 ## 4. `Ask` (drafts and fixes)
 
 ```proto
-message AskClaudeRequest { string prompt = 1; string cwd = 2; }
-message AskClaudeResponse { string text = 1; }
+message AskRequest { string prompt = 1; string cwd = 2; string provider_id = 3; }
+message AskResponse { string text = 1; }
 ```
-- Run `claude -p "<prompt>" --output-format text --permission-mode plan` in `cwd`. Without a `cwd`, use an empty temp dir.
+- Run the CLI `provider_id` names (empty: Claude Code) with its `ask_args`, in `cwd`: for Claude Code, `claude -p "<prompt>" --output-format text --permission-mode plan`. Without a `cwd`, use an empty temp dir.
+- The UI asks the first connected CLI your agents run on, so drafting works without Claude Code.
 - Time out after 2 minutes.
 - The UI builds the prompts (`draftAgentPrompt`, `improveInstructionsPrompt`) and parses the answers.
 

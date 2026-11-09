@@ -128,7 +128,8 @@ abstract class AgentDefsSource extends ChangeNotifier {
   /// Whether triggers run (the daemon schedules them).
   bool get triggersSupported;
 
-  /// An agent Claude drafted from [description]; null when it couldn't.
+  /// An agent a connected CLI drafted from [description]; null when it
+  /// couldn't.
   Future<AgentDef?> draft(String description, {AgentScope scope = AgentScope.personal, String repo = ''});
 
   /// New instructions for [agent], from a test step that went wrong.

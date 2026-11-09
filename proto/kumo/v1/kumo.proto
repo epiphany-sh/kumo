@@ -1032,8 +1032,9 @@ service AgentDefs {
   rpc StopPlay(StopPlayRequest) returns (StopPlayResponse);
   // The last 10 test runs of an agent, kept across restarts.
   rpc ListPlays(ListPlaysRequest) returns (PlayList);
-  // One-shot `claude -p`: drafts an agent, improves instructions.
-  rpc Ask(AskClaudeRequest) returns (AskClaudeResponse);
+  // One answer from a CLI, changing nothing: drafts an agent, improves
+  // instructions.
+  rpc Ask(AskRequest) returns (AskResponse);
   // Skills and MCP servers an agent can be given; whether triggers run.
   rpc Capabilities(AgentDefCapabilitiesRequest) returns (AgentDefCapabilities);
 }
@@ -1182,13 +1183,15 @@ message PlayList {
   repeated PlayRecord plays = 1;
 }
 
-message AskClaudeRequest {
+message AskRequest {
   string prompt = 1;
   // Where it reads from; empty: an empty folder.
   string cwd = 2;
+  // The CLI that answers; empty: Claude Code.
+  string provider_id = 3;
 }
 
-message AskClaudeResponse {
+message AskResponse {
   string text = 1;
 }
 
