@@ -23,11 +23,17 @@ pub fn is_answer(input: &[u8]) -> bool {
     !input.is_empty() && (input[0] != 0x1b || input.len() == 1)
 }
 
-/// `text` as typed into a terminal: escapes dropped, and wrapped as a
-/// bracketed paste when `bracketed` (several lines then go in as one
+/// `text` as typed into a terminal: only text, tabs and line breaks (no
+/// escapes or other control characters, which would act as keys), and wrapped
+/// as a bracketed paste when `bracketed` (several lines then go in as one
 /// message instead of one per line).
 pub fn typed_text(text: &str, bracketed: bool) -> String {
-    let text = text.replace('\x1b', "");
+    let text: String = text
+        .replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .chars()
+        .filter(|c| !c.is_control() || matches!(c, '\n' | '\t'))
+        .collect();
     if bracketed {
         format!("\x1b[200~{text}\x1b[201~")
     } else {
@@ -140,6 +146,18 @@ mod tests {
         assert_eq!(bracketed_paste(b"\x1b[?2004l..\x1b[?2004h"), Some(true));
         assert_eq!(typed_text("a\x1b[2Jb", true), "\x1b[200~a[2Jb\x1b[201~");
         assert_eq!(typed_text("ab", false), "ab");
+    }
+
+    #[test]
+    fn typed_text_cannot_act_as_keys() {
+        assert_eq!(
+            typed_text("a\x1b[201~b\x03c\x04d\x15e\x7ff\u{9b}g", true),
+            "\x1b[200~a[201~bcdefg\x1b[201~"
+        );
+        assert_eq!(
+            typed_text("one\r\ntwo\rthree\tx", false),
+            "one\ntwo\nthree\tx"
+        );
     }
 
     #[test]

@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use super::{AgentError, AgentPreset, split_args};
 
 /// How a CLI receives the initial prompt.
@@ -71,6 +73,8 @@ impl AgentProvider {
     pub fn launch_args(&self, prompt: &str) -> Result<(Vec<String>, bool), AgentError> {
         let mut args = split_args(&self.args)?;
         let has_prompt = !prompt.trim().is_empty();
+        let prompt = never_an_option(prompt);
+        let prompt = prompt.as_str();
         let mut used = false;
         if let Some(AgentPreset {
             prompt: PromptStyle::Argument(template),
@@ -136,9 +140,119 @@ impl AgentProvider {
     }
 }
 
+/// The prompt as an argument, which CLIs must read as text. They tell options
+/// by a leading `-`, so one goes after a space. Not `--`: a custom command
+/// puts `{prompt}` anywhere, and not every CLI takes it.
+fn never_an_option(prompt: &str) -> String {
+    if prompt.starts_with('-') {
+        format!(" {prompt}")
+    } else {
+        prompt.to_owned()
+    }
+}
+
+/// Whether Windows starts `program` through `cmd.exe`, which reads the command
+/// line by rules of its own: quoting an argument doesn't protect it.
+pub fn runs_through_cmd(program: &Path) -> bool {
+    program
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("cmd") || e.eq_ignore_ascii_case("bat"))
+}
+
+/// Arguments for a program [`runs_through_cmd`], and the prompt to type in
+/// instead when one came last (after `--`). What's left can't hold anything
+/// `cmd.exe` acts on, or the agent doesn't start.
+pub fn args_for_cmd(mut args: Vec<String>) -> Result<(Vec<String>, Option<String>), AgentError> {
+    let mut prompt = None;
+    if args.len() >= 2 && args[args.len() - 2] == "--" {
+        prompt = args.pop();
+        args.pop();
+    }
+    if args
+        .iter()
+        .any(|a| a.contains(['&', '|', '<', '>', '^', '%', '!', '\n', '\r']))
+    {
+        return Err(AgentError::Invalid(
+            "this agent's arguments can't go through a .cmd launcher: \
+             install its native executable or remove the special characters"
+                .to_owned(),
+        ));
+    }
+    Ok((args, prompt))
+}
+
 #[cfg(test)]
 mod tests {
+    use super::super::PRESETS;
     use super::*;
+
+    #[test]
+    fn a_prompt_is_never_read_as_an_option() {
+        for preset in PRESETS {
+            let provider = AgentProvider::from_preset(preset);
+            let (args, used) = provider.launch_args("--flag=x and more").unwrap();
+            if used {
+                assert!(
+                    args.iter().all(|a| !a.starts_with("--flag")),
+                    "{}: {args:?}",
+                    preset.id
+                );
+                assert!(args.iter().any(|a| a.contains("--flag=x and more")));
+            }
+        }
+        let custom = AgentProvider {
+            id: "c".into(),
+            name: "My agent".into(),
+            short: "MA".into(),
+            program: "my-agent".into(),
+            args: "{prompt} --fast".into(),
+            custom: true,
+            enabled: true,
+            is_default: false,
+            read_usage: true,
+            preset: None,
+        };
+        assert_eq!(
+            custom.launch_args("-x").unwrap().0,
+            vec![" -x".to_owned(), "--fast".to_owned()]
+        );
+        let claude = AgentProvider::from_preset(AgentPreset::find("claude").unwrap());
+        assert_eq!(
+            claude.launch_args("a - b").unwrap().0,
+            vec!["a - b"],
+            "only a leading dash"
+        );
+    }
+
+    #[test]
+    fn only_batch_files_run_through_cmd() {
+        for program in ["claude.cmd", r"C:\npm\claude.CMD", "x.bat"] {
+            assert!(runs_through_cmd(Path::new(program)), "{program}");
+        }
+        for program in ["claude", "claude.exe", "/usr/bin/cmd"] {
+            assert!(!runs_through_cmd(Path::new(program)), "{program}");
+        }
+    }
+
+    #[test]
+    fn a_cmd_launcher_gets_the_prompt_typed_and_nothing_it_would_act_on() {
+        let args = |list: &[&str]| list.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+        assert_eq!(
+            args_for_cmd(args(&["--agent", "x", "--", "a & b"])).unwrap(),
+            (args(&["--agent", "x"]), Some("a & b".to_owned()))
+        );
+        assert_eq!(
+            args_for_cmd(args(&["--model", "opus"])).unwrap(),
+            (args(&["--model", "opus"]), None)
+        );
+        for unsafe_arg in ["a&b", "a|b", "<a", "a>", "a^b", "%PATH%", "!x!", "a\nb"] {
+            assert!(
+                args_for_cmd(args(&["--x", unsafe_arg])).is_err(),
+                "{unsafe_arg}"
+            );
+        }
+    }
 
     #[test]
     fn known_cli_gets_the_prompt_as_documented() {

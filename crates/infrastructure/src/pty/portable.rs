@@ -117,3 +117,28 @@ impl PtyKiller for PortableKiller {
         Ok(())
     }
 }
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    /// Why an agent's prompt never reaches a batch file as an argument:
+    /// quoting it for the program doesn't quote it for `cmd.exe`.
+    #[test]
+    fn a_batch_file_s_arguments_are_read_by_cmd() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("agent.cmd");
+        std::fs::write(&program, "@echo off\r\nexit /b 0\r\n").unwrap();
+        let spec = LaunchSpec::new(program.display().to_string())
+            .unwrap()
+            .with_args([r#"x"&echo y>marker&"#])
+            .with_cwd(Some(dir.path().to_path_buf()));
+        let mut process = PortablePtySystem.spawn(&spec).unwrap();
+        let mut reader = process.reader;
+        std::thread::spawn(move || {
+            let _ = std::io::copy(&mut reader, &mut std::io::sink());
+        });
+        process.child.wait().unwrap();
+        assert!(dir.path().join("marker").exists());
+    }
+}
