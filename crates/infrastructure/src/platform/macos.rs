@@ -69,6 +69,10 @@ impl PrivateFiles for MacOs {
     fn owner_only(options: &mut OpenOptions) {
         unix::owner_only(options);
     }
+
+    fn owner_only_dir(dir: &Path) -> std::io::Result<()> {
+        unix::owner_only_dir(dir)
+    }
 }
 
 /// The login keychain.

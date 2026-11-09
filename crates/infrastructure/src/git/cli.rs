@@ -55,6 +55,9 @@ impl GitCli {
     {
         let (vars, ssh) = self.profile_env();
         let output = crate::platform::background(&self.program)
+            // Kumo runs git on its own, on any folder: it doesn't start a
+            // program a repo's config names just to read its status.
+            .args(["-c", "core.fsmonitor=false"])
             .arg("-C")
             .arg(dir)
             .args(args)
@@ -315,6 +318,44 @@ fn parse_status(porcelain: &str) -> WorktreeStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn reading_a_repo_does_not_run_its_file_monitor() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::process::Command;
+
+        let dir = tempfile::tempdir().unwrap();
+        let (repo, marker) = (dir.path().join("repo"), dir.path().join("ran"));
+        let script = dir.path().join("monitor.sh");
+        std::fs::write(
+            &script,
+            format!("#!/bin/sh\ntouch '{}'\n", marker.display()),
+        )
+        .unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let git = |args: &[&str]| {
+            let done = Command::new("git")
+                .arg("-C")
+                .arg(&repo)
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(done.status.success(), "{done:?}");
+        };
+        std::fs::create_dir(&repo).unwrap();
+        git(&["init", "-q"]);
+        git(&["config", "core.fsmonitor", script.to_str().unwrap()]);
+        // The check is worth something: git alone runs it.
+        git(&["status", "--porcelain=v2"]);
+        assert!(marker.exists());
+        std::fs::remove_file(&marker).unwrap();
+
+        GitCli::default()
+            .exec(&repo, ["status", "--porcelain=v2"])
+            .unwrap();
+        assert!(!marker.exists());
+    }
 
     #[test]
     fn parses_worktree_list() {

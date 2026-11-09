@@ -86,6 +86,8 @@ pub trait FileIdentity {
 pub trait PrivateFiles {
     /// Makes `options` create the file readable by its owner only.
     fn owner_only(options: &mut OpenOptions);
+    /// Keeps others out of the existing folder `dir`.
+    fn owner_only_dir(dir: &Path) -> std::io::Result<()>;
 }
 
 /// The OS keychain behind [`crate::secrets::KeychainSecretStore`].
@@ -172,6 +174,11 @@ pub fn same_file(source: &Path, target: &Path, existing: &Metadata) -> bool {
 /// See [`PrivateFiles::owner_only`].
 pub fn owner_only(options: &mut OpenOptions) {
     Current::owner_only(options);
+}
+
+/// See [`PrivateFiles::owner_only_dir`].
+pub fn owner_only_dir(dir: &Path) -> std::io::Result<()> {
+    Current::owner_only_dir(dir)
 }
 
 /// See [`Keychain::native_store`].

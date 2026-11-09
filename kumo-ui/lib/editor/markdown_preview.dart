@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../platform/open_url.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../views/task_detail/markdown.dart';
 import 'syntax.dart';
 import '../widgets/controls.dart';
 import '../widgets/kicons.dart';
+import '../widgets/open_link.dart';
 
 /// A Markdown file of the worktree read as a document: one column at a
 /// reading width, headings with room above them, code with its colors and
@@ -54,6 +54,10 @@ class _MarkdownPreviewState extends State<MarkdownPreview> {
 
   List<String>? _filesFrom;
   Set<String> _fileSet = const {};
+
+  /// The document whose web images were asked for. Loading one tells its
+  /// server who's reading and when, so a document doesn't do it by itself.
+  String? _webImagesOf;
 
   @override
   void dispose() {
@@ -123,7 +127,24 @@ class _MarkdownPreviewState extends State<MarkdownPreview> {
     Widget fallback() => _MissingImage(alt: alt, src: src, block: block);
     final svg = _isSvg(src);
     Widget img;
-    if (src.startsWith('http://') || src.startsWith('https://')) {
+    if (src.startsWith('http://')) return fallback();
+    if (src.startsWith('https://')) {
+      if (_webImagesOf != widget.path) {
+        return Semantics(
+          button: true,
+          label: 'Load web images',
+          child: Tooltip(
+            message: 'Load web images: $src',
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => setState(() => _webImagesOf = widget.path),
+                child: _MissingImage(alt: alt, src: src, block: block),
+              ),
+            ),
+          ),
+        );
+      }
       img = svg
           ? SvgPicture.network(src, semanticsLabel: alt, errorBuilder: (_, __, ___) => fallback(), placeholderBuilder: (_) => SizedBox(height: block ? 120 : 20, width: block ? null : 60))
           : Image.network(src, semanticLabel: alt, errorBuilder: (_, __, ___) => fallback(), frameBuilder: _fadeIn);
@@ -276,7 +297,7 @@ class _MarkdownPreviewState extends State<MarkdownPreview> {
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
                 onTap: () {
-                  if (!_openLink(href)) openUrl(href);
+                  if (!_openLink(href)) openDocumentLink(context, href);
                 },
                 child: _picture(alt, src),
               ),

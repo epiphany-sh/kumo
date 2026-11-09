@@ -99,6 +99,17 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('web images load only when asked for, and never over plain http', (tester) async {
+      await _pump(tester, '![Logo](https://images.example/logo.png)\n\n![Old](http://images.example/old.png)');
+      expect(find.byType(Image), findsNothing);
+      expect(find.text('Logo'), findsOneWidget);
+
+      await tester.tap(find.text('Logo'));
+      await tester.pump();
+      expect(find.byType(Image), findsOneWidget, reason: 'only the https one');
+      expect(find.text('Old'), findsOneWidget);
+    });
+
     testWidgets('a link to another file of the worktree opens it', (tester) async {
       final opened = <String>[];
       await _pump(tester, 'See [the readme](../README.md) and [setup](setup/).', files: ['README.md', 'docs/setup/README.md'], onOpenFile: opened.add);

@@ -249,9 +249,15 @@ fn or_default(value: &str, default: &str) -> String {
 
 /// Plain HTTP only to this machine (tests, local proxies).
 fn is_loopback_http(site: &str) -> bool {
-    ["http://127.0.0.1:", "http://localhost:", "http://[::1]:"]
-        .iter()
-        .any(|prefix| site.starts_with(prefix))
+    let Some(rest) = site.strip_prefix("http://") else {
+        return false;
+    };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    ["127.0.0.1:", "localhost:", "[::1]:"].iter().any(|host| {
+        authority
+            .strip_prefix(host)
+            .is_some_and(|port| !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()))
+    })
 }
 
 /// A configured source.
@@ -272,6 +278,28 @@ impl TaskSource {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plain_http_only_reaches_this_machine() {
+        for site in [
+            "http://127.0.0.1:8080",
+            "http://localhost:1/jira",
+            "http://[::1]:9",
+        ] {
+            assert!(is_loopback_http(site), "{site}");
+        }
+        for site in [
+            "http://localhost:x@server.example",
+            "http://localhost:1@server.example",
+            "http://localhost:1\\@server.example",
+            "http://localhost.server.example:1",
+            "http://localhost:",
+            "http://server.example:80",
+            "https://localhost:1",
+        ] {
+            assert!(!is_loopback_http(site), "{site}");
+        }
+    }
 
     fn map(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
         pairs

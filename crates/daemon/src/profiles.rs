@@ -130,6 +130,10 @@ impl ProfileOpener {
     async fn build(&self, profile: &Profile) -> anyhow::Result<ProfileServices> {
         let dir = profile_dir(&self.data_dir, &profile.id);
         std::fs::create_dir_all(&dir)?;
+        // Its database, sessions and CLI folders are nobody else's.
+        if let Err(error) = kumo_infrastructure::platform::owner_only_dir(&dir) {
+            tracing::warn!(%error, "can't restrict the data folder");
+        }
         let db = dir.join(DATABASE);
         let home = &self.home;
         let locator = &self.locator;

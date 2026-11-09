@@ -119,6 +119,11 @@ pub(super) fn owner_only(options: &mut OpenOptions) {
     options.mode(0o600);
 }
 
+/// Mode `0700`.
+pub(super) fn owner_only_dir(dir: &Path) -> std::io::Result<()> {
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
+}
+
 /// Claude Code runs status lines with `sh`.
 pub(super) fn sh_status_line() -> bool {
     true
@@ -184,6 +189,10 @@ mod tests {
         let meta = std::fs::metadata(&path).unwrap();
         assert_eq!(meta.permissions().mode() & 0o777, 0o600);
         assert_eq!(file_id(&meta), Some(meta.ino()));
+
+        owner_only_dir(dir.path()).unwrap();
+        let mode = std::fs::metadata(dir.path()).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o700);
         assert!(same_file(&path, &path, &meta));
         assert!(!same_file(&dir.path().join("other"), &path, &meta));
     }
