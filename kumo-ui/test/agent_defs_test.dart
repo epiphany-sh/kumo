@@ -11,6 +11,7 @@ import 'package:kumo_ui/data/agents_source.dart';
 import 'package:kumo_ui/data/models.dart' show AgentStatus;
 import 'package:kumo_ui/views/agents_library.dart' show lineDiff;
 import 'package:kumo_ui/views/agents_screen.dart';
+import 'package:kumo_ui/widgets/controls.dart' show KSegmented;
 
 Future<AppState> _pumpAgents(WidgetTester tester, {AgentsMode mode = AgentsMode.library}) async {
   tester.view.physicalSize = const Size(1440, 1000);
@@ -219,6 +220,33 @@ void main() {
       await tester.pump();
       expect(state.agentDefs.runsOf(state.agentDefs.agents.firstWhere((a) => a.name == 'go-pr-reviewer')).first.prompt, 'Review #519');
       expect(find.text('Terminal view'), findsOneWidget, reason: 'the new run opens in its terminal');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Run with Codex: what changes shows before it starts, and it starts on Codex', (tester) async {
+      final state = await _pumpAgents(tester);
+      await tester.tap(find.text('go-pr-reviewer').first);
+      await tester.pump();
+      await tester.ensureVisible(find.text('New run'));
+      await tester.pump();
+      await tester.tap(find.text('New run'));
+      await tester.pump();
+      expect(find.text('Runs with'), findsOneWidget);
+      final pick = tester.widget<KSegmented<AgentCli>>(find.byType(KSegmented<AgentCli>));
+      expect([for (final i in pick.items) i.$2], ['Claude Code', 'Codex CLI'], reason: 'only connected CLIs it can run on: not Gemini');
+      expect(find.textContaining('On Codex CLI'), findsNothing, reason: 'Claude Code first: nothing changes');
+      await tester.tap(find.descendant(of: find.byType(KSegmented<AgentCli>), matching: find.text('Codex CLI')));
+      await tester.pump();
+      expect(find.textContaining('Its file is Claude Code’s. On Codex CLI'), findsOneWidget);
+      expect(find.textContaining('Read-only: it reads and runs commands'), findsOneWidget);
+      expect(find.textContaining('codex -s read-only'), findsOneWidget);
+      await tester.ensureVisible(find.text('Start in its own terminal'));
+      await tester.pump();
+      await tester.tap(find.text('Start in its own terminal'));
+      await tester.pump();
+      await tester.pump();
+      final run = state.agentDefs.runsOf(state.agentDefs.agents.firstWhere((a) => a.name == 'go-pr-reviewer')).first;
+      expect(run.providerId, 'codex');
       expect(tester.takeException(), isNull);
     });
 

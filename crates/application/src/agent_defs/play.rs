@@ -123,6 +123,16 @@ impl AgentDefService {
         if start.task.trim().is_empty() {
             return Err(AgentError::Invalid("give it a task to try".into()));
         }
+        // Refused before a throwaway worktree is made for it.
+        cli.play_args(
+            &PlayCommand {
+                name: start.name.clone(),
+                inline_json: start.inline_json.clone(),
+                task: start.task.clone(),
+                ..Default::default()
+            },
+            false,
+        )?;
         let worktree = self
             .workspace
             .known_worktree(&start.worktree)
@@ -167,7 +177,7 @@ impl AgentDefService {
             };
             let spec = HeadlessSpec {
                 program,
-                args: cli.play_args(&command, budget),
+                args: cli.play_args(&command, budget)?,
                 cwd: cwd.clone(),
                 env,
             };

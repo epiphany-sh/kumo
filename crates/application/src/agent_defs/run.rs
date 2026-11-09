@@ -64,6 +64,8 @@ impl AgentDefService {
         let name = start.agent.name.clone();
         check_agent_name(&name)?;
         let cli = cli_for(&start.provider_id)?;
+        // Refused before any worktree or folder is made for it.
+        cli.run_args(&name, &start.inline_json, None, &start.prompt)?;
         let (files, data) = (Arc::clone(&self.ports.files), self.places.data_dir.clone());
         blocking(move || {
             files.sweep(&data.join("runs"), KEEP_FOLDERS);
@@ -99,7 +101,7 @@ impl AgentDefService {
             &start.inline_json,
             context_dir.as_deref(),
             &start.prompt,
-        );
+        )?;
         self.agents
             .launch(AgentLaunch {
                 provider_id: Some(cli.provider_id().to_owned()),

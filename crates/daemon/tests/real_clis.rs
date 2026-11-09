@@ -180,3 +180,103 @@ async fn claude_code_takes_what_kumo_starts_it_with() {
         .await
         .unwrap();
 }
+
+/// Reads a test run to its end: its lines and exit code.
+async fn played(client: &mut KumoClient, request: pb::PlayRequest) -> (Vec<String>, Option<i32>) {
+    let mut stream = client.agent_defs.play(request).await.unwrap().into_inner();
+    let mut lines = Vec::new();
+    let mut exited = None;
+    tokio::time::timeout(ANSWER, async {
+        while let Some(event) = stream.message().await.unwrap() {
+            match event.kind {
+                Some(pb::play_event::Kind::Line(line)) => lines.push(line),
+                Some(pb::play_event::Kind::Exited(code)) => exited = Some(code),
+                None => {}
+            }
+        }
+    })
+    .await
+    .expect("the test run never ended");
+    (lines, exited)
+}
+
+/// A read-only agent as the UI sends it, on the cheapest effort.
+const READER_JSON: &str = r#"{"smoke":{"description":"Answers exactly what it's asked to. Use it to check Kumo runs agents.","prompt":"Do exactly what you are asked to. If something is denied, say what the error was and stop: don't look for another way.","tools":["Read","Grep","Glob"],"model":"haiku"}}"#;
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "runs the real codex: needs it signed in, spends quota"]
+async fn codex_runs_an_agent_and_its_sandbox_holds() {
+    let mut s = RealCli::new("codex").await;
+    let request = pb::PlayRequest {
+        provider_id: "codex".into(),
+        name: "smoke".into(),
+        inline_json: READER_JSON.into(),
+        task: "Reply with exactly the word PONG.".into(),
+        worktree_path: s.repo.display().to_string(),
+        agent: Some(agent()),
+        ..Default::default()
+    };
+    let (lines, exited) = played(&mut s.client, request.clone()).await;
+    assert_eq!(exited, Some(0), "{lines:#?}");
+    let events: Vec<serde_json::Value> = lines
+        .iter()
+        .filter_map(|l| serde_json::from_str(l).ok())
+        .collect();
+    assert!(
+        events.iter().any(|e| e["type"] == "turn.completed"),
+        "{lines:#?}"
+    );
+    assert!(
+        events.iter().any(|e| e["item"]["type"] == "agent_message"
+            && e["item"]["text"].as_str().unwrap_or("").contains("PONG")),
+        "{lines:#?}"
+    );
+
+    // Read-only: told to write, it can't.
+    let (lines, _) = played(
+        &mut s.client,
+        pb::PlayRequest {
+            task: "Run exactly this shell command: touch pwned.txt".into(),
+            ..request
+        },
+    )
+    .await;
+    assert!(!s.repo.join("pwned.txt").exists(), "{lines:#?}");
+
+    // In a terminal of its own, nothing typed: it starts and stays up.
+    let session = s
+        .client
+        .agent_defs
+        .run(pb::RunAgentDefRequest {
+            provider_id: "codex".into(),
+            agent: Some(agent()),
+            inline_json: READER_JSON.into(),
+            r#where: Some(pb::run_agent_def_request::Where::WorktreePath(
+                s.repo.display().to_string(),
+            )),
+            cols: 120,
+            rows: 40,
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(session.provider_id, "codex");
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    let mut watch = s
+        .client
+        .agents
+        .watch(pb::WatchAgentsRequest {})
+        .await
+        .unwrap()
+        .into_inner();
+    let snapshot = watch.message().await.unwrap().expect("watch ended");
+    let now = snapshot.sessions.iter().find(|x| x.id == session.id);
+    let now = now.expect("the session is gone");
+    assert_ne!(now.state(), pb::AgentState::Exited, "{now:?}");
+    s.client
+        .agents
+        .stop(pb::StopAgentRequest { id: session.id })
+        .await
+        .unwrap();
+}

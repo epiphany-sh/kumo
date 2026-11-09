@@ -163,10 +163,11 @@ class EngineAgentDefs extends AgentDefsSource {
       _ask(improveInstructionsPrompt(agent, step: step, answer: answer), cwd: agent.scope == AgentScope.project ? _repoPath(agent.repo) : '');
 
   @override
-  Future<AgentRun?> run(AgentDef agent, AgentWhere where, {String prompt = '', List<AgentContextItem> context = const []}) async {
+  Future<AgentRun?> run(AgentDef agent, AgentWhere where, {String prompt = '', List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async {
     final request = pb.RunAgentDefRequest(
       agent: _fileOf(agent),
       inlineJson: agentInlineJson(agent),
+      providerId: cli.id,
       prompt: prompt,
       context: [for (final c in context) agentContextTo(c)],
       cols: 120,
@@ -174,7 +175,7 @@ class EngineAgentDefs extends AgentDefsSource {
     );
     switch (where.kind) {
       case AgentWhereKind.worktree:
-        // Claude Code doesn't isolate an agent run with --agent: Kumo does.
+        // The CLIs don't isolate an agent run: Kumo does.
         final repo = agent.isolation ? _repoOfWorktree(where) : '';
         if (repo.isNotEmpty) {
           request.newWorktreeRepo = repo;
@@ -231,7 +232,7 @@ class EngineAgentDefs extends AgentDefsSource {
   }
 
   @override
-  Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const []}) async {
+  Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async {
     final history = owner ?? agent;
     final request = pb.PlayRequest(
       name: agent.name,
@@ -242,6 +243,7 @@ class EngineAgentDefs extends AgentDefsSource {
       context: [for (final c in context) agentContextTo(c)],
       agent: _fileOf(history),
       draft: draft,
+      providerId: cli.id,
     );
     if (agent.maxTurns != null) request.maxTurns = agent.maxTurns!;
     if (agent.maxMinutes != null) request.maxMinutes = agent.maxMinutes!;
@@ -256,7 +258,7 @@ class EngineAgentDefs extends AgentDefsSource {
     }
     final id = 'play-local-${++_seq}';
     final list = _plays[history.key] ??= [];
-    list.insert(0, PlayRun(id: id, agent: agent.name, task: task, draft: draft, startedAt: DateTime.now()));
+    list.insert(0, PlayRun(id: id, agent: agent.name, task: task, draft: draft, startedAt: DateTime.now(), cli: cli.id));
     if (list.length > 10) list.removeRange(10, list.length);
     _error = null;
     _changed();
@@ -274,7 +276,7 @@ class EngineAgentDefs extends AgentDefsSource {
         _playIds[id] = event.playId;
         if (_stopping.remove(id)) _stop(event.playId);
         final at = Duration(milliseconds: event.atMs.toInt());
-        if (event.hasLine()) update((r) => foldStreamJson(r, event.line, at: at));
+        if (event.hasLine()) update((r) => foldPlayLine(r, event.line, at: at));
         if (event.hasExited()) update((r) => playEnded(r, event.exited, stopped: _stopped.contains(id)));
       },
       onError: (Object e) {
@@ -371,7 +373,8 @@ PlayRun playEnded(PlayRun run, int code, {bool stopped = false}) {
   if (run.state != PlayState.running) return run;
   // 130: stopped; 124: its time limit.
   if (stopped || code == 130 || code == 124) return run.copyWith(state: PlayState.stopped);
-  return code == 0 ? run.copyWith(state: PlayState.done) : run.copyWith(state: PlayState.failed, error: 'Claude Code exited with code $code.');
+  final name = AgentCli.of(run.cli)?.label ?? run.cli;
+  return code == 0 ? run.copyWith(state: PlayState.done) : run.copyWith(state: PlayState.failed, error: '$name exited with code $code.');
 }
 
 /// A kept test run, its lines folded as they came.
@@ -382,10 +385,12 @@ PlayRun playRunFrom(pb.PlayRecord record, {required String agent}) {
     task: record.task,
     draft: record.draft,
     startedAt: DateTime.fromMillisecondsSinceEpoch(record.startedUnixMs.toInt()),
+    // Kept before there were other CLIs: Claude Code.
+    cli: record.providerId.isEmpty ? AgentCli.claude.id : record.providerId,
   );
   for (final e in record.events) {
     final at = Duration(milliseconds: e.atMs.toInt());
-    if (e.hasLine()) run = foldStreamJson(run, e.line, at: at);
+    if (e.hasLine()) run = foldPlayLine(run, e.line, at: at);
     if (e.hasExited()) run = playEnded(run, e.exited);
   }
   if (!record.running && run.state == PlayState.running) run = run.copyWith(state: PlayState.stopped);

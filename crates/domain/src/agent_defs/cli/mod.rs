@@ -3,10 +3,13 @@
 //! one can't reach the others.
 
 mod claude;
+mod codex;
+mod spec;
 
 use std::path::Path;
 
 use super::PlayCommand;
+use crate::agents::AgentError;
 
 /// The CLI a run uses when the request doesn't name one.
 pub const DEFAULT_CLI: &str = claude::PROVIDER_ID;
@@ -21,16 +24,18 @@ pub trait AgentCli: Send + Sync + std::fmt::Debug {
     /// What a sentence calls whoever answers ("… didn't answer").
     fn speaker(&self) -> &'static str;
     /// An agent in a terminal of its own. With no prompt the user types.
+    /// `inline_json` is the agent as `claude --agents` takes it; a CLI that
+    /// can't run it refuses.
     fn run_args(
         &self,
         name: &str,
         inline_json: &str,
         context_dir: Option<&Path>,
         prompt: &str,
-    ) -> Vec<String>;
+    ) -> Result<Vec<String>, AgentError>;
     /// A headless test run. `budget`: the installed CLI takes
     /// [`Self::budget_flag`].
-    fn play_args(&self, play: &PlayCommand, budget: bool) -> Vec<String>;
+    fn play_args(&self, play: &PlayCommand, budget: bool) -> Result<Vec<String>, AgentError>;
     /// One answer, changing nothing.
     fn ask_args(&self, prompt: &str) -> Vec<String>;
     /// The flag a headless run's spending cap goes in, if it has one. Whether
@@ -47,6 +52,7 @@ pub trait AgentCli: Send + Sync + std::fmt::Debug {
 pub fn agent_cli(provider_id: &str) -> Option<&'static dyn AgentCli> {
     match provider_id {
         "" | claude::PROVIDER_ID => Some(&claude::ClaudeCode),
+        codex::PROVIDER_ID => Some(&codex::Codex),
         _ => None,
     }
 }
@@ -60,6 +66,7 @@ mod tests {
         let default = agent_cli("").unwrap();
         assert_eq!(default.provider_id(), DEFAULT_CLI);
         assert_eq!(agent_cli("claude").unwrap().provider_id(), "claude");
+        assert_eq!(agent_cli("codex").unwrap().provider_id(), "codex");
         assert!(agent_cli("my-own-cli").is_none());
     }
 
@@ -76,6 +83,9 @@ mod tests {
             " claude",
             "claude\n",
             "claude\0",
+            "Codex",
+            "codex ",
+            "../codex",
             "claude;rm -rf /",
         ] {
             assert!(agent_cli(hostile).is_none(), "{hostile:?}");

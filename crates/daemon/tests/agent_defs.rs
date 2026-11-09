@@ -1115,3 +1115,194 @@ async fn text_is_typed_into_a_terminal_as_a_paste_when_it_asked_for_one() {
         .unwrap_err();
     assert_ne!(gone.code(), Code::Ok);
 }
+
+/// A fake Codex CLI. `exec` prints JSONL (or fails when `<log>/codex-fail`
+/// exists); otherwise it says "ready" and waits. Each call writes its
+/// arguments and folder to `<log>/codex-<run|play>.{args,cwd}`.
+fn fake_codex(bin: &Path, log: &Path) {
+    let log = log.display();
+    let script = format!(
+        r#"#!/bin/sh
+kind=run
+if [ "$1" = "exec" ]; then kind=play; fi
+: > "{log}/codex-$kind.args"
+for a in "$@"; do printf '%s\n' "$a" >> "{log}/codex-$kind.args"; done
+pwd > "{log}/codex-$kind.cwd"
+if [ "$kind" = play ]; then
+  if [ -f "{log}/codex-fail" ]; then echo "Error: not signed in" >&2; exit 1; fi
+  echo '{{"type":"thread.started","thread_id":"t1"}}'
+  echo '{{"type":"item.completed","item":{{"id":"item_0","type":"agent_message","text":"PONG"}}}}'
+  echo '{{"type":"turn.completed","usage":{{"input_tokens":10,"cached_input_tokens":0,"output_tokens":2}}}}'
+  exit 0
+fi
+echo ready
+while read line; do :; done
+"#
+    );
+    let path = bin.join("codex");
+    std::fs::write(&path, script).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+/// The agent as the UI sends it with every run (`agentInlineJson`).
+const REV_JSON: &str = r#"{"rev":{"description":"Reviews things. Use it when asked.","prompt":"You review.","tools":["Read"],"model":"sonnet"}}"#;
+
+impl Setup {
+    /// Codex connected too, faked.
+    async fn with_codex() -> Self {
+        let mut s = Self::new().await;
+        fake_codex(&s.daemon.bin(), &s.log);
+        s.client
+            .agents
+            .save_provider(pb::SaveProviderRequest {
+                id: "codex".into(),
+                name: "Codex CLI".into(),
+                program: "codex".into(),
+                enabled: true,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        s
+    }
+
+    fn codex_logged(&self, what: &str) -> Vec<String> {
+        std::fs::read_to_string(self.log.join(format!("codex-{what}.args")))
+            .unwrap()
+            .lines()
+            .map(str::to_owned)
+            .collect()
+    }
+}
+
+/// `-c key=value` pairs and plain flags, as one list to look things up in.
+fn has_pair(args: &[String], a: &str, b: &str) -> bool {
+    args.windows(2).any(|w| w[0] == a && w[1] == b)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_agent_runs_on_codex_read_only_and_with_nothing_of_the_users() {
+    use pb::run_agent_def_request::Where;
+    let mut s = Setup::with_codex().await;
+    let agent = save(&mut s.client, personal("rev"), None).await;
+    let session = s
+        .client
+        .agent_defs
+        .run(pb::RunAgentDefRequest {
+            provider_id: "codex".into(),
+            inline_json: REV_JSON.into(),
+            ..run(
+                agent.clone(),
+                Where::WorktreePath(s.repo.display().to_string()),
+                "-review the branch",
+            )
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(session.provider_id, "codex");
+    assert_eq!(session.agent_name, "rev");
+    appears(&s.log.join("codex-run.cwd")).await;
+    let args = s.codex_logged("run");
+    assert!(has_pair(&args, "-s", "read-only"), "{args:#?}");
+    for config in [
+        "approval_policy=\"never\"",
+        "mcp_servers={}",
+        "features.apps=false",
+        "features.plugins=false",
+        "skills.include_instructions=false",
+        "web_search=\"disabled\"",
+        "model_reasoning_effort=\"medium\"",
+    ] {
+        assert!(has_pair(&args, "-c", config), "{config} in {args:#?}");
+    }
+    assert!(
+        args.iter().any(|a| a.starts_with(
+            "developer_instructions=\"You review.\\n\\nYou are running as the agent `rev`."
+        )),
+        "{args:#?}"
+    );
+    assert!(
+        !args
+            .iter()
+            .any(|a| a == "--agent" || a == "--add-dir" || a == "-m")
+    );
+    assert_eq!(&args[args.len() - 2..], ["--", "-review the branch"]);
+    assert_eq!(s.cwd("codex-run"), std::fs::canonicalize(&s.repo).unwrap());
+    s.client
+        .agents
+        .stop(pb::StopAgentRequest { id: session.id })
+        .await
+        .unwrap();
+
+    // Without the agent's definition Codex has nothing to run: refused
+    // before a scratch folder is made.
+    let refused = s
+        .client
+        .agent_defs
+        .run(pb::RunAgentDefRequest {
+            provider_id: "codex".into(),
+            ..run(agent, Where::Scratch(true), "go")
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code(), Code::InvalidArgument, "{refused:?}");
+    assert!(!s.profile_dir().join("scratch").exists());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_test_run_on_codex_streams_its_events_and_keeps_its_cli() {
+    use pb::play_event::Kind;
+    let mut s = Setup::with_codex().await;
+    let owner = save(&mut s.client, personal("rev"), None).await;
+    let request = pb::PlayRequest {
+        provider_id: "codex".into(),
+        name: "rev".into(),
+        inline_json: REV_JSON.into(),
+        task: "Review #521".into(),
+        worktree_path: s.repo.display().to_string(),
+        max_turns: Some(8),
+        max_cost_usd: Some(0.5),
+        agent: Some(owner.clone()),
+        ..Default::default()
+    };
+    let events = play(&mut s.client, request.clone()).await;
+    let kinds: Vec<_> = events.iter().filter_map(|e| e.kind.as_ref()).collect();
+    assert_eq!(kinds.len(), 4, "{kinds:#?}");
+    assert_eq!(kinds.last(), Some(&&Kind::Exited(0)));
+    let args = s.codex_logged("play");
+    assert_eq!(args[..2], ["exec", "--json"]);
+    assert!(
+        has_pair(&args, "-c", "approval_policy=\"never\""),
+        "{args:#?}"
+    );
+    assert!(
+        !args
+            .iter()
+            .any(|a| a.contains("max-turns") || a.contains("budget"))
+    );
+    assert_eq!(&args[args.len() - 2..], ["--", "Review #521"]);
+
+    // A failure without a result line comes back in Codex's own shape.
+    std::fs::write(s.log.join("codex-fail"), "").unwrap();
+    let failed = play(&mut s.client, request).await;
+    let line = match failed[0].kind.as_ref().unwrap() {
+        Kind::Line(line) => line.clone(),
+        other => panic!("{other:?}"),
+    };
+    let event: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(event["type"], "turn.failed");
+    assert_eq!(event["error"]["message"], "Error: not signed in");
+    assert_eq!(failed.last().unwrap().kind, Some(Kind::Exited(1)));
+
+    let kept = s
+        .client
+        .agent_defs
+        .list_plays(pb::ListPlaysRequest { agent: Some(owner) })
+        .await
+        .unwrap()
+        .into_inner()
+        .plays;
+    assert_eq!(kept.len(), 2);
+    assert!(kept.iter().all(|p| p.provider_id == "codex"), "{kept:?}");
+}
