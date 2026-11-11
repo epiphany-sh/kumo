@@ -161,6 +161,12 @@ void main() {
       expect(notes.map((n) => n.text).join('\n'), allOf(contains('8 turns'), contains('cost limit'), contains('starts fresh')));
     });
 
+    test('Claude Code’s own tools are said once, not warned about', () {
+      final notes = agentCliNotes(reviewer.copyWith(tools: defaultAgentTools), AgentCli.copilot);
+      expect(notes.where((n) => n.level == CheckLevel.warn), isEmpty);
+      expect(notes.map((n) => n.text), contains('Artifact, Skill, ToolSearch, AskUserQuestion are Claude Code’s own: Copilot runs without them.'));
+    });
+
     test('its commands name Kumo’s copy of the agent', () {
       expect(agentCommand(reviewer, prompt: 'Review #521', contextDir: '~/.kumo/runs/rev-1', cli: AgentCli.copilot), 'copilot --agent rev-… --add-dir <its copy> --add-dir ~/.kumo/runs/rev-1 -i "Review #521"');
       expect(playgroundCommand(reviewer, task: 'go', cli: AgentCli.copilot), 'copilot -p "go" --agent rev-… --output-format json');
