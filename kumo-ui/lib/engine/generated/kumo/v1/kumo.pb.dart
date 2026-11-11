@@ -8325,6 +8325,7 @@ class PlanUsage extends $pb.GeneratedMessage {
     $core.Iterable<UsageWindow>? windows,
     $core.String? problem,
     $fixnum.Int64? readAt,
+    $core.bool? needsSignIn,
   }) {
     final result = PlanUsage._();
     if (providerId != null) result.providerId = providerId;
@@ -8332,6 +8333,7 @@ class PlanUsage extends $pb.GeneratedMessage {
     if (windows != null) result.windows.addAll(windows);
     if (problem != null) result.problem = problem;
     if (readAt != null) result.readAt = readAt;
+    if (needsSignIn != null) result.needsSignIn = needsSignIn;
     return result;
   }
 
@@ -8354,6 +8356,7 @@ class PlanUsage extends $pb.GeneratedMessage {
         subBuilder: UsageWindow.$_createMessage)
     ..aOS(4, _omitFieldNames ? '' : 'problem')
     ..aInt64(5, _omitFieldNames ? '' : 'readAt')
+    ..aOB(6, _omitFieldNames ? '' : 'needsSignIn')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8414,6 +8417,15 @@ class PlanUsage extends $pb.GeneratedMessage {
   $core.bool hasReadAt() => $_has(4);
   @$pb.TagNumber(5)
   void clearReadAt() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get needsSignIn => $_getBF(5);
+  @$pb.TagNumber(6)
+  set needsSignIn($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasNeedsSignIn() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearNeedsSignIn() => $_clearField(6);
 }
 
 class ContextSlice extends $pb.GeneratedMessage {

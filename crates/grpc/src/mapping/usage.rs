@@ -18,6 +18,7 @@ fn plan_usage_to(plan: PlanUsage) -> pb::PlanUsage {
         windows: plan.windows.into_iter().map(usage_window_to).collect(),
         problem: plan.problem,
         read_at: unix_ms(plan.read_at),
+        needs_sign_in: plan.needs_sign_in,
     }
 }
 

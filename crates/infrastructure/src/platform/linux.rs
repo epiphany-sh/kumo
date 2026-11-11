@@ -12,7 +12,7 @@ use keyring_core::{CredentialStore, Error as KeyringError};
 
 use super::{
     AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, ProcessTrees,
-    Processes, ProgramSearch, RunningProcess, ScriptShell, Signals, unix,
+    Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals, unix,
 };
 
 pub struct Linux;
@@ -96,6 +96,28 @@ impl AppFolders for Linux {
 impl AgentHooks for Linux {
     fn sh_status_line() -> bool {
         unix::sh_status_line()
+    }
+}
+
+impl SavedSignIns for Linux {
+    /// Through `secret-tool` (libsecret), where Copilot CLI keeps its
+    /// sign-in. Claude Code keeps its own in a file instead. No
+    /// `secret-tool`: nothing to read.
+    fn saved_secret(service: &str, account: Option<&str>) -> Result<Option<String>, String> {
+        let mut command = Self::command(OsStr::new("secret-tool"));
+        command.args(["lookup", "service", service]);
+        if let Some(account) = account {
+            command.args(["account", account]);
+        }
+        let Ok(out) = command.stdin(std::process::Stdio::null()).output() else {
+            return Ok(None);
+        };
+        // It exits 1 both when there's no such item and when it can't ask.
+        Ok(out
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+            .filter(|secret| !secret.is_empty()))
     }
 }
 

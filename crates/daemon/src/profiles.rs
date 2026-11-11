@@ -24,8 +24,11 @@ use kumo_domain::profiles::{Profile, ProfileActivity, ProfileEnv, ProfileError, 
 use kumo_domain::tasks::{SecretStore, TaskConnector};
 use kumo_domain::workspace::{WorkspaceStore, WorktreeLocation};
 use kumo_infrastructure::agent_defs::{HttpPageReader, LocalAgentDefFiles, ProcessHeadlessRunner};
+
+use crate::config::PlanAccounts;
 use kumo_infrastructure::agents::{
-    ClaudeStatusLine, CodexRollouts, OsProcesses, ProfileCliHomes, claude_config_dir, codex_home,
+    ClaudeAccount, ClaudeStatusLine, CodexAccount, CodexRollouts, CopilotAccount, OsProcesses,
+    ProfileCliHomes, claude_config_dir, codex_home,
 };
 use kumo_infrastructure::ci::{
     BitbucketPipelines, BitbucketPulls, BitbucketReleases, GhTokenFallback, GitHubActions,
@@ -85,6 +88,7 @@ pub(crate) struct ProfileOpener {
     pub terminals: Arc<TerminalService>,
     /// A minute of your agents' time limits.
     pub agent_minute: std::time::Duration,
+    pub plan_accounts: PlanAccounts,
 }
 
 impl OpenProfile<ProfileServices> for ProfileOpener {
@@ -269,6 +273,22 @@ impl ProfileOpener {
                     Arc::new(ClaudeStatusLine::new(&dir.join("agents"), &claude_dir)),
                     Arc::new(CodexRollouts::new(&codex_dir)),
                 ],
+                // The same, asked of each account with the CLI's sign-in,
+                // so it shows with no session running.
+                accounts: match self.plan_accounts {
+                    PlanAccounts::Ask => vec![
+                        Arc::new(ClaudeAccount::new(
+                            &claude_dir,
+                            !profile.is_default()
+                                || std::env::var_os("CLAUDE_CONFIG_DIR")
+                                    .is_some_and(|v| !v.is_empty()),
+                            Arc::clone(locator),
+                        )),
+                        Arc::new(CodexAccount::new(&codex_dir)),
+                        Arc::new(CopilotAccount::new(home, Arc::clone(locator))),
+                    ],
+                    PlanAccounts::Never => Vec::new(),
+                },
                 plans: agent_store,
                 homes,
             },

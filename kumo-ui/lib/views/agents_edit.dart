@@ -45,6 +45,8 @@ class _AgentEditorState extends State<_AgentEditor> {
   late final _minutes = TextEditingController(text: widget.agent.maxMinutes?.toString() ?? '');
   late final _cost = TextEditingController(text: widget.agent.maxCostUsd == null ? '' : _money(widget.agent.maxCostUsd!));
   final _knowledge = TextEditingController();
+  final _otherTool = TextEditingController();
+  String _otherToolError = '';
   bool _advanced = false;
   bool _drafting = false;
   bool _confirmDelete = false;
@@ -74,7 +76,7 @@ class _AgentEditorState extends State<_AgentEditor> {
 
   @override
   void dispose() {
-    for (final t in [_name, _desc, _body, _output, _turns, _minutes, _cost, _knowledge]) {
+    for (final t in [_name, _desc, _body, _output, _turns, _minutes, _cost, _knowledge, _otherTool]) {
       t.dispose();
     }
     super.dispose();
@@ -290,6 +292,7 @@ class _AgentEditorState extends State<_AgentEditor> {
   String _advancedSummary() => [
         if (a.skills.isNotEmpty) '${a.skills.length} skill${a.skills.length == 1 ? '' : 's'}',
         if (a.knowledge.isNotEmpty) '${a.knowledge.length} doc${a.knowledge.length == 1 ? '' : 's'}',
+        if (agentOtherTools(a.tools).isNotEmpty) agentOtherTools(a.tools).join(', '),
         if (a.mcpServers.isNotEmpty) a.mcpServers.join(', '),
         if (a.maxTurns != null) '${a.maxTurns} turns',
         if (a.maxMinutes != null) '${a.maxMinutes} min',
@@ -325,10 +328,10 @@ class _AgentEditorState extends State<_AgentEditor> {
               onToggle: (t) => _set(a.copyWith(mcpServers: [for (final m in a.mcpServers) if ('mcp__$m' != t) m])),
             ),
         ]),
-        // Tools a file names that Kumo doesn't offer: kept, and shown.
-        if (a.tools.any((t) => !agentToolGroups.any((g) => g.$3.any((x) => x.$1 == t)))) ...[
+        // Tools Kumo doesn't offer: kept as the file says, edited in Advanced.
+        if (agentOtherTools(a.tools).isNotEmpty) ...[
           const SizedBox(height: 6),
-          Text('Also: ${a.tools.where((t) => !agentToolGroups.any((g) => g.$3.any((x) => x.$1 == t))).join(', ')}', style: mono(11, color: c.text3)),
+          Text('Also: ${agentOtherTools(a.tools).join(', ')} · in Advanced', style: mono(11, color: c.text3)),
         ],
         if (warning != null) ...[
           const SizedBox(height: 8),
@@ -373,6 +376,39 @@ class _AgentEditorState extends State<_AgentEditor> {
                 _set(a.copyWith(knowledge: [...a.knowledge, p]));
               },
             ),
+          ]),
+        ),
+        _Row(
+          label: 'More tools',
+          hint: 'any other Claude Code tool, by name',
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Wrap(spacing: 5, runSpacing: 5, children: [
+              for (final t in agentOtherTools(a.tools)) _Chip(label: t, onRemove: () => _set(a.copyWith(tools: [for (final x in a.tools) if (x != t) x]))),
+            ]),
+            if (agentOtherTools(a.tools).isNotEmpty) const SizedBox(height: 6),
+            _Line(
+              controller: _otherTool,
+              monospace: true,
+              label: 'Add a tool',
+              hint: 'Monitor, LSP…, then Enter',
+              border: _otherToolError.isEmpty ? null : c.err,
+              onChanged: (_) {
+                if (_otherToolError.isNotEmpty) setState(() => _otherToolError = '');
+              },
+              onSubmitted: (v) {
+                final error = agentOtherToolError(v, a.tools);
+                if (error != null) {
+                  setState(() => _otherToolError = error);
+                  return;
+                }
+                _otherTool.clear();
+                _set(a.copyWith(tools: [...a.tools, v.trim()]));
+              },
+            ),
+            if (_otherToolError.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(_otherToolError, style: sans(11, color: c.err)),
+            ],
           ]),
         ),
         _Row(
@@ -579,7 +615,7 @@ class _ToolGroup extends StatelessWidget {
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(on ? KIcons.check : KIcons.add, size: 12, color: on ? color : c.text3),
                   const SizedBox(width: 4),
-                  Text(t, style: mono(11.5, color: on ? c.text : c.text2)),
+                  Flexible(child: Text(t, style: mono(11.5, color: on ? c.text : c.text2), overflow: TextOverflow.ellipsis, softWrap: false)),
                 ]),
               ),
             ),

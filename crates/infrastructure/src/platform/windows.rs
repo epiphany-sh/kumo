@@ -12,7 +12,7 @@ use keyring_core::{CredentialStore, Error as KeyringError};
 
 use super::{
     AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, ProcessTrees,
-    Processes, ProgramSearch, RunningProcess, ScriptShell, Signals,
+    Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals,
 };
 
 /// The child gets a console nobody sees.
@@ -125,6 +125,14 @@ impl AgentHooks for Windows {
     /// whichever it finds: no way to know which, so Kumo's isn't used.
     fn sh_status_line() -> bool {
         false
+    }
+}
+
+impl SavedSignIns for Windows {
+    /// Claude Code keeps its sign-in in a file here, and Copilot CLI's
+    /// is found through `gh` instead.
+    fn saved_secret(_service: &str, _account: Option<&str>) -> Result<Option<String>, String> {
+        Ok(None)
     }
 }
 

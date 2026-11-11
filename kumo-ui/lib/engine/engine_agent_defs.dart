@@ -156,7 +156,8 @@ class EngineAgentDefs extends AgentDefsSource {
     final text = await _ask(draftAgentPrompt(description), cwd: scope == AgentScope.project ? _repoPath(repo) : '');
     if (text == null) return null;
     final taken = {for (final a in _list) if (a.scope == scope && (scope == AgentScope.personal || a.repo == repo)) a.name};
-    return readAgentFile(text, scope: scope, repo: repo, taken: taken).agent;
+    final drafted = readAgentFile(text, scope: scope, repo: repo, taken: taken).agent;
+    return drafted == null ? null : withClaudeCodeTools(drafted);
   }
 
   @override

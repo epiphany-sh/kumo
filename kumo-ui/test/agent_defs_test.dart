@@ -13,8 +13,8 @@ import 'package:kumo_ui/views/agents_library.dart' show lineDiff;
 import 'package:kumo_ui/views/agents_screen.dart';
 import 'package:kumo_ui/widgets/controls.dart' show KSegmented;
 
-Future<AppState> _pumpAgents(WidgetTester tester, {AgentsMode mode = AgentsMode.library}) async {
-  tester.view.physicalSize = const Size(1440, 1000);
+Future<AppState> _pumpAgents(WidgetTester tester, {AgentsMode mode = AgentsMode.library, Size size = const Size(1440, 1000)}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final state = AppState(demoWallpaper: true);
@@ -89,7 +89,7 @@ void main() {
     test('what a file lacks, and names', () {
       expect(readAgentFile('hello').checks.single.level, CheckLevel.error, reason: 'no frontmatter');
       final noTools = readAgentFile('---\nname: lint-fixer\ndescription: Fixes lint. Use it before a PR.\n---\nDo it.');
-      expect(noTools.agent!.tools, readOnlyTools, reason: 'no tools line means every tool: it comes in read-only');
+      expect(noTools.agent!.tools, defaultAgentTools, reason: 'no tools line means every tool: it comes in read-only, with Claude Code’s own');
       expect(noTools.checks.first.text, startsWith('No tools line'));
       final named = readAgentFile('---\nname: Go PR Reviewer\ndescription: x\ntools:\n  - Read\n  - Grep\n---\nBody', taken: {'go-pr-reviewer'});
       expect(named.agent!.name, 'go-pr-reviewer-2');
@@ -115,6 +115,35 @@ void main() {
       expect(agentToolsWarning(ok), isNull);
       expect(agentToolsWarning(ok.copyWith(tools: const ['Edit', 'Bash'])), startsWith('It can change files and run commands.'));
       expect(agentToolsKind(const ['Read', 'WebFetch']).$2, 'read + web');
+      expect(agentToolsKind(defaultAgentTools), (AgentRisk.web, 'read + artifacts'));
+      expect(agentWrites(defaultAgentTools), isFalse, reason: 'Claude Code’s own tools change nothing here');
+    });
+
+    test('Claude Code’s own tools: offered, named in the file, and only added where Kumo picks', () {
+      const mine = AgentDef(name: 'rev', description: 'd', instructions: 'x', tools: ['Read', 'Artifact', 'ToolSearch']);
+      expect(mine.toMarkdown(), contains('tools: Read, Artifact, ToolSearch'));
+      expect(((jsonDecode(agentInlineJson(mine)) as Map)['rev'] as Map)['tools'], ['Read', 'Artifact', 'ToolSearch'], reason: 'an agent has only what its tools line names');
+      expect(agentOtherTools(mine.tools), isEmpty, reason: 'offered in the Tools block');
+
+      final written = readAgentFile('---\nname: rev\ndescription: d\ntools: Read, Grep\n---\nDo it.').agent!;
+      expect(written.tools, ['Read', 'Grep'], reason: 'a file keeps the tools it names');
+      expect(withClaudeCodeTools(written).tools, ['Read', 'Grep', ...claudeCodeTools], reason: 'a drafted one gets them');
+      expect(withClaudeCodeTools(withClaudeCodeTools(written)).tools, withClaudeCodeTools(written).tools);
+      const every = AgentDef(name: 'all', description: 'd', instructions: 'x', everyTool: true);
+      expect(withClaudeCodeTools(every).everyTool, isTrue, reason: 'every tool is more already');
+    });
+
+    test('more tools, by name', () {
+      expect(agentOtherToolError('Monitor', defaultAgentTools), isNull);
+      expect(agentOtherToolError('  ', defaultAgentTools), '');
+      expect(agentOtherToolError('Artifact', defaultAgentTools), 'It has it already.');
+      expect(agentOtherToolError('mcp__jira__get_issue', defaultAgentTools), contains('connectors'));
+      expect(agentOtherToolError('Bash(rm:*)', defaultAgentTools), isNotNull);
+      expect(agentOtherTools(['Read', 'Monitor', 'LSP']), ['Monitor', 'LSP']);
+
+      const ok = AgentDef(name: 'go-pr-reviewer', description: 'Reviews Go pull requests for code that could be reused. Use it when a PR is ready.', instructions: 'Do it.');
+      final delegates = agentChecks(ok.copyWith(tools: [...defaultAgentTools, 'Agent'])).where((c) => c.level == CheckLevel.warn).map((c) => c.text);
+      expect(delegates.single, startsWith('Agent starts other agents'), reason: 'its agents have tools of their own');
     });
 
     test('commands: by name where it’s found, inline elsewhere', () {
@@ -138,7 +167,10 @@ void main() {
 
     test('templates start with safe defaults', () {
       final reviewer = agentTemplates.first.draft();
-      expect(reviewer.tools, readOnlyTools);
+      expect(reviewer.tools, defaultAgentTools);
+      for (final t in agentTemplates) {
+        expect(t.tools, containsAll(claudeCodeTools), reason: '${t.id} can publish an artifact and load tools');
+      }
       expect(reviewer.isolation, isFalse);
       final tests = agentTemplates.firstWhere((t) => t.id == 'test-writer').draft();
       expect(tests.isolation, isTrue, reason: 'it changes files: its own worktree');
@@ -281,6 +313,39 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('Edit: Claude Code’s own tools are picked like the rest, any other by name in Advanced', (tester) async {
+      // Wide: Advanced's choices don't fit the test font at 1440.
+      await _pumpAgents(tester, size: const Size(2200, 1200));
+      await tester.tap(find.text('go-pr-reviewer').first);
+      await tester.pump();
+      await tester.tap(find.text('Edit').first);
+      await tester.pump();
+      await tester.ensureVisible(find.text('Artifact'));
+      await tester.pump();
+      await tester.tap(find.text('Artifact'));
+      await tester.pump();
+      expect(find.textContaining(RegExp(r'tools: .*Artifact')), findsOneWidget, reason: 'the file preview follows');
+
+      await tester.ensureVisible(find.text('Advanced'));
+      await tester.pump();
+      await tester.tap(find.text('Advanced'));
+      await tester.pump();
+      final field = find.byKey(const ValueKey('field-Add a tool'));
+      await tester.ensureVisible(field);
+      await tester.pump();
+      await tester.enterText(field, 'mcp__jira__get_issue');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      expect(find.text('Add MCP servers as connectors.'), findsOneWidget);
+      await tester.enterText(field, 'Monitor');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      expect(find.text('Add MCP servers as connectors.'), findsNothing);
+      expect(find.textContaining(RegExp(r'tools: .*Artifact, Monitor')), findsOneWidget);
+      expect(find.textContaining('Also: Monitor'), findsOneWidget, reason: 'the Tools block says it has more');
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('Create: a template opens unsaved in Edit; import reads a pasted file', (tester) async {
       final state = await _pumpAgents(tester);
       await tester.tap(find.text('Create agent').first);
@@ -382,7 +447,7 @@ void main() {
     expect(listed.copyWith(tools: readOnlyTools).everyTool, isFalse);
 
     final imported = readAgentFile(file).agent!;
-    expect((imported.everyTool, imported.approvals, imported.tools), (false, AgentApprovals.ask, readOnlyTools));
+    expect((imported.everyTool, imported.approvals, imported.tools), (false, AgentApprovals.ask, defaultAgentTools));
   });
 
   test('inline, an agent keeps what its file says', () {

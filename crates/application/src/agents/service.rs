@@ -5,10 +5,10 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use kumo_domain::agents::{
-    AgentContext, AgentError, AgentEventKind, AgentPreset, AgentProvider, AgentSession,
-    AgentSessionId, AgentState, AgentStore, CliHomes, PRESETS, PlanUsage, PlanUsageStore,
-    ProgramLocator, StoredProvider, TerminalAgent, UsageReport, UsageSource, UsageTarget,
-    args_for_cmd, runs_through_cmd,
+    AccountProblem, AccountUsage, AgentContext, AgentError, AgentEventKind, AgentPreset,
+    AgentProvider, AgentSession, AgentSessionId, AgentState, AgentStore, CliHomes, PRESETS,
+    PlanUsage, PlanUsageStore, ProgramLocator, StoredProvider, TerminalAgent, UsageReport,
+    UsageSource, UsageTarget, args_for_cmd, runs_through_cmd,
 };
 use kumo_domain::terminal::{
     LaunchSpec, TerminalError, TerminalId, TerminalSize, bracketed_paste, typed_text,
@@ -39,6 +39,8 @@ pub struct AgentPorts {
     pub locator: Arc<dyn ProgramLocator>,
     /// Where the CLIs that report their usage report it.
     pub usage: Vec<Arc<dyn UsageSource>>,
+    /// The accounts that tell their plan's usage when asked.
+    pub accounts: Vec<Arc<dyn AccountUsage>>,
     pub plans: Arc<dyn PlanUsageStore>,
     /// The CLIs' folders in this profile (their sign-ins and sessions).
     pub homes: Arc<dyn CliHomes>,
@@ -543,6 +545,7 @@ impl AgentService {
     pub async fn usage(&self) -> Result<UsageReport, AgentError> {
         self.load_plans().await;
         let providers = self.providers().await?;
+        self.ask_accounts(&providers).await;
         let sessions = self.sessions();
         Ok(self
             .usage_lock()
@@ -710,6 +713,41 @@ impl AgentService {
             .iter()
             .find(|s| s.provider_id() == provider.id)
             .cloned()
+    }
+
+    /// Asks the accounts of the connected providers whose usage is read,
+    /// those due, all at once.
+    async fn ask_accounts(&self, providers: &[ProviderView]) {
+        let now = Timestamp::now();
+        let due: Vec<Arc<dyn AccountUsage>> = self
+            .ports
+            .accounts
+            .iter()
+            .filter(|account| {
+                providers.iter().any(|v| {
+                    v.provider.id == account.provider_id()
+                        && v.provider.enabled
+                        && v.provider.reads_usage()
+                })
+            })
+            .filter(|account| self.usage_lock().claim_ask(account.provider_id(), now))
+            .cloned()
+            .collect();
+        let asks = due.into_iter().map(|account| async move {
+            let id = account.provider_id().to_owned();
+            let answer = tokio::task::spawn_blocking(move || account.read())
+                .await
+                .unwrap_or_else(|e| Err(AccountProblem::Unavailable(e.to_string())));
+            (id, answer)
+        });
+        for (id, answer) in futures::future::join_all(asks).await {
+            let plan = self
+                .usage_lock()
+                .record_account(&id, answer, Timestamp::now());
+            if let Some(plan) = plan {
+                self.save_plan(plan).await;
+            }
+        }
     }
 
     /// The plan readings kept from earlier runs, once.
