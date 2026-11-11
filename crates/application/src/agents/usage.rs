@@ -1,14 +1,16 @@
 //! Follows what agents report about their usage: the latest plan reading
 //! per provider (account-wide, so it outlives sessions) and the latest
-//! context reading per session.
+//! context reading per session. Plans are also asked of each account on
+//! their own, so they show with no session running.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
 use kumo_domain::agents::{
-    AgentSession, AgentSessionId, AgentState, ContextSlice, ContextSliceKind, PlanUsage,
-    SessionUsage, UsageReading, UsageReport, UsageSource, UsageTarget,
+    AccountProblem, AgentSession, AgentSessionId, AgentState, ContextSlice, ContextSliceKind,
+    PlanReading, PlanUsage, SessionUsage, UsageReading, UsageReport, UsageSource, UsageTarget,
+    UsageWindow,
 };
 use kumo_domain::time::Timestamp;
 
@@ -17,12 +19,23 @@ use super::service::{AgentService, ProviderView};
 /// How often a session's reports are read. Claude Code updates its
 /// status line at most every 300 ms; Codex writes once per turn.
 const POLL: Duration = Duration::from_secs(2);
+/// How often an account is asked, after an answer. The providers limit
+/// how often their usage may be asked; sessions fill in between.
+const ASK_EVERY: Duration = Duration::from_secs(2 * 60);
+/// After it turned the sign-in down: the user may be signing in again.
+const ASK_SIGNED_OUT: Duration = Duration::from_secs(60);
+/// After it couldn't be asked (offline, rate limited).
+const ASK_UNAVAILABLE: Duration = Duration::from_secs(5 * 60);
+/// While an ask is under way, no other starts.
+const ASKING: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Default)]
 pub(super) struct UsageState {
     plans_loaded: bool,
     plans: HashMap<String, PlanUsage>,
     sessions: HashMap<AgentSessionId, Followed>,
+    /// When each account may be asked again.
+    next_ask: HashMap<String, Timestamp>,
 }
 
 #[derive(Debug)]
@@ -80,15 +93,114 @@ impl UsageState {
         let plan = reading.plan.clone();
         followed.reading = std::mem::take(&mut followed.reading).merged(reading);
         followed.read_at = Some(now);
+        let reading = plan?;
+        // A session sees only some of the windows its account has: the rest
+        // stand as the account last told them.
+        let mut windows = self
+            .plans
+            .get(provider_id)
+            .map(|p| p.windows.clone())
+            .unwrap_or_default();
+        for window in reading.windows {
+            match windows.iter_mut().find(|w| w.label == window.label) {
+                Some(known) => *known = window,
+                None => windows.push(window),
+            }
+        }
         let plan = PlanUsage {
             provider_id: provider_id.to_owned(),
-            plan: plan.as_ref()?.plan.clone(),
-            windows: plan?.windows,
+            plan: self.plan_name(provider_id, reading.plan),
+            windows,
             problem: String::new(),
+            needs_sign_in: false,
             read_at: now,
         };
         self.plans.insert(provider_id.to_owned(), plan.clone());
         Some(plan)
+    }
+
+    /// Whether `provider_id`'s account is due to be asked; if so, no one
+    /// else asks it until [`UsageState::record_account`] (or a while).
+    pub(super) fn claim_ask(&mut self, provider_id: &str, now: Timestamp) -> bool {
+        if self.next_ask.get(provider_id).is_some_and(|at| *at > now) {
+            return false;
+        }
+        self.next_ask
+            .insert(provider_id.to_owned(), later(now, ASKING));
+        true
+    }
+
+    /// Takes in what `provider_id`'s account said. Returns the plan to save
+    /// when it told one.
+    pub(super) fn record_account(
+        &mut self,
+        provider_id: &str,
+        answer: Result<PlanReading, AccountProblem>,
+        now: Timestamp,
+    ) -> Option<PlanUsage> {
+        let (wait, plan) = match answer {
+            Ok(reading) => (
+                ASK_EVERY,
+                PlanUsage {
+                    provider_id: provider_id.to_owned(),
+                    plan: self.plan_name(provider_id, reading.plan),
+                    windows: reading.windows,
+                    problem: String::new(),
+                    needs_sign_in: false,
+                    read_at: now,
+                },
+            ),
+            Err(AccountProblem::SignedOut(why)) => (
+                ASK_SIGNED_OUT,
+                PlanUsage {
+                    provider_id: provider_id.to_owned(),
+                    plan: self.plan_name(provider_id, String::new()),
+                    windows: Vec::new(),
+                    problem: why,
+                    needs_sign_in: true,
+                    read_at: now,
+                },
+            ),
+            Err(AccountProblem::Unavailable(why)) => {
+                self.next_ask
+                    .insert(provider_id.to_owned(), later(now, ASK_UNAVAILABLE));
+                // What was read before still stands until its reset.
+                if self
+                    .plans
+                    .get(provider_id)
+                    .is_some_and(|p| !p.windows.is_empty())
+                {
+                    return None;
+                }
+                tracing::debug!(provider = provider_id, problem = %why, "plan usage not read");
+                let plan = PlanUsage {
+                    provider_id: provider_id.to_owned(),
+                    plan: self.plan_name(provider_id, String::new()),
+                    windows: Vec::new(),
+                    problem: why,
+                    needs_sign_in: false,
+                    read_at: now,
+                };
+                self.plans.insert(provider_id.to_owned(), plan);
+                return None;
+            }
+        };
+        self.next_ask
+            .insert(provider_id.to_owned(), later(now, wait));
+        let save = plan.problem.is_empty().then(|| plan.clone());
+        self.plans.insert(provider_id.to_owned(), plan);
+        save
+    }
+
+    /// `told`, or the name known before when it's empty.
+    fn plan_name(&self, provider_id: &str, told: String) -> String {
+        if !told.is_empty() {
+            return told;
+        }
+        self.plans
+            .get(provider_id)
+            .map(|p| p.plan.clone())
+            .unwrap_or_default()
     }
 
     /// Plans of connected providers whose usage is read (windows past their
@@ -111,13 +223,13 @@ impl UsageState {
             .values()
             .filter(|plan| reads(&plan.provider_id).is_some())
             .filter_map(|plan| {
-                let windows: Vec<_> = plan
+                let windows: Vec<UsageWindow> = plan
                     .windows
                     .iter()
                     .filter(|w| w.resets_at.is_none_or(|at| at > now))
                     .cloned()
                     .collect();
-                (!windows.is_empty()).then(|| PlanUsage {
+                (!windows.is_empty() || !plan.problem.is_empty()).then(|| PlanUsage {
                     windows,
                     ..plan.clone()
                 })
@@ -166,6 +278,12 @@ impl UsageState {
             .collect();
         UsageReport { plans, sessions }
     }
+}
+
+/// `duration` after `at`.
+fn later(at: Timestamp, duration: Duration) -> Timestamp {
+    let nanos = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
+    Timestamp::from_unix_nanos(at.as_unix_nanos().saturating_add(nanos))
 }
 
 /// `args` with what `source` needs to read the session in front; as they
@@ -388,6 +506,7 @@ mod tests {
             plan: String::new(),
             windows: reading(1_000).plan.unwrap().windows,
             problem: String::new(),
+            needs_sign_in: false,
             read_at: at(5),
         }]);
         assert_eq!(
@@ -408,6 +527,115 @@ mod tests {
         assert!(state.report(&[off], &[], at(10)).plans.is_empty());
     }
 
+    fn account(windows: Vec<UsageWindow>) -> Result<PlanReading, AccountProblem> {
+        Ok(PlanReading {
+            plan: "Claude Max 20x".into(),
+            windows,
+        })
+    }
+
+    #[test]
+    fn an_account_is_asked_again_only_once_due() {
+        let mut state = UsageState::default();
+        assert!(state.claim_ask("claude", at(0)));
+        assert!(!state.claim_ask("claude", at(1)), "an ask is under way");
+        assert!(state.claim_ask("codex", at(1)), "each account on its own");
+
+        let told = state.record_account("claude", account(Vec::new()), at(10));
+        assert_eq!(told.map(|p| p.plan), Some("Claude Max 20x".into()));
+        assert!(!state.claim_ask("claude", at(60)));
+        assert!(state.claim_ask("claude", at(10 + ASK_EVERY.as_secs())));
+    }
+
+    #[test]
+    fn signed_out_shows_why_and_is_fixed_by_signing_in() {
+        let mut state = UsageState::default();
+        let providers = [provider("claude", true)];
+        let saved = state.record_account(
+            "claude",
+            Err(AccountProblem::SignedOut(
+                "Claude Code isn't signed in".into(),
+            )),
+            at(10),
+        );
+        assert_eq!(saved, None, "a problem isn't kept across restarts");
+        let report = state.report(&providers, &[], at(10));
+        let plan = &report.plans[0];
+        assert!(plan.windows.is_empty() && plan.needs_sign_in);
+        assert_eq!(plan.problem, "Claude Code isn't signed in");
+        assert!(state.claim_ask("claude", at(10 + ASK_SIGNED_OUT.as_secs())));
+
+        state.record_account(
+            "claude",
+            account(reading(1_000).plan.unwrap().windows),
+            at(80),
+        );
+        let plan = &state.report(&providers, &[], at(80)).plans[0];
+        assert!(!plan.needs_sign_in && plan.problem.is_empty());
+        assert_eq!(plan.windows.len(), 2);
+    }
+
+    #[test]
+    fn unreachable_keeps_what_was_read_or_says_why() {
+        let mut state = UsageState::default();
+        let providers = [provider("codex", true)];
+        let offline = || Err(AccountProblem::Unavailable("Can't reach ChatGPT".into()));
+        state.record_account("codex", offline(), at(10));
+        assert_eq!(
+            state.report(&providers, &[], at(10)).plans[0].problem,
+            "Can't reach ChatGPT"
+        );
+
+        state.record_account(
+            "codex",
+            account(reading(9_000).plan.unwrap().windows),
+            at(20),
+        );
+        assert!(!state.claim_ask("codex", at(30)));
+        state.record_account("codex", offline(), at(20 + ASK_EVERY.as_secs()));
+        let offline_at = 20 + ASK_EVERY.as_secs();
+        let plan = &state.report(&providers, &[], at(offline_at)).plans[0];
+        assert_eq!((plan.windows.len(), plan.problem.as_str()), (2, ""));
+        let normal_wait = offline_at + ASK_EVERY.as_secs();
+        assert!(
+            !state.claim_ask("codex", at(normal_wait)),
+            "waits longer when offline"
+        );
+        assert!(state.claim_ask("codex", at(offline_at + ASK_UNAVAILABLE.as_secs())));
+    }
+
+    #[test]
+    fn a_session_updates_the_windows_it_sees_and_keeps_the_rest() {
+        let mut state = UsageState::default();
+        let model_week = UsageWindow::percent_used("Weekly · Fable", "wk", 12.0, None);
+        state.record_account(
+            "claude",
+            account(vec![
+                UsageWindow::percent_over_minutes(300, 10.0, None),
+                model_week.clone(),
+            ]),
+            at(10),
+        );
+        state.follow(target("s1"));
+        let saved = state
+            .record("claude", &target("s1").session_id, reading(1_000), at(20))
+            .unwrap();
+        let seen: Vec<_> = saved
+            .windows
+            .iter()
+            .map(|w| (w.label.as_str(), w.left))
+            .collect();
+        assert_eq!(
+            seen,
+            [
+                ("5-hour session", 76.5),
+                ("Weekly · Fable", 88.0),
+                ("Weekly", 58.8)
+            ]
+        );
+        assert_eq!(saved.plan, "Claude Max 20x", "the session doesn't name it");
+    }
+
     #[test]
     fn a_newer_reading_wins_over_the_saved_one() {
         let mut state = UsageState::default();
@@ -418,6 +646,7 @@ mod tests {
             plan: "old".into(),
             windows: Vec::new(),
             problem: String::new(),
+            needs_sign_in: false,
             read_at: at(5),
         }]);
         assert!(state.plans_loaded());

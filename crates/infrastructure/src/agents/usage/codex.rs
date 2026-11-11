@@ -258,7 +258,7 @@ fn plan_of(limits: &Value) -> Option<PlanReading> {
 }
 
 /// "plus" → "ChatGPT Plus".
-fn plan_name(plan_type: &str) -> String {
+pub(super) fn plan_name(plan_type: &str) -> String {
     let mut chars = plan_type.chars();
     match chars.next() {
         Some(first) if plan_type != "unknown" => {

@@ -1,6 +1,6 @@
 //! What's left on an agent's plan and how full its context window is, as
-//! the agent's own CLI reports them. Only what a CLI documents (or writes
-//! in a stable format) is read: a number that can't be read is left out,
+//! the agent's own CLI reports them, or its account does when asked with
+//! the sign-in the CLI keeps. A number that can't be read is left out,
 //! never estimated.
 
 use std::path::PathBuf;
@@ -82,6 +82,8 @@ pub struct PlanUsage {
     pub windows: Vec<UsageWindow>,
     /// Why it can't be read now; empty when fine.
     pub problem: String,
+    /// Signing in to the CLI again fixes `problem`.
+    pub needs_sign_in: bool,
     pub read_at: Timestamp,
 }
 
@@ -183,6 +185,25 @@ pub trait UsageSource: Send + Sync + 'static {
     fn read(&self, target: &UsageTarget) -> Option<UsageReading>;
     /// The session is gone: drop what was kept for it.
     fn forget(&self, target: &UsageTarget);
+}
+
+/// Why an account couldn't tell what's left on its plan.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AccountProblem {
+    /// There's no sign-in to ask with, or the account turned it down:
+    /// signing in to the CLI again fixes it.
+    SignedOut(String),
+    /// It couldn't be asked now (offline, rate limited, an answer it
+    /// doesn't understand); asking later may work.
+    Unavailable(String),
+}
+
+/// Asks a provider's account what's left on its plan, with the sign-in
+/// its CLI keeps, so it's known whether or not a session runs. Blocks.
+pub trait AccountUsage: Send + Sync + 'static {
+    /// The preset it reads (e.g. "claude").
+    fn provider_id(&self) -> &str;
+    fn read(&self) -> Result<PlanReading, AccountProblem>;
 }
 
 /// Where the last plan readings are kept across restarts. Blocks.

@@ -8,7 +8,7 @@ use bytes::Bytes;
 use kumo_domain::daemon::DaemonEndpoint;
 use kumo_grpc::client::KumoClient;
 use kumo_proto::v1 as pb;
-use kumod::{Daemon, DaemonConfig, SecretsBackend};
+use kumod::{Daemon, DaemonConfig, PlanAccounts, SecretsBackend};
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -68,6 +68,8 @@ pub fn test_config(dir: &std::path::Path) -> DaemonConfig {
         credential_helper: Some(env!("CARGO_BIN_EXE_kumod").into()),
         // Agents' time limits in tenths of a second.
         agent_minute: Some(Duration::from_millis(300)),
+        // Never the user's real sign-ins, nor the network.
+        plan_accounts: PlanAccounts::Never,
         ..Default::default()
     }
 }

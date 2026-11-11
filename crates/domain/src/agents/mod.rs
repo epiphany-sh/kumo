@@ -28,6 +28,7 @@ pub use session::{
     ContextKind, TerminalAgent, agent_program,
 };
 pub use usage::{
-    ContextReading, ContextSlice, ContextSliceKind, PlanReading, PlanUsage, PlanUsageStore,
-    SessionUsage, UsageReading, UsageReport, UsageSource, UsageTarget, UsageUnit, UsageWindow,
+    AccountProblem, AccountUsage, ContextReading, ContextSlice, ContextSliceKind, PlanReading,
+    PlanUsage, PlanUsageStore, SessionUsage, UsageReading, UsageReport, UsageSource, UsageTarget,
+    UsageUnit, UsageWindow,
 };

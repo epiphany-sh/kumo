@@ -8,4 +8,7 @@ mod usage;
 pub use homes::ProfileCliHomes;
 pub use locator::ShellPathLocator;
 pub use processes::OsProcesses;
-pub use usage::{ClaudeStatusLine, CodexRollouts, claude_config_dir, codex_home};
+pub use usage::{
+    ClaudeAccount, ClaudeStatusLine, CodexAccount, CodexRollouts, CopilotAccount,
+    claude_config_dir, codex_home,
+};

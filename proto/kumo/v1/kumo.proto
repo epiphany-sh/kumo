@@ -950,8 +950,8 @@ message SendToTerminalRequest {
 message SendToTerminalResponse {}
 
 // Usage: only what an agent's CLI itself reports (Claude Code's status
-// line, Codex's session files). What can't be read is left out, never
-// estimated.
+// line, Codex's session files) or its account tells when asked with the
+// CLI's sign-in. What can't be read is left out, never estimated.
 
 enum UsageUnit {
   USAGE_UNIT_PERCENT = 0;
@@ -974,6 +974,7 @@ message PlanUsage {
   repeated UsageWindow windows = 3;
   string problem = 4;      // why it can't be read now; empty = fine
   int64 read_at = 5;       // unix ms
+  bool needs_sign_in = 6;  // signing in to the CLI again fixes `problem`
 }
 
 enum ContextSliceKind {
