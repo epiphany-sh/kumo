@@ -12,7 +12,7 @@ use keyring_core::{CredentialStore, Error as KeyringError};
 
 use super::{
     AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, ProcessTrees,
-    Processes, ProgramSearch, RunningProcess, ScriptShell, Signals, unix,
+    Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals, unix,
 };
 
 pub struct MacOs;
@@ -94,6 +94,32 @@ impl AppFolders for MacOs {
 impl AgentHooks for MacOs {
     fn sh_status_line() -> bool {
         unix::sh_status_line()
+    }
+}
+
+impl SavedSignIns for MacOs {
+    /// Through `security`, the tool Claude Code itself saves its sign-in
+    /// with: reading it asks nothing. Items other programs saved (Copilot
+    /// CLI's) make macOS ask the user once.
+    fn saved_secret(service: &str, account: Option<&str>) -> Result<Option<String>, String> {
+        /// `security`'s exit code when there's no such item.
+        const NOT_FOUND: i32 = 44;
+        let mut command = Self::command(OsStr::new("/usr/bin/security"));
+        command.args(["find-generic-password", "-s", service]);
+        if let Some(account) = account {
+            command.args(["-a", account]);
+        }
+        let out = command
+            .arg("-w")
+            .stdin(std::process::Stdio::null())
+            .output()
+            .map_err(|e| e.to_string())?;
+        match out.status.code() {
+            Some(0) => Ok(Some(String::from_utf8_lossy(&out.stdout).trim().to_owned())
+                .filter(|secret| !secret.is_empty())),
+            Some(NOT_FOUND) => Ok(None),
+            _ => Err(String::from_utf8_lossy(&out.stderr).trim().to_owned()),
+        }
     }
 }
 

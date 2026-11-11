@@ -10,5 +10,5 @@ pub mod git_credential;
 mod profiles;
 mod single_instance;
 
-pub use config::{DaemonConfig, SecretsBackend};
+pub use config::{DaemonConfig, PlanAccounts, SecretsBackend};
 pub use daemon::Daemon;

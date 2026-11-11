@@ -110,6 +110,15 @@ pub trait AgentHooks {
     fn sh_status_line() -> bool;
 }
 
+/// Sign-ins other programs keep in the OS's own secret store (Claude
+/// Code's and Copilot CLI's on macOS), read as those programs save them.
+pub trait SavedSignIns {
+    /// The secret saved under `service` (and `account`, when given).
+    /// Ok(None): there's none; Err: there is, but it can't be read (the
+    /// user didn't allow it).
+    fn saved_secret(service: &str, account: Option<&str>) -> Result<Option<String>, String>;
+}
+
 /// A running process, as seen from outside.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunningProcess {
@@ -199,6 +208,11 @@ pub fn obsidian_settings(home: &Path) -> PathBuf {
 /// See [`AgentHooks::sh_status_line`].
 pub fn sh_status_line() -> bool {
     Current::sh_status_line()
+}
+
+/// See [`SavedSignIns::saved_secret`].
+pub fn saved_secret(service: &str, account: Option<&str>) -> Result<Option<String>, String> {
+    Current::saved_secret(service, account)
 }
 
 /// See [`ProcessTrees::own_group`].

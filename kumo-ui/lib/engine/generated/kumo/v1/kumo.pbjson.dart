@@ -2505,6 +2505,7 @@ const PlanUsage$json = {
     },
     {'1': 'problem', '3': 4, '4': 1, '5': 9, '10': 'problem'},
     {'1': 'read_at', '3': 5, '4': 1, '5': 3, '10': 'readAt'},
+    {'1': 'needs_sign_in', '3': 6, '4': 1, '5': 8, '10': 'needsSignIn'},
   ],
 };
 
@@ -2512,7 +2513,8 @@ const PlanUsage$json = {
 final $typed_data.Uint8List planUsageDescriptor = $convert.base64Decode(
     'CglQbGFuVXNhZ2USHwoLcHJvdmlkZXJfaWQYASABKAlSCnByb3ZpZGVySWQSEgoEcGxhbhgCIA'
     'EoCVIEcGxhbhIuCgd3aW5kb3dzGAMgAygLMhQua3Vtby52MS5Vc2FnZVdpbmRvd1IHd2luZG93'
-    'cxIYCgdwcm9ibGVtGAQgASgJUgdwcm9ibGVtEhcKB3JlYWRfYXQYBSABKANSBnJlYWRBdA==');
+    'cxIYCgdwcm9ibGVtGAQgASgJUgdwcm9ibGVtEhcKB3JlYWRfYXQYBSABKANSBnJlYWRBdBIiCg'
+    '1uZWVkc19zaWduX2luGAYgASgIUgtuZWVkc1NpZ25Jbg==');
 
 @$core.Deprecated('Use contextSliceDescriptor instead')
 const ContextSlice$json = {

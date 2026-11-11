@@ -295,7 +295,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 'usage.sidebar',
                 'Show what’s left in the sidebar',
                 s.usage.supported
-                    ? 'One row per agent with its tightest limit: Claude Code and Codex count 5-hour and weekly windows, Gemini CLI requests per day, Copilot premium requests per month.'
+                    ? 'One row per agent with its tightest limit: Claude Code and Codex count 5-hour and weekly windows, Copilot premium requests per month. Read from each account with the agent’s own sign-in, even when none is running.'
                     : 'Not available yet: this version of Kumo can’t read the agents’ usage. The setting applies once it can.',
                 true,
               ),

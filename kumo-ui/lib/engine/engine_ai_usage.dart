@@ -10,7 +10,8 @@ import 'kumo_engine.dart';
 
 /// Plan usage and session context over `Agents.Usage` / `Agents.Compact`:
 /// read on start, every minute, and when an agent starts, ends or its turn
-/// does.
+/// does. The daemon asks each account on its own schedule, so plans show
+/// with no agent running.
 class EngineAiUsage extends AiUsageSource {
   EngineAiUsage(this._engine, this._agents) {
     _agents.addListener(_agentsChanged);
@@ -97,6 +98,7 @@ class EngineAiUsage extends AiUsageSource {
             ),
         ],
         problem: p.problem.isEmpty ? null : p.problem,
+        fix: p.problem.isNotEmpty && p.needsSignIn ? 'Sign in again in Settings › AI agents' : null,
       );
 
   static AgentSessionUsage _session(pb.SessionUsage s) => AgentSessionUsage(

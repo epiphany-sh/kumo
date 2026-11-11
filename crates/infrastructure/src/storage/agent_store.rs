@@ -108,6 +108,7 @@ impl PlanUsageStore for SqliteAgentStore {
                 plan,
                 windows: windows_from_json(&windows),
                 problem: String::new(),
+                needs_sign_in: false,
                 read_at: Timestamp::from_unix_nanos(u64::try_from(read_at).unwrap_or(0)),
             })
             .collect())
@@ -244,6 +245,7 @@ mod tests {
                 Some(Timestamp::from_unix_nanos(1_738_425_600_000_000_000)),
             )],
             problem: String::new(),
+            needs_sign_in: false,
             read_at: Timestamp::from_unix_nanos(at),
         };
         {

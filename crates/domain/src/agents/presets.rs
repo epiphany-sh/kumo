@@ -15,8 +15,9 @@ pub struct AgentPreset {
     pub install_hint: &'static str,
     /// The CLI's own command to compact its context, typed in.
     pub compact_command: Option<&'static str>,
-    /// Kumo can read its plan limits and context window (a
-    /// [`UsageSource`](super::UsageSource) reads it).
+    /// Kumo can read its plan limits or context window (a
+    /// [`UsageSource`](super::UsageSource) or an
+    /// [`AccountUsage`](super::AccountUsage) reads it).
     pub reads_usage: bool,
     /// Arguments that make the CLI say when it's asking something (see
     /// [`ActivityTracker`](super::ActivityTracker)): none print a sign on
@@ -87,7 +88,7 @@ pub const PRESETS: &[AgentPreset] = &[
         login: None,
         install_hint: "npm install -g @github/copilot",
         compact_command: None,
-        reads_usage: false,
+        reads_usage: true,
         ask_notice: &[],
         tells_state: true,
     },
