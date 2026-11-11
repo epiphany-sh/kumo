@@ -113,12 +113,44 @@ const agentToolGroups = <(String, AgentRisk, List<(String, String)>, String)>[
   ('Web', AgentRisk.web, [('WebFetch', 'Read a page'), ('WebSearch', 'Search the web')], 'What it searches for leaves your computer.'),
   ('Change files', AgentRisk.edits, [('Edit', 'Change a file'), ('Write', 'Create or replace a file')], 'Changes files where it runs.'),
   ('Run commands', AgentRisk.commands, [('Bash', 'Any shell command')], 'Anything you can run: tests and git, but also rm.'),
+  ('Claude Code', AgentRisk.web, [('Artifact', 'Publish a page on claude.ai'), ('Skill', 'Load a skill when it needs one'), ('ToolSearch', 'Load tools as it needs them'), ('AskUserQuestion', 'Ask you, with options')], 'They change nothing on your computer. A page it publishes stays private until you share it.'),
 ];
 
 const readOnlyTools = ['Read', 'Grep', 'Glob'];
 
+/// Claude Code's own tools that change nothing on your computer. Not
+/// inherited: an agent with a tools line has only what it names, so without
+/// these it can't publish an artifact or load a tool it was told about.
+/// ToolSearch loads the ones Claude Code holds back until asked for (an
+/// artifact's comments and data).
+const claudeCodeTools = ['Artifact', 'Skill', 'ToolSearch', 'AskUserQuestion'];
+
+/// What Kumo gives an agent when it picks for you: read, and Claude Code's
+/// own tools.
+const defaultAgentTools = [...readOnlyTools, ...claudeCodeTools];
+
 /// What a file with no tools line has, as far as Kumo shows it: everything.
-const everyAgentTool = ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'Bash', 'WebFetch', 'WebSearch'];
+const everyAgentTool = ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'Bash', 'WebFetch', 'WebSearch', ...claudeCodeTools];
+
+/// The tools Kumo offers, by name.
+final _offered = {for (final g in agentToolGroups) for (final (t, _) in g.$3) t};
+
+/// Tools [tools] names that Kumo doesn't offer: kept as the file says, and
+/// added by name in Advanced.
+List<String> agentOtherTools(List<String> tools) => [for (final t in tools) if (!_offered.contains(t)) t];
+
+/// Why [name] can't be added as another tool, or null if it can.
+String? agentOtherToolError(String name, List<String> tools) {
+  final t = name.trim();
+  if (t.isEmpty) return '';
+  if (t.startsWith('mcp__')) return 'Add MCP servers as connectors.';
+  if (!RegExp(r'^[A-Za-z][A-Za-z0-9_]*$').hasMatch(t)) return 'A tool’s name, as Claude Code writes it: Monitor, LSP.';
+  if (tools.contains(t)) return 'It has it already.';
+  return null;
+}
+
+/// Tools that start other agents, each with tools of its own.
+bool _delegates(String t) => t == 'Agent' || t == 'Task';
 
 bool _edits(String t) => t == 'Edit' || t == 'Write' || t == 'MultiEdit' || t == 'NotebookEdit';
 
@@ -129,6 +161,7 @@ bool _edits(String t) => t == 'Edit' || t == 'Write' || t == 'MultiEdit' || t ==
   if (bash) return (AgentRisk.commands, edits ? 'edits + commands' : 'runs commands');
   if (edits) return (AgentRisk.edits, 'edits files');
   if (tools.any((t) => t == 'WebFetch' || t == 'WebSearch')) return (AgentRisk.web, 'read + web');
+  if (tools.contains('Artifact')) return (AgentRisk.web, 'read + artifacts');
   if (tools.isEmpty) return (AgentRisk.none, 'no tools');
   return (AgentRisk.read, 'read-only');
 }
@@ -454,7 +487,7 @@ AgentFileRead readAgentFile(String text, {AgentScope scope = AgentScope.personal
   var tools = [for (final t in allTools) if (!t.startsWith('mcp__')) t];
   if (!fields.containsKey('tools')) {
     checks.add(const AgentCheck(CheckLevel.warn, 'No tools line: in Claude Code that means every tool. It comes in read-only; give it more in Edit.'));
-    tools = asWritten ? everyAgentTool : readOnlyTools;
+    tools = asWritten ? everyAgentTool : defaultAgentTools;
   } else {
     final writes = agentWrites(tools);
     checks.add(AgentCheck(writes ? CheckLevel.warn : CheckLevel.ok, 'Tools: ${allTools.join(', ')}.${writes ? ' It can change things: check its approvals in Edit.' : ''}'));
@@ -615,6 +648,8 @@ List<AgentCheck> agentChecks(AgentDef a, {Set<String> taken = const {}}) {
       const AgentCheck(CheckLevel.warn, 'Its file skips every approval (bypassPermissions): it runs everything without asking.'),
     if (a.everyTool)
       const AgentCheck(CheckLevel.warn, 'Its file has no tools line: it has every tool, MCP ones too. Pick some in Edit to limit it.'),
+    if (!a.everyTool && a.tools.any(_delegates))
+      AgentCheck(CheckLevel.warn, '${a.tools.firstWhere(_delegates)} starts other agents with tools of their own: it can do more than its list says.'),
     if (writes && a.triggers.isNotEmpty && !a.isolation)
       const AgentCheck(CheckLevel.warn, 'A trigger runs it on its own with tools that change things: turn Isolation on.'),
   ];
@@ -779,7 +814,8 @@ List<AgentCheck> _copilotNotes(AgentDef a) {
   final edits = tools.contains('edit');
   final model = a.model.toLowerCase();
   final own = model != 'inherit' && !model.startsWith('claude') && !['haiku', 'sonnet', 'opus'].any(model.contains);
-  final unmatched = [for (final t in a.tools) if (!t.startsWith('mcp__') && !_copilotToolOf.containsKey(t)) t];
+  final claudeOnly = [for (final t in a.tools) if (claudeCodeTools.contains(t)) t];
+  final unmatched = [for (final t in a.tools) if (!t.startsWith('mcp__') && !_copilotToolOf.containsKey(t) && !claudeOnly.contains(t)) t];
   return [
     if (!edits && !tools.contains('execute'))
       AgentCheck(CheckLevel.ok, '${plan ? 'Plan only, so it only reads' : 'It only reads'}: Copilot gets ${tools.isEmpty ? 'no tools' : tools.join(', ')}, as Kumo writes it for each run.')
@@ -795,6 +831,7 @@ List<AgentCheck> _copilotNotes(AgentDef a) {
       CheckLevel.info,
       own ? 'Model: ${a.model}.' : 'Model: your Copilot default. If that’s Auto it can change from run to run, and some models drift from the role: pick one with /model in Copilot.',
     ),
+    if (claudeOnly.isNotEmpty) AgentCheck(CheckLevel.info, '${claudeOnly.join(', ')} ${claudeOnly.length == 1 ? 'is' : 'are'} Claude Code’s own: Copilot runs without ${claudeOnly.length == 1 ? 'it' : 'them'}.'),
     if (unmatched.isNotEmpty) AgentCheck(CheckLevel.warn, '${unmatched.join(', ')} ${unmatched.length == 1 ? 'has' : 'have'} no match in Copilot: it runs without ${unmatched.length == 1 ? 'it' : 'them'}.'),
     if (a.mcpServers.isNotEmpty) AgentCheck(CheckLevel.warn, 'Its connectors don’t carry over yet: it runs without ${a.mcpServers.join(', ')}.'),
     if (a.skills.isNotEmpty) AgentCheck(CheckLevel.warn, 'Its skills don’t carry over: it runs without ${a.skills.join(', ')}.'),
@@ -880,18 +917,22 @@ class AgentTemplate {
 }
 
 const agentTemplates = [
-  AgentTemplate('code-reviewer', 'Code reviewer', 'Reads a diff and reports bugs, risky changes and missing tests. Changes nothing.', readOnlyTools, 'cyan',
+  AgentTemplate('code-reviewer', 'Code reviewer', 'Reads a diff and reports bugs, risky changes and missing tests. Changes nothing.', defaultAgentTools, 'cyan',
       role: 'a code reviewer', step: 'Read the diff, then the code around each change; list bugs, risky changes and missing tests, most serious first.', dont: 'Don’t change any file.'),
-  AgentTemplate('researcher', 'Researcher', 'Reads the code and the web; reports options with sources.', [...readOnlyTools, 'WebFetch', 'WebSearch'], 'purple',
+  AgentTemplate('researcher', 'Researcher', 'Reads the code and the web; reports options with sources.', [...defaultAgentTools, 'WebFetch', 'WebSearch'], 'purple',
       role: 'a researcher', step: 'Look at three to five options: docs, issues, releases, and how the code here would use each.', dont: 'Don’t change any file. Cite every claim.'),
-  AgentTemplate('doc-writer', 'Writer', 'Writes and updates docs, READMEs and runbooks.', [...readOnlyTools, 'Edit', 'Write'], 'blue',
+  AgentTemplate('doc-writer', 'Writer', 'Writes and updates docs, READMEs and runbooks.', [...defaultAgentTools, 'Edit', 'Write'], 'blue',
       role: 'a technical writer', step: 'Write or update the docs it was asked for, in the repo’s style.', dont: 'Only change documentation files. Don’t push.'),
-  AgentTemplate('test-writer', 'Test writer', 'Writes tests for what a branch changed, and runs them.', [...readOnlyTools, 'Edit', 'Write', 'Bash'], 'green',
+  AgentTemplate('test-writer', 'Test writer', 'Writes tests for what a branch changed, and runs them.', [...defaultAgentTools, 'Edit', 'Write', 'Bash'], 'green',
       role: 'a test writer', step: 'Write tests for every function the branch changed, then run them.', dont: 'Don’t change code outside test files. Don’t push.'),
-  AgentTemplate('bug-fixer', 'Bug fixer', 'Reproduces a bug from a ticket, fixes it and proves it with a test.', [...readOnlyTools, 'Edit', 'Bash'], 'red',
+  AgentTemplate('bug-fixer', 'Bug fixer', 'Reproduces a bug from a ticket, fixes it and proves it with a test.', [...defaultAgentTools, 'Edit', 'Bash'], 'red',
       role: 'a bug fixer', step: 'Reproduce the bug with a failing test, fix it, and run the tests around it.', dont: 'Don’t push. Don’t change unrelated code.'),
-  AgentTemplate('blank', 'Blank', 'Only the safe defaults: read-only.', readOnlyTools, 'yellow'),
+  AgentTemplate('blank', 'Blank', 'Only the safe defaults: read-only.', defaultAgentTools, 'yellow'),
 ];
+
+/// [a] with Claude Code's own tools, for an agent Kumo drafted: a file you
+/// wrote or imported keeps its tools as they are.
+AgentDef withClaudeCodeTools(AgentDef a) => a.everyTool ? a : a.copyWith(tools: [...a.tools, for (final t in claudeCodeTools) if (!a.tools.contains(t)) t]);
 
 /// What Kumo asks a CLI to draft an agent from [description] (the engine
 /// runs it headless and hands back the file). The file is Claude Code's

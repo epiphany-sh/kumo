@@ -313,6 +313,7 @@ class MockAgentDefs extends AgentDefsSource {
           ? 'Checks that SQL migrations are reversible and safe on a live table. Use it on any branch that adds a migration.'
           : '${description.trim().replaceAll(RegExp(r'\.$'), '')}. Use it when ',
       instructions: 'You are ${migrations ? 'a reviewer of SQL migrations' : 'an agent that ${description.trim()}'}.\n\nHow to work:\n1. Read what you were given first.\n2. ${migrations ? 'Check every migration has a down step and won’t lock a large table.' : 'Do the job, step by step.'}\n3. Say what you did and what you’re unsure of.\n\nDon’t change any file.',
+      tools: defaultAgentTools,
       color: migrations ? 'orange' : 'cyan',
       scope: scope,
       repo: repo,
