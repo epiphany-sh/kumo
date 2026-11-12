@@ -1087,7 +1087,7 @@ async fn a_cli_typed_in_a_terminal_is_seen() {
         ),
         (terminal.as_str(), "claude", "claude")
     );
-    assert_eq!(std::fs::canonicalize(&seen[0].cwd).unwrap(), repo);
+    assert_eq!(kumo_infrastructure::platform::canonical(&seen[0].cwd), repo);
 
     shell.send(b"go\n").await;
     terminal_agents_where(&mut client, |a| {

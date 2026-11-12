@@ -113,7 +113,7 @@ impl Setup {
 
     fn cwd(&self, what: &str) -> PathBuf {
         let raw = std::fs::read_to_string(self.log.join(format!("{what}.cwd"))).unwrap();
-        std::fs::canonicalize(raw.trim()).unwrap()
+        kumo_infrastructure::platform::canonical(raw.trim())
     }
 }
 
@@ -439,7 +439,7 @@ async fn a_run_starts_claude_with_its_agent_and_its_context() {
             &kumo_domain::agent_defs::role_sentence("rev"),
         ]
     );
-    let scratch = std::fs::canonicalize(s.profile_dir().join("scratch/rev-1")).unwrap();
+    let scratch = kumo_infrastructure::platform::canonical(s.profile_dir().join("scratch/rev-1"));
     assert_eq!(s.cwd("run"), scratch);
 
     // A new worktree on a branch of its own.
@@ -1337,7 +1337,10 @@ async fn an_agent_runs_on_codex_read_only_and_with_nothing_of_the_users() {
             .any(|a| a == "--agent" || a == "--add-dir" || a == "-m")
     );
     assert_eq!(&args[args.len() - 2..], ["--", "-review the branch"]);
-    assert_eq!(s.cwd("codex-run"), std::fs::canonicalize(&s.repo).unwrap());
+    assert_eq!(
+        s.cwd("codex-run"),
+        kumo_infrastructure::platform::canonical(&s.repo)
+    );
     s.client
         .agents
         .stop(pb::StopAgentRequest { id: session.id })
@@ -1487,7 +1490,7 @@ async fn an_agent_runs_on_copilot_as_the_file_kumo_wrote() {
     assert!(file.contains("You review.\n\nYou are running as the agent `rev`."));
     assert_eq!(
         s.cwd("copilot-run"),
-        std::fs::canonicalize(&s.repo).unwrap()
+        kumo_infrastructure::platform::canonical(&s.repo)
     );
     s.client
         .agents

@@ -82,6 +82,14 @@ pub trait FileIdentity {
     fn same_file(source: &Path, target: &Path, existing: &Metadata) -> bool;
 }
 
+/// Paths in the form every program takes.
+pub trait PlainPaths {
+    /// `path` as shells and the UI read it: without the `\\?\` that
+    /// Windows' `canonicalize` puts in front, which `cmd.exe` refuses as a
+    /// working directory.
+    fn plain(path: PathBuf) -> PathBuf;
+}
+
 /// Files only their owner may read.
 pub trait PrivateFiles {
     /// Makes `options` create the file readable by its owner only.
@@ -178,6 +186,18 @@ pub fn file_id(meta: &Metadata) -> Option<u64> {
 /// See [`FileIdentity::same_file`].
 pub fn same_file(source: &Path, target: &Path, existing: &Metadata) -> bool {
     Current::same_file(source, target, existing)
+}
+
+/// See [`PlainPaths::plain`].
+pub fn plain_path(path: PathBuf) -> PathBuf {
+    Current::plain(path)
+}
+
+/// `path` with its links resolved, in its [plain form](PlainPaths::plain);
+/// `path` itself when it can't be resolved.
+pub fn canonical(path: impl AsRef<Path>) -> PathBuf {
+    let path = path.as_ref();
+    std::fs::canonicalize(path).map_or_else(|_| path.to_owned(), Current::plain)
 }
 
 /// See [`PrivateFiles::owner_only`].
