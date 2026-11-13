@@ -18,7 +18,7 @@ enum _Source { ticket, fresh, existing }
 /// its header. Mirrors the canvas:
 /// start from a ticket / new branch / existing branch, optional agent, ⌘↩.
 class NewWorktreePopover extends StatefulWidget {
-  const NewWorktreePopover({super.key, required this.onClose, this.repo = 'price-admin'});
+  const NewWorktreePopover({super.key, required this.onClose, this.repo = 'repo-a'});
 
   final VoidCallback onClose;
 
@@ -35,7 +35,7 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
   String _base = 'main';
   /// Id of the task to start from.
   String? _ticket;
-  String _existing = 'origin/fix/PRC-377-export-rounding';
+  String _existing = 'origin/fix/TSK-377-export-rounding';
   String _agent = 'claude';
   bool _agentOn = true;
   bool _created = false;
@@ -73,7 +73,7 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
   /// then remote ones.
   List<String> get _existingOptions {
     final b = _branches;
-    if (b == null) return const ['origin/fix/PRC-377-export-rounding', 'origin/chore/pgx-v5.7', 'origin/spike/price-cache'];
+    if (b == null) return const ['origin/fix/TSK-377-export-rounding', 'origin/chore/pgx-v5.7', 'origin/spike/cache'];
     final checkedOut = {for (final w in _repoEntry?.worktrees ?? const <Worktree>[]) w.branch};
     return [for (final l in b.local) if (!checkedOut.contains(l)) l, ...b.remote];
   }

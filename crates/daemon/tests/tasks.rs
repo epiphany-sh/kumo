@@ -352,7 +352,7 @@ async fn api_sources_keep_their_token_and_report_failures() {
     let detail = client
         .tasks
         .get_task(pb::GetTaskRequest {
-            id: format!("{}/PRC-1", source.id),
+            id: format!("{}/TSK-1", source.id),
             refresh: false,
         })
         .await

@@ -266,8 +266,8 @@ mod tests {
                 api: api.into(),
                 web: "https://gitlab.example.com".into(),
             },
-            repo: "pricing/price-admin".into(),
-            branch: "feat/PRC-412-bulk-discounts".into(),
+            repo: "platform/repo-a".into(),
+            branch: "feat/TSK-412-bulk-discounts".into(),
         }
     }
 
@@ -276,18 +276,18 @@ mod tests {
         let server = TestServer::start(|r| match (r.method.as_str(), r.path.as_str()) {
             (
                 "GET",
-                "/projects/pricing%2Fprice-admin/pipelines?ref=feat%2FPRC-412-bulk-discounts&per_page=1",
+                "/projects/platform%2Frepo-a/pipelines?ref=feat%2FTSK-412-bulk-discounts&per_page=1",
             ) => (
                 200,
                 include_str!("fixtures/gitlab_pipelines.json").to_owned(),
             ),
-            ("GET", "/projects/pricing%2Fprice-admin/pipelines/991204417/jobs?per_page=100") => {
+            ("GET", "/projects/platform%2Frepo-a/pipelines/991204417/jobs?per_page=100") => {
                 (200, include_str!("fixtures/gitlab_jobs.json").to_owned())
             }
-            ("GET", "/projects/pricing%2Fprice-admin/jobs/7710021/trace") => {
+            ("GET", "/projects/platform%2Frepo-a/jobs/7710021/trace") => {
                 (200, include_str!("fixtures/gitlab_trace.txt").to_owned())
             }
-            ("POST", "/projects/pricing%2Fprice-admin/pipelines/991204417/retry") => {
+            ("POST", "/projects/platform%2Frepo-a/pipelines/991204417/retry") => {
                 (201, r#"{"id":991204417,"status":"pending"}"#.to_owned())
             }
             _ => (404, r#"{"message":"404 Not Found"}"#.to_owned()),

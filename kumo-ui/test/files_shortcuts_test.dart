@@ -263,7 +263,7 @@ void main() {
       expect(find.byType(MarkdownPreview), findsOneWidget);
       expect(find.byType(CodeEditor), findsNothing);
       expect(find.text('Run locally'), findsOneWidget, reason: 'a heading, rendered');
-      expect(find.textContaining('# price-admin'), findsNothing, reason: 'no Markdown syntax showing');
+      expect(find.textContaining('# repo-a'), findsNothing, reason: 'no Markdown syntax showing');
 
       await _cmd(tester, LogicalKeyboardKey.keyV, shift: true);
       expect(find.byType(CodeEditor), findsOneWidget);

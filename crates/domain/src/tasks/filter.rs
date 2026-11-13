@@ -67,9 +67,9 @@ mod tests {
 
     fn task(id: &str, title: &str, status: TaskStatus, labels: &[&str]) -> Task {
         Task {
-            key: "PRC-1".into(),
+            key: "TSK-1".into(),
             status,
-            context: "pricing".into(),
+            context: "platform".into(),
             labels: labels.iter().map(|l| (*l).to_owned()).collect(),
             ..Task::new(TaskId::parse(id).unwrap(), title)
         }
@@ -93,7 +93,7 @@ mod tests {
                 .collect::<Vec<_>>()
         };
         assert_eq!(ids(&TaskFilter::new("discounts BACKEND")), ["a/1"]);
-        assert_eq!(ids(&TaskFilter::new("pricing")).len(), 3);
+        assert_eq!(ids(&TaskFilter::new("platform")).len(), 3);
         assert_eq!(ids(&TaskFilter::new("atención")), ["b/3"]);
         assert_eq!(
             ids(&TaskFilter::new("").with_status([TaskStatus::Done])),

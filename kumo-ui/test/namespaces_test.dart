@@ -3,9 +3,9 @@ import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/data/mock_data.dart';
 
 void main() {
-  test('starts with pricing and identity', () {
+  test('starts with platform and identity', () {
     final s = AppState();
-    expect(s.namespaces.map((n) => n.name), ['pricing', 'identity']);
+    expect(s.namespaces.map((n) => n.name), ['platform', 'identity']);
     s.dispose();
   });
 
@@ -27,22 +27,22 @@ void main() {
 
   test('delete namespace is undoable and keeps its position', () {
     final s = AppState();
-    s.deleteNamespace('pricing');
+    s.deleteNamespace('platform');
     expect(s.namespaces.map((n) => n.id), ['identity']);
     expect(s.undo, isNotNull);
     s.undoLast();
-    expect(s.namespaces.map((n) => n.id), ['pricing', 'identity']);
+    expect(s.namespaces.map((n) => n.id), ['platform', 'identity']);
     expect(s.undo, isNull);
     s.dispose();
   });
 
   test('delete worktree hides it, main is protected, undo restores', () {
     final s = AppState();
-    final repo = Mock.repoNamed('price-admin')!;
-    s.deleteWorktree('price-admin', 'main');
+    final repo = Mock.repoNamed('repo-a')!;
+    s.deleteWorktree('repo-a', 'main');
     expect(s.worktreesOf(repo).length, 3);
-    s.deleteWorktree('price-admin', 'feat/PRC-412-bulk-discounts');
-    expect(s.worktreesOf(repo).map((w) => w.branch), ['main', 'fix/PRC-398-rounding']);
+    s.deleteWorktree('repo-a', 'feat/TSK-412-bulk-discounts');
+    expect(s.worktreesOf(repo).map((w) => w.branch), ['main', 'fix/TSK-398-rounding']);
     expect(s.activeWorktree, 'main', reason: 'active worktree falls back to the principal checkout');
     s.undoLast();
     expect(s.worktreesOf(repo).length, 3);

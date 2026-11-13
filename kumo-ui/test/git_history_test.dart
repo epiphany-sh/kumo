@@ -107,16 +107,16 @@ void main() {
   group('prompts', () {
     test('release notes: since the previous release, into the draft file', () {
       final p = releaseNotesPrompt(
-        const ReleaseTarget(repoName: 'price-admin', host: 'GH', tag: 'v1.8.0', since: 'v1.7.2', skipped: ['v1.7.3']),
+        const ReleaseTarget(repoName: 'repo-a', host: 'GH', tag: 'v1.8.0', since: 'v1.7.2', skipped: ['v1.7.3']),
         draftPath: '/tmp/n.md',
         namePath: '/tmp/n.name.txt',
-        prs: const [('#521', 'feat: bulk discounts by category', 'Mauri', 'PRC-412')],
+        prs: const [('#521', 'feat: bulk discounts by category', 'Mauri', 'TSK-412')],
         styleOf: 'v1.7.2',
         style: ReleaseNotesStyle.highlights,
       );
       expect(p, contains('git log --format=\'%h %s%n%b\' v1.7.2..v1.8.0'));
       expect(p, contains('That includes v1.7.3, which has no notes of its own.'));
-      expect(p, contains('- #521 feat: bulk discounts by category (Mauri, PRC-412)'));
+      expect(p, contains('- #521 feat: bulk discounts by category (Mauri, TSK-412)'));
       expect(p, contains('gh release view v1.7.2'));
       expect(p, contains(ReleaseNotesStyle.highlights.hint));
       expect(p, contains('`/tmp/n.name.txt`'));
@@ -125,23 +125,23 @@ void main() {
     });
 
     test('the first release is written from the project', () {
-      final p = releaseNotesPrompt(const ReleaseTarget(repoName: 'price-reader-v2', host: 'GL', tag: 'v0.1.0', first: true), draftPath: '/tmp/n.md');
-      expect(p, contains('the first release of price-reader-v2'));
+      final p = releaseNotesPrompt(const ReleaseTarget(repoName: 'repo-b', host: 'GL', tag: 'v0.1.0', first: true), draftPath: '/tmp/n.md');
+      expect(p, contains('the first release of repo-b'));
       expect(p, contains('nothing before v0.1.0 to compare with'));
       expect(p, contains('README'));
       expect(p, isNot(contains('..v0.1.0')));
     });
 
     test('an oldest listed release that isn’t the first: git finds the tag before it', () {
-      final p = releaseNotesPrompt(const ReleaseTarget(repoName: 'price-admin', host: 'GH', tag: 'v1.6.4'), draftPath: '/tmp/n.md');
+      final p = releaseNotesPrompt(const ReleaseTarget(repoName: 'repo-a', host: 'GH', tag: 'v1.6.4'), draftPath: '/tmp/n.md');
       expect(p, isNot(contains('first release')));
       expect(p, contains(r'$(git describe --tags --abbrev=0 v1.6.4^)..v1.6.4'));
     });
 
     test('resolve comments lists the threads and asks for the answers file', () {
       const t = PrAgentTarget(
-        pr: RepoPullRequest(number: '#521', title: 'feat: bulk discounts', author: 'Mauri', branch: 'feat/PRC-412', state: RepoPrState.draft, mine: true),
-        repoName: 'price-admin',
+        pr: RepoPullRequest(number: '#521', title: 'feat: bulk discounts', author: 'Mauri', branch: 'feat/TSK-412', state: RepoPrState.draft, mine: true),
+        repoName: 'repo-a',
         host: 'GH',
         base: 'main',
         inWorktree: true,
@@ -156,14 +156,14 @@ void main() {
     });
 
     test('a commit is explained, not changed', () {
-      final p = commitExplainPrompt(repoName: 'price-admin', sha: '7be2f41', subject: 'feat: batch upsert');
+      final p = commitExplainPrompt(repoName: 'repo-a', sha: '7be2f41', subject: 'feat: batch upsert');
       expect(p, contains('git show 7be2f41'));
       expect(p, contains('Don’t change any file.'));
     });
   });
 
   test('the mock: ranges add up, releases and threads change', () async {
-    final repo = Mock.repoNamed('price-admin')!;
+    final repo = Mock.repoNamed('repo-a')!;
     final a = MockRepoActivity(repo, repo.worktrees);
     final all = a.releases;
     expect(all.first.tag, 'v1.9.0-rc.1');
@@ -171,7 +171,7 @@ void main() {
     final range = await a.releaseRange(v180, since: all.firstWhere((r) => r.tag == 'v1.7.2'));
     expect(range.commits, 19, reason: 'v1.8.0 and the bare v1.7.3');
     expect(range.prs.length, 6);
-    expect(range.tickets, ['PRC-412', 'PRC-409', 'PRC-411']);
+    expect(range.tickets, ['TSK-412', 'TSK-409', 'TSK-411']);
     await a.editRelease(all.first, publish: true, notes: '## Hi');
     expect(a.releases.first.kind, ReleaseKind.release);
     expect(a.releases.first.notes, '## Hi');
@@ -188,7 +188,7 @@ void main() {
     await _pumpGit(tester);
     await tester.tap(find.byTooltip('Which branch’s commits'));
     await tester.pump();
-    await tester.tap(_inMenu('feat/PRC-412-bulk-discounts'));
+    await tester.tap(_inMenu('feat/TSK-412-bulk-discounts'));
     await tester.pump();
     // (Its subject is also a pipeline run's title: the row is found by its tooltip.)
     expect(find.byTooltip('Show what 7be2f41 changed'), findsOneWidget);
@@ -226,7 +226,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final state = AppState(demoWallpaper: true);
-    final repo = Mock.repoNamed('price-admin')!;
+    final repo = Mock.repoNamed('repo-a')!;
     final source = _LargeCommit(repo, repo.worktrees);
     addTearDown(source.dispose);
     await tester.pumpWidget(AppScope(
@@ -337,7 +337,7 @@ void main() {
   });
 
   test('trying again after a failure doesn’t post a reply twice', () async {
-    final repo = Mock.repoNamed('price-admin')!;
+    final repo = Mock.repoNamed('repo-a')!;
     final source = _FailsOnce(repo, repo.worktrees, failOn: 't2');
     final threads = [for (final id in ['t1', 't2', 't3']) ReviewThread(id: id, path: 'a.go', line: 1, author: 'x', body: 'b', time: DateTime(2026), resolved: false)];
     final pr = source.pullRequests.first;

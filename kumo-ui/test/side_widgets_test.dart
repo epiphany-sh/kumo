@@ -72,7 +72,7 @@ AgentRun _run(String path, {AgentStatus status = AgentStatus.running, List<Agent
       short: 'CC',
       worktreePath: path,
       terminalId: 't1',
-      title: 'PRC-412 · Bulk discounts by category',
+      title: 'TSK-412 · Bulk discounts by category',
       status: status,
       startedAt: _t0,
       lastLine: 'Editing internal/kafka/bulk_consumer.go',
@@ -80,7 +80,7 @@ AgentRun _run(String path, {AgentStatus status = AgentStatus.running, List<Agent
       steps: steps,
     );
 
-const _ticket = AgentContextItem(kind: AgentContextKind.task, title: 'PRC-412 · Bulk discounts by category', detail: 'Jira · Story', url: 'https://acme.atlassian.net/browse/PRC-412');
+const _ticket = AgentContextItem(kind: AgentContextKind.task, title: 'TSK-412 · Bulk discounts by category', detail: 'Jira · Story', url: 'https://acme.atlassian.net/browse/TSK-412');
 
 Future<(AppState, String)> _pump(WidgetTester tester, {required _Agents agents, _Tests? tests, List<InspectorWidget> show = const []}) async {
   tester.view.physicalSize = const Size(420, 2400);
@@ -128,7 +128,7 @@ void main() {
     await tester.pump();
     expect(find.text('Claude Code'), findsOneWidget);
     expect(find.text('Working · started 13:54'), findsOneWidget);
-    expect(find.text('PRC-412 · Bulk discounts by category'), findsWidgets);
+    expect(find.text('TSK-412 · Bulk discounts by category'), findsWidgets);
     expect(find.text('Jira · Story'), findsWidgets);
     expect(find.text('Editing internal/kafka/bulk_consumer.go'), findsOneWidget);
     expect(find.text('2 files edited · 1 command'), findsOneWidget);
@@ -156,11 +156,11 @@ void main() {
     expect(find.text('${task.key} · ${task.title}'), findsOneWidget);
     expect(find.text('Linked · not sent to the agent'), findsWidgets);
 
-    const page = AgentContextItem(kind: AgentContextKind.doc, title: 'Discount rules v3', detail: 'Confluence · Pricing');
+    const page = AgentContextItem(kind: AgentContextKind.doc, title: 'Discount rules v3', detail: 'Confluence · Platform');
     agents.set([_run(path, context: const [page])]);
     await tester.pump();
     expect(find.text('Discount rules v3'), findsOneWidget);
-    expect(find.text('Confluence · Pricing'), findsOneWidget);
+    expect(find.text('Confluence · Platform'), findsOneWidget);
     expect(find.text('CF'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Send context to the agent'));

@@ -13,7 +13,7 @@ async fn says_what_is_missing_before_asking_the_host() {
     let mut client = daemon.client().await;
     let repo = git_repo(
         &daemon.home().join("dev/app"),
-        Some("git@github.com:pricing/app.git"),
+        Some("git@github.com:platform/app.git"),
     );
     save_namespace(&mut client, "app", &[&repo]).await;
     let path = repo.display().to_string();

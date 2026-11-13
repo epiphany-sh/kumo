@@ -558,7 +558,7 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
           maxLines: 4,
           style: sans(12.5, color: c.text, height: 1.4),
           cursorColor: c.acc,
-          decoration: const InputDecoration.collapsed(hintText: 'e.g. say the flag stays off in production until the pricing team signs off'),
+          decoration: const InputDecoration.collapsed(hintText: 'e.g. say the flag stays off in production until the platform team signs off'),
         ),
       ),
       _errorLine(context),

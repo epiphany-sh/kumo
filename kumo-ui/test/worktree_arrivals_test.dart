@@ -65,12 +65,12 @@ void main() {
     final s = AppState(workspace: source);
     expect(s.arrivedWorktree, isNull);
 
-    source.arrive('~/wt/price-admin/PRC-398');
+    source.arrive('~/wt/repo-a/TSK-398');
     final (r, w) = s.arrivedWorktree!;
-    expect((r.name, w.branch), ('price-admin', 'fix/PRC-398-rounding'));
+    expect((r.name, w.branch), ('repo-a', 'fix/TSK-398-rounding'));
 
     s.openArrivedWorktree();
-    expect(s.activeWorktreeEntry?.path, '~/wt/price-admin/PRC-398');
+    expect(s.activeWorktreeEntry?.path, '~/wt/repo-a/TSK-398');
     expect(source.arrived, isEmpty);
     expect(s.arrivedWorktree, isNull);
   });
@@ -78,17 +78,17 @@ void main() {
   test('a dismissed arrival keeps its badge but leaves the toast', () {
     final source = _ArrivingSource();
     final s = AppState(workspace: source);
-    source.arrive('~/wt/price-admin/PRC-398');
+    source.arrive('~/wt/repo-a/TSK-398');
     s.dismissArrivedWorktree();
     expect(s.arrivedWorktree, isNull);
-    expect(source.arrived, {'~/wt/price-admin/PRC-398'});
+    expect(source.arrived, {'~/wt/repo-a/TSK-398'});
   });
 
   test('Changes lists the other worktrees with uncommitted files', () {
     final s = AppState();
-    s.selectWorktree('feat/PRC-412-bulk-discounts', path: '~/wt/price-admin/PRC-412');
+    s.selectWorktree('feat/TSK-412-bulk-discounts', path: '~/wt/repo-a/TSK-412');
     final others = [for (final (r, w) in s.otherChangedWorktrees) '${r.name} ${w.branch} ${w.changed}'];
-    expect(others, ['price-admin fix/PRC-398-rounding 2'], reason: 'not the selected one, not clean ones');
+    expect(others, ['repo-a fix/TSK-398-rounding 2'], reason: 'not the selected one, not clean ones');
   });
 
   testWidgets('the sidebar announces the arrival and Changes points at it', (tester) async {
@@ -99,19 +99,19 @@ void main() {
     final s = AppState(demoWallpaper: true, workspace: source);
     await tester.pumpWidget(KumoApp(state: s));
     await tester.pump();
-    s.selectWorktree('feat/PRC-412-bulk-discounts', path: '~/wt/price-admin/PRC-412');
+    s.selectWorktree('feat/TSK-412-bulk-discounts', path: '~/wt/repo-a/TSK-412');
 
-    source.arrive('~/wt/price-admin/PRC-398');
+    source.arrive('~/wt/repo-a/TSK-398');
     await tester.pump();
-    expect(find.text('New worktree in price-admin'), findsOneWidget);
+    expect(find.text('New worktree in repo-a'), findsOneWidget);
     expect(find.text('new'), findsOneWidget, reason: 'badge on the sidebar row');
     expect(find.text('In other worktrees'), findsOneWidget);
-    expect(find.text('price-admin · 2 changed'), findsOneWidget);
+    expect(find.text('repo-a · 2 changed'), findsOneWidget);
 
     await tester.tap(find.text('Open'));
     await tester.pump();
-    expect(s.activeWorktreeEntry?.branch, 'fix/PRC-398-rounding');
-    expect(find.text('New worktree in price-admin'), findsNothing);
+    expect(s.activeWorktreeEntry?.branch, 'fix/TSK-398-rounding');
+    expect(find.text('New worktree in repo-a'), findsNothing);
     expect(find.text('new'), findsNothing);
     expect(tester.takeException(), isNull);
   });

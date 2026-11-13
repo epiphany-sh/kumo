@@ -47,13 +47,13 @@ async fn namespace_registers_repositories_and_streams_them() {
     let daemon = TestDaemon::start().await;
     let mut client = daemon.client().await;
     let root = git_repo(
-        &daemon.home().join("dev/price-admin"),
-        Some("git@github.com:pricing/price-admin.git"),
+        &daemon.home().join("dev/repo-a"),
+        Some("git@github.com:platform/repo-a.git"),
     );
     std::fs::create_dir_all(root.join("src")).unwrap();
 
     // Any folder inside the repository identifies it.
-    let id = save_namespace(&mut client, " pricing ", &[&root.join("src")]).await;
+    let id = save_namespace(&mut client, " platform ", &[&root.join("src")]).await;
 
     let snapshot = snapshot_where(&mut client, |s| {
         s.repositories.iter().any(|r| !r.worktrees.is_empty())
@@ -65,7 +65,7 @@ async fn namespace_registers_repositories_and_streams_them() {
             snapshot.namespaces[0].id.as_str(),
             snapshot.namespaces[0].name.as_str()
         ),
-        (id.as_str(), "pricing")
+        (id.as_str(), "platform")
     );
     assert_eq!(
         snapshot.namespaces[0].repo_paths,
@@ -74,9 +74,9 @@ async fn namespace_registers_repositories_and_streams_them() {
     let repo = repo(&snapshot, &root);
     assert_eq!(
         (repo.name.as_str(), repo.host()),
-        ("price-admin", pb::GitHost::Github)
+        ("repo-a", pb::GitHost::Github)
     );
-    assert_eq!(repo.full_name, "pricing/price-admin");
+    assert_eq!(repo.full_name, "platform/repo-a");
     assert_eq!(repo.worktrees.len(), 1);
     assert!(repo.worktrees[0].is_main);
     assert_eq!(repo.worktrees[0].branch, "main");
@@ -93,7 +93,7 @@ async fn worktrees_are_created_tracked_and_removed() {
         .workspace
         .create_worktree(pb::CreateWorktreeRequest {
             repo_path: root.display().to_string(),
-            branch: "feat/PRC-1".into(),
+            branch: "feat/TSK-1".into(),
             create_branch: true,
             ..Default::default()
         })
@@ -103,13 +103,13 @@ async fn worktrees_are_created_tracked_and_removed() {
         .worktree
         .unwrap();
     let expected =
-        kumo_infrastructure::platform::canonical(daemon.home().join("wt/kumo/feat-PRC-1"));
+        kumo_infrastructure::platform::canonical(daemon.home().join("wt/kumo/feat-TSK-1"));
     assert_eq!(
         created.path,
         expected.display().to_string(),
         "default location is ~/wt/<repo>/<branch>"
     );
-    assert_eq!(created.branch, "feat/PRC-1");
+    assert_eq!(created.branch, "feat/TSK-1");
     assert_eq!(
         created.status.as_ref().unwrap().upstream,
         "",
@@ -152,7 +152,7 @@ async fn worktrees_are_created_tracked_and_removed() {
         "git refuses to drop changes"
     );
     assert!(expected.exists(), "left as it was");
-    assert!(git(&root, &["branch", "--list", "feat/PRC-1"]).contains("feat/PRC-1"));
+    assert!(git(&root, &["branch", "--list", "feat/TSK-1"]).contains("feat/TSK-1"));
 
     // Forced, with its branch (merged: nothing was committed on it).
     let removed = client
@@ -166,7 +166,7 @@ async fn worktrees_are_created_tracked_and_removed() {
         "{removed:?}"
     );
     assert!(!expected.exists());
-    assert_eq!(git(&root, &["branch", "--list", "feat/PRC-1"]), "");
+    assert_eq!(git(&root, &["branch", "--list", "feat/TSK-1"]), "");
 
     let main = client
         .workspace
@@ -277,8 +277,8 @@ async fn existing_branch_and_explicit_path() {
 async fn a_taken_path_is_refused_before_git_runs() {
     let daemon = TestDaemon::start().await;
     let mut client = daemon.client().await;
-    let root = git_repo(&daemon.home().join("dev/price-admin"), None);
-    save_namespace(&mut client, "pricing", &[&root]).await;
+    let root = git_repo(&daemon.home().join("dev/repo-a"), None);
+    save_namespace(&mut client, "platform", &[&root]).await;
     let create = |branch: &str, path: &str| pb::CreateWorktreeRequest {
         repo_path: root.display().to_string(),
         branch: branch.into(),
@@ -296,7 +296,7 @@ async fn a_taken_path_is_refused_before_git_runs() {
     // sent when the path didn't follow the branch.
     let error = client
         .workspace
-        .create_worktree(create("feat/test", "~/wt/price-admin/"))
+        .create_worktree(create("feat/test", "~/wt/repo-a/"))
         .await
         .unwrap_err();
     assert_eq!(error.code(), tonic::Code::AlreadyExists);
@@ -319,10 +319,10 @@ async fn a_taken_path_is_refused_before_git_runs() {
     );
 
     // An empty folder is still fine, as it is for git.
-    std::fs::create_dir_all(daemon.home().join("wt/price-admin/empty")).unwrap();
+    std::fs::create_dir_all(daemon.home().join("wt/repo-a/empty")).unwrap();
     client
         .workspace
-        .create_worktree(create("feat/test", "~/wt/price-admin/empty"))
+        .create_worktree(create("feat/test", "~/wt/repo-a/empty"))
         .await
         .unwrap();
 }

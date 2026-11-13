@@ -2434,7 +2434,7 @@ class _PullRequestCardState extends State<PullRequestCard> {
     if (mounted) setState(() => _busy = false);
   }
 
-  /// `feat/PRC-412-bulk-discounts` → `feat: PRC-412 bulk discounts`.
+  /// `feat/TSK-412-bulk-discounts` → `feat: TSK-412 bulk discounts`.
   static String _titleFor(String branch) {
     final slash = branch.indexOf('/');
     final rest = (slash < 0 ? branch : branch.substring(slash + 1)).replaceAll('-', ' ').replaceAll('_', ' ');

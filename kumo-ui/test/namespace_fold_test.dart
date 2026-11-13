@@ -15,20 +15,20 @@ void main() {
     await tester.pumpWidget(KumoApp(state: state));
     await tester.pump();
 
-    final ns = state.namespaces.firstWhere((n) => n.repos.contains('price-admin'));
+    final ns = state.namespaces.firstWhere((n) => n.repos.contains('repo-a'));
     expect(ns.collapsed, isFalse);
-    expect(_repoRow('price-admin'), findsOneWidget);
+    expect(_repoRow('repo-a'), findsOneWidget);
 
     final fold = find.byWidgetPredicate((w) => w is KPressable && w.semanticLabel == 'Collapse ${ns.name}');
     await tester.tap(fold);
     await tester.pump();
     expect(state.namespaceById(ns.id)!.collapsed, isTrue);
-    expect(_repoRow('price-admin'), findsNothing);
+    expect(_repoRow('repo-a'), findsNothing);
 
     await tester.tap(find.byWidgetPredicate((w) => w is KPressable && w.semanticLabel == 'Expand ${ns.name}'));
     await tester.pump();
     expect(state.namespaceById(ns.id)!.collapsed, isFalse);
-    expect(_repoRow('price-admin'), findsOneWidget);
+    expect(_repoRow('repo-a'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -39,10 +39,10 @@ void main() {
     final state = AppState(demoWallpaper: true)..view = KumoView.docs;
     await tester.pumpWidget(KumoApp(state: state));
     await tester.pump();
-    await tester.tap(find.text('fix/PRC-398-rounding').first);
+    await tester.tap(find.text('fix/TSK-398-rounding').first);
     await tester.pump();
     expect(state.view, KumoView.terminal);
-    expect(state.activeWorktree, 'fix/PRC-398-rounding');
+    expect(state.activeWorktree, 'fix/TSK-398-rounding');
     expect(state.activeContext, isNull, reason: 'its terminals, not a Files or Git tab');
     expect(tester.takeException(), isNull);
   });

@@ -244,7 +244,7 @@ class _RunTabState extends State<_RunTab> {
                     onChanged: (v) => setState(() => f.newIn = v),
                   ),
             AgentWhereKind.link => _Line(controller: f.link, monospace: true, label: 'Link', hint: 'https://github.com/owner/repo/pull/123', onChanged: (_) => setState(() {})),
-            AgentWhereKind.folder => _Line(controller: f.folder, monospace: true, label: 'Folder', hint: '~/notes/pricing', onChanged: (_) => setState(() {})),
+            AgentWhereKind.folder => _Line(controller: f.folder, monospace: true, label: 'Folder', hint: '~/notes/platform', onChanged: (_) => setState(() {})),
             AgentWhereKind.scratch => Text('~/.kumo/scratch/${a.name}-${widget.runs.length + 1}', style: mono(12, color: c.text2)),
           },
           const SizedBox(height: 6),
@@ -297,7 +297,7 @@ class _RunTabState extends State<_RunTab> {
                   controller: _addText,
                   label: 'What to add',
                   hint: switch (_addKind) {
-                    AgentContextKind.task => 'PRC-415',
+                    AgentContextKind.task => 'TSK-415',
                     AgentContextKind.pullRequest => '#519, or its link',
                     AgentContextKind.link => 'https://…',
                     _ => 'internal/discount/',

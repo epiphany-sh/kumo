@@ -23,14 +23,14 @@ Finder get _repoButton => find.byTooltip('Switch repository');
 
 void main() {
   test('the mock has the design’s activity per repository', () {
-    final repo = Mock.repoNamed('price-admin')!;
+    final repo = Mock.repoNamed('repo-a')!;
     final a = MockRepoActivity(repo, repo.worktrees);
     expect(a.commits().every((k) => k.branch == null), isTrue, reason: 'main only');
     expect(a.commits(allBranches: true).length, greaterThan(a.commits().length));
     expect(a.pullRequests.where((p) => p.mine).map((p) => p.number), ['#521']);
     expect(a.runs.first.label, 'run #8816', reason: 'newest first');
     expect(a.branches.first.isMain, isTrue);
-    expect(a.branches.where((b) => b.worktree == null).map((b) => b.name), contains('feat/PRC-415-csv-validation'));
+    expect(a.branches.where((b) => b.worktree == null).map((b) => b.name), contains('feat/TSK-415-csv-validation'));
     a.dispose();
 
     final users = Mock.repoNamed('users-permissions')!;
@@ -43,7 +43,7 @@ void main() {
   testWidgets('the breadcrumb shows the repo of the current worktree', (tester) async {
     await _pumpGit(tester);
     expect(_repoButton, findsOneWidget);
-    expect(find.descendant(of: _repoButton, matching: find.text('price-admin')), findsOneWidget);
+    expect(find.descendant(of: _repoButton, matching: find.text('repo-a')), findsOneWidget);
     expect(find.text('repo of the current worktree'), findsOneWidget);
     expect(find.text('chore: bump pgx to v5.7'), findsOneWidget, reason: 'main’s history');
     expect(find.text('Fetched all remotes 2 min ago'), findsOneWidget);
@@ -55,10 +55,10 @@ void main() {
     await tester.tap(_repoButton);
     await tester.pump();
     expect(find.byType(KMenuPanel), findsOneWidget);
-    await tester.tap(find.descendant(of: find.byType(KMenuPanel), matching: find.text('price-reader-v2')));
+    await tester.tap(find.descendant(of: find.byType(KMenuPanel), matching: find.text('repo-b')));
     await tester.pump();
     expect(find.byType(KMenuPanel), findsNothing);
-    expect(find.descendant(of: _repoButton, matching: find.text('price-reader-v2')), findsOneWidget);
+    expect(find.descendant(of: _repoButton, matching: find.text('repo-b')), findsOneWidget);
     expect(find.text('repo of the current worktree'), findsNothing);
     expect(find.text('perf: batch Mongo lookups for price lists'), findsOneWidget);
     expect(find.text('chore: bump pgx to v5.7'), findsNothing);
@@ -127,10 +127,10 @@ void main() {
 
   testWidgets('a worktree row opens its terminal', (tester) async {
     final state = await _pumpGit(tester);
-    await tester.tap(find.byTooltip('Open terminal in fix/PRC-398-rounding'));
+    await tester.tap(find.byTooltip('Open terminal in fix/TSK-398-rounding'));
     await tester.pump();
     expect(state.view, KumoView.terminal);
-    expect(state.activeWorktree, 'fix/PRC-398-rounding');
+    expect(state.activeWorktree, 'fix/TSK-398-rounding');
     expect(tester.takeException(), isNull);
   });
 }

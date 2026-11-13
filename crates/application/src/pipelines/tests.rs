@@ -256,7 +256,7 @@ async fn next(rx: &mut watch::Receiver<Option<Arc<PipelinesSnapshot>>>) -> Arc<P
 
 #[tokio::test(flavor = "multi_thread")]
 async fn polls_fast_while_a_run_is_active_and_slow_once_it_finished() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     f.script.then(Ok(Some(run("1", CiState::Running))));
     f.script.then(Ok(Some(run("1", CiState::Running))));
     f.script.then(Ok(Some(run("1", CiState::Passed))));
@@ -265,7 +265,7 @@ async fn polls_fast_while_a_run_is_active_and_slow_once_it_finished() {
     assert_eq!(first.provider, Some(CiProvider::GitHubActions));
     assert_eq!(
         (first.repo.as_str(), first.branch.as_str()),
-        ("pricing/app", "feat/x")
+        ("platform/app", "feat/x")
     );
     assert_eq!(first.latest.as_ref().unwrap().state, CiState::Running);
     assert!(first.checked_at.is_some());
@@ -290,7 +290,7 @@ async fn polls_fast_while_a_run_is_active_and_slow_once_it_finished() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn watchers_share_one_poller_that_stops_when_they_leave() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     f.script.then(Ok(Some(run("1", CiState::Running))));
     let mut a = f.service.watch(Path::new(WT)).unwrap();
     let mut b = f.service.watch(Path::new(WT)).unwrap();
@@ -315,7 +315,7 @@ async fn watchers_share_one_poller_that_stops_when_they_leave() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn local_problems_need_no_provider() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     *f.branch.0.lock().unwrap() = LocalBranch {
         name: Some("feat/x".into()),
         upstream: None,
@@ -356,7 +356,7 @@ async fn local_problems_need_no_provider() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn outages_keep_the_last_run_and_back_off() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     f.script.then(Ok(Some(run("7", CiState::Failed))));
     f.script.then(Err(CiProblem::new(
         CiProblemKind::Unreachable,
@@ -388,7 +388,7 @@ async fn outages_keep_the_last_run_and_back_off() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn token_problems_drop_the_run_and_saving_a_token_retries() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     f.script.then(Ok(Some(run("7", CiState::Passed))));
     let mut rx = f.service.watch(Path::new(WT)).unwrap();
     next(&mut rx).await;
@@ -406,7 +406,7 @@ async fn token_problems_drop_the_run_and_saving_a_token_retries() {
         .await
         .unwrap();
     assert!(info.has_token);
-    assert_eq!(info.repos, ["pricing/app"]);
+    assert_eq!(info.repos, ["platform/app"]);
     let s = next(&mut rx).await;
     assert!(
         s.problem.is_none(),
@@ -421,7 +421,7 @@ async fn token_problems_drop_the_run_and_saving_a_token_retries() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn reruns_the_failed_jobs_of_the_latest_run() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     f.script.then(Ok(Some(run("7", CiState::Failed))));
     let mut rx = f.service.watch(Path::new(WT)).unwrap();
     next(&mut rx).await;
@@ -437,7 +437,7 @@ async fn reruns_the_failed_jobs_of_the_latest_run() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn hosts_and_token_tests() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     let hosts = f.service.hosts().await;
     assert_eq!(hosts.len(), 1);
     assert_eq!(
@@ -479,7 +479,7 @@ async fn hosts_and_token_tests() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn signing_in_with_the_cli_opens_its_login_and_retries_once_it_is_done() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     f.tokens.delete("github.com").unwrap();
     f.script.then(Ok(Some(run("7", CiState::Passed))));
     let mut rx = f.service.watch(Path::new(WT)).unwrap();

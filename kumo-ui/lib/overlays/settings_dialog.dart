@@ -207,7 +207,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           ]),
           ('Startup', [
             _toggle(s, 'general.login', 'Open Kumo at login', null, false),
-            _select(s, 'general.workspace', 'Default workspace', 'Namespace selected when the app opens.', const ['Last used', 'pricing', 'identity'], 'Last used'),
+            _select(s, 'general.workspace', 'Default workspace', 'Namespace selected when the app opens.', const ['Last used', 'platform', 'identity'], 'Last used'),
             _toggle(s, 'general.reopen', 'Reopen terminals and agents from last session', 'kumod keeps them running while the app is closed.', true),
           ]),
           ('Updates & privacy', [

@@ -80,10 +80,10 @@ impl fmt::Display for TaskId {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Task {
     pub id: TaskId,
-    /// Short label shown on the card: an issue key (`PRC-412`, `#18`), a
+    /// Short label shown on the card: an issue key (`TSK-412`, `#18`), a
     /// project or a note.
     pub key: String,
-    /// The tracker's reference when it has one (`PRC-412`, `18`): goes in
+    /// The tracker's reference when it has one (`TSK-412`, `18`): goes in
     /// branch names.
     pub ticket: Option<String>,
     pub title: String,
@@ -171,7 +171,7 @@ impl Task {
         self
     }
 
-    /// Branch to work on it: `feat/PRC-412-bulk-discounts`.
+    /// Branch to work on it: `feat/TSK-412-bulk-discounts`.
     pub fn suggested_branch(&self) -> String {
         const MAX_WORDS: usize = 6;
         let words: Vec<String> = self
@@ -265,9 +265,9 @@ mod tests {
     fn suggests_valid_branches() {
         let cases = [
             (
-                Some("PRC-412"),
+                Some("TSK-412"),
                 "Bulk discounts by category",
-                "feat/PRC-412-bulk-discounts-by-category",
+                "feat/TSK-412-bulk-discounts-by-category",
             ),
             (
                 Some("#18"),

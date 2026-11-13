@@ -42,11 +42,11 @@ void main() {
 
     test('replace one keeps the rest; regex groups expand', () {
       const q = FindQuery(r'(\w+)@(\w+)', regex: true);
-      final r = findMatches('ana@pricing bo@ops', q).matches;
-      final (one, end) = replaceMatch('ana@pricing bo@ops', r.first, q, r'$2/$1');
-      expect(one, 'pricing/ana bo@ops');
-      expect(end, 'pricing/ana'.length);
-      expect(replaceAllMatches('ana@pricing bo@ops', q, r'$2/$1 ($&) $$'), ('pricing/ana (ana@pricing) \$ ops/bo (bo@ops) \$', 2));
+      final r = findMatches('ana@platform bo@ops', q).matches;
+      final (one, end) = replaceMatch('ana@platform bo@ops', r.first, q, r'$2/$1');
+      expect(one, 'platform/ana bo@ops');
+      expect(end, 'platform/ana'.length);
+      expect(replaceAllMatches('ana@platform bo@ops', q, r'$2/$1 ($&) $$'), ('platform/ana (ana@platform) \$ ops/bo (bo@ops) \$', 2));
       expect(replaceAllMatches('a.b a.b', const FindQuery('a.b'), r'$1'), (r'$1 $1', 2), reason: 'no regex: the text as typed');
     });
 

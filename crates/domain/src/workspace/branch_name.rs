@@ -43,7 +43,7 @@ impl BranchName {
         &self.0
     }
 
-    /// A single path component for folders: `feat/PRC-1` → `feat-PRC-1`.
+    /// A single path component for folders: `feat/TSK-1` → `feat-TSK-1`.
     pub fn slug(&self) -> String {
         self.0.replace('/', "-")
     }
@@ -63,7 +63,7 @@ mod tests {
     fn accepts_usual_branches() {
         for name in [
             "main",
-            "feat/PRC-412-bulk-discounts",
+            "feat/TSK-412-bulk-discounts",
             "fix/v1.2",
             "user/x_y",
         ] {

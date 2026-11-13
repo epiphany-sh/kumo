@@ -403,17 +403,17 @@ mod tests {
 
     fn task(source: &SourceId, external: &str, title: &str) -> Task {
         let parent = TaskRef {
-            id: Some(TaskId::new(source, "PRC-1")),
+            id: Some(TaskId::new(source, "TSK-1")),
             kind: TaskType::Epic,
             source_status: "In Progress".into(),
             status: TaskStatus::Doing,
             color: "violet".into(),
-            url: Some("https://x/browse/PRC-1".into()),
-            ..TaskRef::new("PRC-1", "Graviton")
+            url: Some("https://x/browse/TSK-1".into()),
+            ..TaskRef::new("TSK-1", "arm64")
         };
         Task {
             key: "Inbox".into(),
-            ticket: Some("PRC-1".into()),
+            ticket: Some("TSK-1".into()),
             status: TaskStatus::Review,
             priority: Priority::High,
             due: Some("2026-11-02".into()),
@@ -430,7 +430,7 @@ mod tests {
             parent: Some(parent),
             blocked: true,
             sprint: Some(Sprint {
-                name: "Pricing 2026.22".into(),
+                name: "Platform 2026.22".into(),
                 state: SprintState::Active,
                 start: Some(Timestamp::from_unix_nanos(1)),
                 end: None,
@@ -449,12 +449,12 @@ mod tests {
             acceptance_criteria: "- [ ] dos".into(),
             subtasks: vec![TaskRef {
                 assignee: Some(theirs.clone()),
-                ..TaskRef::new("PRC-2", "Sub")
+                ..TaskRef::new("TSK-2", "Sub")
             }],
             links: vec![LinkedTask {
                 kind: LinkKind::BlockedBy,
                 relation: "is blocked by".into(),
-                task: TaskRef::new("PRC-3", "Blocker"),
+                task: TaskRef::new("TSK-3", "Blocker"),
             }],
             attachments: vec![Attachment {
                 name: "a.png".into(),
@@ -467,7 +467,7 @@ mod tests {
                 created: Some(Timestamp::from_unix_nanos(9)),
                 body: "**ok**".into(),
             }],
-            components: vec!["price-admin".into()],
+            components: vec!["repo-a".into()],
             fix_versions: vec!["2026.11".into()],
             time_tracking: Some(TimeTracking {
                 estimate: "3d".into(),
@@ -487,7 +487,7 @@ mod tests {
         let a = source("a", "/vault");
         store.save_source(&a).unwrap();
         let now = Timestamp::now().as_unix_nanos();
-        let first = detail(task(&a.id, "PRC-9", "Nine"), now);
+        let first = detail(task(&a.id, "TSK-9", "Nine"), now);
         assert_eq!(store.detail(&first.task.id).unwrap(), None);
         store.save_detail(&first).unwrap();
         assert_eq!(store.detail(&first.task.id).unwrap(), Some(first.clone()));
@@ -500,7 +500,7 @@ mod tests {
         assert_eq!(store.detail(&first.task.id).unwrap(), Some(again));
 
         // Saving prunes details nobody opened in a month.
-        let old = detail(task(&a.id, "PRC-8", "Old"), 1);
+        let old = detail(task(&a.id, "TSK-8", "Old"), 1);
         store.save_detail(&old).unwrap();
         store.save_detail(&first).unwrap();
         assert_eq!(store.detail(&old.task.id).unwrap(), None);

@@ -263,7 +263,7 @@ class TaskEntry {
   final String sourceId;
   final TaskSourceKind kind;
 
-  /// Issue key (PRC-412, #18), project or note.
+  /// Issue key (TSK-412, #18), project or note.
   final String key;
   final String title;
   final TaskColumn column;

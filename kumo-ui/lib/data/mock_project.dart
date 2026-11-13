@@ -1,4 +1,4 @@
-/// The price-admin worktree shown in the Files view: tree, contents, git
+/// The repo-a worktree shown in the Files view: tree, contents, git
 /// status and changed-line marks. Indentation is stored as spaces (Go tabs
 /// rendered as 4 spaces) so the editor's text and spans always line up.
 library;
@@ -83,8 +83,8 @@ abstract final class MockProject {
 import (
     "go.uber.org/fx"
 
-    "github.com/pricing/price-admin/internal/discount"
-    "github.com/pricing/price-admin/internal/kafka"
+    "github.com/platform/repo-a/internal/discount"
+    "github.com/platform/repo-a/internal/kafka"
 )
 
 func main() {
@@ -110,9 +110,9 @@ discounts:
     'deploy/k8s/values.yaml': r'''replicaCount: 3
 
 image:
-  repository: gcr.io/pricing/price-admin
-<<<<<<< HEAD (feat/PRC-412-bulk-discounts)
-  tag: "2026.10.27-prc412"
+  repository: gcr.io/platform/repo-a
+<<<<<<< HEAD (feat/TSK-412-bulk-discounts)
+  tag: "2026.10.27-tsk412"
 =======
   tag: "2026.10.24"
 >>>>>>> main
@@ -120,8 +120,8 @@ image:
 
 kafka:
   brokers:
-    - kafka-0.pricing.svc:9092
-    - kafka-1.pricing.svc:9092
+    - kafka-0.platform.svc:9092
+    - kafka-1.platform.svc:9092
   topics:
     discounts: price.discounts.v1
     bulk: price.discounts.bulk.v1   # new consumer
@@ -201,7 +201,7 @@ import (
     "github.com/shopspring/decimal"
 )
 
-// Deprecated: v1 endpoints were removed in PRC-370.
+// Deprecated: v1 endpoints were removed in TSK-370.
 func (s *Service) LegacyApply(ctx context.Context, sku string, pct float64) error {
     return s.repo.Upsert(ctx, Discount{SKU: sku, Percent: decimal.NewFromFloat(pct)})
 }''',
@@ -269,7 +269,7 @@ import (
     "context"
     "encoding/json"
 
-    "github.com/pricing/price-admin/internal/discount"
+    "github.com/platform/repo-a/internal/discount"
     kafkago "github.com/segmentio/kafka-go"
 )
 
@@ -311,7 +311,7 @@ func (c *BulkConsumer) Run(ctx context.Context) error {
 /coverage.out
 .env
 *.local.yaml''',
-    'go.mod': r'''module github.com/pricing/price-admin
+    'go.mod': r'''module github.com/platform/repo-a
 
 go 1.23
 
@@ -336,7 +336,7 @@ lint:
 
 migrate-up:
     migrate -path ./migrations -database $(POSTGRES_DSN) up''',
-    'README.md': r'''# price-admin
+    'README.md': r'''# repo-a
 
 Admin API for list prices and discounts.
 
@@ -346,7 +346,7 @@ Start Postgres and Kafka with `docker compose up`, then run `make test`.
 
 ## Docs
 
-Discount rules live in Confluence › Pricing › Discount rules v3.''',
+Discount rules live in Confluence › Platform › Discount rules v3.''',
   };
 
   /// Removes conflict markers keeping current, incoming or both sides.

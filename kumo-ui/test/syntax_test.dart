@@ -18,7 +18,7 @@ void main() {
     expect(kv.last, ('8080', Tok.num));
     final withComment = Syntax.line(Lang.yaml, '    bulk: price.discounts.bulk.v1   # new consumer');
     expect(withComment.last.$2, Tok.com);
-    final item = Syntax.line(Lang.yaml, '    - kafka-0.pricing.svc:9092');
+    final item = Syntax.line(Lang.yaml, '    - kafka-0.platform.svc:9092');
     expect(item.any((s) => s.$2 == Tok.key), isFalse, reason: 'host:port in a list item is a value, not a key');
     expect(Syntax.line(Lang.yaml, r'  dsn: ${POSTGRES_DSN}').last, (r'${POSTGRES_DSN}', Tok.type));
   });
@@ -33,7 +33,7 @@ void main() {
   test('segments always rebuild the original line exactly', () {
     const samples = {
       Lang.go: '        rows = append(rows, []any{d.SKU, d.Percent})',
-      Lang.yaml: '<<<<<<< HEAD (feat/PRC-412-bulk-discounts)',
+      Lang.yaml: '<<<<<<< HEAD (feat/TSK-412-bulk-discounts)',
       Lang.json: '  "endsAt": null,',
       Lang.makefile: '    migrate -path ./migrations -database \$(POSTGRES_DSN) up',
       Lang.markdown: 'Start Postgres with `docker compose up`, then `make test`.',

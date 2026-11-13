@@ -594,7 +594,7 @@ mod tests {
 
     #[test]
     fn encodes_branches_and_project_paths() {
-        assert_eq!(enc("feat/PRC-412 x"), "feat%2FPRC-412%20x");
+        assert_eq!(enc("feat/TSK-412 x"), "feat%2FTSK-412%20x");
         assert_eq!(enc("{a1-b2}"), "%7Ba1-b2%7D");
     }
 }

@@ -14,7 +14,7 @@ void main() {
     final repo = state.workspace.repos.first;
     final first = repo.worktrees.firstWhere(state.isActiveWorktree);
     final other = repo.worktrees.firstWhere((w) => !state.isActiveWorktree(w));
-    expect(find.text('claude · PRC-412'), findsOneWidget);
+    expect(find.text('claude · TSK-412'), findsOneWidget);
 
     // Opening another worktree, from any view, shows its (empty) terminals.
     state.view = KumoView.tasks;
@@ -22,7 +22,7 @@ void main() {
     state.openWorktree(other);
     await tester.pump();
     expect(state.view, KumoView.terminal);
-    expect(find.text('claude · PRC-412'), findsNothing);
+    expect(find.text('claude · TSK-412'), findsNothing);
     expect(find.text('No terminals open in this worktree'), findsOneWidget);
 
     await tester.tap(find.text('New tab'));
@@ -33,7 +33,7 @@ void main() {
     // The first worktree's terminals were kept as they were.
     state.openWorktree(first);
     await tester.pump();
-    expect(find.text('claude · PRC-412'), findsOneWidget);
+    expect(find.text('claude · TSK-412'), findsOneWidget);
     expect(find.text('1 tab · 3 panes'), findsOneWidget);
 
     state.openWorktree(other);
@@ -82,7 +82,7 @@ void main() {
     // The other worktrees keep theirs.
     state.openWorktree(first);
     await tester.pump();
-    expect(find.text('claude · PRC-412'), findsOneWidget);
+    expect(find.text('claude · TSK-412'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

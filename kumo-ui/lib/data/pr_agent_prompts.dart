@@ -158,5 +158,5 @@ String prDescriptionPrompt(
 String prDescriptionRevision(String draftPath, String ask) =>
     'Change the description in `$draftPath` as follows, and save it to the same file: ${ask.trim()}. Don’t change anything else. When the file is written, say “Done”.';
 
-/// A ticket key in a branch name (`feat/PRC-412-bulk-discounts` → PRC-412).
+/// A ticket key in a branch name (`feat/TSK-412-bulk-discounts` → TSK-412).
 String? ticketKeyIn(String branch) => RegExp(r'[A-Z][A-Z0-9]+-\d+').firstMatch(branch)?.group(0);

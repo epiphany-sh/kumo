@@ -345,7 +345,7 @@ class AppState extends ChangeNotifier {
 
   /// The selected worktree: its branch (shown) and, with real data, its path
   /// (the identity: `main` exists in every repo). Mocks select by branch.
-  String activeWorktree = 'feat/PRC-412-bulk-discounts';
+  String activeWorktree = 'feat/TSK-412-bulk-discounts';
   String? activeWorktreePath;
   void selectWorktree(String branch, {String? path}) {
     activeWorktree = branch;

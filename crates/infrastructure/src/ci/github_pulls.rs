@@ -402,7 +402,7 @@ mod tests {
                 api: api.into(),
                 web: "https://github.com".into(),
             },
-            repo: "pricing/price-admin".into(),
+            repo: "platform/repo-a".into(),
             branch: branch.into(),
         }
     }
@@ -434,7 +434,7 @@ mod tests {
             (
                 "#521",
                 "feat: bulk discounts by category",
-                "feat/PRC-412-bulk-discounts",
+                "feat/TSK-412-bulk-discounts",
                 "main"
             )
         );
@@ -481,7 +481,7 @@ mod tests {
     #[test]
     fn graphql_errors_are_classified() {
         let server = TestServer::start(|_| {
-            (200, r#"{"data":{"viewer":{"login":"ana"},"repository":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a Repository with the name 'pricing/nope'."}]}"#.to_owned())
+            (200, r#"{"data":{"viewer":{"login":"ana"},"repository":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a Repository with the name 'platform/nope'."}]}"#.to_owned())
         });
         let problem = GitHubPulls::default()
             .list(&target(&server.url, ""), "t", 30)
@@ -503,15 +503,15 @@ mod tests {
     fn the_branch_pull_request_prefers_the_open_one_and_create_returns_it() {
         let server = TestServer::start(|r| match (r.method.as_str(), r.path.as_str()) {
             ("POST", "/graphql") => (200, include_str!("fixtures/github_pulls.json").to_owned()),
-            ("POST", "/repos/pricing/price-admin/pulls") => (201, r#"{"number":530}"#.to_owned()),
-            ("GET", "/repos/pricing/price-admin") => {
+            ("POST", "/repos/platform/repo-a/pulls") => (201, r#"{"number":530}"#.to_owned()),
+            ("GET", "/repos/platform/repo-a") => {
                 (200, r#"{"default_branch":"main"}"#.to_owned())
             }
             _ => (404, "{}".to_owned()),
         });
         let client = GitHubPulls::default();
         let mine = client
-            .for_branch(&target(&server.url, "feat/PRC-412-bulk-discounts"), "t")
+            .for_branch(&target(&server.url, "feat/TSK-412-bulk-discounts"), "t")
             .unwrap()
             .unwrap();
         assert_eq!(mine.label, "#521");

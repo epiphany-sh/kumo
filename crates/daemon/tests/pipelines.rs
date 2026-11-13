@@ -21,7 +21,7 @@ async fn watches_the_branch_and_explains_what_is_missing() {
     let mut client = daemon.client().await;
     let repo = git_repo(
         &daemon.home().join("dev/app"),
-        Some("git@github.com:pricing/app.git"),
+        Some("git@github.com:platform/app.git"),
     );
     save_namespace(&mut client, "app", &[&repo]).await;
     let worktree = pb::WatchPipelinesRequest {
@@ -38,7 +38,7 @@ async fn watches_the_branch_and_explains_what_is_missing() {
     assert_eq!(first.provider(), pb::CiProvider::GithubActions);
     assert_eq!(
         (first.repo.as_str(), first.branch.as_str()),
-        ("pricing/app", "main")
+        ("platform/app", "main")
     );
     let problem = first.problem.unwrap();
     assert_eq!(
@@ -75,7 +75,7 @@ async fn watches_the_branch_and_explains_what_is_missing() {
         (hosts[0].host.as_str(), hosts[0].has_token, hosts[0].uses_gh),
         ("github.com", false, false)
     );
-    assert_eq!(hosts[0].repos, ["pricing/app"]);
+    assert_eq!(hosts[0].repos, ["platform/app"]);
     // Tests never find the user's gh: nothing to sign in with.
     assert!(!hosts[0].gh_available);
     let no_gh = client

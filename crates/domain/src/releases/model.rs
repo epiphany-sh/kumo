@@ -76,13 +76,13 @@ pub struct MergedPr {
     pub reference: String,
     pub title: String,
     pub author: String,
-    /// `PRC-412`, from its branch or title.
+    /// `TSK-412`, from its branch or title.
     pub ticket: Option<String>,
 }
 
 impl MergedPr {
     /// The pull request a commit on the range merged, if it names one: a
-    /// merge (`Merge pull request #518 from acme/feat/PRC-412-x`, GitLab's
+    /// merge (`Merge pull request #518 from acme/feat/TSK-412-x`, GitLab's
     /// `Merge branch 'x' into 'main'` + `See merge request g/r!228`) or a
     /// squash (`feat: x (#518)`).
     pub fn from_commit(subject: &str, author: &str, body: &str) -> Option<Self> {
@@ -183,16 +183,16 @@ mod tests {
 
     #[test]
     fn tickets() {
-        assert_eq!(ticket_in("feat/PRC-412-bulk").as_deref(), Some("PRC-412"));
+        assert_eq!(ticket_in("feat/TSK-412-bulk").as_deref(), Some("TSK-412"));
         assert_eq!(ticket_in("fix: x (AB2-9)").as_deref(), Some("AB2-9"));
         assert_eq!(ticket_in("utf-8 and A-1 and v1-2"), None);
-        assert_eq!(ticket_in("xPRC-1"), None);
+        assert_eq!(ticket_in("xTSK-1"), None);
     }
 
     #[test]
     fn merged_pull_requests_from_their_commits() {
         let merge = MergedPr::from_commit(
-            "Merge pull request #521 from pricing/feat/PRC-412-bulk-discounts",
+            "Merge pull request #521 from platform/feat/TSK-412-bulk-discounts",
             "Mauri",
             "feat: bulk discounts by category\n",
         )
@@ -203,22 +203,22 @@ mod tests {
                 reference: "#521".into(),
                 title: "feat: bulk discounts by category".into(),
                 author: "Mauri".into(),
-                ticket: Some("PRC-412".into()),
+                ticket: Some("TSK-412".into()),
             }
         );
-        let squash = MergedPr::from_commit("fix: cache key (PRC-409) (#516)", "Lucía", "").unwrap();
+        let squash = MergedPr::from_commit("fix: cache key (TSK-409) (#516)", "Lucía", "").unwrap();
         assert_eq!(
             (
                 squash.reference.as_str(),
                 squash.title.as_str(),
                 squash.ticket.as_deref()
             ),
-            ("#516", "fix: cache key (PRC-409)", Some("PRC-409"))
+            ("#516", "fix: cache key (TSK-409)", Some("TSK-409"))
         );
         let gitlab = MergedPr::from_commit(
             "Merge branch 'perf/PRR-9-batch' into 'main'",
             "Lucía",
-            "perf: batch lookups\n\nSee merge request pricing/reader!224",
+            "perf: batch lookups\n\nSee merge request platform/reader!224",
         )
         .unwrap();
         assert_eq!(

@@ -319,7 +319,7 @@ class _OfflineNotice extends StatelessWidget {
   }
 }
 
-/// "Blocked by PRC-11355 · To Do" with a way there.
+/// "Blocked by TSK-11355 · To Do" with a way there.
 class _BlockedBanner extends StatelessWidget {
   const _BlockedBanner({required this.blockers, required this.onOpen});
   final List<TaskRef> blockers;

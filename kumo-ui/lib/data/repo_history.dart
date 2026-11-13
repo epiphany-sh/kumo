@@ -315,7 +315,7 @@ CommitDetail mockCommitDetail(String sha, String subject, {String parent = ''}) 
       DiffHunk.parse(1, 1, ['-package $area', '+package engine', ' ']),
     ]));
     files.add(CommitFile(path: 'internal/$area/service.go', kind: CommitFileKind.modified, hunks: [
-      DiffHunk.parse(5, 5, [' import (', '+\t"price-admin/internal/$area/engine"', ' )'], section: 'import ('),
+      DiffHunk.parse(5, 5, [' import (', '+\t"repo-a/internal/$area/engine"', ' )'], section: 'import ('),
     ]));
   } else {
     final added = type == 'feat';
@@ -340,7 +340,7 @@ final _writtenCommits = <String, CommitDetail>{
   '7be2f41': CommitDetail(
     sha: '7be2f41',
     parents: const ['2c9a0e5'],
-    body: 'Bulk discounts are copied in batches of 500 into a temp table with pgx.CopyFrom,\nthen upserted from it in one statement per batch.\n\nPRC-412',
+    body: 'Bulk discounts are copied in batches of 500 into a temp table with pgx.CopyFrom,\nthen upserted from it in one statement per batch.\n\nTSK-412',
     files: [
       CommitFile(path: 'internal/discount/repository.go', kind: CommitFileKind.modified, hunks: [
         DiffHunk.parse(72, 72, section: 'func (r *Repository) UpsertBulk(ctx context.Context, ds []BulkDiscount) error {', [
@@ -401,7 +401,7 @@ final _writtenCommits = <String, CommitDetail>{
   'a3f9c12': CommitDetail(
     sha: 'a3f9c12',
     parents: const ['9d02e1f'],
-    body: 'GET /v2/prices/{sku}/history?from=&to= returns every price a SKU had,\nwith who changed it. Paginated, newest first.\n\nCloses PRC-401',
+    body: 'GET /v2/prices/{sku}/history?from=&to= returns every price a SKU had,\nwith who changed it. Paginated, newest first.\n\nCloses TSK-401',
     files: [
       CommitFile(path: 'internal/api/history.go', kind: CommitFileKind.added, hunks: [
         DiffHunk.parse(0, 1, [
@@ -505,18 +505,18 @@ ReleaseRange mockRangeOf(List<MockRelease> list, int index, int? since) {
 List<MockRelease> mockReleases(String repoName, String host, DateTime now) {
   DateTime ago(Duration d) => now.subtract(d);
   String url(String tag) => switch (host) {
-        'GL' => 'https://gitlab.com/pricing/$repoName/-/releases/$tag',
-        'BB' => 'https://bitbucket.org/pricing/$repoName/src/$tag',
-        _ => 'https://github.com/pricing/$repoName/releases/tag/$tag',
+        'GL' => 'https://gitlab.com/platform/$repoName/-/releases/$tag',
+        'BB' => 'https://bitbucket.org/platform/$repoName/src/$tag',
+        _ => 'https://github.com/platform/$repoName/releases/tag/$tag',
       };
   const src = [('Source code (zip)', '1.4 MB'), ('Source code (tar.gz)', '1.1 MB')];
   switch (repoName) {
-    case 'price-admin':
+    case 'repo-a':
       return [
         MockRelease(
           RepoRelease(tag: 'v1.9.0-rc.1', kind: ReleaseKind.preRelease, time: ago(const Duration(hours: 2)), author: 'Mauri', sha: 'b41e9d0', url: url('v1.9.0-rc.1'), assets: src),
           commits: 6, added: 412, deleted: 96, files: 12,
-          prs: const [('#528', 'feat: CSV imports report the rows that fail', 'Lucía', 'PRC-415'), ('#527', 'fix: round discounts half-even', 'Mauri', 'PRC-419')],
+          prs: const [('#528', 'feat: CSV imports report the rows that fail', 'Lucía', 'TSK-415'), ('#527', 'fix: round discounts half-even', 'Mauri', 'TSK-419')],
         ),
         MockRelease(
           RepoRelease(
@@ -535,22 +535,22 @@ List<MockRelease> mockReleases(String repoName, String host, DateTime now) {
           ),
           commits: 17, added: 1104, deleted: 352, files: 33,
           prs: const [
-            ('#521', 'feat: bulk discounts by category', 'Mauri', 'PRC-412'),
-            ('#519', 'feat(kafka): bulk discount consumer', 'Mauri', 'PRC-412'),
+            ('#521', 'feat: bulk discounts by category', 'Mauri', 'TSK-412'),
+            ('#519', 'feat(kafka): bulk discount consumer', 'Mauri', 'TSK-412'),
             ('#518', 'chore: drop the legacy v1 endpoints', 'Tomás', null),
-            ('#516', 'fix: cache key includes the sales channel', 'Lucía', 'PRC-409'),
+            ('#516', 'fix: cache key includes the sales channel', 'Lucía', 'TSK-409'),
             ('#514', 'docs: bulk discount runbook', 'Valentina', null),
           ],
         ),
         MockRelease(
           RepoRelease(tag: 'v1.7.3', kind: ReleaseKind.tagOnly, time: ago(const Duration(days: 5)), author: 'Tomás', sha: '3c09e1a', url: url('v1.7.3'), checks: true),
           commits: 2, added: 18, deleted: 4, files: 2,
-          prs: const [('#515', 'fix: nil price on deleted SKUs', 'Tomás', 'PRC-411')],
+          prs: const [('#515', 'fix: nil price on deleted SKUs', 'Tomás', 'TSK-411')],
         ),
         MockRelease(
           RepoRelease(tag: 'v1.7.2', kind: ReleaseKind.release, time: ago(const Duration(days: 14)), author: 'Lucía', sha: 'e81d4f2', url: url('v1.7.2'), checks: true, assets: src),
           commits: 4, added: 61, deleted: 22, files: 5,
-          prs: const [('#511', 'fix: timezone of scheduled prices', 'Lucía', 'PRC-402'), ('#510', 'chore: bump pgx to v5.7', 'Nico', null)],
+          prs: const [('#511', 'fix: timezone of scheduled prices', 'Lucía', 'TSK-402'), ('#510', 'chore: bump pgx to v5.7', 'Nico', null)],
         ),
         MockRelease(
           RepoRelease(
@@ -565,7 +565,7 @@ List<MockRelease> mockReleases(String repoName, String host, DateTime now) {
             notes: '## Fixes\n- Margin rounding on prices with three decimals (#507).',
           ),
           commits: 3, added: 27, deleted: 9, files: 3,
-          prs: const [('#507', 'fix: margin rounding with three decimals', 'Mauri', 'PRC-398')],
+          prs: const [('#507', 'fix: margin rounding with three decimals', 'Mauri', 'TSK-398')],
         ),
         MockRelease(
           RepoRelease(
@@ -578,22 +578,22 @@ List<MockRelease> mockReleases(String repoName, String host, DateTime now) {
             url: url('v1.7.0'),
             checks: true,
             assets: src,
-            notes: '## Highlights\n- Prices can’t go below their category’s minimum margin (#503).\n- Margin alerts on Slack for the pricing team (#501).',
+            notes: '## Highlights\n- Prices can’t go below their category’s minimum margin (#503).\n- Margin alerts on Slack for the platform team (#501).',
           ),
           commits: 21, added: 1890, deleted: 640, files: 47,
           prs: const [
-            ('#503', 'feat: block prices below the minimum margin', 'Mauri', 'PRC-381'),
-            ('#501', 'feat: margin alerts on Slack', 'Valentina', 'PRC-384'),
-            ('#499', 'refactor: pricing rules package', 'Tomás', null),
+            ('#503', 'feat: block prices below the minimum margin', 'Mauri', 'TSK-381'),
+            ('#501', 'feat: margin alerts on Slack', 'Valentina', 'TSK-384'),
+            ('#499', 'refactor: platform rules package', 'Tomás', null),
           ],
         ),
         MockRelease(
           RepoRelease(tag: 'v1.6.4', kind: ReleaseKind.release, time: ago(const Duration(days: 52)), author: 'Nico', sha: '1b9e0a4', url: url('v1.6.4'), checks: true, assets: src, notes: '## Fixes\n- Exports of more than 100,000 prices no longer time out.'),
           commits: 2, added: 40, deleted: 12, files: 2,
-          prs: const [('#496', 'fix: stream large exports', 'Nico', 'PRC-377')],
+          prs: const [('#496', 'fix: stream large exports', 'Nico', 'TSK-377')],
         ),
       ];
-    case 'price-reader-v2':
+    case 'repo-b':
       return [
         MockRelease(
           RepoRelease(tag: 'v0.1.0', kind: ReleaseKind.release, time: ago(const Duration(days: 1)), author: 'Nico', sha: '9d2e417', url: url('v0.1.0'), checks: true, assets: src),
@@ -643,5 +643,5 @@ const mockThreadWork = <String, (String, String, String)>{
   't1': ('Retries a failed batch up to 3 times before giving up', 'a91c4e2', 'Good catch: each batch now retries up to 3 times (a91c4e2), and only that batch fails if it still can’t be written.'),
   't2': ('Commits the offset after the write', '5d03b7f', 'Moved the commit after the write (5d03b7f). A crash in between now replays the message, and the upsert makes that safe.'),
   't3': ('Unexports MaxPercent', 'a91c4e2', 'Done.'),
-  't4': ('', '', 'So QA can try it with the pricing team this sprint. It stays off in production until they sign off; the flag is per environment.'),
+  't4': ('', '', 'So QA can try it with the platform team this sprint. It stays off in production until they sign off; the flag is per environment.'),
 };
