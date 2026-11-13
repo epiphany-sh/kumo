@@ -58,4 +58,8 @@ class LinuxOs extends HostOs {
 
   @override
   bool get windowButtonsInContent => false;
+
+  /// No Linux runner sets one yet.
+  @override
+  String? get appIconPlaces => null;
 }

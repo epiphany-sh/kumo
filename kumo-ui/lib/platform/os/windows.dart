@@ -62,4 +62,9 @@ class WindowsOs extends HostOs {
 
   @override
   bool get windowButtonsInContent => false;
+
+  /// `WM_SETICON` on the window (`flutter_window.cpp`); a button pinned to
+  /// the taskbar may keep its shortcut's icon.
+  @override
+  String? get appIconPlaces => 'On the window and its taskbar button while Kumo runs.';
 }

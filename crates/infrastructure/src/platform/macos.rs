@@ -13,7 +13,7 @@ use keyring_core::{CredentialStore, Error as KeyringError};
 use super::{
     AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PlainPaths, PrivateFiles,
     ProcessTrees, Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals,
-    unix,
+    TerminalShells, unix,
 };
 
 pub struct MacOs;
@@ -95,6 +95,12 @@ impl Keychain for MacOs {
 impl AppFolders for MacOs {
     fn obsidian_settings(home: &Path) -> PathBuf {
         home.join("Library/Application Support/obsidian/obsidian.json")
+    }
+}
+
+impl TerminalShells for MacOs {
+    fn shell_integration() -> bool {
+        true
     }
 }
 

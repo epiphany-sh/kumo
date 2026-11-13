@@ -43,8 +43,15 @@ impl pb::terminals_server::Terminals for TerminalsGrpc {
         request: Request<pb::OpenRequest>,
     ) -> Result<Response<pb::OpenResponse>, Status> {
         let service = self.service(&request).await?;
-        let spec = launch_spec_from(request.into_inner()).map_err(status_from)?;
-        let id = service.open(spec).map_err(status_from)?;
+        let request = request.into_inner();
+        let shell = request.shell_integration;
+        let spec = launch_spec_from(request).map_err(status_from)?;
+        let id = if shell {
+            service.open_shell(spec)
+        } else {
+            service.open(spec)
+        }
+        .map_err(status_from)?;
         Ok(Response::new(pb::OpenResponse {
             terminal_id: id.to_string(),
         }))

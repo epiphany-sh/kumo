@@ -13,6 +13,7 @@ use keyring_core::{CredentialStore, Error as KeyringError};
 use super::{
     AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PlainPaths, PrivateFiles,
     ProcessTrees, Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals,
+    TerminalShells,
 };
 
 /// The child gets a console nobody sees.
@@ -156,6 +157,14 @@ impl Keychain for Windows {
 impl AppFolders for Windows {
     fn obsidian_settings(home: &Path) -> PathBuf {
         home.join("AppData/Roaming/obsidian/obsidian.json")
+    }
+}
+
+impl TerminalShells for Windows {
+    /// cmd.exe and PowerShell aren't covered, and a Git Bash would be
+    /// handed Windows paths to its scripts.
+    fn shell_integration() -> bool {
+        false
     }
 }
 

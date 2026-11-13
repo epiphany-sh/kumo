@@ -118,6 +118,13 @@ pub trait AgentHooks {
     fn sh_status_line() -> bool;
 }
 
+/// The shells a terminal opens in.
+pub trait TerminalShells {
+    /// Whether the user's shell gets Kumo's integration (see
+    /// `pty::shell_integration`): zsh, bash and fish mark the commands run.
+    fn shell_integration() -> bool;
+}
+
 /// Sign-ins other programs keep in the OS's own secret store (Claude
 /// Code's and Copilot CLI's on macOS), read as those programs save them.
 pub trait SavedSignIns {
@@ -228,6 +235,11 @@ pub fn obsidian_settings(home: &Path) -> PathBuf {
 /// See [`AgentHooks::sh_status_line`].
 pub fn sh_status_line() -> bool {
     Current::sh_status_line()
+}
+
+/// See [`TerminalShells::shell_integration`].
+pub fn shell_integration() -> bool {
+    Current::shell_integration()
 }
 
 /// See [`SavedSignIns::saved_secret`].

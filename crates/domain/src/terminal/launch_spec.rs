@@ -57,6 +57,12 @@ impl LaunchSpec {
         self
     }
 
+    /// Sets one variable, over what the caller set.
+    pub fn with_var(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.env.insert(key.into(), value.into());
+        self
+    }
+
     pub fn with_size(mut self, size: TerminalSize) -> Self {
         self.size = size;
         self
@@ -72,6 +78,11 @@ impl LaunchSpec {
 
     pub fn cwd(&self) -> Option<&Path> {
         self.cwd.as_deref()
+    }
+
+    /// A variable the caller set (not the inherited environment).
+    pub fn var(&self, key: &str) -> Option<&str> {
+        self.env.get(key).map(String::as_str)
     }
 
     pub fn size(&self) -> TerminalSize {

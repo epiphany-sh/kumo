@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter/services.dart';
 
+import '../app/app_state.dart';
 import '../engine/grpc_terminal_surface.dart';
 import '../platform/open_url.dart';
 import '../platform/pasteboard.dart';
@@ -17,7 +18,9 @@ import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/context_menu.dart';
 import '../widgets/kicons.dart';
+import 'command_marks.dart';
 import 'grid_renderer.dart';
+import 'row_layout.dart';
 import 'term_selection.dart';
 import 'terminal_keys.dart';
 import 'terminal_surface.dart';
@@ -43,21 +46,37 @@ class TerminalCanvas extends StatefulWidget {
   State<TerminalCanvas> createState() => _TerminalCanvasState();
 }
 
-/// First buffer line on screen: the bottom of the buffer, or the line the
-/// user scrolled to. [top] is that line counted from the session's start
-/// (see [TermBuffer.dropped]); null follows the output. A full-screen
-/// program, or lines re-wrapped since [reflows], show the bottom.
-int visibleStart(TermBuffer b, int fit, {int? top, int reflows = 0}) {
+/// Where the view's top is at the bottom of the buffer, as a position of
+/// [layout] (a line and how far into its slot): the last [fit] rows' worth
+/// of lines show, the gaps among them pushing the first ones out the top.
+double bottomTop(TermBuffer b, int fit, [RowLayout? layout]) {
   final maxLines = b.cursor != null ? fit : math.max(1, fit - 1);
-  final bottom = math.max(0, b.lines.length - maxLines);
-  if (top == null || b.altScreen || b.reflows != reflows) return bottom;
-  return (top - b.dropped).clamp(0, bottom);
+  final plain = math.max(0, b.lines.length - maxLines);
+  if (layout == null || layout.isEmpty) return plain.toDouble();
+  return math.max(0.0, layout.positionAt(layout.slotTop(b.lines.length) - maxLines * layout.lineExtent));
 }
 
+/// Where the view's top is: the bottom of the buffer, or the line the
+/// user scrolled to and the fraction of it scrolled past. [top] is that
+/// line counted from the session's start (see [TermBuffer.dropped]); null
+/// follows the output. A full-screen program, or lines re-wrapped since
+/// [reflows], show the bottom.
+double viewTop(TermBuffer b, int fit, {int? top, int reflows = 0, double frac = 0, RowLayout? layout}) {
+  final bottom = bottomTop(b, fit, layout);
+  if (top == null || b.altScreen || b.reflows != reflows) return bottom;
+  final at = (top - b.dropped).clamp(0, bottom.floor()) + frac;
+  return at < bottom ? at : bottom;
+}
+
+/// First buffer line on screen (see [viewTop]).
+int visibleStart(TermBuffer b, int fit, {int? top, int reflows = 0, RowLayout? layout}) => viewTop(b, fit, top: top, reflows: reflows, layout: layout).floor();
+
 /// Fraction of a line the view sits past [visibleStart]'s line: [frac] while
-/// in the history, none once that line is the bottom.
-double visibleOffset(TermBuffer b, int fit, {int? top, int reflows = 0, double frac = 0}) =>
-    visibleStart(b, fit, top: top, reflows: reflows) < visibleStart(b, fit) ? frac : 0;
+/// in the history, none once that line is the bottom (without gaps).
+double visibleOffset(TermBuffer b, int fit, {int? top, int reflows = 0, double frac = 0, RowLayout? layout}) {
+  final at = viewTop(b, fit, top: top, reflows: reflows, frac: frac, layout: layout);
+  return at - at.floor();
+}
 
 class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProviderStateMixin {
   int _cols = 0;
@@ -115,6 +134,13 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   Duration _lastCoast = Duration.zero;
   Offset _coastAt = Offset.zero;
 
+  // ---- Your lines: marks on what you ran, the command pinned on top
+  // (Settings → Appearance). Without the app around (tests), the defaults.
+  ValueListenable<YourLines>? _yourLines;
+  YourLines get _yl => _yourLines?.value ?? const YourLines();
+
+  void _yourLinesChanged() => setState(() {});
+
   /// Geometry of the last layout, to map the pointer to cells.
   Size _cell = const Size(7, 15);
   Size _size = Size.zero;
@@ -127,13 +153,38 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
 
   TermBuffer get _buffer => widget.surface.buffer.value;
 
-  /// First buffer line on screen.
-  int _firstLine(TermBuffer b) => visibleStart(b, _fit, top: _top, reflows: _seenReflows);
+  /// Where [b]'s lines sit: with room around the commands you ran while
+  /// they're marked.
+  RowLayout _layout(TermBuffer b) {
+    final cached = _layoutCache;
+    if (cached != null && identical(cached.$1, b) && cached.$2 == _yl.marks && cached.$3.lineExtent == _cell.height) return cached.$3;
+    final layout = _yl.marks ? RowLayout.of(b, _cell.height) : RowLayout.none(_cell.height);
+    _layoutCache = (b, _yl.marks, layout);
+    return layout;
+  }
 
-  int _bottomLine(TermBuffer b) => visibleStart(b, _fit);
+  (TermBuffer, bool, RowLayout)? _layoutCache;
+
+  /// Where the view's top is (see [viewTop]).
+  double _pos(TermBuffer b) => viewTop(b, _fit, top: _top, reflows: _seenReflows, frac: _frac, layout: _layout(b));
+
+  /// [_pos] at the bottom, following the output.
+  double _bottomPos(TermBuffer b) => bottomTop(b, _fit, _layout(b));
+
+  /// First buffer line on screen.
+  int _firstLine(TermBuffer b) => _pos(b).floor();
 
   /// Fraction of a line the view sits past [_firstLine].
-  double _offset(TermBuffer b) => visibleOffset(b, _fit, top: _top, reflows: _seenReflows, frac: _frac);
+  double _offset(TermBuffer b) {
+    final at = _pos(b);
+    return at - at.floor();
+  }
+
+  /// The line at [dy] in the pane, as a position (see [RowLayout]).
+  double _positionAt(TermBuffer b, double dy) {
+    final layout = _layout(b);
+    return layout.positionAt(layout.yOf(_pos(b)) + dy - widget.padding.top);
+  }
 
   /// Lines were re-wrapped (a width change): positions in them are gone.
   void _syncReflows(TermBuffer b) {
@@ -160,11 +211,12 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     final b = _buffer;
     if (b.lines.isEmpty) return const TermPoint(0, 0);
     final first = _firstLine(b);
-    final row = ((local.dy - widget.padding.top) / _cell.height + _offset(b)).floor();
-    final line = first + row;
+    final x = (local.dx - widget.padding.left) / _cell.width;
+    var line = _positionAt(b, local.dy).floor();
     if (line >= b.lines.length) return TermPoint(b.lines.length - 1, lineWidth(b.lines.last));
     if (line < first) return TermPoint(first, 0);
-    final x = (local.dx - widget.padding.left) / _cell.width;
+    // A folded prompt's two lines share a row: the one with characters there.
+    if (_yl.marks) line = foldedLineAt(b, line, x.floor());
     final width = lineWidth(b.lines[line]);
     final col = cell ? x.floor() : x.round();
     return TermPoint(line, col.clamp(0, cell ? 1 << 20 : width));
@@ -262,7 +314,17 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     final b = _buffer;
     if (b.altScreen || delta == 0) return false;
     _syncReflows(b);
-    return _scrollTo(_firstLine(b) + _offset(b) + delta);
+    return _scrollTo(_pos(b) + delta);
+  }
+
+  /// Moves the view [pixels] (negative: back in history), across the
+  /// gaps around commands as they are.
+  bool _scrollPixels(double pixels) {
+    final b = _buffer;
+    if (b.altScreen || pixels == 0) return false;
+    _syncReflows(b);
+    final layout = _layout(b);
+    return _scrollTo(layout.positionAt(layout.yOf(_pos(b)) + pixels));
   }
 
   /// Puts [line] (and the [line]'s fraction scrolled past) at the top; at
@@ -270,10 +332,10 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   bool _scrollTo(num line) {
     final b = _buffer;
     _syncReflows(b);
-    final bottom = _bottomLine(b);
+    final bottom = _bottomPos(b);
     final next = line.clamp(0, bottom).toDouble();
     final whole = next.floor();
-    final top = whole >= bottom ? null : b.dropped + whole;
+    final top = next >= bottom ? null : b.dropped + whole;
     final frac = top == null ? 0.0 : next - whole;
     final moved = top != _top || frac != _frac;
     setState(() {
@@ -287,6 +349,38 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   void _toBottom() {
     if (_top == null) return;
     setState(() => _top = null);
+  }
+
+  /// The command pinned on top right now, if any.
+  StickyCommand? _sticky(TermBuffer b) {
+    if (!_yl.sticky || b.altScreen || b.blocks.isEmpty) return null;
+    _syncReflows(b);
+    return stickyCommand(b.blocks, _firstLine(b), _offset(b));
+  }
+
+  /// ⌘↑ / ⌘↓ with commands marked: the previous or next one at the top.
+  /// False when there are no marks (the keys scroll a line instead).
+  bool _jumpCommand({required bool up}) {
+    final b = _buffer;
+    if (b.blocks.isEmpty) return false;
+    _syncReflows(b);
+    final here = _pos(b);
+    if (!up) {
+      final next = nextBlock(b.blocks, here);
+      if (next == null || next.start >= _bottomPos(b)) {
+        _toBottom();
+      } else {
+        _scrollTo(next.start);
+      }
+      return true;
+    }
+    // Commands near the bottom can't reach the top: go on to one that can.
+    num at = here;
+    while (true) {
+      final prev = previousBlock(b.blocks, at);
+      if (prev == null || _scrollTo(prev.start)) return true;
+      at = prev.start;
+    }
   }
 
   void _flashBar() {
@@ -320,7 +414,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
       modes.sendBytes(bytes);
       return true;
     }
-    return _scrollBy(pixels / _cell.height);
+    return _scrollPixels(pixels);
   }
 
   void _signal(PointerSignalEvent e) {
@@ -375,7 +469,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   /// Scrollbar drag: the thumb's center follows the pointer.
   void _dragBar(Offset local) {
     final b = _buffer;
-    final bottom = _bottomLine(b);
+    final bottom = _bottomPos(b);
     if (bottom <= 0) return;
     final track = _size.height - 8;
     final thumb = scrollThumbExtent(track, _fit, b.lines.length);
@@ -424,11 +518,16 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     return surface is TerminalModes && surface.mouseTracking && _top == null ? surface : null;
   }
 
-  /// Cell of the visible screen under [local], clamped to the grid.
-  (int, int) _screenCell(Offset local) => (
-        ((local.dx - widget.padding.left) / _cell.width).floor().clamp(0, _cols - 1),
-        ((local.dy - widget.padding.top) / _cell.height).floor().clamp(0, _rows - 1),
-      );
+  /// Cell of the visible screen under [local], clamped to the grid. With
+  /// room around commands, the row is found through where lines are drawn
+  /// (the screen is the buffer's last rows).
+  (int, int) _screenCell(Offset local) {
+    final col = ((local.dx - widget.padding.left) / _cell.width).floor().clamp(0, _cols - 1);
+    final b = _buffer;
+    if (_layout(b).isEmpty) return (col, ((local.dy - widget.padding.top) / _cell.height).floor().clamp(0, _rows - 1));
+    final line = _positionAt(b, local.dy).floor();
+    return (col, (line - (b.lines.length - _rows)).clamp(0, _rows - 1));
+  }
 
   void _report(TerminalModes to, Offset local, {int button = 0, bool release = false, bool motion = false}) {
     final cell = _screenCell(local);
@@ -467,6 +566,12 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     if (to != null && !HardwareKeyboard.instance.isShiftPressed) {
       _reporting = true;
       _report(to, e.localPosition);
+      return;
+    }
+    // A click on the pinned command takes you to it.
+    final sticky = _sticky(_buffer);
+    if (sticky != null && e.localPosition.dy < widget.padding.top + (sticky.lines + sticky.shift) * _cell.height) {
+      _scrollTo(sticky.block.start);
       return;
     }
     // Clicks in quick succession at the same spot count up: 2 word, 3 line.
@@ -675,6 +780,15 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final source = context.getInheritedWidgetOfExactType<AppScope>()?.notifier?.yourLines;
+    if (source == _yourLines) return;
+    _yourLines?.removeListener(_yourLinesChanged);
+    _yourLines = source?..addListener(_yourLinesChanged);
+  }
+
+  @override
   void didUpdateWidget(TerminalCanvas old) {
     super.didUpdateWidget(old);
     if (widget.active && !old.active) _grabKeyboard();
@@ -689,6 +803,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_modifierChanged);
+    _yourLines?.removeListener(_yourLinesChanged);
     _drops?.cancel();
     widget.surface.buffer.removeListener(_onBuffer);
     _barTimer?.cancel();
@@ -707,7 +822,9 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   }
 
   /// Scrollback keys: Shift+PageUp/PageDown a page, Shift+Home/End the
-  /// ends; on macOS also ⌘↑/⌘↓ a line and ⌘Home/⌘End the ends.
+  /// ends; on macOS also ⌘Home/⌘End the ends and ⌘↑/⌘↓ the previous or
+  /// next command (a line when the shell doesn't mark them; Ctrl+Shift+↑/↓
+  /// elsewhere).
   bool _scrollKey(KeyEvent event) {
     if (event is KeyUpEvent || _buffer.altScreen) return false;
     final keys = HardwareKeyboard.instance;
@@ -731,13 +848,14 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
         return true;
       }
     }
+    final arrow = key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown;
+    if (arrow && !_mac && keys.isControlPressed && keys.isShiftPressed && !keys.isAltPressed) {
+      return _jumpCommand(up: key == LogicalKeyboardKey.arrowUp);
+    }
     if (_mac && keys.isMetaPressed && !keys.isShiftPressed) {
-      if (key == LogicalKeyboardKey.arrowUp) {
-        _scrollBy(-1);
-        return true;
-      }
-      if (key == LogicalKeyboardKey.arrowDown) {
-        _scrollBy(1);
+      if (arrow) {
+        final up = key == LogicalKeyboardKey.arrowUp;
+        if (!_jumpCommand(up: up)) _scrollBy(up ? -1 : 1);
         return true;
       }
       if (key == LogicalKeyboardKey.home) {
@@ -840,6 +958,8 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
             selectionColor: c.acc.withValues(alpha: 0.32),
             showBar: _top != null || _barFlash || _barHover || _barDrag,
             barColor: c.text3.withValues(alpha: _barDrag || _barHover ? 0.55 : 0.35),
+            yourLines: _yl,
+            markColor: _yl.colorFor(c),
           ),
         ),
       );
@@ -980,6 +1100,8 @@ class _TerminalPainter extends CustomPainter {
     required this.selectionColor,
     this.showBar = false,
     required this.barColor,
+    this.yourLines = const YourLines(),
+    this.markColor = YourLines.defaultColor,
   }) : super(repaint: buffer);
 
   final ValueListenable<TermBuffer> buffer;
@@ -1000,6 +1122,10 @@ class _TerminalPainter extends CustomPainter {
   final Color selectionColor;
   final bool showBar;
   final Color barColor;
+  final YourLines yourLines;
+
+  /// The marks' color on this terminal (dark or light background).
+  final Color markColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1009,29 +1135,39 @@ class _TerminalPainter extends CustomPainter {
     final fit = math.max(1, ((size.height - padding.vertical) / lineExtent).floor());
     // Line-oriented surfaces (mocks) get +1 row for the prompt/cursor line.
     final maxLines = cursor != null ? fit : math.max(1, fit - 1);
-    final start = visibleStart(b, fit, top: top, reflows: reflows);
-    final offset = visibleOffset(b, fit, top: top, reflows: reflows, frac: frac);
+    final layout = yourLines.marks ? RowLayout.of(b, lineExtent) : RowLayout.none(lineExtent);
+    final at = viewTop(b, fit, top: top, reflows: reflows, frac: frac, layout: layout);
+    final start = at.floor();
+    final offset = at - start;
+    final atBottom = at >= bottomTop(b, fit, layout);
+    // Lines are drawn from the top of [start]'s slot; what's scrolled past
+    // of it goes in the shift below.
+    final base = layout.slotTop(start);
+    _lineY = (i) => padding.top + layout.lineTop(i) - base;
+    _textY = yourLines.marks ? (i) => _lineY(i) + foldShift(b, i, lineExtent) : _lineY;
     // Part of a line scrolled off the top shows part of one more below.
-    final end = math.min(b.lines.length, start + maxLines + (offset > 0 ? 1 : 0));
-    final atBottom = start + maxLines >= b.lines.length;
+    final room = (maxLines + (offset > 0 ? 1 : 0)) * lineExtent;
+    var end = start;
+    while (end < b.lines.length && layout.lineTop(end) - base < room + (layout.yOf(at) - base)) {
+      end++;
+    }
 
     canvas.save();
     canvas.clipRect(Offset.zero & size);
     // Shifted on whole device pixels, so text stays crisp mid-scroll.
     canvas
       ..save()
-      ..translate(0, -(offset * lineExtent * devicePixelRatio).round() / devicePixelRatio);
-    var y = padding.top;
+      ..translate(0, -((layout.yOf(at) - base) * devicePixelRatio).round() / devicePixelRatio);
+    if (yourLines.marks && b.blocks.isNotEmpty) _paintMarks(canvas, size, b, start, end);
     for (var i = start; i < end; i++) {
       final line = b.lines[i];
       if (line.spans.isNotEmpty) {
         canvas
           ..save()
-          ..translate(padding.left, y)
+          ..translate(padding.left, _textY(i))
           ..drawPicture(renderer.row(line))
           ..restore();
       }
-      y += lineExtent;
     }
     final sel = b.reflows == selectionReflows ? selection?.shifted(selectionDropped - b.dropped) : null;
     if (sel != null && !sel.isEmpty) {
@@ -1042,23 +1178,106 @@ class _TerminalPainter extends CustomPainter {
         // An empty line inside the selection shows as a sliver.
         final (from, to) = range;
         final right = to > from ? to * cellWidth : from * cellWidth + cellWidth / 2;
-        canvas.drawRect(Rect.fromLTRB(padding.left + from * cellWidth, padding.top + (i - start) * lineExtent, padding.left + right, padding.top + (i - start + 1) * lineExtent), paint);
+        canvas.drawRect(Rect.fromLTWH(padding.left + from * cellWidth, _textY(i), right - from * cellWidth, lineExtent), paint);
       }
     }
     if (cursor != null) {
       if (b.cursorVisible && cursor.$1 >= start && cursor.$1 < end) {
-        _paintCursor(canvas, b.lines[cursor.$1], cursor.$2, padding.top + (cursor.$1 - start) * lineExtent);
+        _paintCursor(canvas, b.lines[cursor.$1], cursor.$2, _textY(cursor.$1));
       }
     } else if (b.cursorVisible && atBottom) {
-      _paintPromptCursor(canvas, y);
+      _paintPromptCursor(canvas, _lineY(b.lines.length));
     }
     canvas.restore();
-    if (showBar && !b.altScreen && b.lines.length > maxLines) _paintBar(canvas, size, start + offset, b.lines.length - maxLines, maxLines, b.lines.length);
+    if (yourLines.sticky && !b.altScreen && b.blocks.isNotEmpty) {
+      final sticky = stickyCommand(b.blocks, start, offset);
+      if (sticky != null) _paintSticky(canvas, size, b, sticky);
+    }
+    if (showBar && !b.altScreen && b.lines.length > maxLines) _paintBar(canvas, size, at, bottomTop(b, fit, layout), maxLines, b.lines.length);
+    canvas.restore();
+  }
+
+  /// Top of buffer line `i` in this paint, past its gap (lines off screen
+  /// too).
+  late double Function(int) _lineY;
+
+  /// Where line `i`'s characters are drawn: [_lineY], or a folded
+  /// prompt's row (see [foldsPrompt]).
+  late double Function(int) _textY;
+
+  Color _markOf(CommandBlock block) => block.failed ? palette.err : markColor;
+
+  /// The mark behind [block]'s command lines, from [top] down [lines]
+  /// lines. Lines off screen still count, so a command half scrolled away
+  /// keeps its shape.
+  void _paintMark(Canvas canvas, Size size, CommandBlock block, double top, int lines) {
+    paintCommandMark(canvas, Rect.fromLTWH(0, top, size.width, lines * lineExtent), _markOf(block), yourLines);
+  }
+
+  /// Marks under the command lines on screen, one per command, and on a
+  /// finished command's first line its exit status or time (where the line
+  /// leaves room).
+  void _paintMarks(Canvas canvas, Size size, TermBuffer b, int start, int end) {
+    CommandBlock? last;
+    for (var i = start; i < end; i++) {
+      final block = blockAt(b.blocks, i);
+      if (block == null) continue;
+      if (!identical(block, last)) {
+        last = block;
+        // Its lines have no gaps among them: they're the command's.
+        _paintMark(canvas, size, block, _lineY(block.start), block.commandLines);
+      }
+      if (yourLines.meta && i == block.start) _paintMeta(canvas, size, block, b.lines[i], _textY(i));
+    }
+  }
+
+  void _paintMeta(Canvas canvas, Size size, CommandBlock block, TermLine line, double top) {
+    final meta = commandMeta(block);
+    if (meta == null) return;
+    final tp = TextPainter(
+      text: TextSpan(text: meta, style: style.copyWith(fontSize: style.fontSize! * 0.88, height: 1, color: block.failed ? palette.err : palette.text3)),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout();
+    final x = size.width - math.max(padding.right, markInsetRight + 8) - tp.width;
+    // Never over the command's own text.
+    if (padding.left + (lineWidth(line) + 2) * cellWidth <= x) tp.paint(canvas, Offset(x, top + (lineExtent - tp.height) / 2));
+    tp.dispose();
+  }
+
+  /// The command whose output fills the view, pinned at the top on frosted
+  /// glass, pushed up by the next one as it arrives.
+  void _paintSticky(Canvas canvas, Size size, TermBuffer b, StickyCommand sticky) {
+    final shift = sticky.shift * lineExtent;
+    // Room under its lines for the mark's bleed.
+    final bottom = padding.top + sticky.lines * lineExtent + shift + (yourLines.marks ? markBleed : 0);
+    if (bottom <= 0) return;
+    canvas
+      ..save()
+      ..clipRect(Rect.fromLTWH(0, 0, size.width, bottom));
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, bottom),
+      Paint()..color = palette.isDark ? const Color(0xF0181A24) : const Color(0xF0FAFAFD),
+    );
+    if (yourLines.marks) _paintMark(canvas, size, sticky.block, padding.top + shift, sticky.lines);
+    for (var k = 0; k < sticky.lines; k++) {
+      final i = sticky.block.start + k;
+      if (i < 0 || i >= b.lines.length) continue;
+      final top = padding.top + k * lineExtent + shift + (yourLines.marks && sticky.lines == 2 ? foldShift(b, i, lineExtent) : 0);
+      final line = b.lines[i];
+      if (line.spans.isNotEmpty) {
+        canvas
+          ..save()
+          ..translate(padding.left, top)
+          ..drawPicture(renderer.row(line))
+          ..restore();
+      }
+    }
     canvas.restore();
   }
 
   /// A thin thumb on the right edge: where the view is in the history.
-  void _paintBar(Canvas canvas, Size size, double start, int bottom, int fit, int total) {
+  void _paintBar(Canvas canvas, Size size, double start, double bottom, int fit, int total) {
     final track = size.height - 8;
     final thumb = scrollThumbExtent(track, fit, total);
     final y = 4.0 + (bottom <= 0 ? 0.0 : (track - thumb) * start / bottom);
@@ -1120,7 +1339,9 @@ class _TerminalPainter extends CustomPainter {
       old.selectionReflows != selectionReflows ||
       old.selectionColor != selectionColor ||
       old.showBar != showBar ||
-      old.barColor != barColor;
+      old.barColor != barColor ||
+      old.yourLines != yourLines ||
+      old.markColor != markColor;
 }
 
 /// The room kept under an agent's terminal for "it's asking you something".

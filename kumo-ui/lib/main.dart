@@ -17,6 +17,7 @@ import 'engine/engine_tests_source.dart';
 import 'engine/engine_workspace_source.dart';
 import 'engine/engine_worktree_changes.dart';
 import 'engine/kumo_engine.dart';
+import 'platform/app_icon.dart';
 import 'platform/new_window.dart';
 import 'platform/updates.dart';
 import 'platform/window_effects.dart';
@@ -29,6 +30,9 @@ Future<void> main() async {
   final primary = KumoEngine()..connection().ignore();
   await WindowEffects.init();
   final prefs = Preferences.load();
+  // The runner shows the last one already; this keeps it in step with the
+  // settings file.
+  AppIcons.apply(prefs).ignore();
   // A window opened for a workspace ("Open in new window") starts on it;
   // otherwise on the default one, then back to the last one used.
   final launched = launchWorkspace;

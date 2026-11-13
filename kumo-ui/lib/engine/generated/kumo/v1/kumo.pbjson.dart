@@ -910,6 +910,13 @@ const OpenRequest$json = {
     },
     {'1': 'cols', '3': 5, '4': 1, '5': 13, '10': 'cols'},
     {'1': 'rows', '3': 6, '4': 1, '5': 13, '10': 'rows'},
+    {
+      '1': 'shell_integration',
+      '3': 7,
+      '4': 1,
+      '5': 8,
+      '10': 'shellIntegration'
+    },
   ],
   '3': [OpenRequest_EnvEntry$json],
 };
@@ -929,7 +936,8 @@ final $typed_data.Uint8List openRequestDescriptor = $convert.base64Decode(
     'CgtPcGVuUmVxdWVzdBIYCgdwcm9ncmFtGAEgASgJUgdwcm9ncmFtEhIKBGFyZ3MYAiADKAlSBG'
     'FyZ3MSEAoDY3dkGAMgASgJUgNjd2QSLwoDZW52GAQgAygLMh0ua3Vtby52MS5PcGVuUmVxdWVz'
     'dC5FbnZFbnRyeVIDZW52EhIKBGNvbHMYBSABKA1SBGNvbHMSEgoEcm93cxgGIAEoDVIEcm93cx'
-    'o2CghFbnZFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFsdWU6AjgB');
+    'IrChFzaGVsbF9pbnRlZ3JhdGlvbhgHIAEoCFIQc2hlbGxJbnRlZ3JhdGlvbho2CghFbnZFbnRy'
+    'eRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFsdWU6AjgB');
 
 @$core.Deprecated('Use openResponseDescriptor instead')
 const OpenResponse$json = {
