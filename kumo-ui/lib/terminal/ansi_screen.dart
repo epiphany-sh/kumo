@@ -115,6 +115,7 @@ class AnsiScreen {
     for (final row in _grid) {
       lines.add(row.line);
     }
+    final (blocks, prompts) = _marked && !_onAltScreen ? _commands() : (const <CommandBlock>[], const <int>[]);
     return TermBuffer(
       lines,
       cursorVisible: _cursorVisible,
@@ -123,16 +124,18 @@ class AnsiScreen {
       dropped: _dropped,
       reflows: _reflows,
       altScreen: _onAltScreen,
-      blocks: _marked && !_onAltScreen ? _blocks() : const [],
+      blocks: blocks,
+      prompts: prompts,
     );
   }
 
-  /// The commands the marks on the rows describe, in order. A prompt (A)
-  /// opens one, its output (C) makes it a command, done (D) closes it. A
-  /// prompt left without running anything (Enter on an empty line, ^C)
-  /// is no command.
-  List<CommandBlock> _blocks() {
+  /// The commands the marks on the rows describe, in order, and the line
+  /// of every prompt. A prompt (A) opens one, its output (C) makes it a
+  /// command, done (D) closes it. A prompt left without running anything
+  /// (Enter on an empty line, ^C) is no command.
+  (List<CommandBlock>, List<int>) _commands() {
     final out = <CommandBlock>[];
+    final prompts = <int>[];
     int? start, output, outputAt;
     void close(int end, int? exit, int? at) {
       final from = output!;
@@ -153,6 +156,7 @@ class AnsiScreen {
           case _Mark.prompt:
             // A command still open here ended without a D (no exit status).
             if (start != null && output != null) close(m.col > 0 ? y + 1 : y, null, null);
+            if (prompts.isEmpty || prompts.last != y) prompts.add(y);
             start = y;
             output = outputAt = null;
           case _Mark.output:
@@ -170,7 +174,7 @@ class AnsiScreen {
     _scrollback.forEach(scan);
     _grid.forEach(scan);
     if (start != null && output != null) out.add(CommandBlock(start: start!, outputStart: output!));
-    return out;
+    return (out, prompts);
   }
 
   /// Re-wraps the main screen and its scrollback to the new width, like

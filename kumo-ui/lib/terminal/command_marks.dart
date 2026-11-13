@@ -224,6 +224,38 @@ class YourLines {
   int get hashCode => Object.hash(marks, band, bandAlpha, bar, dark, light, meta, sticky);
 }
 
+/// How far the mark sits from the pane's left edge, and from its right
+/// one (clear of the scrollbar).
+const markInsetLeft = 5.0;
+const markInsetRight = 12.0;
+
+/// How far the mark reaches past its lines, above and below, into the gap
+/// the terminal leaves around them (`commandGap`, 10): a prompt drawn in
+/// pills fills its cells, and would touch the edges otherwise.
+const markBleed = 4.0;
+
+/// One command's mark over [area] (its lines, the width of the pane, and
+/// [markBleed] past them so they sit centered in it): a rounded card of
+/// the color, fading to the right so the line's end stays clean, and the
+/// bar as a pill inside its left edge.
+void paintCommandMark(Canvas canvas, Rect area, Color color, YourLines lines) {
+  final card = Rect.fromLTRB(area.left + markInsetLeft, area.top - markBleed, area.right - markInsetRight, area.bottom + markBleed);
+  if (card.width <= 0 || card.height <= 0) return;
+  if (lines.band) {
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(card, const Radius.circular(7)),
+      Paint()
+        ..shader = LinearGradient(colors: [
+          color.withValues(alpha: lines.bandAlpha),
+          color.withValues(alpha: lines.bandAlpha * 0.3),
+        ]).createShader(card),
+    );
+  }
+  final inset = math.min(6.0, card.height / 4);
+  final pill = Rect.fromLTWH(card.left + 3, card.top + inset, lines.bar, card.height - inset * 2);
+  canvas.drawRRect(RRect.fromRectAndRadius(pill, Radius.circular(lines.bar / 2)), Paint()..color = color);
+}
+
 /// The swatches in Settings, for dark terminals. Light ones are these,
 /// through [forLightTerminal].
 const yourLinesPresets = <(String, Color)>[

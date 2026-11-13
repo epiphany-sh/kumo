@@ -245,6 +245,7 @@ void main() {
     // Marks off: only the switch and the pinned command are left.
     final marks = find.byWidgetPredicate((w) => w is KSwitch && w.label == 'Mark what you ran');
     await tester.ensureVisible(marks);
+    await tester.pump();
     await tester.tap(marks);
     await tester.pump();
     expect(state.yourLines.value.marks, isFalse);

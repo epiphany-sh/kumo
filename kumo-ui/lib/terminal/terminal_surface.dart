@@ -83,7 +83,7 @@ class TermLine {
 /// screen state (dirty-line diffs from the daemon); in M0/M1 raw bytes.
 @immutable
 class TermBuffer {
-  const TermBuffer(this.lines, {this.cursorVisible = true, this.cursor, this.seq = 0, this.dropped = 0, this.reflows = 0, this.altScreen = false, this.blocks = const []});
+  const TermBuffer(this.lines, {this.cursorVisible = true, this.cursor, this.seq = 0, this.dropped = 0, this.reflows = 0, this.altScreen = false, this.blocks = const [], this.prompts = const []});
   final List<TermLine> lines;
   final bool cursorVisible;
 
@@ -109,6 +109,10 @@ class TermBuffer {
   /// The commands run here, in order, when the shell marks them (shell
   /// integration, OSC 133): what you ran gets marked, and its line pinned.
   final List<CommandBlock> blocks;
+
+  /// The line of every prompt the shell marked, commands or not (Enter on
+  /// an empty line), in order: each gets room above it.
+  final List<int> prompts;
 
   /// [more] lines at the end; [block] marks the first of them as something
   /// you sent (mocks: a steer message), which ends the block before it.

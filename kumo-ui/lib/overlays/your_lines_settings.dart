@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../terminal/command_marks.dart';
+import '../terminal/row_layout.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/controls.dart';
@@ -175,20 +176,16 @@ class _MiniTerminal extends StatelessWidget {
   /// A [command] you ran (with its [mark] when marks are on), or output.
   Widget _line(String text, {bool command = false, Color? mark, String? meta, Color? color}) {
     final style = mono(11.5, color: color ?? (command ? palette.text : palette.text2), height: 1.4);
-    return Container(
+    // Inset like the terminal's text, clear of the mark's right edge.
+    final row = Container(
       height: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: mark == null
-          ? null
-          : BoxDecoration(
-              color: lines.band ? mark.withValues(alpha: lines.bandAlpha) : null,
-              border: Border(left: BorderSide(color: mark, width: lines.bar)),
-            ),
+      padding: const EdgeInsets.fromLTRB(14, 0, markInsetRight + 8, 0),
       child: Row(children: [
         Expanded(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: style)),
         if (meta != null) Text(meta, style: mono(10.5, color: mark ?? palette.text3, height: 1.4)),
       ]),
     );
+    return mark == null ? row : CustomPaint(painter: _MarkPainter(mark, lines), child: row);
   }
 
   @override
@@ -206,11 +203,29 @@ class _MiniTerminal extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // The room the terminal leaves around what you ran.
+        if (on) const SizedBox(height: commandGap / 2),
         _line('❯ git pull --rebase', command: true, mark: mine),
+        if (on) const SizedBox(height: commandGap),
         _line('Already up to date.'),
+        if (on) const SizedBox(height: commandGap),
         _line('❯ go test ./kafka/...', command: true, mark: failed, meta: on && lines.meta ? 'exit 1 · 12s' : null),
+        if (on) const SizedBox(height: commandGap),
         _line('--- FAIL: TestConsumerRebalance (12.04s)', color: palette.err),
       ]),
     );
   }
+}
+
+/// The terminal's own mark (see [paintCommandMark]) behind a preview line.
+class _MarkPainter extends CustomPainter {
+  const _MarkPainter(this.color, this.lines);
+  final Color color;
+  final YourLines lines;
+
+  @override
+  void paint(Canvas canvas, Size size) => paintCommandMark(canvas, Offset.zero & size, color, lines);
+
+  @override
+  bool shouldRepaint(_MarkPainter old) => old.color != color || old.lines != lines;
 }

@@ -75,6 +75,15 @@ List<(int, int)> _cells(TermLine line) {
   return out;
 }
 
+/// Cell of [line]'s first character other than a blank; null when it's
+/// all blank.
+int? firstInk(TermLine line) {
+  for (final (rune, col) in _cells(line)) {
+    if (rune != 0x20) return col;
+  }
+  return null;
+}
+
 /// Width of [line] in cells, trailing blanks excluded.
 int lineWidth(TermLine line) {
   var width = 0;
