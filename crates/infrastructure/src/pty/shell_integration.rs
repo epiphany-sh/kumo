@@ -147,6 +147,11 @@ mod tests {
         }
     }
 
+    /// [name] in the scripts' folder, with the OS's separator.
+    fn script(name: &str) -> String {
+        scripts().dir.join(name).display().to_string()
+    }
+
     fn spec(program: &str, args: &[&str]) -> LaunchSpec {
         LaunchSpec::new(program)
             .unwrap()
@@ -158,7 +163,7 @@ mod tests {
         let applied =
             scripts().apply(spec("/bin/zsh", &["-l"]).with_var("ZDOTDIR", "/home/u/.config/zsh"));
         assert_eq!(applied.args(), ["-l"]);
-        assert_eq!(applied.var("ZDOTDIR"), Some("/data/kumo/shell/zsh"));
+        assert_eq!(applied.var("ZDOTDIR"), Some(script("zsh").as_str()));
         assert_eq!(
             applied.var("KUMO_USER_ZDOTDIR"),
             Some("/home/u/.config/zsh")
@@ -170,7 +175,7 @@ mod tests {
         let applied = scripts().apply(spec("/bin/bash", &["-l"]));
         assert_eq!(
             applied.args(),
-            ["--init-file", "/data/kumo/shell/kumo.bash", "-i"]
+            ["--init-file", script("kumo.bash").as_str(), "-i"]
         );
         assert_eq!(applied.var("KUMO_BASH_LOGIN"), Some("1"));
 
@@ -184,7 +189,7 @@ mod tests {
         assert_eq!(applied.args()[..2], ["-l", "--init-command"]);
         assert_eq!(
             applied.var("KUMO_FISH_INTEGRATION"),
-            Some("/data/kumo/shell/kumo.fish")
+            Some(script("kumo.fish").as_str())
         );
     }
 
