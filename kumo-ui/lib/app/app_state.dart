@@ -292,6 +292,43 @@ class AppState extends ChangeNotifier {
 
   /// Keeps the width for the next launch (once a drag ends, not per frame).
   void saveSidebarWidth() => prefs.set('sidebar.width', _sidebarWidth);
+
+  /// Whether the sidebar keeps which repositories are folded for the next
+  /// launch. Off, every repository opens expanded again. Namespaces keep
+  /// their fold either way: the daemon stores it with the namespace.
+  bool get rememberSidebarFolds => prefs.get<bool>('sidebar.rememberFolds', true);
+  set rememberSidebarFolds(bool v) {
+    prefs.set('sidebar.rememberFolds', v);
+    _saveRepoFolds();
+    notifyListeners();
+  }
+
+  /// Folded repositories, as `namespace id/repo id`: the same repository
+  /// can sit in two namespaces and fold in each on its own.
+  late final Set<String> _foldedRepos = {
+    if (rememberSidebarFolds) ...prefs.get<List<Object?>>('sidebar.foldedRepos', const []).whereType<String>(),
+  };
+
+  bool isRepoFolded(String namespace, Repo repo) => _foldedRepos.contains('$namespace/${repo.id}');
+
+  void toggleRepoFolded(String namespace, Repo repo) {
+    final key = '$namespace/${repo.id}';
+    if (!_foldedRepos.remove(key)) _foldedRepos.add(key);
+    _saveRepoFolds();
+    notifyListeners();
+  }
+
+  void _saveRepoFolds() {
+    if (!rememberSidebarFolds) {
+      prefs.set('sidebar.foldedRepos', null);
+      return;
+    }
+    // Folds of namespaces that are gone are dropped on the way out.
+    final live = {for (final n in workspace.namespaces) n.id};
+    final keep = [for (final k in _foldedRepos) if (live.contains(k.split('/').first)) k]..sort();
+    prefs.set('sidebar.foldedRepos', keep.isEmpty ? null : keep);
+  }
+
   void toggleSidebar() {
     _sidebarVisible = !_sidebarVisible;
     notifyListeners();

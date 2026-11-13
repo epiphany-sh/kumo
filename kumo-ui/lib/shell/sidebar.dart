@@ -736,7 +736,7 @@ class _NamespaceGroupState extends State<_NamespaceGroup> {
           ),
         ),
         if (!ns.collapsed)
-          for (final r in repos) _RepoGroup(key: ValueKey('${ns.id}/${r.name}'), repo: r, signal: widget.signalRepo == r.name),
+          for (final r in repos) _RepoGroup(key: ValueKey('${ns.id}/${r.name}'), namespace: ns.id, repo: r, signal: widget.signalRepo == r.name),
       ]),
     );
   }
@@ -919,7 +919,10 @@ class _NewNamespaceRow extends StatelessWidget {
 }
 
 class _RepoGroup extends StatefulWidget {
-  const _RepoGroup({super.key, required this.repo, this.signal = false});
+  const _RepoGroup({super.key, required this.namespace, required this.repo, this.signal = false});
+
+  /// The namespace it is listed under: folding is per namespace.
+  final String namespace;
   final Repo repo;
 
   /// This row's + also answers ⇧⌘N.
@@ -930,7 +933,6 @@ class _RepoGroup extends StatefulWidget {
 }
 
 class _RepoGroupState extends State<_RepoGroup> {
-  bool _open = true;
   String? _menuFor;
 
   /// (worktree path, what) just copied: its status line says so briefly.
@@ -968,19 +970,20 @@ class _RepoGroupState extends State<_RepoGroup> {
     final s = AppScope.of(context);
     final c = context.c;
     final r = widget.repo;
+    final open = !s.isRepoFolded(widget.namespace, r);
     return Padding(
       // Projects breathe apart; their worktrees stay close together.
       padding: const EdgeInsets.only(bottom: 14, left: 4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         KPressable(
-          onTap: () => setState(() => _open = !_open),
-          semanticLabel: '${r.name}, ${_open ? 'collapse' : 'expand'}',
+          onTap: () => s.toggleRepoFolded(widget.namespace, r),
+          semanticLabel: '${r.name}, ${open ? 'collapse' : 'expand'}',
           builder: (context, hover, focus) => Container(
             height: 28,
             padding: const EdgeInsets.only(left: 8, right: 2),
             decoration: BoxDecoration(color: hover ? c.tile : null, borderRadius: BorderRadius.circular(8)),
             child: Row(children: [
-              Icon(_open ? KIcons.chevronDown : KIcons.chevronRight, size: 14, color: c.text3),
+              Icon(open ? KIcons.chevronDown : KIcons.chevronRight, size: 14, color: c.text3),
               const SizedBox(width: 6),
               Icon(KIcons.repo, size: 15, color: c.text2),
               const SizedBox(width: 8),
@@ -1009,7 +1012,7 @@ class _RepoGroupState extends State<_RepoGroup> {
             ]),
           ),
         ),
-        if (_open)
+        if (open)
           for (final w in s.worktreesOf(r))
             GestureDetector(
               onSecondaryTapDown: (d) => _openMenu(w, d.globalPosition),
