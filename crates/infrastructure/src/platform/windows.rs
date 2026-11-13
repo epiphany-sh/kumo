@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn canonical_paths_are_plain() {
         let dir = tempfile::tempdir().unwrap();
-        let path = super::super::canonical(dir.path().to_path_buf());
+        let path = super::super::canonical(dir.path());
         assert!(
             !path.to_string_lossy().starts_with(r"\\?\"),
             "{}",
