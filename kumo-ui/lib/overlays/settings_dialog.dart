@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
 import '../platform/os/host_os.dart';
+import '../terminal/command_marks.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/profile_tile.dart';
@@ -16,6 +17,7 @@ import 'docs_settings.dart';
 import 'host_settings.dart';
 import 'task_settings.dart';
 import 'workspace_settings.dart';
+import 'your_lines_settings.dart';
 
 enum SettingsTab {
   general('General', Icons.settings_outlined),
@@ -206,7 +208,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           ]),
         ]);
       case SettingsTab.appearance:
-        return _Page('Appearance', 'Liquid Glass themes and translucency.', sections: [
+        return _Page('Appearance', 'Liquid Glass themes, translucency, and how the lines you run look in the terminal.', sections: [
           ('Theme', [
             _Row(label: 'Theme', control: _ThemePicker(value: s.mode, onChanged: (m) => s.mode = m)),
             _Row(
@@ -221,6 +223,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
               onChanged: (_) => s.toggleDemoWallpaper(),
             ),
           ]),
+          ('Your lines in the terminal', _yourLinesRows(s)),
           ('Files', [
             _SegRow(
               label: 'File icons',
@@ -256,6 +259,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
             _KbdRow('Split right', ['⌘', 'D']),
             _KbdRow('Split down', ['⇧', '⌘', 'D']),
             _KbdRow('Close pane', ['⌘', 'W']),
+            _KbdRow('Previous command you ran', ['⌘', '↑']),
+            _KbdRow('Next command you ran', ['⌘', '↓']),
             _KbdRow('Show / hide side panel', ['⌥', '⌘', 'B']),
           ]),
           ('Workspace', const [
@@ -338,6 +343,71 @@ class _SettingsDialogState extends State<SettingsDialog> {
           custom: const DocsSourcesPanel(),
         );
     }
+  }
+
+  /// Marks on what you ran and the pinned command (see [YourLines]).
+  List<Widget> _yourLinesRows(AppState s) {
+    final yl = s.yourLines.value;
+    final sticky = _toggle(
+      s,
+      YourLines.keySticky,
+      'Keep the command on top',
+      'While its output scrolls, the line you ran stays pinned at the top of the pane until you run the next one.',
+      true,
+    );
+    final on = _toggle(
+      s,
+      YourLines.keyOn,
+      'Mark what you ran',
+      'A bar, and a faint band if you want, on the commands you typed. Output isn’t touched. Needs Kumo’s shell integration (zsh, bash and fish).',
+      true,
+    );
+    if (!yl.marks) return [on, sticky];
+    final own = s.setting<String>(YourLines.keyLightMode, 'auto') == 'own';
+    final auto = forLightTerminal(yl.dark, terminalBackground(KumoPalette.light));
+    final light = yl.colorFor(KumoPalette.light);
+    String withNote(String desc, String? note) => note == null ? desc : '$desc $note';
+    return [
+      on,
+      _SegRow(
+        label: 'Style',
+        desc: 'Bar only is the quietest.',
+        options: const ['Bar + band', 'Bar only'],
+        value: yl.band ? 'Bar + band' : 'Bar only',
+        onChanged: (v) => s.setSetting(YourLines.keyStyle, v == 'Bar only' ? 'bar' : 'barBand'),
+      ),
+      _Row(
+        label: 'Color on dark terminals',
+        desc: withNote('Dark theme, and Hybrid (its terminal is dark). Failed commands stay red.', lowContrastNote(yl.dark, KumoPalette.dark)),
+        control: MarkSwatches(label: 'Color on dark terminals', presets: yourLinesPresets, value: yl.dark, onChanged: (c) => s.setSetting(YourLines.keyDark, hexOf(c))),
+      ),
+      _SegRow(
+        label: 'On light terminals',
+        desc: own ? 'Its own color, for when the darker version of yours doesn’t look right.' : 'Same hue, darkened until it reads on white: ${hexOf(auto)}.',
+        options: const ['Auto', 'Own color'],
+        value: own ? 'Own color' : 'Auto',
+        onChanged: (v) => s.setSetting(YourLines.keyLightMode, v == 'Own color' ? 'own' : 'auto'),
+      ),
+      if (own)
+        _Row(
+          label: 'Color on light terminals',
+          desc: withNote('Presets are the dark ones, darkened.', lowContrastNote(light, KumoPalette.light)),
+          control: MarkSwatches(label: 'Color on light terminals', presets: lightPresets(), value: light, onChanged: (c) => s.setSetting(YourLines.keyLight, hexOf(c))),
+        ),
+      if (yl.band)
+        _Row(
+          label: 'Band strength',
+          desc: 'How much of the color fills the line.',
+          control: _StepSlider(label: 'Band strength', value: yl.bandAlpha * 100, min: 2, max: 30, unit: '%', onChanged: (v) => s.setSetting(YourLines.keyBand, v)),
+        ),
+      _Row(
+        label: 'Bar width',
+        control: _StepSlider(label: 'Bar width', value: yl.bar, min: 1, max: 5, unit: ' px', onChanged: (v) => s.setSetting(YourLines.keyBar, v)),
+      ),
+      _toggle(s, YourLines.keyMeta, 'Exit code and time', 'On a command that failed or that you stopped, and the time when it took 10 seconds or more.', true),
+      sticky,
+      _Row(label: 'Preview', desc: 'Both terminals, as you tune them. Hybrid uses the dark one.', control: YourLinesPreview(lines: yl)),
+    ];
   }
 
   // Rows backed by AppState.setting / setSetting (persisted).
@@ -679,6 +749,48 @@ class _PercentSlider extends StatelessWidget {
         ),
       ),
       SizedBox(width: 40, child: Text('${(value * 100).round()}%', textAlign: TextAlign.right, style: mono(11.5, color: c.text2))),
+    ]);
+  }
+}
+
+/// A whole-number slider with its value and [unit] next to it.
+class _StepSlider extends StatelessWidget {
+  const _StepSlider({required this.label, required this.value, required this.min, required this.max, required this.unit, required this.onChanged});
+  final String label;
+  final double value;
+  final int min;
+  final int max;
+  final String unit;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final v = value.round().clamp(min, max);
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      SizedBox(
+        width: 160,
+        child: SliderTheme(
+          data: SliderThemeData(
+            trackHeight: 4,
+            activeTrackColor: c.accFill,
+            inactiveTrackColor: c.tile,
+            thumbColor: const Color(0xFFFFFFFF),
+            overlayColor: c.accSoft,
+          ),
+          child: Slider(
+            value: v.toDouble(),
+            min: min.toDouble(),
+            max: max.toDouble(),
+            divisions: max - min,
+            onChanged: (x) {
+              if (x.round() != v) onChanged(x.round());
+            },
+            semanticFormatterCallback: (x) => '$label ${x.round()}$unit',
+          ),
+        ),
+      ),
+      SizedBox(width: 44, child: Text('$v$unit', textAlign: TextAlign.right, style: mono(11.5, color: c.text2))),
     ]);
   }
 }

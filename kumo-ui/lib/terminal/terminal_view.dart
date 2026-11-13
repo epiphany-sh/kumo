@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter/services.dart';
 
+import '../app/app_state.dart';
 import '../engine/grpc_terminal_surface.dart';
 import '../platform/open_url.dart';
 import '../platform/pasteboard.dart';
@@ -17,6 +18,7 @@ import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/context_menu.dart';
 import '../widgets/kicons.dart';
+import 'command_marks.dart';
 import 'grid_renderer.dart';
 import 'term_selection.dart';
 import 'terminal_keys.dart';
@@ -114,6 +116,13 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   late final Ticker _fling;
   Duration _lastCoast = Duration.zero;
   Offset _coastAt = Offset.zero;
+
+  // ---- Your lines: marks on what you ran, the command pinned on top
+  // (Settings → Appearance). Without the app around (tests), the defaults.
+  ValueListenable<YourLines>? _yourLines;
+  YourLines get _yl => _yourLines?.value ?? const YourLines();
+
+  void _yourLinesChanged() => setState(() {});
 
   /// Geometry of the last layout, to map the pointer to cells.
   Size _cell = const Size(7, 15);
@@ -287,6 +296,38 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   void _toBottom() {
     if (_top == null) return;
     setState(() => _top = null);
+  }
+
+  /// The command pinned on top right now, if any.
+  StickyCommand? _sticky(TermBuffer b) {
+    if (!_yl.sticky || b.altScreen || b.blocks.isEmpty) return null;
+    _syncReflows(b);
+    return stickyCommand(b.blocks, _firstLine(b), _offset(b));
+  }
+
+  /// ⌘↑ / ⌘↓ with commands marked: the previous or next one at the top.
+  /// False when there are no marks (the keys scroll a line instead).
+  bool _jumpCommand({required bool up}) {
+    final b = _buffer;
+    if (b.blocks.isEmpty) return false;
+    _syncReflows(b);
+    final here = _firstLine(b) + _offset(b);
+    if (!up) {
+      final next = nextBlock(b.blocks, here);
+      if (next == null || next.start >= _bottomLine(b)) {
+        _toBottom();
+      } else {
+        _scrollTo(next.start);
+      }
+      return true;
+    }
+    // Commands near the bottom can't reach the top: go on to one that can.
+    num at = here;
+    while (true) {
+      final prev = previousBlock(b.blocks, at);
+      if (prev == null || _scrollTo(prev.start)) return true;
+      at = prev.start;
+    }
   }
 
   void _flashBar() {
@@ -467,6 +508,12 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     if (to != null && !HardwareKeyboard.instance.isShiftPressed) {
       _reporting = true;
       _report(to, e.localPosition);
+      return;
+    }
+    // A click on the pinned command takes you to it.
+    final sticky = _sticky(_buffer);
+    if (sticky != null && e.localPosition.dy < widget.padding.top + (sticky.lines + sticky.shift) * _cell.height) {
+      _scrollTo(sticky.block.start);
       return;
     }
     // Clicks in quick succession at the same spot count up: 2 word, 3 line.
@@ -675,6 +722,15 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final source = context.getInheritedWidgetOfExactType<AppScope>()?.notifier?.yourLines;
+    if (source == _yourLines) return;
+    _yourLines?.removeListener(_yourLinesChanged);
+    _yourLines = source?..addListener(_yourLinesChanged);
+  }
+
+  @override
   void didUpdateWidget(TerminalCanvas old) {
     super.didUpdateWidget(old);
     if (widget.active && !old.active) _grabKeyboard();
@@ -689,6 +745,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_modifierChanged);
+    _yourLines?.removeListener(_yourLinesChanged);
     _drops?.cancel();
     widget.surface.buffer.removeListener(_onBuffer);
     _barTimer?.cancel();
@@ -707,7 +764,9 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   }
 
   /// Scrollback keys: Shift+PageUp/PageDown a page, Shift+Home/End the
-  /// ends; on macOS also ⌘↑/⌘↓ a line and ⌘Home/⌘End the ends.
+  /// ends; on macOS also ⌘Home/⌘End the ends and ⌘↑/⌘↓ the previous or
+  /// next command (a line when the shell doesn't mark them; Ctrl+Shift+↑/↓
+  /// elsewhere).
   bool _scrollKey(KeyEvent event) {
     if (event is KeyUpEvent || _buffer.altScreen) return false;
     final keys = HardwareKeyboard.instance;
@@ -731,13 +790,14 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
         return true;
       }
     }
+    final arrow = key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown;
+    if (arrow && !_mac && keys.isControlPressed && keys.isShiftPressed && !keys.isAltPressed) {
+      return _jumpCommand(up: key == LogicalKeyboardKey.arrowUp);
+    }
     if (_mac && keys.isMetaPressed && !keys.isShiftPressed) {
-      if (key == LogicalKeyboardKey.arrowUp) {
-        _scrollBy(-1);
-        return true;
-      }
-      if (key == LogicalKeyboardKey.arrowDown) {
-        _scrollBy(1);
+      if (arrow) {
+        final up = key == LogicalKeyboardKey.arrowUp;
+        if (!_jumpCommand(up: up)) _scrollBy(up ? -1 : 1);
         return true;
       }
       if (key == LogicalKeyboardKey.home) {
@@ -840,6 +900,8 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
             selectionColor: c.acc.withValues(alpha: 0.32),
             showBar: _top != null || _barFlash || _barHover || _barDrag,
             barColor: c.text3.withValues(alpha: _barDrag || _barHover ? 0.55 : 0.35),
+            yourLines: _yl,
+            markColor: _yl.colorFor(c),
           ),
         ),
       );
@@ -980,6 +1042,8 @@ class _TerminalPainter extends CustomPainter {
     required this.selectionColor,
     this.showBar = false,
     required this.barColor,
+    this.yourLines = const YourLines(),
+    this.markColor = YourLines.defaultColor,
   }) : super(repaint: buffer);
 
   final ValueListenable<TermBuffer> buffer;
@@ -1000,6 +1064,10 @@ class _TerminalPainter extends CustomPainter {
   final Color selectionColor;
   final bool showBar;
   final Color barColor;
+  final YourLines yourLines;
+
+  /// The marks' color on this terminal (dark or light background).
+  final Color markColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1021,6 +1089,7 @@ class _TerminalPainter extends CustomPainter {
     canvas
       ..save()
       ..translate(0, -(offset * lineExtent * devicePixelRatio).round() / devicePixelRatio);
+    if (yourLines.marks && b.blocks.isNotEmpty) _paintMarks(canvas, size, b, start, end);
     var y = padding.top;
     for (var i = start; i < end; i++) {
       final line = b.lines[i];
@@ -1053,7 +1122,76 @@ class _TerminalPainter extends CustomPainter {
       _paintPromptCursor(canvas, y);
     }
     canvas.restore();
+    if (yourLines.sticky && !b.altScreen && b.blocks.isNotEmpty) {
+      final sticky = stickyCommand(b.blocks, start, offset);
+      if (sticky != null) _paintSticky(canvas, size, b, sticky);
+    }
     if (showBar && !b.altScreen && b.lines.length > maxLines) _paintBar(canvas, size, start + offset, b.lines.length - maxLines, maxLines, b.lines.length);
+    canvas.restore();
+  }
+
+  Color _markOf(CommandBlock block) => block.failed ? palette.err : markColor;
+
+  /// Bar (and band) behind one line of [block] you ran, its top at [top].
+  void _paintMark(Canvas canvas, Size size, CommandBlock block, double top) {
+    final color = _markOf(block);
+    if (yourLines.band) canvas.drawRect(Rect.fromLTWH(0, top, size.width, lineExtent), Paint()..color = color.withValues(alpha: yourLines.bandAlpha));
+    canvas.drawRect(Rect.fromLTWH(0, top, yourLines.bar, lineExtent), Paint()..color = color);
+  }
+
+  /// Marks under the command lines on screen, and on a finished command's
+  /// first line its exit status or time (where the line leaves room).
+  void _paintMarks(Canvas canvas, Size size, TermBuffer b, int start, int end) {
+    for (var i = start; i < end; i++) {
+      final block = blockAt(b.blocks, i);
+      if (block == null) continue;
+      final top = padding.top + (i - start) * lineExtent;
+      _paintMark(canvas, size, block, top);
+      if (yourLines.meta && i == block.start) _paintMeta(canvas, size, block, b.lines[i], top);
+    }
+  }
+
+  void _paintMeta(Canvas canvas, Size size, CommandBlock block, TermLine line, double top) {
+    final meta = commandMeta(block);
+    if (meta == null) return;
+    final tp = TextPainter(
+      text: TextSpan(text: meta, style: style.copyWith(fontSize: style.fontSize! * 0.88, height: 1, color: block.failed ? palette.err : palette.text3)),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout();
+    final x = size.width - padding.right - tp.width;
+    // Never over the command's own text.
+    if (padding.left + (lineWidth(line) + 2) * cellWidth <= x) tp.paint(canvas, Offset(x, top + (lineExtent - tp.height) / 2));
+    tp.dispose();
+  }
+
+  /// The command whose output fills the view, pinned at the top on frosted
+  /// glass, pushed up by the next one as it arrives.
+  void _paintSticky(Canvas canvas, Size size, TermBuffer b, StickyCommand sticky) {
+    final shift = sticky.shift * lineExtent;
+    final bottom = padding.top + sticky.lines * lineExtent + shift;
+    if (bottom <= 0) return;
+    canvas
+      ..save()
+      ..clipRect(Rect.fromLTWH(0, 0, size.width, bottom));
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, bottom),
+      Paint()..color = palette.isDark ? const Color(0xF0181A24) : const Color(0xF0FAFAFD),
+    );
+    for (var k = 0; k < sticky.lines; k++) {
+      final i = sticky.block.start + k;
+      if (i < 0 || i >= b.lines.length) continue;
+      final top = padding.top + k * lineExtent + shift;
+      if (yourLines.marks) _paintMark(canvas, size, sticky.block, top);
+      final line = b.lines[i];
+      if (line.spans.isNotEmpty) {
+        canvas
+          ..save()
+          ..translate(padding.left, top)
+          ..drawPicture(renderer.row(line))
+          ..restore();
+      }
+    }
     canvas.restore();
   }
 
@@ -1120,7 +1258,9 @@ class _TerminalPainter extends CustomPainter {
       old.selectionReflows != selectionReflows ||
       old.selectionColor != selectionColor ||
       old.showBar != showBar ||
-      old.barColor != barColor;
+      old.barColor != barColor ||
+      old.yourLines != yourLines ||
+      old.markColor != markColor;
 }
 
 /// The room kept under an agent's terminal for "it's asking you something".

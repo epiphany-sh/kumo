@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'command_marks.dart';
 import 'terminal_surface.dart';
 
 /// Scripted terminal for the UI mock. Optionally "streams" [script] lines one
@@ -14,8 +15,10 @@ class MockTerminalSurface implements TerminalSurface {
     List<TermLine> script = const [],
     Duration interval = const Duration(milliseconds: 1400),
     this.loop = false,
-  })  : _buffer = ValueNotifier(TermBuffer(initial)),
+    List<CommandBlock> blocks = const [],
+  })  : _buffer = ValueNotifier(TermBuffer(initial, blocks: blocks)),
         _initial = initial,
+        _blocks = blocks,
         _script = script {
     if (script.isNotEmpty) _timer = Timer.periodic(interval, (_) => _tick());
   }
@@ -28,6 +31,7 @@ class MockTerminalSurface implements TerminalSurface {
 
   final ValueNotifier<TermBuffer> _buffer;
   final List<TermLine> _initial;
+  final List<CommandBlock> _blocks;
   final List<TermLine> _script;
   Timer? _timer;
   int _next = 0;
@@ -44,7 +48,7 @@ class MockTerminalSurface implements TerminalSurface {
         return;
       }
       _next = 0;
-      _buffer.value = TermBuffer(_initial, seq: _buffer.value.seq + 1);
+      _buffer.value = TermBuffer(_initial, seq: _buffer.value.seq + 1, blocks: _blocks);
     }
     _buffer.value = _buffer.value.append([_script[_next++]]);
   }
@@ -52,9 +56,10 @@ class MockTerminalSurface implements TerminalSurface {
   @override
   void sendText(String text) {
     if (text.trim().isEmpty) return;
+    // What you sent is marked like a command you ran.
     _buffer.value = _buffer.value.append([
       TermLine.of([('› you  ', TermRole.purple), (text, TermRole.text)]),
-    ]);
+    ], block: true);
   }
 
   @override
@@ -97,10 +102,14 @@ abstract final class MockSessions {
         ],
       );
 
+  /// The command on the first line, still running.
+  static const _ran = [CommandBlock(start: 0, outputStart: 1)];
+
   static MockTerminalSurface agent() => MockTerminalSurface(
         title: 'Claude Code',
         cwd: '~/wt/price-admin/PRC-412',
         loop: true,
+        blocks: _ran,
         initial: [
           TermLine.of([('❯ ', TermRole.acc), ('kumo agent run ', TermRole.text), ('--ticket ', TermRole.text3), ('PRC-412 ', TermRole.purple), ('--agent ', TermRole.text3), ('claude', TermRole.text)]),
           TermLine.of([('  worktree ', TermRole.text3), ('~/wt/price-admin/PRC-412', TermRole.cyan), ('  branch ', TermRole.text3), ('feat/PRC-412-bulk-discounts', TermRole.ok)]),
@@ -128,6 +137,7 @@ abstract final class MockSessions {
   static MockTerminalSurface tests() => MockTerminalSurface(
         title: 'gotestsum',
         cwd: 'watch',
+        blocks: _ran,
         initial: [
           TermLine.of([('PRC-412 ', TermRole.cyan), ('❯ ', TermRole.acc), ('gotestsum --watch ./...', TermRole.text)]),
           TermLine.of([('✓ ', TermRole.ok), ('internal/discount ', TermRole.text), ('412ms', TermRole.text3)]),
@@ -145,6 +155,7 @@ abstract final class MockSessions {
         cwd: 'gke-staging / pricing',
         loop: true,
         interval: const Duration(milliseconds: 900),
+        blocks: _ran,
         initial: [
           TermLine.of([('❯ ', TermRole.acc), ('kubectl logs -f deploy/price-reader-v2', TermRole.text)]),
           TermLine.of([('14:02:11 ', TermRole.text3), ('INFO ', TermRole.ok), ('cache warm keys=18240 took=912ms', TermRole.text2)]),

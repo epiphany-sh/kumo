@@ -18,6 +18,7 @@ import '../data/worktree_changes.dart';
 import '../data/models.dart';
 import '../editor/file_buffers.dart';
 import '../platform/updates.dart';
+import '../terminal/command_marks.dart';
 import '../theme/palette.dart';
 import '../widgets/usage_meter.dart';
 import 'preferences.dart';
@@ -235,8 +236,14 @@ class AppState extends ChangeNotifier {
 
   void setSetting(String key, Object? value) {
     prefs.set(key, value);
+    if (YourLines.isKey(key)) yourLines.value = YourLines.from(prefs);
     notifyListeners();
   }
+
+  /// How terminals mark what you ran and pin the running command (Settings
+  /// → Appearance). Terminals listen to this alone, so other settings
+  /// don't repaint them.
+  late final ValueNotifier<YourLines> yourLines = ValueNotifier(YourLines.from(prefs));
 
   KumoThemeMode _mode;
   KumoThemeMode get mode => _mode;

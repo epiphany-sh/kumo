@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'cell_width.dart';
+import 'command_marks.dart';
 import 'terminal_surface.dart';
 
 /// Minimal VT100/xterm screen for M1 (kumo.md §10): enough for shells,
@@ -12,16 +13,31 @@ import 'terminal_surface.dart';
 /// Supported: UTF-8, C0 controls, cursor movement, erase (with background
 /// color, like xterm), insert/delete, scroll regions, alternate screen, SGR
 /// (16 colors as themed roles, 256 and truecolor exact, bold, dim, italic,
-/// underline, inverse), wide glyphs, cursor visibility and DSR/DA replies.
+/// underline, inverse), wide glyphs, cursor visibility and DSR/DA replies,
+/// and the shell's command marks (OSC 133, see [TermBuffer.blocks]).
 class AnsiScreen {
-  AnsiScreen({int cols = 80, int rows = 24, this.maxScrollback = 5000, this.onReply})
+  AnsiScreen({int cols = 80, int rows = 24, this.maxScrollback = 5000, this.onReply, int Function()? clock})
       : _cols = math.max(1, cols),
-        _rows = math.max(1, rows) {
+        _rows = math.max(1, rows),
+        _clock = clock ?? _elapsed {
     _grid = List.generate(_rows, (_) => _Row(_cols));
     _decoder = const Utf8Decoder(allowMalformed: true).startChunkedConversion(_RuneSink(_onRune));
   }
 
   final int maxScrollback;
+
+  /// Milliseconds on a monotonic clock, to time commands.
+  final int Function() _clock;
+  static final _watch = Stopwatch()..start();
+  static int _elapsed() => _watch.elapsedMilliseconds;
+
+  /// Some row got a command mark: [snapshot] looks for blocks.
+  bool _marked = false;
+
+  /// The prompt mark the shell sent last, and whether a screen clear wiped
+  /// it since (⌃L redraws the prompt without marking it again).
+  _Mark? _lastPrompt;
+  bool _promptLost = false;
 
   /// Bytes the terminal must send back to the program (cursor reports).
   final void Function(List<int> bytes)? onReply;
@@ -64,6 +80,7 @@ class AnsiScreen {
   _State _state = _State.ground;
   final _params = StringBuffer();
   String _private = '';
+  final _osc = StringBuffer();
 
   /// DECCKM: arrows send `ESC O x` instead of `ESC [ x` (vim, less…).
   bool get applicationCursorKeys => _appCursorKeys;
@@ -106,7 +123,54 @@ class AnsiScreen {
       dropped: _dropped,
       reflows: _reflows,
       altScreen: _onAltScreen,
+      blocks: _marked && !_onAltScreen ? _blocks() : const [],
     );
+  }
+
+  /// The commands the marks on the rows describe, in order. A prompt (A)
+  /// opens one, its output (C) makes it a command, done (D) closes it. A
+  /// prompt left without running anything (Enter on an empty line, ^C)
+  /// is no command.
+  List<CommandBlock> _blocks() {
+    final out = <CommandBlock>[];
+    int? start, output, outputAt;
+    void close(int end, int? exit, int? at) {
+      final from = output!;
+      out.add(CommandBlock(
+        start: start!,
+        outputStart: from,
+        end: math.max(from, end),
+        exit: exit,
+        took: at != null && outputAt != null ? Duration(milliseconds: at - outputAt!) : null,
+      ));
+      start = output = outputAt = null;
+    }
+
+    var y = 0;
+    void scan(_Row row) {
+      for (final m in row.marks ?? const <_Mark>[]) {
+        switch (m.kind) {
+          case _Mark.prompt:
+            // A command still open here ended without a D (no exit status).
+            if (start != null && output != null) close(m.col > 0 ? y + 1 : y, null, null);
+            start = y;
+            output = outputAt = null;
+          case _Mark.output:
+            if (start != null && output == null) {
+              output = math.max(y, start! + 1);
+              outputAt = m.at;
+            }
+          case _Mark.done:
+            if (start != null && output != null) close(m.col > 0 ? y + 1 : y, m.exit, m.at);
+        }
+      }
+      y++;
+    }
+
+    _scrollback.forEach(scan);
+    _grid.forEach(scan);
+    if (start != null && output != null) out.add(CommandBlock(start: start!, outputStart: output!));
+    return out;
   }
 
   /// Re-wraps the main screen and its scrollback to the new width, like
@@ -178,16 +242,19 @@ class AnsiScreen {
       }
       final line = _Cells();
       int? offset;
+      List<_Mark>? marks;
       while (true) {
         final row = source[i];
         if (i == cursorRow) offset = line.length + cx + (pending ? 1 : 0);
         line.add(row, row.wrapped ? row.length : row.contentEnd);
+        if (row.marks != null) (marks ??= []).addAll(row.marks!);
         i++;
         if (!row.wrapped || i >= source.length) break;
       }
       if (offset != null) line.pad(offset);
       final first = out.length;
       final starts = line.split(cols, out);
+      out[first].marks = marks;
       if (offset != null) {
         // The row whose cells hold the cursor; at a row's very end it
         // waits there to wrap, as it would have while typing.
@@ -250,8 +317,19 @@ class AnsiScreen {
       case _State.osc:
         if (r == 0x07) {
           _state = _State.ground;
+          _oscDone();
         } else if (r == 0x1b) {
-          _state = _State.stringEsc;
+          _state = _State.oscEsc;
+        } else if (_osc.length < 4096) {
+          _osc.writeCharCode(r);
+        }
+      case _State.oscEsc:
+        if (r == 0x5c) {
+          _state = _State.ground;
+          _oscDone();
+        } else {
+          // ESC started something else: the OSC was cut short.
+          _escape(r);
         }
       case _State.string:
         if (r == 0x1b) _state = _State.stringEsc;
@@ -271,6 +349,7 @@ class AnsiScreen {
         _private = '';
         _state = _State.csi;
       case 0x5d: // ]
+        _osc.clear();
         _state = _State.osc;
       case 0x50 || 0x58 || 0x5e || 0x5f: // P X ^ _
         _state = _State.string;
@@ -290,6 +369,41 @@ class AnsiScreen {
       case 0x63: // c
         _reset();
     }
+  }
+
+  /// An OSC ended. Only the shell's command marks are read: 133 (FinalTerm,
+  /// iTerm2, WezTerm, Kumo's integration) and VS Code's 633, same letters.
+  void _oscDone() {
+    final parts = _osc.toString().split(';');
+    _osc.clear();
+    if (parts.length < 2 || (parts[0] != '133' && parts[0] != '633') || _onAltScreen) return;
+    final kind = switch (parts[1]) {
+      'A' => _Mark.prompt,
+      'C' => _Mark.output,
+      'D' => _Mark.done,
+      _ => null, // B (prompt end), E (command line), P…: not needed
+    };
+    if (kind == null) return;
+    final exit = kind == _Mark.done && parts.length > 2 ? int.tryParse(parts[2]) : null;
+    final mark = _Mark(kind, col: _cx, at: _clock(), exit: exit);
+    if (kind == _Mark.prompt) {
+      _lastPrompt = mark;
+      _promptLost = false;
+    } else if (kind == _Mark.output && _promptLost) {
+      // The prompt was redrawn after a clear: it's the line just typed.
+      _grid[math.max(0, _cy - 1)].mark(_Mark(_Mark.prompt, col: 0, at: mark.at));
+      _promptLost = false;
+    }
+    _grid[_cy].mark(mark);
+    _marked = true;
+  }
+
+  /// [row] was wiped whole: its marks go.
+  void _forget(_Row row) {
+    final marks = row.marks;
+    if (marks == null) return;
+    if (marks.any((m) => identical(m, _lastPrompt))) _promptLost = true;
+    row.marks = null;
   }
 
   void _control(int r) {
@@ -491,15 +605,20 @@ class AnsiScreen {
         _grid[_cy].clear(_cx, _cols, bg);
         for (var y = _cy + 1; y < _rows; y++) {
           _grid[y].clear(0, _cols, bg);
+          _forget(_grid[y]);
         }
       case 1:
         _grid[_cy].clear(0, _cx + 1, bg);
         for (var y = 0; y < _cy; y++) {
           _grid[y].clear(0, _cols, bg);
+          _forget(_grid[y]);
         }
       case 2:
+        // Wiped rows forget their commands (clear, ⌃L); a whole-line erase
+        // doesn't: the shell redraws the line it's editing that way.
         for (final row in _grid) {
           row.clear(0, _cols, bg);
+          _forget(row);
         }
       case 3:
         clearScrollback();
@@ -633,7 +752,22 @@ class AnsiScreen {
   }
 }
 
-enum _State { ground, escape, csi, osc, string, stringEsc, charset }
+enum _State { ground, escape, csi, osc, oscEsc, string, stringEsc, charset }
+
+/// A shell mark on a row: where (column), when, and for "done" the exit
+/// status.
+class _Mark {
+  const _Mark(this.kind, {required this.col, required this.at, this.exit});
+
+  static const prompt = 0;
+  static const output = 1;
+  static const done = 2;
+
+  final int kind;
+  final int col;
+  final int at;
+  final int? exit;
+}
 
 /// Cell colors packed in an int: 0 = default, 1–16 = ANSI color + 1
 /// (themed), `0x1000000 | rgb` = exact color.
@@ -730,6 +864,17 @@ class _Row {
   /// written, not a line feed.
   bool wrapped = false;
 
+  /// Shell marks on this row (OSC 133), in the order they came.
+  List<_Mark>? marks;
+
+  /// Adds [m]; the same mark again right after (two integrations, a
+  /// redrawn prompt) replaces it.
+  void mark(_Mark m) {
+    final list = marks ??= [];
+    if (list.isNotEmpty && list.last.kind == m.kind) list.removeLast();
+    list.add(m);
+  }
+
   int get length => _runes.length;
 
   /// Cells up to the last one that shows something.
@@ -751,7 +896,9 @@ class _Row {
       Uint32List.fromList(_fg.sublist(0, end)),
       Uint32List.fromList(_bg.sublist(0, end)),
       Uint8List.fromList(_attrs.sublist(0, end)),
-    )..wrapped = wrapped;
+    )
+      ..wrapped = wrapped
+      ..marks = marks;
     row._line = _line;
     return row;
   }
