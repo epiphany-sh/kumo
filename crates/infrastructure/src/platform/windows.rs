@@ -11,8 +11,9 @@ use std::sync::Arc;
 use keyring_core::{CredentialStore, Error as KeyringError};
 
 use super::{
-    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, ProcessTrees,
-    Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals,
+    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PlainPaths, PrivateFiles,
+    ProcessTrees, Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals,
+    TerminalShells,
 };
 
 /// The child gets a console nobody sees.
@@ -95,6 +96,45 @@ impl FileIdentity for Windows {
     }
 }
 
+/// The longest path programs take without `\\?\` (`MAX_PATH`).
+const MAX_PATH: usize = 260;
+
+impl PlainPaths for Windows {
+    /// `\\?\C:\x` → `C:\x`, `\\?\UNC\server\share` → `\\server\share`.
+    /// Kept as it is when the plain form wouldn't name the same file: too
+    /// long, or a name ending in a dot or a space (Windows drops those).
+    fn plain(path: PathBuf) -> PathBuf {
+        let Some(text) = path.to_str() else {
+            return path;
+        };
+        let plain = if let Some(share) = text.strip_prefix(r"\\?\UNC\") {
+            format!(r"\\{share}")
+        } else if let Some(local) = text.strip_prefix(r"\\?\")
+            && is_drive_path(local)
+        {
+            local.to_owned()
+        } else {
+            return path;
+        };
+        let names_change = plain
+            .split('\\')
+            .any(|name| name.ends_with('.') && name != "." && name != ".." || name.ends_with(' '));
+        if plain.len() >= MAX_PATH || names_change {
+            return path;
+        }
+        PathBuf::from(plain)
+    }
+}
+
+/// `C:` or `C:\…`.
+fn is_drive_path(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() >= 2
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes.len() == 2 || bytes[2] == b'\\')
+}
+
 impl PrivateFiles for Windows {
     /// Files under the user's profile are already theirs alone.
     fn owner_only(_options: &mut OpenOptions) {}
@@ -117,6 +157,14 @@ impl Keychain for Windows {
 impl AppFolders for Windows {
     fn obsidian_settings(home: &Path) -> PathBuf {
         home.join("AppData/Roaming/obsidian/obsidian.json")
+    }
+}
+
+impl TerminalShells for Windows {
+    /// cmd.exe and PowerShell aren't covered, and a Git Bash would be
+    /// handed Windows paths to its scripts.
+    fn shell_integration() -> bool {
+        false
     }
 }
 
@@ -170,6 +218,38 @@ mod tests {
             Windows::executable_names("claude"),
             ["claude.exe", "claude.cmd", "claude.bat", "claude"]
         );
+    }
+
+    #[test]
+    fn plain_paths_drop_the_verbatim_prefix() {
+        let plain = |path: &str| Windows::plain(PathBuf::from(path));
+        assert_eq!(
+            plain(r"\\?\C:\Users\me\wt\x"),
+            PathBuf::from(r"C:\Users\me\wt\x")
+        );
+        assert_eq!(
+            plain(r"\\?\UNC\server\share\x"),
+            PathBuf::from(r"\\server\share\x")
+        );
+        assert_eq!(plain(r"C:\Users\me"), PathBuf::from(r"C:\Users\me"));
+        // The plain form would name another file, or be too long.
+        assert_eq!(plain(r"\\?\C:\x\name."), PathBuf::from(r"\\?\C:\x\name."));
+        let long = format!(r"\\?\C:\{}", "a".repeat(MAX_PATH));
+        assert_eq!(plain(&long), PathBuf::from(&long));
+        assert_eq!(plain(r"\\?\Volume{0}\x"), PathBuf::from(r"\\?\Volume{0}\x"));
+    }
+
+    /// `canonicalize` gives `\\?\C:\…`, which `cmd.exe` won't start in.
+    #[test]
+    fn canonical_paths_are_plain() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = super::super::canonical(dir.path());
+        assert!(
+            !path.to_string_lossy().starts_with(r"\\?\"),
+            "{}",
+            path.display()
+        );
+        assert!(path.is_dir());
     }
 
     #[test]

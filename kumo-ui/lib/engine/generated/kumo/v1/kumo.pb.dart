@@ -1568,6 +1568,7 @@ class OpenRequest extends $pb.GeneratedMessage {
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? env,
     $core.int? cols,
     $core.int? rows,
+    $core.bool? shellIntegration,
   }) {
     final result = OpenRequest._();
     if (program != null) result.program = program;
@@ -1576,6 +1577,7 @@ class OpenRequest extends $pb.GeneratedMessage {
     if (env != null) result.env.addEntries(env);
     if (cols != null) result.cols = cols;
     if (rows != null) result.rows = rows;
+    if (shellIntegration != null) result.shellIntegration = shellIntegration;
     return result;
   }
 
@@ -1602,6 +1604,7 @@ class OpenRequest extends $pb.GeneratedMessage {
         packageName: const $pb.PackageName('kumo.v1'))
     ..aI(5, _omitFieldNames ? '' : 'cols', fieldType: $pb.PbFieldType.OU3)
     ..aI(6, _omitFieldNames ? '' : 'rows', fieldType: $pb.PbFieldType.OU3)
+    ..aOB(7, _omitFieldNames ? '' : 'shellIntegration')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1668,6 +1671,18 @@ class OpenRequest extends $pb.GeneratedMessage {
   $core.bool hasRows() => $_has(5);
   @$pb.TagNumber(6)
   void clearRows() => $_clearField(6);
+
+  /// The user's interactive shell: Kumo adds its shell integration (zsh,
+  /// bash and fish mark each prompt and command with OSC 133). Ignored for
+  /// other programs and when there are arguments other than -l / -i.
+  @$pb.TagNumber(7)
+  $core.bool get shellIntegration => $_getBF(6);
+  @$pb.TagNumber(7)
+  set shellIntegration($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasShellIntegration() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearShellIntegration() => $_clearField(7);
 }
 
 class OpenResponse extends $pb.GeneratedMessage {

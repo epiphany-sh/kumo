@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use kumo_domain::profiles::{ProfileEnv, ProfileId};
 use kumo_domain::terminal::{
-    LaunchSpec, PtySystem, TerminalError, TerminalId, TerminalInfo, TerminalStatus,
+    LaunchSpec, NoShellIntegration, PtySystem, ShellIntegration, TerminalError, TerminalId,
+    TerminalInfo, TerminalStatus,
 };
 
 use super::registry::SessionRegistry;
@@ -22,6 +23,8 @@ pub struct Attachment {
 /// opens terminals for it and only sees those; the unscoped one sees all.
 pub struct TerminalService {
     pty: Arc<dyn PtySystem>,
+    /// What [`Self::open_shell`] adds to the user's shell.
+    shells: Arc<dyn ShellIntegration>,
     config: SessionConfig,
     registry: Arc<SessionRegistry>,
     scope: Option<ProfileId>,
@@ -43,11 +46,18 @@ impl TerminalService {
     pub fn new(pty: Arc<dyn PtySystem>, config: SessionConfig) -> Self {
         Self {
             pty,
+            shells: Arc::new(NoShellIntegration),
             config,
             registry: Arc::default(),
             scope: None,
             env: ProfileEnv::default(),
         }
+    }
+
+    /// Shells opened with [`Self::open_shell`] get `shells`.
+    pub fn with_shell_integration(mut self, shells: Arc<dyn ShellIntegration>) -> Self {
+        self.shells = shells;
+        self
     }
 
     /// The same terminals, seen from `profile`: what it opens is tagged
@@ -56,6 +66,7 @@ impl TerminalService {
     pub fn scoped(&self, profile: ProfileId, env: ProfileEnv) -> Self {
         Self {
             pty: Arc::clone(&self.pty),
+            shells: Arc::clone(&self.shells),
             config: self.config.clone(),
             registry: Arc::clone(&self.registry),
             scope: Some(profile),
@@ -77,6 +88,12 @@ impl TerminalService {
         self.registry.insert(session, self.scope.clone());
         tracing::info!(terminal = %id, program = spec.program(), "terminal opened");
         Ok(id)
+    }
+
+    /// Like [`Self::open`], for the user's interactive shell: it reports
+    /// its prompts and commands (see [`ShellIntegration`]).
+    pub fn open_shell(&self, spec: LaunchSpec) -> Result<TerminalId, TerminalError> {
+        self.open(self.shells.apply(spec))
     }
 
     /// Attaches to a session, optionally replaying buffered output first.

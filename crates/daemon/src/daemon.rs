@@ -14,7 +14,7 @@ use kumo_infrastructure::agents::ShellPathLocator;
 use kumo_infrastructure::discovery::FileDiscoveryStore;
 use kumo_infrastructure::executable::ProgramFile;
 use kumo_infrastructure::profiles::{FileProfileStore, LocalMachineAccounts};
-use kumo_infrastructure::pty::PortablePtySystem;
+use kumo_infrastructure::pty::{PortablePtySystem, shell_integration};
 use kumo_infrastructure::secrets::{KeychainSecretStore, MemorySecretStore};
 use kumo_infrastructure::security::generate_auth_token;
 
@@ -55,10 +55,10 @@ impl Daemon {
         let instance = lock(&data_dir).await?;
 
         let token = generate_auth_token().context("generating auth token")?;
-        let terminals = Arc::new(TerminalService::new(
-            Arc::new(PortablePtySystem),
-            config.session,
-        ));
+        let terminals = Arc::new(
+            TerminalService::new(Arc::new(PortablePtySystem), config.session)
+                .with_shell_integration(shell_integration(&data_dir.join("shell-integration"))),
+        );
         let locator: Arc<dyn ProgramLocator> = Arc::new(match config.agent_path {
             Some(path) => ShellPathLocator::with_path(&home, path),
             None => ShellPathLocator::new(&home),

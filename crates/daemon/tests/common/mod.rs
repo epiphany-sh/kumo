@@ -262,7 +262,7 @@ pub fn git_repo(dir: &std::path::Path, remote: Option<&str>) -> std::path::PathB
     if let Some(url) = remote {
         git(dir, &["remote", "add", "origin", url]);
     }
-    std::fs::canonicalize(dir).unwrap()
+    kumo_infrastructure::platform::canonical(dir)
 }
 
 /// Runs git in `dir`, panicking on failure; returns stdout.

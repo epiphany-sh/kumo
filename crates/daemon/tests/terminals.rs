@@ -224,3 +224,98 @@ async fn two_attachments_share_a_terminal() {
     agents_view.read_until("40 120").await;
     assert_eq!(terminal_view.read_to_exit().await, 0);
 }
+
+/// Opens `shell` as the UI opens yours (`-l`, with Kumo's integration),
+/// with `home` as its home folder.
+async fn open_shell(
+    client: &mut kumo_grpc::client::KumoClient,
+    shell: &str,
+    home: &std::path::Path,
+    integration: bool,
+) -> String {
+    let home = home.display().to_string();
+    client
+        .terminals
+        .open(pb::OpenRequest {
+            program: shell.into(),
+            args: vec!["-l".into()],
+            cwd: home.clone(),
+            env: [
+                ("HOME".to_owned(), home.clone()),
+                ("ZDOTDIR".to_owned(), home),
+            ]
+            .into(),
+            shell_integration: integration,
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .terminal_id
+}
+
+/// The shell, where this machine has it.
+fn installed(shell: &str) -> Option<String> {
+    ["/bin", "/usr/bin"]
+        .into_iter()
+        .map(|dir| format!("{dir}/{shell}"))
+        .find(|path| std::path::Path::new(path).exists())
+}
+
+/// Runs `true` and `false` in a shell with Kumo's integration: its own
+/// startup file still loads, and each command is marked with its status.
+async fn marks_what_you_ran(shell: &str, rc_file: &str) {
+    let Some(path) = installed(shell) else {
+        eprintln!("{shell} isn't installed: skipped");
+        return;
+    };
+    let daemon = TestDaemon::start().await;
+    let home = daemon.home();
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::write(home.join(rc_file), "echo YOUR_RC_RAN\n").unwrap();
+    let mut client = daemon.client().await;
+    let id = open_shell(&mut client, &path, &home, true).await;
+
+    let mut attached = Attached::new(&mut client, &id, true).await;
+    attached.read_until("YOUR_RC_RAN").await;
+    attached.read_until("\x1b]133;A").await;
+    attached.send(b"true\n").await;
+    attached.read_until("\x1b]133;D;0").await;
+    attached.send(b"false\n").await;
+    attached.read_until("\x1b]133;D;1").await;
+    attached.send(b"exit\n").await;
+    attached.read_to_exit().await;
+    let text = attached.received.text();
+    assert_eq!(text.matches("\x1b]133;C").count(), 3, "{text:?}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn zsh_marks_what_you_ran() {
+    marks_what_you_ran("zsh", ".zshrc").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn bash_marks_what_you_ran() {
+    // A login bash reads .bash_profile, not .bashrc.
+    marks_what_you_ran("bash", ".bash_profile").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_shell_opened_without_integration_marks_nothing() {
+    let Some(zsh) = installed("zsh") else {
+        eprintln!("zsh isn't installed: skipped");
+        return;
+    };
+    let daemon = TestDaemon::start().await;
+    let home = daemon.home();
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::write(home.join(".zshrc"), "echo YOUR_RC_RAN\n").unwrap();
+    let mut client = daemon.client().await;
+    let id = open_shell(&mut client, &zsh, &home, false).await;
+
+    let mut attached = Attached::new(&mut client, &id, true).await;
+    attached.read_until("YOUR_RC_RAN").await;
+    attached.send(b"exit\n").await;
+    attached.read_to_exit().await;
+    assert!(!attached.received.text().contains("\x1b]133;"));
+}

@@ -115,6 +115,11 @@ pub(super) fn same_file(source: &Path, _target: &Path, existing: &Metadata) -> b
 }
 
 /// Mode `0600`.
+/// Unix paths have a single form.
+pub(super) fn plain(path: PathBuf) -> PathBuf {
+    path
+}
+
 pub(super) fn owner_only(options: &mut OpenOptions) {
     options.mode(0o600);
 }

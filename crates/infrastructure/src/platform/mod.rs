@@ -82,6 +82,14 @@ pub trait FileIdentity {
     fn same_file(source: &Path, target: &Path, existing: &Metadata) -> bool;
 }
 
+/// Paths in the form every program takes.
+pub trait PlainPaths {
+    /// `path` as shells and the UI read it: without the `\\?\` that
+    /// Windows' `canonicalize` puts in front, which `cmd.exe` refuses as a
+    /// working directory.
+    fn plain(path: PathBuf) -> PathBuf;
+}
+
 /// Files only their owner may read.
 pub trait PrivateFiles {
     /// Makes `options` create the file readable by its owner only.
@@ -108,6 +116,13 @@ pub trait AgentHooks {
     /// Whether Claude Code runs a POSIX `sh` status line command (Kumo's
     /// usage hook is one).
     fn sh_status_line() -> bool;
+}
+
+/// The shells a terminal opens in.
+pub trait TerminalShells {
+    /// Whether the user's shell gets Kumo's integration (see
+    /// `pty::shell_integration`): zsh, bash and fish mark the commands run.
+    fn shell_integration() -> bool;
 }
 
 /// Sign-ins other programs keep in the OS's own secret store (Claude
@@ -180,6 +195,18 @@ pub fn same_file(source: &Path, target: &Path, existing: &Metadata) -> bool {
     Current::same_file(source, target, existing)
 }
 
+/// See [`PlainPaths::plain`].
+pub fn plain_path(path: PathBuf) -> PathBuf {
+    Current::plain(path)
+}
+
+/// `path` with its links resolved, in its [plain form](PlainPaths::plain);
+/// `path` itself when it can't be resolved.
+pub fn canonical(path: impl AsRef<Path>) -> PathBuf {
+    let path = path.as_ref();
+    std::fs::canonicalize(path).map_or_else(|_| path.to_owned(), Current::plain)
+}
+
 /// See [`PrivateFiles::owner_only`].
 pub fn owner_only(options: &mut OpenOptions) {
     Current::owner_only(options);
@@ -208,6 +235,11 @@ pub fn obsidian_settings(home: &Path) -> PathBuf {
 /// See [`AgentHooks::sh_status_line`].
 pub fn sh_status_line() -> bool {
     Current::sh_status_line()
+}
+
+/// See [`TerminalShells::shell_integration`].
+pub fn shell_integration() -> bool {
+    Current::shell_integration()
 }
 
 /// See [`SavedSignIns::saved_secret`].

@@ -71,6 +71,10 @@ abstract class HostOs {
   /// Whether the native window buttons (traffic lights) sit inside our
   /// content once the native backdrop is on, so the layout leaves room.
   bool get windowButtonsInContent;
+
+  /// Where the icon chosen in Settings › Appearance shows, said for the
+  /// user; null when the app can't change its own icon here.
+  String? get appIconPlaces;
 }
 
 HostOs? _override;

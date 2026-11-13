@@ -45,6 +45,8 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     RegisterGeneratedPlugins(registry: flutterViewController)
     (NSApp.delegate as? AppDelegate)?.updates.attach(
       messenger: flutterViewController.engine.binaryMessenger)
+    (NSApp.delegate as? AppDelegate)?.appIcon.attach(
+      messenger: flutterViewController.engine.binaryMessenger)
     pasteboard.attach(messenger: flutterViewController.engine.binaryMessenger)
     // Files dragged from Finder land on the terminal under the pointer.
     self.registerForDraggedTypes([.fileURL])

@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'command_marks.dart';
+
 /// Semantic color roles. The painter maps them to the current palette, so a
 /// theme switch never touches the buffer.
 enum TermRole { text, text2, text3, acc, ok, warn, err, purple, yellow, cyan }
@@ -81,7 +83,7 @@ class TermLine {
 /// screen state (dirty-line diffs from the daemon); in M0/M1 raw bytes.
 @immutable
 class TermBuffer {
-  const TermBuffer(this.lines, {this.cursorVisible = true, this.cursor, this.seq = 0, this.dropped = 0, this.reflows = 0, this.altScreen = false});
+  const TermBuffer(this.lines, {this.cursorVisible = true, this.cursor, this.seq = 0, this.dropped = 0, this.reflows = 0, this.altScreen = false, this.blocks = const [], this.prompts = const []});
   final List<TermLine> lines;
   final bool cursorVisible;
 
@@ -104,10 +106,27 @@ class TermBuffer {
   /// scrollback to show.
   final bool altScreen;
 
-  TermBuffer append(List<TermLine> more, {int maxLines = 5000}) {
+  /// The commands run here, in order, when the shell marks them (shell
+  /// integration, OSC 133): what you ran gets marked, and its line pinned.
+  final List<CommandBlock> blocks;
+
+  /// The line of every prompt the shell marked, commands or not (Enter on
+  /// an empty line), in order: each gets room above it.
+  final List<int> prompts;
+
+  /// [more] lines at the end; [block] marks the first of them as something
+  /// you sent (mocks: a steer message), which ends the block before it.
+  TermBuffer append(List<TermLine> more, {int maxLines = 5000, bool block = false}) {
     final all = [...lines, ...more];
     final trimmed = all.length > maxLines ? all.sublist(all.length - maxLines) : all;
-    return TermBuffer(trimmed, cursorVisible: cursorVisible, cursor: cursor, seq: seq + 1, dropped: dropped + all.length - trimmed.length);
+    final cut = all.length - trimmed.length;
+    final at = lines.length;
+    final kept = [
+      for (final b in blocks)
+        if ((b.end ?? at) - cut > 0) (block && b.running ? CommandBlock(start: b.start, outputStart: b.outputStart, end: at) : b).shifted(-cut),
+      if (block && more.isNotEmpty) CommandBlock(start: at, outputStart: at + 1).shifted(-cut),
+    ];
+    return TermBuffer(trimmed, cursorVisible: cursorVisible, cursor: cursor, seq: seq + 1, dropped: dropped + cut, blocks: kept);
   }
 }
 

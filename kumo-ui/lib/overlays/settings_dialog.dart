@@ -1,10 +1,14 @@
+import 'dart:io' show File;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
+import '../platform/app_icon.dart';
+import '../platform/pasteboard.dart';
 import '../platform/os/host_os.dart';
+import '../terminal/command_marks.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/profile_tile.dart';
@@ -16,6 +20,7 @@ import 'docs_settings.dart';
 import 'host_settings.dart';
 import 'task_settings.dart';
 import 'workspace_settings.dart';
+import 'your_lines_settings.dart';
 
 enum SettingsTab {
   general('General', Icons.settings_outlined),
@@ -193,6 +198,12 @@ class _SettingsDialogState extends State<SettingsDialog> {
               onChanged: (v) => s.sidePanelRight = v == 'Right',
             ),
             _ToggleRow(label: 'Show the side panel when Kumo opens', desc: 'Hide or show it anytime with ⌥⌘B.', value: s.sidePanelOnLaunch, onChanged: (v) => s.sidePanelOnLaunch = v),
+            _ToggleRow(
+              label: 'Remember folded repositories',
+              desc: 'Repositories you fold in the sidebar stay folded the next time Kumo opens. Off, they all open expanded.',
+              value: s.rememberSidebarFolds,
+              onChanged: (v) => s.rememberSidebarFolds = v,
+            ),
           ]),
           ('Startup', [
             _toggle(s, 'general.login', 'Open Kumo at login', null, false),
@@ -206,9 +217,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
           ]),
         ]);
       case SettingsTab.appearance:
-        return _Page('Appearance', 'Liquid Glass themes and translucency.', sections: [
+        return _Page('Appearance', 'Liquid Glass themes, translucency, and how the lines you run look in the terminal.', sections: [
           ('Theme', [
             _Row(label: 'Theme', control: _ThemePicker(value: s.mode, onChanged: (m) => s.mode = m)),
+            if (AppIcons.choosable)
+              _Row(
+                label: 'App icon',
+                desc: AppIcons.canMakeOwn ? '${hostOs.appIconPlaces} Any image can be yours: a square one gets rounded corners.' : hostOs.appIconPlaces,
+                control: _AppIconPicker(state: s),
+              ),
             _Row(
               label: 'Glass translucency',
               desc: 'How much of the desktop shows through panels.',
@@ -221,6 +238,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
               onChanged: (_) => s.toggleDemoWallpaper(),
             ),
           ]),
+          ('Your lines in the terminal', _yourLinesRows(s)),
           ('Files', [
             _SegRow(
               label: 'File icons',
@@ -256,6 +274,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
             _KbdRow('Split right', ['⌘', 'D']),
             _KbdRow('Split down', ['⇧', '⌘', 'D']),
             _KbdRow('Close pane', ['⌘', 'W']),
+            _KbdRow('Previous command you ran', ['⌘', '↑']),
+            _KbdRow('Next command you ran', ['⌘', '↓']),
             _KbdRow('Show / hide side panel', ['⌥', '⌘', 'B']),
           ]),
           ('Workspace', const [
@@ -338,6 +358,71 @@ class _SettingsDialogState extends State<SettingsDialog> {
           custom: const DocsSourcesPanel(),
         );
     }
+  }
+
+  /// Marks on what you ran and the pinned command (see [YourLines]).
+  List<Widget> _yourLinesRows(AppState s) {
+    final yl = s.yourLines.value;
+    final sticky = _toggle(
+      s,
+      YourLines.keySticky,
+      'Keep the command on top',
+      'While its output scrolls, the line you ran stays pinned at the top of the pane until you run the next one.',
+      true,
+    );
+    final on = _toggle(
+      s,
+      YourLines.keyOn,
+      'Mark what you ran',
+      'A bar, and a faint band if you want, on the commands you typed. Output isn’t touched. Works in zsh, bash and fish.',
+      true,
+    );
+    if (!yl.marks) return [on, sticky];
+    final own = s.setting<String>(YourLines.keyLightMode, 'auto') == 'own';
+    final auto = forLightTerminal(yl.dark, terminalBackground(KumoPalette.light));
+    final light = yl.colorFor(KumoPalette.light);
+    String withNote(String desc, String? note) => note == null ? desc : '$desc $note';
+    return [
+      on,
+      _SegRow(
+        label: 'Style',
+        desc: 'Bar only is the quietest.',
+        options: const ['Bar + band', 'Bar only'],
+        value: yl.band ? 'Bar + band' : 'Bar only',
+        onChanged: (v) => s.setSetting(YourLines.keyStyle, v == 'Bar only' ? 'bar' : 'barBand'),
+      ),
+      _Row(
+        label: 'Color on dark terminals',
+        desc: withNote('Dark theme, and Hybrid (its terminal is dark). Failed commands stay red.', lowContrastNote(yl.dark, KumoPalette.dark)),
+        control: MarkSwatches(label: 'Color on dark terminals', presets: yourLinesPresets, value: yl.dark, onChanged: (c) => s.setSetting(YourLines.keyDark, hexOf(c))),
+      ),
+      _SegRow(
+        label: 'On light terminals',
+        desc: own ? 'Its own color, for when the darker version of yours doesn’t look right.' : 'Same hue, darkened until it reads on white: ${hexOf(auto)}.',
+        options: const ['Auto', 'Own color'],
+        value: own ? 'Own color' : 'Auto',
+        onChanged: (v) => s.setSetting(YourLines.keyLightMode, v == 'Own color' ? 'own' : 'auto'),
+      ),
+      if (own)
+        _Row(
+          label: 'Color on light terminals',
+          desc: withNote('Presets are the dark ones, darkened.', lowContrastNote(light, KumoPalette.light)),
+          control: MarkSwatches(label: 'Color on light terminals', presets: lightPresets(), value: light, onChanged: (c) => s.setSetting(YourLines.keyLight, hexOf(c))),
+        ),
+      if (yl.band)
+        _Row(
+          label: 'Band strength',
+          desc: 'How much of the color fills the line.',
+          control: _StepSlider(label: 'Band strength', value: yl.bandAlpha * 100, min: 2, max: 30, unit: '%', onChanged: (v) => s.setSetting(YourLines.keyBand, v)),
+        ),
+      _Row(
+        label: 'Bar width',
+        control: _StepSlider(label: 'Bar width', value: yl.bar, min: 1, max: 5, unit: ' px', onChanged: (v) => s.setSetting(YourLines.keyBar, v)),
+      ),
+      _toggle(s, YourLines.keyMeta, 'Exit code and time', 'On a command that failed or that you stopped, and the time when it took 10 seconds or more.', true),
+      sticky,
+      _Row(label: 'Preview', desc: 'Both terminals, as you tune them. Hybrid uses the dark one.', control: YourLinesPreview(lines: yl)),
+    ];
   }
 
   // Rows backed by AppState.setting / setSetting (persisted).
@@ -683,6 +768,48 @@ class _PercentSlider extends StatelessWidget {
   }
 }
 
+/// A whole-number slider with its value and [unit] next to it.
+class _StepSlider extends StatelessWidget {
+  const _StepSlider({required this.label, required this.value, required this.min, required this.max, required this.unit, required this.onChanged});
+  final String label;
+  final double value;
+  final int min;
+  final int max;
+  final String unit;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final v = value.round().clamp(min, max);
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      SizedBox(
+        width: 160,
+        child: SliderTheme(
+          data: SliderThemeData(
+            trackHeight: 4,
+            activeTrackColor: c.accFill,
+            inactiveTrackColor: c.tile,
+            thumbColor: const Color(0xFFFFFFFF),
+            overlayColor: c.accSoft,
+          ),
+          child: Slider(
+            value: v.toDouble(),
+            min: min.toDouble(),
+            max: max.toDouble(),
+            divisions: max - min,
+            onChanged: (x) {
+              if (x.round() != v) onChanged(x.round());
+            },
+            semanticFormatterCallback: (x) => '$label ${x.round()}$unit',
+          ),
+        ),
+      ),
+      SizedBox(width: 44, child: Text('$v$unit', textAlign: TextAlign.right, style: mono(11.5, color: c.text2))),
+    ]);
+  }
+}
+
 class _ThemePicker extends StatelessWidget {
   const _ThemePicker({required this.value, required this.onChanged});
   final KumoThemeMode value;
@@ -726,5 +853,97 @@ class _ThemePicker extends StatelessWidget {
           ),
         ),
     ]);
+  }
+}
+
+/// The icons Kumo can show itself with, as they look, and a button to make
+/// one from an image of yours.
+class _AppIconPicker extends StatefulWidget {
+  const _AppIconPicker({required this.state});
+  final AppState state;
+
+  @override
+  State<_AppIconPicker> createState() => _AppIconPickerState();
+}
+
+class _AppIconPickerState extends State<_AppIconPicker> {
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _choose() async {
+    final source = await Pasteboard.chooseFile(extensions: AppIcons.imageTypes, message: 'An image for Kumo’s icon: a square one gets rounded corners');
+    if (source == null || !mounted) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final ok = await widget.state.useOwnAppIcon(source);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _error = ok ? null : 'Kumo couldn’t read that file as an image.';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final s = widget.state;
+    final own = s.ownAppIcon;
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        for (final icon in AppIcon.values)
+          if (icon.preview != null)
+            _AppIconTile(icon: icon, image: AssetImage(icon.preview!), selected: icon == s.appIcon, onTap: () => s.appIcon = icon)
+          else if (icon == AppIcon.own && own != null)
+            _AppIconTile(icon: icon, image: FileImage(File(own)), selected: icon == s.appIcon, onTap: () => s.appIcon = icon),
+        if (AppIcons.canMakeOwn)
+          Padding(
+            padding: const EdgeInsets.only(left: 14, bottom: 22),
+            child: KButton(label: _busy ? 'Making it…' : 'Choose image…', height: 28, fontSize: 12, onTap: _busy ? null : _choose),
+          ),
+      ]),
+      if (_error != null) ...[const SizedBox(height: 6), Text(_error!, style: sans(11.5, color: c.err))],
+    ]);
+  }
+}
+
+class _AppIconTile extends StatelessWidget {
+  const _AppIconTile({required this.icon, required this.image, required this.selected, required this.onTap});
+  final AppIcon icon;
+  final ImageProvider image;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Padding(
+      padding: const EdgeInsets.only(left: 10),
+      child: KPressable(
+        onTap: onTap,
+        semanticLabel: '${icon.label} app icon',
+        selected: selected,
+        builder: (context, hover, focus) => Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: selected ? c.accFill : (hover ? c.text3 : Colors.transparent), width: 2),
+            ),
+            // The picture has the room macOS leaves around an icon.
+            child: Image(
+              image: image,
+              width: 60,
+              height: 60,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (context, error, stack) => SizedBox(width: 60, height: 60, child: Icon(Icons.image_not_supported_outlined, size: 22, color: c.text3)),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(icon.label, style: sans(11.5, weight: selected ? FontWeight.w600 : FontWeight.w500, color: selected ? c.text : c.text2)),
+        ]),
+      ),
+    );
   }
 }

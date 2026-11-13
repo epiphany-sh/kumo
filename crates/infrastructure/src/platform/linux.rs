@@ -11,8 +11,9 @@ use std::sync::Arc;
 use keyring_core::{CredentialStore, Error as KeyringError};
 
 use super::{
-    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, ProcessTrees,
-    Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals, unix,
+    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PlainPaths, PrivateFiles,
+    ProcessTrees, Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals,
+    TerminalShells, unix,
 };
 
 pub struct Linux;
@@ -65,6 +66,12 @@ impl FileIdentity for Linux {
     }
 }
 
+impl PlainPaths for Linux {
+    fn plain(path: PathBuf) -> PathBuf {
+        unix::plain(path)
+    }
+}
+
 impl PrivateFiles for Linux {
     fn owner_only(options: &mut OpenOptions) {
         unix::owner_only(options);
@@ -90,6 +97,12 @@ impl Keychain for Linux {
 impl AppFolders for Linux {
     fn obsidian_settings(home: &Path) -> PathBuf {
         home.join(".config/obsidian/obsidian.json")
+    }
+}
+
+impl TerminalShells for Linux {
+    fn shell_integration() -> bool {
+        true
     }
 }
 

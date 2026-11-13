@@ -102,7 +102,8 @@ async fn worktrees_are_created_tracked_and_removed() {
         .into_inner()
         .worktree
         .unwrap();
-    let expected = std::fs::canonicalize(daemon.home().join("wt/kumo/feat-PRC-1")).unwrap();
+    let expected =
+        kumo_infrastructure::platform::canonical(daemon.home().join("wt/kumo/feat-PRC-1"));
     assert_eq!(
         created.path,
         expected.display().to_string(),
@@ -265,8 +266,7 @@ async fn existing_branch_and_explicit_path() {
         .unwrap();
     assert_eq!(
         created.path,
-        std::fs::canonicalize(daemon.home().join("elsewhere/old"))
-            .unwrap()
+        kumo_infrastructure::platform::canonical(daemon.home().join("elsewhere/old"))
             .display()
             .to_string()
     );
@@ -520,8 +520,7 @@ async fn worktrees_and_changes_made_outside_show_without_a_refresh() {
         .output()
         .unwrap();
     assert!(added.status.success(), "{added:?}");
-    let sibling = std::fs::canonicalize(sibling)
-        .unwrap()
+    let sibling = kumo_infrastructure::platform::canonical(sibling)
         .display()
         .to_string();
     snapshot_where(&mut client, |s| {

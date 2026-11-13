@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Directory;
 
 import 'package:flutter/widgets.dart';
 
@@ -17,7 +18,9 @@ import '../data/workspace_source.dart';
 import '../data/worktree_changes.dart';
 import '../data/models.dart';
 import '../editor/file_buffers.dart';
+import '../platform/app_icon.dart';
 import '../platform/updates.dart';
+import '../terminal/command_marks.dart';
 import '../theme/palette.dart';
 import '../widgets/usage_meter.dart';
 import 'preferences.dart';
@@ -235,8 +238,14 @@ class AppState extends ChangeNotifier {
 
   void setSetting(String key, Object? value) {
     prefs.set(key, value);
+    if (YourLines.isKey(key)) yourLines.value = YourLines.from(prefs);
     notifyListeners();
   }
+
+  /// How terminals mark what you ran and pin the running command (Settings
+  /// → Appearance). Terminals listen to this alone, so other settings
+  /// don't repaint them.
+  late final ValueNotifier<YourLines> yourLines = ValueNotifier(YourLines.from(prefs));
 
   KumoThemeMode _mode;
   KumoThemeMode get mode => _mode;
@@ -292,6 +301,43 @@ class AppState extends ChangeNotifier {
 
   /// Keeps the width for the next launch (once a drag ends, not per frame).
   void saveSidebarWidth() => prefs.set('sidebar.width', _sidebarWidth);
+
+  /// Whether the sidebar keeps which repositories are folded for the next
+  /// launch. Off, every repository opens expanded again. Namespaces keep
+  /// their fold either way: the daemon stores it with the namespace.
+  bool get rememberSidebarFolds => prefs.get<bool>('sidebar.rememberFolds', true);
+  set rememberSidebarFolds(bool v) {
+    prefs.set('sidebar.rememberFolds', v);
+    _saveRepoFolds();
+    notifyListeners();
+  }
+
+  /// Folded repositories, as `namespace id/repo id`: the same repository
+  /// can sit in two namespaces and fold in each on its own.
+  late final Set<String> _foldedRepos = {
+    if (rememberSidebarFolds) ...prefs.get<List<Object?>>('sidebar.foldedRepos', const []).whereType<String>(),
+  };
+
+  bool isRepoFolded(String namespace, Repo repo) => _foldedRepos.contains('$namespace/${repo.id}');
+
+  void toggleRepoFolded(String namespace, Repo repo) {
+    final key = '$namespace/${repo.id}';
+    if (!_foldedRepos.remove(key)) _foldedRepos.add(key);
+    _saveRepoFolds();
+    notifyListeners();
+  }
+
+  void _saveRepoFolds() {
+    if (!rememberSidebarFolds) {
+      prefs.set('sidebar.foldedRepos', null);
+      return;
+    }
+    // Folds of namespaces that are gone are dropped on the way out.
+    final live = {for (final n in workspace.namespaces) n.id};
+    final keep = [for (final k in _foldedRepos) if (live.contains(k.split('/').first)) k]..sort();
+    prefs.set('sidebar.foldedRepos', keep.isEmpty ? null : keep);
+  }
+
   void toggleSidebar() {
     _sidebarVisible = !_sidebarVisible;
     notifyListeners();
@@ -628,6 +674,30 @@ class AppState extends ChangeNotifier {
   /// Colored icons per file type in file trees; off keeps them plain gray.
   bool get colorFileIcons => prefs.get<bool>('files.colorIcons', true);
   set colorFileIcons(bool v) => setSetting('files.colorIcons', v);
+
+  /// The icon Kumo shows itself with (Settings › Appearance), where the OS
+  /// lets it ([AppIcons.supported]).
+  AppIcon get appIcon => AppIcons.chosen(prefs);
+  set appIcon(AppIcon icon) {
+    setSetting(AppIcons.key, icon.name);
+    AppIcons.apply(prefs).ignore();
+  }
+
+  /// The icon made from your image, when you chose one.
+  String? get ownAppIcon => AppIcons.ownFile(prefs);
+
+  /// Makes your icon from the image at [source] and shows it; false when
+  /// that isn't an image Kumo reads.
+  Future<bool> useOwnAppIcon(String source) async {
+    final made = await AppIcons.make(source, prefs.file?.parent ?? Directory.systemTemp);
+    if (made == null) return false;
+    final old = ownAppIcon;
+    setSetting(AppIcons.fileKey, made);
+    appIcon = AppIcon.own;
+    if (old != null && old != made) AppIcons.discard(old);
+    return true;
+  }
+
   void toggleSidePanel() {
     _sidePanelOpen = !_sidePanelOpen;
     notifyListeners();

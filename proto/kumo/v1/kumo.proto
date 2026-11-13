@@ -202,6 +202,10 @@ message OpenRequest {
   map<string, string> env = 4;
   uint32 cols = 5;
   uint32 rows = 6;
+  // The user's interactive shell: Kumo adds its shell integration (zsh,
+  // bash and fish mark each prompt and command with OSC 133). Ignored for
+  // other programs and when there are arguments other than -l / -i.
+  bool shell_integration = 7;
 }
 
 message OpenResponse {
