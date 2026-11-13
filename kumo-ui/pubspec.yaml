@@ -29,6 +29,8 @@ flutter:
   # Material Icon Theme (MIT), from tool/file_icons.py.
   assets:
     - assets/file_icons/
+    # The icons offered in Settings › Appearance (lib/platform/app_icon.dart).
+    - assets/app_icons/
   fonts:
     - family: Geist
       fonts:

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Directory;
 
 import 'package:flutter/widgets.dart';
 
@@ -17,6 +18,7 @@ import '../data/workspace_source.dart';
 import '../data/worktree_changes.dart';
 import '../data/models.dart';
 import '../editor/file_buffers.dart';
+import '../platform/app_icon.dart';
 import '../platform/updates.dart';
 import '../terminal/command_marks.dart';
 import '../theme/palette.dart';
@@ -635,6 +637,30 @@ class AppState extends ChangeNotifier {
   /// Colored icons per file type in file trees; off keeps them plain gray.
   bool get colorFileIcons => prefs.get<bool>('files.colorIcons', true);
   set colorFileIcons(bool v) => setSetting('files.colorIcons', v);
+
+  /// The icon Kumo shows itself with (Settings › Appearance), where the OS
+  /// lets it ([AppIcons.supported]).
+  AppIcon get appIcon => AppIcons.chosen(prefs);
+  set appIcon(AppIcon icon) {
+    setSetting(AppIcons.key, icon.name);
+    AppIcons.apply(prefs).ignore();
+  }
+
+  /// The icon made from your image, when you chose one.
+  String? get ownAppIcon => AppIcons.ownFile(prefs);
+
+  /// Makes your icon from the image at [source] and shows it; false when
+  /// that isn't an image Kumo reads.
+  Future<bool> useOwnAppIcon(String source) async {
+    final made = await AppIcons.make(source, prefs.file?.parent ?? Directory.systemTemp);
+    if (made == null) return false;
+    final old = ownAppIcon;
+    setSetting(AppIcons.fileKey, made);
+    appIcon = AppIcon.own;
+    if (old != null && old != made) AppIcons.discard(old);
+    return true;
+  }
+
   void toggleSidePanel() {
     _sidePanelOpen = !_sidePanelOpen;
     notifyListeners();

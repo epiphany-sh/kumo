@@ -1,9 +1,12 @@
+import 'dart:io' show File;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
+import '../platform/app_icon.dart';
+import '../platform/pasteboard.dart';
 import '../platform/os/host_os.dart';
 import '../terminal/command_marks.dart';
 import '../theme/kumo_theme.dart';
@@ -211,6 +214,12 @@ class _SettingsDialogState extends State<SettingsDialog> {
         return _Page('Appearance', 'Liquid Glass themes, translucency, and how the lines you run look in the terminal.', sections: [
           ('Theme', [
             _Row(label: 'Theme', control: _ThemePicker(value: s.mode, onChanged: (m) => s.mode = m)),
+            if (AppIcons.choosable)
+              _Row(
+                label: 'App icon',
+                desc: AppIcons.canMakeOwn ? '${hostOs.appIconPlaces} Any image can be yours: a square one gets rounded corners.' : hostOs.appIconPlaces,
+                control: _AppIconPicker(state: s),
+              ),
             _Row(
               label: 'Glass translucency',
               desc: 'How much of the desktop shows through panels.',
@@ -838,5 +847,97 @@ class _ThemePicker extends StatelessWidget {
           ),
         ),
     ]);
+  }
+}
+
+/// The icons Kumo can show itself with, as they look, and a button to make
+/// one from an image of yours.
+class _AppIconPicker extends StatefulWidget {
+  const _AppIconPicker({required this.state});
+  final AppState state;
+
+  @override
+  State<_AppIconPicker> createState() => _AppIconPickerState();
+}
+
+class _AppIconPickerState extends State<_AppIconPicker> {
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _choose() async {
+    final source = await Pasteboard.chooseFile(extensions: AppIcons.imageTypes, message: 'An image for Kumo’s icon: a square one gets rounded corners');
+    if (source == null || !mounted) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final ok = await widget.state.useOwnAppIcon(source);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _error = ok ? null : 'Kumo couldn’t read that file as an image.';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final s = widget.state;
+    final own = s.ownAppIcon;
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        for (final icon in AppIcon.values)
+          if (icon.preview != null)
+            _AppIconTile(icon: icon, image: AssetImage(icon.preview!), selected: icon == s.appIcon, onTap: () => s.appIcon = icon)
+          else if (icon == AppIcon.own && own != null)
+            _AppIconTile(icon: icon, image: FileImage(File(own)), selected: icon == s.appIcon, onTap: () => s.appIcon = icon),
+        if (AppIcons.canMakeOwn)
+          Padding(
+            padding: const EdgeInsets.only(left: 14, bottom: 22),
+            child: KButton(label: _busy ? 'Making it…' : 'Choose image…', height: 28, fontSize: 12, onTap: _busy ? null : _choose),
+          ),
+      ]),
+      if (_error != null) ...[const SizedBox(height: 6), Text(_error!, style: sans(11.5, color: c.err))],
+    ]);
+  }
+}
+
+class _AppIconTile extends StatelessWidget {
+  const _AppIconTile({required this.icon, required this.image, required this.selected, required this.onTap});
+  final AppIcon icon;
+  final ImageProvider image;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Padding(
+      padding: const EdgeInsets.only(left: 10),
+      child: KPressable(
+        onTap: onTap,
+        semanticLabel: '${icon.label} app icon',
+        selected: selected,
+        builder: (context, hover, focus) => Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: selected ? c.accFill : (hover ? c.text3 : Colors.transparent), width: 2),
+            ),
+            // The picture has the room macOS leaves around an icon.
+            child: Image(
+              image: image,
+              width: 60,
+              height: 60,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (context, error, stack) => SizedBox(width: 60, height: 60, child: Icon(Icons.image_not_supported_outlined, size: 22, color: c.text3)),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(icon.label, style: sans(11.5, weight: selected ? FontWeight.w600 : FontWeight.w500, color: selected ? c.text : c.text2)),
+        ]),
+      ),
+    );
   }
 }
