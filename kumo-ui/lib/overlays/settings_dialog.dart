@@ -193,6 +193,12 @@ class _SettingsDialogState extends State<SettingsDialog> {
               onChanged: (v) => s.sidePanelRight = v == 'Right',
             ),
             _ToggleRow(label: 'Show the side panel when Kumo opens', desc: 'Hide or show it anytime with ⌥⌘B.', value: s.sidePanelOnLaunch, onChanged: (v) => s.sidePanelOnLaunch = v),
+            _ToggleRow(
+              label: 'Remember folded repositories',
+              desc: 'Repositories you fold in the sidebar stay folded the next time Kumo opens. Off, they all open expanded.',
+              value: s.rememberSidebarFolds,
+              onChanged: (v) => s.rememberSidebarFolds = v,
+            ),
           ]),
           ('Startup', [
             _toggle(s, 'general.login', 'Open Kumo at login', null, false),
