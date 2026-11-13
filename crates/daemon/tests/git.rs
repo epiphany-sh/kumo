@@ -543,7 +543,7 @@ async fn every_branch_history_and_what_a_commit_changed() {
     let daemon = TestDaemon::start().await;
     let mut client = daemon.client().await;
     let wt = feature_worktree(&daemon, &mut client).await;
-    let main = std::fs::canonicalize(daemon.home().join("dev/app")).unwrap();
+    let main = kumo_infrastructure::platform::canonical(daemon.home().join("dev/app"));
     let log = |all_branches| pb::LogRequest {
         worktree_path: request(&main),
         limit: 10,
@@ -624,7 +624,7 @@ async fn tags_without_a_host_list_alone_with_their_ranges() {
     let daemon = TestDaemon::start().await;
     let mut client = daemon.client().await;
     let wt = feature_worktree(&daemon, &mut client).await;
-    let main = std::fs::canonicalize(daemon.home().join("dev/app")).unwrap();
+    let main = kumo_infrastructure::platform::canonical(daemon.home().join("dev/app"));
     git(&main, &["tag", "v0.1.0"]);
     git(
         &main,

@@ -43,7 +43,8 @@ fn command(spec: &LaunchSpec) -> Result<CommandBuilder, TerminalError> {
         Some(cwd) => cwd.to_path_buf(),
         None => std::env::current_dir().map_err(|e| TerminalError::Spawn(e.to_string()))?,
     };
-    cmd.cwd(cwd);
+    // `cmd.exe` takes `\\?\C:\x` for a network folder it can't start in.
+    cmd.cwd(crate::platform::plain_path(cwd));
     for (key, value) in spec.effective_env() {
         cmd.env(key, value);
     }

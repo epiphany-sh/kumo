@@ -11,8 +11,9 @@ use std::sync::Arc;
 use keyring_core::{CredentialStore, Error as KeyringError};
 
 use super::{
-    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PrivateFiles, ProcessTrees,
-    Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals, unix,
+    AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PlainPaths, PrivateFiles,
+    ProcessTrees, Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals,
+    unix,
 };
 
 pub struct Linux;
@@ -62,6 +63,12 @@ impl FileIdentity for Linux {
     }
     fn same_file(source: &Path, target: &Path, existing: &Metadata) -> bool {
         unix::same_file(source, target, existing)
+    }
+}
+
+impl PlainPaths for Linux {
+    fn plain(path: PathBuf) -> PathBuf {
+        unix::plain(path)
     }
 }
 

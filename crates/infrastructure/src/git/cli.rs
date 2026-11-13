@@ -104,7 +104,7 @@ impl Git for GitCli {
             .into_iter()
             .next()
             .ok_or_else(|| WorkspaceError::NotARepository(path.into()))?;
-        Ok(canonical(main.path))
+        Ok(crate::platform::canonical(main.path))
     }
 
     fn remote_url(&self, repo: &Path) -> Result<Option<String>, WorkspaceError> {
@@ -129,7 +129,7 @@ impl Git for GitCli {
         Ok(parse_worktrees(&list)
             .into_iter()
             .map(|w| Worktree {
-                path: canonical(w.path),
+                path: crate::platform::canonical(w.path),
                 ..w
             })
             .collect())
@@ -250,10 +250,6 @@ fn parse_branches(refs: &str, current: Option<&str>) -> Branches {
         }
     }
     branches
-}
-
-fn canonical(path: PathBuf) -> PathBuf {
-    std::fs::canonicalize(&path).unwrap_or(path)
 }
 
 /// Parses `git worktree list --porcelain`: blocks separated by blank lines,
