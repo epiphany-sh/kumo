@@ -359,7 +359,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       s,
       YourLines.keyOn,
       'Mark what you ran',
-      'A bar, and a faint band if you want, on the commands you typed. Output isn’t touched. Needs Kumo’s shell integration (zsh, bash and fish).',
+      'A bar, and a faint band if you want, on the commands you typed. Output isn’t touched. Works in zsh, bash and fish.',
       true,
     );
     if (!yl.marks) return [on, sticky];

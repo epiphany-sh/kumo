@@ -169,6 +169,8 @@ class GrpcTerminalSurface implements TerminalModes {
       }.entries,
       cols: cols,
       rows: rows,
+      // zsh, bash and fish mark what you run (see YourLines).
+      shellIntegration: true,
     );
   }
 
