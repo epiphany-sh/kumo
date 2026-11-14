@@ -303,10 +303,13 @@ fn run(
     }
 }
 
-/// Waits for `path` to exist (the fake writes it once it starts).
+/// Waits for `path` to have something in it (the fake writes it once it
+/// starts). The shell creates the file before it writes, so existing is
+/// not enough: read too early, it is still empty.
 async fn appears(path: &Path) {
+    let written = |p: &Path| std::fs::metadata(p).is_ok_and(|m| m.len() > 0);
     tokio::time::timeout(TIMEOUT, async {
-        while !path.exists() {
+        while !written(path) {
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
     })
