@@ -21,6 +21,7 @@ abstract final class KIcons {
   static const package = Icons.inventory_2_outlined;
   static const wrench = Icons.build_outlined;
   static const pullRequest = Icons.merge_type_rounded;
+  static const merged = Icons.merge_rounded;
   static const repo = Icons.folder_outlined;
   static const folder = Icons.folder_outlined;
   static const folderOpen = Icons.folder_open_outlined;

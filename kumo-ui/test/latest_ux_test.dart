@@ -139,7 +139,8 @@ void main() {
     testWidgets('a worktree shows its whole name and path on hover; right-click copies either', (tester) async {
       final state = await _app(tester);
       final w = state.activeWorktreeEntry!;
-      expect(find.byTooltip('${w.branch}\n${state.workspace.absolutePathOf(w)}\nRight-click for actions'), findsOneWidget);
+      // The design draws an agent working there: the tooltip says so too.
+      expect(find.byTooltip('${w.branch}\n${state.workspace.absolutePathOf(w)}\nAn agent is working\nRight-click for actions'), findsOneWidget);
       await tester.tap(find.text(w.branch).first, buttons: kSecondaryButton);
       await tester.pump();
       expect(find.text('Copy full path'), findsOneWidget);
