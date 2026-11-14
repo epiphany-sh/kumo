@@ -44,8 +44,15 @@ class EngineAgentsSource extends AgentsSource {
   Future<void> _watch() async {
     while (!_disposed) {
       try {
+        // Every view that runs an agent reads the providers: load them once
+        // the daemon answers, and again after it restarts.
+        var connected = false;
         await for (final snapshot in (await _client).watch(pb.WatchAgentsRequest())) {
           if (_disposed) return;
+          if (!connected) {
+            connected = true;
+            unawaited(loadProviders());
+          }
           _runs = [for (final s in snapshot.sessions) _run(s)];
           if (snapshot.terminalAgents.any((a) => !_shells.containsKey(a.terminalId))) await _readShells();
           _terminalAgents = [for (final a in snapshot.terminalAgents) _terminalAgent(a)];
