@@ -5,14 +5,17 @@ use futures::{Stream, StreamExt};
 use kumo_application::terminal::{Attachment, TerminalService, TerminalSession};
 use kumo_domain::terminal::TerminalId;
 use kumo_proto::v1 as pb;
+use tokio_stream::wrappers::WatchStream;
 use tonic::{Request, Response, Status, Streaming};
 
 use crate::mapping::{
     history_to, launch_spec_from, size_from, status_from, terminal_info_to, terminal_output_to,
+    terminals_activity_to,
 };
 use crate::profile::{Profiles, services_of};
 
 type OutputStream = Pin<Box<dyn Stream<Item = Result<pb::TerminalOutput, Status>> + Send>>;
+type ActivityStream = Pin<Box<dyn Stream<Item = Result<pb::TerminalsActivity, Status>> + Send>>;
 
 /// `kumo.v1.Terminals`.
 ///
@@ -106,6 +109,20 @@ impl pb::terminals_server::Terminals for TerminalsGrpc {
             .map(terminal_info_to)
             .collect();
         Ok(Response::new(pb::ListResponse { terminals }))
+    }
+
+    type WatchStream = ActivityStream;
+
+    /// The changes are every profile's (one registry): a change elsewhere
+    /// sends this profile's shells again, unchanged.
+    async fn watch(
+        &self,
+        request: Request<pb::WatchTerminalsRequest>,
+    ) -> Result<Response<Self::WatchStream>, Status> {
+        let service = self.service(&request).await?;
+        let changes = WatchStream::new(service.activity_changes());
+        let shells = changes.map(move |_| Ok(terminals_activity_to(service.activity())));
+        Ok(Response::new(Box::pin(shells)))
     }
 
     async fn history(

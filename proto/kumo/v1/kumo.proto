@@ -197,6 +197,10 @@ service Terminals {
   rpc History(HistoryRequest) returns (HistoryResponse);
   // Forgets the commands of the repository a shell is in, or all of them.
   rpc ForgetHistory(ForgetHistoryRequest) returns (ForgetHistoryResponse);
+  // What each shell with Kumo's integration is doing: the command running
+  // and the last one done, as its marks say. All of them now, then again
+  // whenever a terminal opens or closes or a shell's activity changes.
+  rpc Watch(WatchTerminalsRequest) returns (stream TerminalsActivity);
 }
 
 message OpenRequest {
@@ -306,6 +310,40 @@ message HistoryEntry {
   optional int32 last_exit = 4;
   // Where it last ran; empty when the shell didn't say.
   string last_cwd = 5;
+}
+
+message WatchTerminalsRequest {}
+
+message TerminalsActivity {
+  // Oldest first. Programs that aren't shells with the integration are
+  // left out.
+  repeated ShellActivity shells = 1;
+}
+
+message ShellActivity {
+  string terminal_id = 1;
+  // The folder its shell said it's in last, else the one it opened in;
+  // empty when neither is known.
+  string cwd = 2;
+  // Unset: nothing runs (a shell that exited runs nothing).
+  RunningCommand running = 3;
+  // Unset: no command ran to its end yet.
+  FinishedCommand last = 4;
+}
+
+message RunningCommand {
+  // As typed; empty when the shell didn't sign it (a space first).
+  string command = 1;
+  // When its output started.
+  uint64 started_unix_nanos = 2;
+}
+
+message FinishedCommand {
+  // As typed; empty when the shell didn't sign it.
+  string command = 1;
+  // Its status, when the shell reported one.
+  optional int32 exit_code = 2;
+  uint64 finished_unix_nanos = 3;
 }
 
 message ForgetHistoryRequest {

@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use kumo_domain::profiles::{ProfileEnv, ProfileId};
 use kumo_domain::terminal::{
-    CommandMarks, LaunchSpec, NoShellIntegration, PtySystem, ShellIntegration, TerminalError,
-    TerminalId, TerminalInfo, TerminalStatus,
+    CommandMarks, LaunchSpec, NoShellIntegration, PtySystem, ShellIntegration, TerminalActivity,
+    TerminalError, TerminalId, TerminalInfo, TerminalStatus,
 };
+use tokio::sync::watch;
 
 use super::registry::SessionRegistry;
 use super::session::Recorder;
@@ -124,7 +125,8 @@ impl TerminalService {
         let recorder = Recorder::new(
             CommandMarks::new(nonce),
             self.history.clone().filter(|_| remember),
-        );
+        )
+        .telling(Arc::clone(self.registry.changes()));
         self.spawn(spec, Some(recorder))
     }
 
@@ -208,6 +210,35 @@ impl TerminalService {
             .collect();
         infos.sort_by_key(|info| info.opened_at);
         infos
+    }
+
+    /// What each shell it sees is doing (programs that aren't shells with
+    /// Kumo's integration are left out), oldest first.
+    pub fn activity(&self) -> Vec<TerminalActivity> {
+        let mut shells: Vec<_> = self
+            .registry
+            .all(self.scope.as_ref())
+            .into_iter()
+            .filter_map(|session| {
+                let activity = session.shell_activity()?;
+                Some((
+                    session.info().opened_at,
+                    TerminalActivity {
+                        id: session.id().clone(),
+                        cwd: session.current_dir(),
+                        activity,
+                    },
+                ))
+            })
+            .collect();
+        shells.sort_by_key(|(opened_at, _)| *opened_at);
+        shells.into_iter().map(|(_, shell)| shell).collect()
+    }
+
+    /// Changes when a terminal opens or closes, or a shell's activity
+    /// changes: read [`Self::activity`] again then. Shared by every scope.
+    pub fn activity_changes(&self) -> watch::Receiver<u64> {
+        self.registry.changes().subscribe()
     }
 
     /// Sessions whose process is still alive.
