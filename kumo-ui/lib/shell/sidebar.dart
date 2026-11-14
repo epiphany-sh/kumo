@@ -8,6 +8,9 @@ import '../app/app_state.dart';
 import '../data/agents_source.dart';
 import '../data/ai_usage_source.dart';
 import '../data/profiles_source.dart';
+import '../data/pull_requests_source.dart';
+import '../data/pipelines_source.dart';
+import '../data/worktree_lights.dart';
 import '../data/models.dart';
 import '../overlays/namespace_dialog.dart';
 import '../overlays/new_workspace_dialog.dart';
@@ -965,6 +968,71 @@ class _RepoGroupState extends State<_RepoGroup> {
     );
   }
 
+  Widget _worktreeRow(BuildContext context, AppState s, Worktree w) {
+    final c = context.c;
+    final dot = s.worktreeLight(w);
+    final pr = s.pullRequestOf(w);
+    return GestureDetector(
+      onSecondaryTapDown: (d) => _openMenu(w, d.globalPosition),
+      child: KPressable(
+        // From Docs, Tasks, Git or Agents a worktree takes you to its
+        // terminals; in the Terminal view it switches the context.
+        onTap: () => s.view == KumoView.terminal ? s.selectWorktree(w.branch, path: w.path) : s.openWorktree(w),
+        semanticLabel: '${w.branch}, ${w.note}${w.isMain ? ', principal checkout' : ''}'
+            '${_lightSays(dot.light).isEmpty ? '' : ', ${_lightSays(dot.light)}'}${pr == null ? '' : ', ${_prSays(pr)}'}',
+        // Long branch names are cut: the whole name and where it lives.
+        tooltip: '${w.branch}${w.isMain ? ' · principal checkout' : ''}\n${s.workspace.absolutePathOf(w)}'
+            '${_lightSays(dot.light).isEmpty ? '' : '\n${_lightSays(dot.light)}'}\nRight-click for actions',
+        selected: s.isActiveWorktree(w) && !s.inHome,
+        builder: (context, hover, focus) {
+          // The worktree you're standing on: a soft accent background.
+          final sel = s.isActiveWorktree(w) && !s.inHome;
+          final menu = _menuFor == w.branch;
+          return Container(
+            margin: const EdgeInsets.only(top: 1),
+            padding: const EdgeInsets.fromLTRB(28, 5, 8, 5),
+            decoration: BoxDecoration(color: menu ? c.tile : (sel ? c.accSoft : (hover ? c.tile : null)), borderRadius: BorderRadius.circular(9)),
+            child: Row(children: [
+              WorktreeDot(dot.light, pulse: dot.pulse),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Flexible(child: Text(w.branch, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11.5, color: c.text, height: 1.35))),
+                    if (w.isMain) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                        decoration: BoxDecoration(color: c.accSoft, borderRadius: BorderRadius.circular(5)),
+                        child: Text('principal', style: sans(9.5, weight: FontWeight.w600, color: c.acc, height: 1.6, letterSpacing: 0.2)),
+                      ),
+                    ],
+                    if (s.workspace.arrived.contains(w.path)) ...[
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: 'Made outside Kumo (a terminal or an agent)',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          decoration: BoxDecoration(color: c.okSoft, borderRadius: BorderRadius.circular(5)),
+                          child: Text('new', style: sans(9.5, weight: FontWeight.w600, color: c.ok, height: 1.6, letterSpacing: 0.2)),
+                        ),
+                      ),
+                    ],
+                  ]),
+                  if (_copied?.$1 == w.path)
+                    Text('Copied ${_copied!.$2}', style: sans(11, color: c.ok))
+                  else
+                    Text(w.note, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11, color: w.tone == WorktreeTone.warn ? c.warn : c.text3)),
+                ]),
+              ),
+              if (pr != null) ...[const SizedBox(width: 6), _PrMark(pr)],
+            ]),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
@@ -1013,63 +1081,7 @@ class _RepoGroupState extends State<_RepoGroup> {
           ),
         ),
         if (open)
-          for (final w in s.worktreesOf(r))
-            GestureDetector(
-              onSecondaryTapDown: (d) => _openMenu(w, d.globalPosition),
-              child: KPressable(
-                // From Docs, Tasks, Git or Agents a worktree takes you to its
-                // terminals; in the Terminal view it switches the context.
-                onTap: () => s.view == KumoView.terminal ? s.selectWorktree(w.branch, path: w.path) : s.openWorktree(w),
-                semanticLabel: '${w.branch}, ${w.note}${w.isMain ? ', principal checkout' : ''}',
-                // Long branch names are cut: the whole name and where it lives.
-                tooltip: '${w.branch}${w.isMain ? ' · principal checkout' : ''}\n${s.workspace.absolutePathOf(w)}\nRight-click for actions',
-                selected: s.isActiveWorktree(w) && !s.inHome,
-                builder: (context, hover, focus) {
-                  // The worktree you're standing on: a soft accent background.
-                  final sel = s.isActiveWorktree(w) && !s.inHome;
-                  final menu = _menuFor == w.branch;
-                  return Container(
-                    margin: const EdgeInsets.only(top: 1),
-                    padding: const EdgeInsets.fromLTRB(28, 5, 8, 5),
-                    decoration: BoxDecoration(color: menu ? c.tile : (sel ? c.accSoft : (hover ? c.tile : null)), borderRadius: BorderRadius.circular(9)),
-                    child: Row(children: [
-                      Dot(toneColor(context, w.tone)),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Row(children: [
-                            Flexible(child: Text(w.branch, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11.5, color: c.text, height: 1.35))),
-                            if (w.isMain) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5),
-                                decoration: BoxDecoration(color: c.accSoft, borderRadius: BorderRadius.circular(5)),
-                                child: Text('principal', style: sans(9.5, weight: FontWeight.w600, color: c.acc, height: 1.6, letterSpacing: 0.2)),
-                              ),
-                            ],
-                            if (s.workspace.arrived.contains(w.path)) ...[
-                              const SizedBox(width: 6),
-                              Tooltip(
-                                message: 'Made outside Kumo (a terminal or an agent)',
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                                  decoration: BoxDecoration(color: c.okSoft, borderRadius: BorderRadius.circular(5)),
-                                  child: Text('new', style: sans(9.5, weight: FontWeight.w600, color: c.ok, height: 1.6, letterSpacing: 0.2)),
-                                ),
-                              ),
-                            ],
-                          ]),
-                          if (_copied?.$1 == w.path)
-                            Text('Copied ${_copied!.$2}', style: sans(11, color: c.ok))
-                          else
-                            Text(w.note, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11, color: w.tone == WorktreeTone.warn ? c.warn : c.text3)),
-                        ]),
-                      ),
-                    ]),
-                  );
-                },
-              ),
-            ),
+          for (final w in s.worktreesOf(r)) _worktreeRow(context, s, w),
       ]),
     );
   }
@@ -1153,5 +1165,114 @@ class _WorktreeMenuState extends State<_WorktreeMenu> {
             else
               KMenuItem(icon: KIcons.trash, label: 'Delete worktree…', danger: true, onTap: () => setState(() => _confirm = true)),
           ]);
+  }
+}
+
+/// What a worktree's dot says, for the tooltip and screen readers.
+String _lightSays(WorktreeLight l) => switch (l) {
+      WorktreeLight.idle => '',
+      WorktreeLight.done => 'An agent finished',
+      WorktreeLight.working => 'An agent is working',
+      WorktreeLight.asking => 'An agent needs you',
+      WorktreeLight.failed => 'An agent failed',
+    };
+
+String _prSays(PullRequestInfo pr) => switch (pr.state) {
+      PrOpenState.merged => '${pr.label} merged: this worktree can go',
+      PrOpenState.closed => '${pr.label} closed without merging',
+      PrOpenState.open => '${pr.label}${pr.draft ? ' draft' : ' open'}${switch (pr.checksState) {
+          CiState.passed => ' · checks passed',
+          CiState.failed => ' · checks failed',
+          CiState.running || CiState.queued => ' · checks running',
+          _ => '',
+        }}',
+    };
+
+/// A worktree's dot: gray with nothing new, green when an agent finished,
+/// the accent (pulsing) while one works, amber when one needs you and red
+/// when one failed.
+class WorktreeDot extends StatefulWidget {
+  const WorktreeDot(this.light, {super.key, this.pulse = false});
+  final WorktreeLight light;
+  final bool pulse;
+
+  @override
+  State<WorktreeDot> createState() => _WorktreeDotState();
+}
+
+class _WorktreeDotState extends State<WorktreeDot> with SingleTickerProviderStateMixin {
+  late final _beat = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _follow();
+  }
+
+  @override
+  void didUpdateWidget(WorktreeDot old) {
+    super.didUpdateWidget(old);
+    _follow();
+  }
+
+  /// Beats while asked to, unless the system asks for less motion.
+  void _follow() {
+    final beat = widget.pulse && !MediaQuery.disableAnimationsOf(context);
+    if (beat && !_beat.isAnimating) {
+      _beat.repeat(reverse: true);
+    } else if (!beat && _beat.isAnimating) {
+      _beat
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _beat.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final color = switch (widget.light) {
+      WorktreeLight.idle => c.text3,
+      WorktreeLight.done => c.ok,
+      WorktreeLight.working => c.acc,
+      WorktreeLight.asking => c.warn,
+      WorktreeLight.failed => c.err,
+    };
+    return FadeTransition(
+      opacity: Tween<double>(begin: 1, end: 0.35).animate(CurvedAnimation(parent: _beat, curve: Curves.easeInOut)),
+      child: Dot(color),
+    );
+  }
+}
+
+/// The worktree branch's pull request: merged (purple), closed (gray) or
+/// open, colored by its checks.
+class _PrMark extends StatelessWidget {
+  const _PrMark(this.pr);
+  final PullRequestInfo pr;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final (icon, color) = switch (pr.state) {
+      PrOpenState.merged => (KIcons.merged, c.purple),
+      PrOpenState.closed => (KIcons.pullRequest, c.text3),
+      PrOpenState.open when pr.draft => (KIcons.pullRequest, c.text3),
+      PrOpenState.open => (
+          KIcons.pullRequest,
+          switch (pr.checksState) {
+            CiState.passed => c.ok,
+            CiState.failed => c.err,
+            CiState.running || CiState.queued => c.acc,
+            _ => c.text2,
+          }
+        ),
+    };
+    return Tooltip(message: _prSays(pr), child: Icon(icon, size: 14, color: color));
   }
 }

@@ -16,6 +16,7 @@ import '../data/tests_source.dart';
 import '../data/changes.dart';
 import '../data/workspace_source.dart';
 import '../data/worktree_changes.dart';
+import '../data/worktree_lights.dart';
 import '../data/models.dart';
 import '../editor/file_buffers.dart';
 import '../platform/app_icon.dart';
@@ -120,9 +121,12 @@ class AppState extends ChangeNotifier {
     _bindPipelines();
     _bindTests();
     this.workspace.addListener(_onWorkspaceChanged);
+    // The lights first: the listeners that rebuild read them.
     this.agents
+      ..addListener(_readLights)
       ..addListener(notifyListeners)
       ..addListener(_flushQueued);
+    _readLights();
     this.usage.addListener(notifyListeners);
     this.updates.addListener(notifyListeners);
     this.profiles.addListener(notifyListeners);
@@ -351,6 +355,7 @@ class AppState extends ChangeNotifier {
     activeWorktree = branch;
     activeWorktreePath = path;
     if (path != null) workspace.acknowledge(path);
+    if (activeWorktreeEntry case final w?) _lights.seen(workspace.absolutePathOf(w));
     _home = false;
     _bindChanges();
     _bindPipelines();
@@ -419,6 +424,8 @@ class AppState extends ChangeNotifier {
   }
 
   void _onWorkspaceChanged() {
+    // An agent's worktree may have just arrived: place it.
+    _readLights();
     if (workspace.error != _lastWorkspaceError) {
       _lastWorkspaceError = workspace.error;
       _workspaceErrorDismissed = false;
@@ -1324,10 +1331,71 @@ class AppState extends ChangeNotifier {
     if (repo != null) setSetting('tests.command.${repo.id}', command.trim().isEmpty ? null : command.trim());
   }
 
+  /// Each worktree's pull request, when it was asked for, and the ones
+  /// being asked for now (key: path and branch).
+  final _prOf = <String, (PullRequestInfo?, DateTime)>{};
+  final _prAsking = <String>{};
+
+  /// How long a worktree's pull request is trusted before asking again.
+  static const prFreshFor = Duration(minutes: 3);
+
+  /// [w]'s pull request (open, merged or closed) as last read, or null: it
+  /// has none, or it hasn't arrived yet (asking for it notifies when it
+  /// does). The principal checkout and branches never pushed aren't asked.
+  PullRequestInfo? pullRequestOf(Worktree w) {
+    if (w.isMain || !w.everPushed) return null;
+    final path = workspace.absolutePathOf(w);
+    final key = '$path\n${w.branch}';
+    final have = _prOf[key];
+    if ((have == null || DateTime.now().difference(have.$2) > prFreshFor) && _prAsking.add(key)) _askPullRequest(key, path);
+    return have?.$1;
+  }
+
+  Future<void> _askPullRequest(String key, String path) async {
+    PullRequestInfo? pr;
+    try {
+      pr = (await pullRequests.forBranch(path)).pullRequest;
+    } on Object {
+      // No host, no token, no network: no icon, like a branch without one.
+    }
+    _prAsking.remove(key);
+    if (_disposed) return;
+    final before = _prOf[key]?.$1;
+    _prOf[key] = (pr, DateTime.now());
+    if (pr?.state != before?.state || pr?.checksState != before?.checksState || pr?.number != before?.number) notifyListeners();
+  }
+
   // ---- Agents ----
 
   /// Coding agents (optional): connected providers and running sessions.
   final AgentsSource agents;
+
+  final _lights = WorktreeLights();
+
+  void _readLights() {
+    final entry = activeWorktreeEntry;
+    _lights.update(
+      runs: agents.runs,
+      handTyped: agents.terminalAgents,
+      worktrees: [for (final r in workspace.repos) for (final w in r.worktrees) workspace.absolutePathOf(w)],
+      looking: entry == null || _home ? null : workspace.absolutePathOf(entry),
+    );
+  }
+
+  /// What [w]'s dot in the sidebar says, and whether it pulses: an agent
+  /// is working there. Mock worktrees, with no agents, show their drawn
+  /// tone, still.
+  ({WorktreeLight light, bool pulse}) worktreeLight(Worktree w) {
+    final live = _lights.of(workspace.absolutePathOf(w));
+    if (live != WorktreeLight.idle) return (light: live, pulse: live == WorktreeLight.working);
+    final drawn = switch (w.tone) {
+      WorktreeTone.idle => WorktreeLight.idle,
+      WorktreeTone.running => WorktreeLight.working,
+      WorktreeTone.warn => WorktreeLight.asking,
+      WorktreeTone.ok => WorktreeLight.done,
+    };
+    return (light: drawn, pulse: false);
+  }
 
   /// Your agents (Claude Code subagents): their files, runs and test runs.
   /// Views listen to it directly.
@@ -1592,6 +1660,7 @@ class AppState extends ChangeNotifier {
       profiles.dispose();
     }
     agents
+      ..removeListener(_readLights)
       ..removeListener(notifyListeners)
       ..removeListener(_flushQueued)
       ..dispose();
