@@ -2,7 +2,8 @@
 //! data in the same SQLite file.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Mutex, PoisonError};
+use std::time::Duration;
 
 use kumo_domain::terminal::{
     CommandHistoryStore, CommandRun, HISTORY_LIMIT, HistoryEntry, HistoryError,
@@ -13,30 +14,50 @@ use rusqlite::{Connection, params};
 use super::migrations;
 
 /// [`CommandHistoryStore`] on a SQLite file.
+///
+/// Opens the file for each call (one per command run, not per key): the
+/// terminals that hold it may outlive their profile for a moment, and
+/// Windows can't delete a profile's folder while a file in it is open.
 #[derive(Debug)]
 pub struct SqliteHistoryStore {
-    conn: Mutex<Connection>,
+    db: Db,
     /// Most commands kept per repository.
     limit: usize,
 }
 
+#[derive(Debug)]
+enum Db {
+    File(PathBuf),
+    Memory(Mutex<Connection>),
+}
+
+/// How long a call waits for another writer (the other stores share the
+/// file).
+const BUSY_WAIT: Duration = Duration::from_secs(2);
+
 impl SqliteHistoryStore {
+    /// Creates or migrates the database at `path`.
     pub fn open(path: &Path) -> Result<Self, HistoryError> {
-        Self::init(Connection::open(path).map_err(store_error)?)
+        Self::prepare(&mut Connection::open(path).map_err(store_error)?)?;
+        Ok(Self {
+            db: Db::File(path.to_path_buf()),
+            limit: HISTORY_LIMIT,
+        })
     }
 
     pub fn in_memory() -> Result<Self, HistoryError> {
-        Self::init(Connection::open_in_memory().map_err(store_error)?)
-    }
-
-    fn init(mut conn: Connection) -> Result<Self, HistoryError> {
-        conn.execute_batch("PRAGMA journal_mode = WAL;")
-            .map_err(store_error)?;
-        migrations::migrate(&mut conn).map_err(store_error)?;
+        let mut conn = Connection::open_in_memory().map_err(store_error)?;
+        Self::prepare(&mut conn)?;
         Ok(Self {
-            conn: Mutex::new(conn),
+            db: Db::Memory(Mutex::new(conn)),
             limit: HISTORY_LIMIT,
         })
+    }
+
+    fn prepare(conn: &mut Connection) -> Result<(), HistoryError> {
+        conn.execute_batch("PRAGMA journal_mode = WAL;")
+            .map_err(store_error)?;
+        migrations::migrate(conn).map_err(store_error)
     }
 
     #[cfg(test)]
@@ -45,8 +66,20 @@ impl SqliteHistoryStore {
         self
     }
 
-    fn conn(&self) -> MutexGuard<'_, Connection> {
-        self.conn.lock().unwrap_or_else(PoisonError::into_inner)
+    fn with_conn<T>(
+        &self,
+        call: impl FnOnce(&mut Connection) -> rusqlite::Result<T>,
+    ) -> Result<T, HistoryError> {
+        match &self.db {
+            Db::File(path) => {
+                let mut conn = Connection::open(path).map_err(store_error)?;
+                conn.busy_timeout(BUSY_WAIT).map_err(store_error)?;
+                call(&mut conn).map_err(store_error)
+            }
+            Db::Memory(conn) => {
+                call(&mut conn.lock().unwrap_or_else(PoisonError::into_inner)).map_err(store_error)
+            }
+        }
     }
 }
 
@@ -63,40 +96,38 @@ impl CommandHistoryStore for SqliteHistoryStore {
     fn record(&self, repo: Option<&Path>, run: &CommandRun) -> Result<(), HistoryError> {
         let repo = key(repo);
         let cwd = run.cwd.as_ref().map(|c| c.display().to_string());
-        let mut conn = self.conn();
-        let tx = conn.transaction().map_err(store_error)?;
-        tx.execute(
-            "INSERT INTO command_history (repo, command, runs, last_run, last_exit, last_cwd)
-             VALUES (?1, ?2, 1, ?3, ?4, ?5)
-             ON CONFLICT (repo, command) DO UPDATE SET
-                runs = runs + 1,
-                last_run = MAX(last_run, excluded.last_run),
-                last_exit = excluded.last_exit,
-                last_cwd = excluded.last_cwd",
-            params![repo, run.command, nanos(run.started_at), run.exit, cwd],
-        )
-        .map_err(store_error)?;
-        tx.execute(
-            "DELETE FROM command_history WHERE repo = ?1 AND command IN (
-                SELECT command FROM command_history WHERE repo = ?1
-                ORDER BY last_run DESC LIMIT -1 OFFSET ?2)",
-            params![repo, i64::try_from(self.limit).unwrap_or(i64::MAX)],
-        )
-        .map_err(store_error)?;
-        tx.commit().map_err(store_error)
+        let limit = i64::try_from(self.limit).unwrap_or(i64::MAX);
+        self.with_conn(|conn| {
+            let tx = conn.transaction()?;
+            tx.execute(
+                "INSERT INTO command_history (repo, command, runs, last_run, last_exit, last_cwd)
+                 VALUES (?1, ?2, 1, ?3, ?4, ?5)
+                 ON CONFLICT (repo, command) DO UPDATE SET
+                    runs = runs + 1,
+                    last_run = MAX(last_run, excluded.last_run),
+                    last_exit = excluded.last_exit,
+                    last_cwd = excluded.last_cwd",
+                params![repo, run.command, nanos(run.started_at), run.exit, cwd],
+            )?;
+            tx.execute(
+                "DELETE FROM command_history WHERE repo = ?1 AND command IN (
+                    SELECT command FROM command_history WHERE repo = ?1
+                    ORDER BY last_run DESC LIMIT -1 OFFSET ?2)",
+                params![repo, limit],
+            )?;
+            tx.commit()
+        })
     }
 
     fn recent(&self, repo: Option<&Path>, limit: usize) -> Result<Vec<HistoryEntry>, HistoryError> {
-        let conn = self.conn();
-        let mut stmt = conn
-            .prepare_cached(
+        let repo = key(repo);
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX);
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
                 "SELECT command, runs, last_run, last_exit, last_cwd FROM command_history
                  WHERE repo = ?1 ORDER BY last_run DESC LIMIT ?2",
-            )
-            .map_err(store_error)?;
-        stmt.query_map(
-            params![key(repo), i64::try_from(limit).unwrap_or(i64::MAX)],
-            |row| {
+            )?;
+            stmt.query_map(params![repo, limit], |row| {
                 let last_run: i64 = row.get(2)?;
                 let last_cwd: Option<String> = row.get(4)?;
                 Ok(HistoryEntry {
@@ -106,25 +137,20 @@ impl CommandHistoryStore for SqliteHistoryStore {
                     last_exit: row.get(3)?,
                     last_cwd: last_cwd.map(PathBuf::from),
                 })
-            },
-        )
-        .and_then(Iterator::collect)
-        .map_err(store_error)
+            })?
+            .collect()
+        })
     }
 
     fn forget(&self, repo: Option<&Path>) -> Result<usize, HistoryError> {
-        self.conn()
-            .execute(
-                "DELETE FROM command_history WHERE repo = ?1",
-                params![key(repo)],
-            )
-            .map_err(store_error)
+        let repo = key(repo);
+        self.with_conn(|conn| {
+            conn.execute("DELETE FROM command_history WHERE repo = ?1", params![repo])
+        })
     }
 
     fn forget_all(&self) -> Result<usize, HistoryError> {
-        self.conn()
-            .execute("DELETE FROM command_history", [])
-            .map_err(store_error)
+        self.with_conn(|conn| conn.execute("DELETE FROM command_history", []))
     }
 }
 
@@ -223,5 +249,8 @@ mod tests {
         let store = SqliteHistoryStore::open(&path).unwrap();
         store.record(None, &run("ls", 1, Some(0))).unwrap();
         assert_eq!(store.recent(None, 1).unwrap().len(), 1);
+        // Nothing stays open between calls: the folder can go (Windows).
+        std::fs::remove_dir_all(dir.path()).unwrap();
+        drop(store);
     }
 }

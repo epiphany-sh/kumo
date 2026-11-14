@@ -272,6 +272,15 @@ mod tests {
 
     const NONCE: &str = "n0nce";
 
+    /// An absolute folder on this OS (`C:` first on Windows).
+    fn abs(dir: &str) -> String {
+        if cfg!(windows) {
+            format!("C:{dir}")
+        } else {
+            dir.to_owned()
+        }
+    }
+
     fn at(ms: u64) -> Timestamp {
         Timestamp::from_unix_nanos(ms * 1_000_000)
     }
@@ -292,7 +301,8 @@ mod tests {
     #[test]
     fn a_command_is_read_once_done_with_its_folder_status_and_time() {
         let mut marks = CommandMarks::new(NONCE);
-        assert!(feed(&mut marks, "\x1b]133;A\x07\x1b]633;P;Cwd=/w/repo\x07$ ", 0).is_empty());
+        let prompt = format!("\x1b]133;A\x07\x1b]633;P;Cwd={}\x07$ ", abs("/w/repo"));
+        assert!(feed(&mut marks, &prompt, 0).is_empty());
         assert!(
             feed(
                 &mut marks,
@@ -306,18 +316,18 @@ mod tests {
             done,
             [CommandRun {
                 command: "cargo test".into(),
-                cwd: Some("/w/repo".into()),
+                cwd: Some(abs("/w/repo").into()),
                 exit: Some(101),
                 started_at: at(5),
                 took: Some(Duration::from_secs(1)),
             }]
         );
-        assert_eq!(marks.cwd(), Some(&PathBuf::from("/w/repo")));
+        assert_eq!(marks.cwd(), Some(&PathBuf::from(abs("/w/repo"))));
     }
 
     #[test]
     fn marks_split_anywhere_between_chunks_still_read() {
-        let stream = run("git status", "/w/repo", 0);
+        let stream = run("git status", &abs("/w/repo"), 0);
         for cut in 0..stream.len() {
             let mut marks = CommandMarks::new(NONCE);
             let mut done = Vec::new();
@@ -325,7 +335,7 @@ mod tests {
             marks.feed(&stream.as_bytes()[cut..], at(1), &mut done);
             assert_eq!(done.len(), 1, "cut at {cut}");
             assert_eq!(done[0].command, "git status");
-            assert_eq!(done[0].cwd, Some("/w/repo".into()));
+            assert_eq!(done[0].cwd, Some(abs("/w/repo").into()));
         }
     }
 
@@ -360,10 +370,10 @@ mod tests {
     #[test]
     fn escaped_semicolons_backslashes_and_lines_come_back() {
         let mut marks = CommandMarks::new(NONCE);
-        let stream = run(r"a\x3b b \\ c\x0ad", r"/w/my\x3bdir", 0);
+        let stream = run(r"a\x3b b \\ c\x0ad", &abs(r"/w/my\x3bdir"), 0);
         let done = feed(&mut marks, &stream, 0);
         assert_eq!(done[0].command, "a; b \\ c\nd");
-        assert_eq!(done[0].cwd, Some("/w/my;dir".into()));
+        assert_eq!(done[0].cwd, Some(abs("/w/my;dir").into()));
     }
 
     #[test]
@@ -392,9 +402,14 @@ mod tests {
     #[test]
     fn the_folder_isn_t_taken_from_a_running_command_s_output() {
         let mut marks = CommandMarks::new(NONCE);
-        feed(&mut marks, "\x1b]633;P;Cwd=/w/a\x07", 0);
-        feed(&mut marks, "\x1b]133;C\x07\x1b]633;P;Cwd=/elsewhere\x07", 0);
-        assert_eq!(marks.cwd(), Some(&PathBuf::from("/w/a")));
+        feed(
+            &mut marks,
+            &format!("\x1b]633;P;Cwd={}\x07", abs("/w/a")),
+            0,
+        );
+        let elsewhere = format!("\x1b]133;C\x07\x1b]633;P;Cwd={}\x07", abs("/elsewhere"));
+        feed(&mut marks, &elsewhere, 0);
+        assert_eq!(marks.cwd(), Some(&PathBuf::from(abs("/w/a"))));
         feed(&mut marks, "\x1b]133;D;0\x07\x1b]633;P;Cwd=relative\x07", 0);
         assert_eq!(marks.cwd(), None);
     }
