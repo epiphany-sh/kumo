@@ -46,4 +46,23 @@ void main() {
     expect(state.contextFile, 'internal/discount/repository.go');
     expect(tester.takeException(), isNull);
   });
+
+  test('opening the Files tab moves an open side panel off its own Files tree', () {
+    final s = AppState();
+    s.showSidePanelTab(SidePanelTab.files);
+    s.openContext(ContextTab.files);
+    expect(s.sidePanelTab, SidePanelTab.git, reason: 'the same tree twice is one too many');
+    expect(s.sidePanelOpen, isTrue);
+
+    s.showSidePanelTab(SidePanelTab.widgets);
+    s.openContext(ContextTab.files);
+    expect(s.sidePanelTab, SidePanelTab.widgets, reason: 'another tab stays');
+
+    s.showSidePanelTab(SidePanelTab.files);
+    s.toggleSidePanel();
+    s.openContext(ContextTab.files);
+    expect(s.sidePanelOpen, isFalse, reason: 'a hidden panel stays hidden');
+    expect(s.sidePanelTab, SidePanelTab.files);
+    s.dispose();
+  });
 }

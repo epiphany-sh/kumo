@@ -79,6 +79,16 @@ void main() {
     s.dispose();
   });
 
+  test('new folders keep a .gitkeep and are refused where something exists', () async {
+    final s = AppState();
+    expect(await s.createFolder('internal/discount'), 'internal/discount already exists');
+    expect(await s.createFolder(_repo), '$_repo already exists');
+    expect(await s.createFolder(' / '), 'Give the folder a name');
+    expect(await s.createFolder('/internal//cache/lru/'), isNull);
+    expect(s.changes.files, contains('internal/cache/lru/.gitkeep'));
+    s.dispose();
+  });
+
   testWidgets('a file in the Files tab is editable; ⌘S saves it', (tester) async {
     final state = await _filesTab(tester);
     await tester.tap(find.text('repository.go').first);
@@ -158,6 +168,18 @@ void main() {
     expect(state.contextFile, 'internal/discount/cache.go', reason: 'the new file opens');
 
     await _rightClick(tester, find.text('discount').first);
+    await tester.tap(find.text('New folder…'));
+    await tester.pump();
+    await tester.pump();
+    await tester.enterText(find.byKey(const ValueKey('tree-name')), 'adapters/kafka');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await _pumpAsync(tester);
+    expect(state.changes.files, contains('internal/discount/adapters/kafka/.gitkeep'));
+    expect(find.text('adapters'), findsOneWidget);
+    expect(find.text('.gitkeep'), findsOneWidget, reason: 'the new folders show open');
+    expect(state.contextFile, 'internal/discount/cache.go', reason: 'a folder opens no tab');
+
+    await _rightClick(tester, find.text('discount').first);
     await tester.tap(find.text('Delete folder'));
     await tester.pump();
     expect(find.text('cache.go'), findsNothing);
@@ -165,6 +187,25 @@ void main() {
     state.undoLast();
     await tester.pump();
     expect(find.text('repository.go'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('New folder in the header creates it next to the open file', (tester) async {
+    final state = await _filesTab(tester);
+    await tester.tap(find.text('repository.go').first);
+    await _pumpAsync(tester);
+    await tester.tap(find.byTooltip('New folder (or right-click a folder)'));
+    await tester.pump();
+    await tester.pump();
+    await tester.enterText(find.byKey(const ValueKey('tree-name')), 'repository.go');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await _pumpAsync(tester);
+    expect(find.text('internal/discount/repository.go already exists'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('tree-name')), 'fixtures');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await _pumpAsync(tester);
+    expect(state.changes.files, contains('internal/discount/fixtures/.gitkeep'));
+    expect(find.byKey(const ValueKey('tree-name')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

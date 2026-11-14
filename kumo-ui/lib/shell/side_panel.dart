@@ -691,10 +691,12 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
   bool _changedOnly = false;
 
   /// The row whose menu is open, the one being renamed, and the folder a
-  /// new file is being named in ('' is the worktree's root).
+  /// new file or folder ([_newFolder]) is being named in ('' is the
+  /// worktree's root).
   String? _menuFor;
   String? _renaming;
   String? _creatingIn;
+  bool _newFolder = false;
   final _name = TextEditingController();
   final _nameFocus = FocusNode();
   String? _nameError;
@@ -744,11 +746,12 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
     _focusName();
   }
 
-  void _startCreate(String dir) {
+  void _startCreate(String dir, {bool folder = false}) {
     _name.clear();
     setState(() {
       _changedOnly = false; // its folder may be hidden
       _creatingIn = dir;
+      _newFolder = folder;
       _renaming = null;
       _nameError = null;
       if (dir.isNotEmpty) _openUpTo(dir);
@@ -763,7 +766,8 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
     }
   }
 
-  /// ↩ in the name field: renames, or creates the file and opens it.
+  /// ↩ in the name field: renames, creates the file and opens it, or
+  /// creates the folder and shows it open.
   Future<void> _submitName() async {
     final s = AppScope.read(context);
     final raw = _name.text.trim();
@@ -788,10 +792,15 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
     } else {
       final dir = _creatingIn ?? '';
       final path = AppState.cleanPath(dir.isEmpty ? raw : '$dir/$raw');
-      error = await s.createFile(path);
-      if (error == null) {
-        _openUpTo(_dirOf(path));
-        widget.onOpen(path);
+      if (_newFolder) {
+        error = await s.createFolder(path);
+        if (error == null) _openUpTo(path);
+      } else {
+        error = await s.createFile(path);
+        if (error == null) {
+          _openUpTo(_dirOf(path));
+          widget.onOpen(path);
+        }
       }
     }
     _busy = false;
@@ -822,6 +831,7 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
         close: close,
         onOpen: dir ? null : () => widget.onOpen(path),
         onNewFile: () => _startCreate(path),
+        onNewFolder: () => _startCreate(path, folder: true),
         onRename: () => _startRename(path),
       ),
     );
@@ -856,6 +866,8 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
       node.files.add(p);
     }
     const newHint = 'name.ext — a/b.ext makes folders';
+    Widget newField(int depth) =>
+        _newFolder ? _field(depth, KIcons.folder, hint: 'name — a/b makes nested folders') : _field(depth, KIcons.file, hint: newHint);
     final rows = <Widget>[];
     void walk(_Dir node, int depth) {
       for (final name in node.dirs.keys.toList()..sort()) {
@@ -883,7 +895,7 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
             onMenu: (at) => _menu(at, d.key, dir: true),
           ));
         }
-        if (open && _creatingIn == d.key) rows.add(_field(depth + 1, KIcons.file, hint: newHint));
+        if (open && _creatingIn == d.key) rows.add(newField(depth + 1));
         if (open) walk(d, depth + 1);
       }
       final files = [...node.files]..sort((a, b) => a.split('/').last.compareTo(b.split('/').last));
@@ -912,7 +924,7 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
       }
     }
 
-    if (_creatingIn == '') rows.add(_field(0, KIcons.file, hint: newHint));
+    if (_creatingIn == '') rows.add(newField(0));
     walk(root, 0);
     final pending = s.pendingChanges;
     final added = pending.where((f) => f.kind == 'A').length;
@@ -946,6 +958,11 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
           onTap: () => _startCreate(_dirOf(widget.selected)),
         ),
         KIconButton(
+          icon: KIcons.folderAdd,
+          label: 'New folder (or right-click a folder)',
+          onTap: () => _startCreate(_dirOf(widget.selected), folder: true),
+        ),
+        KIconButton(
           icon: KIcons.collapseAll,
           label: 'Collapse all',
           onTap: () => setState(() {
@@ -968,12 +985,21 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
 
 /// Right-click on a file or folder of the Files tree.
 class _FileTreeMenu extends StatelessWidget {
-  const _FileTreeMenu({required this.path, required this.dir, required this.close, required this.onNewFile, required this.onRename, this.onOpen});
+  const _FileTreeMenu({
+    required this.path,
+    required this.dir,
+    required this.close,
+    required this.onNewFile,
+    required this.onNewFolder,
+    required this.onRename,
+    this.onOpen,
+  });
   final String path;
   final bool dir;
   final VoidCallback close;
   final VoidCallback? onOpen;
   final VoidCallback onNewFile;
+  final VoidCallback onNewFolder;
   final VoidCallback onRename;
 
   @override
@@ -988,7 +1014,10 @@ class _FileTreeMenu extends StatelessWidget {
     final n = changed.length;
     final discardLabel = dir && n > 0 ? 'Discard $n ${n == 1 ? 'change' : 'changes'}' : 'Discard changes';
     return KMenuPanel(width: 248, children: [
-      if (dir) KMenuItem(icon: KIcons.fileAdd, label: 'New file…', onTap: () => then(onNewFile)),
+      if (dir) ...[
+        KMenuItem(icon: KIcons.fileAdd, label: 'New file…', onTap: () => then(onNewFile)),
+        KMenuItem(icon: KIcons.folderAdd, label: 'New folder…', onTap: () => then(onNewFolder)),
+      ],
       if (onOpen != null) KMenuItem(icon: KIcons.file, label: 'Open', onTap: () => then(onOpen!)),
       KMenuItem(icon: KIcons.rename, label: 'Rename…', onTap: () => then(onRename)),
       KMenuItem(
