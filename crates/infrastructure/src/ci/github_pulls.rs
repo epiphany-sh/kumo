@@ -504,9 +504,7 @@ mod tests {
         let server = TestServer::start(|r| match (r.method.as_str(), r.path.as_str()) {
             ("POST", "/graphql") => (200, include_str!("fixtures/github_pulls.json").to_owned()),
             ("POST", "/repos/platform/repo-a/pulls") => (201, r#"{"number":530}"#.to_owned()),
-            ("GET", "/repos/platform/repo-a") => {
-                (200, r#"{"default_branch":"main"}"#.to_owned())
-            }
+            ("GET", "/repos/platform/repo-a") => (200, r#"{"default_branch":"main"}"#.to_owned()),
             _ => (404, "{}".to_owned()),
         });
         let client = GitHubPulls::default();

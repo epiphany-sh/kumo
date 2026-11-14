@@ -303,10 +303,9 @@ mod tests {
                         include_str!("fixtures/github_annotations.json").to_owned(),
                     )
                 }
-                (
-                    "POST",
-                    "/repos/platform/repo-a/actions/runs/11896352187/rerun-failed-jobs",
-                ) => (201, Vec::new(), String::new()),
+                ("POST", "/repos/platform/repo-a/actions/runs/11896352187/rerun-failed-jobs") => {
+                    (201, Vec::new(), String::new())
+                }
                 _ => (404, Vec::new(), r#"{"message":"Not Found"}"#.to_owned()),
             }
         });
