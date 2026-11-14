@@ -143,7 +143,7 @@ class KumoEngine extends ChangeNotifier {
     if (conn == null) return;
     try {
       await conn.core.shutdown(ShutdownRequest(ifIdle: false), options: CallOptions(timeout: const Duration(seconds: 3)));
-      await conn.channel.shutdown();
+      await _closeStopping(conn.channel);
       await discovery.waitGone(conn.endpoint.pid);
     } on Object catch (e) {
       // Kumo quits anyway; the next one restarts an outdated daemon itself.
@@ -271,11 +271,18 @@ class KumoEngine extends ChangeNotifier {
       return old;
     }
     debugPrint('kumo: restarting kumod ${old.serverVersion} (pid ${old.endpoint.pid}) to run its update');
-    await old.channel.shutdown();
+    await _closeStopping(old.channel);
     await discovery.waitGone(old.endpoint.pid);
     _running = 0;
     return _connect();
   }
+
+  /// Closes the channel to a daemon that accepted to stop, without waiting
+  /// on it for long: once the daemon is gone, `shutdown` can wait forever
+  /// for its connection to close. That it's gone is told by the discovery
+  /// file ([DaemonDiscovery.waitGone]), not by the channel.
+  static Future<void> _closeStopping(ClientChannel channel) =>
+      channel.shutdown().timeout(const Duration(seconds: 2), onTimeout: () {});
 
   void _set(EngineStatus status) {
     _status = status;

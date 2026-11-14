@@ -42,6 +42,7 @@ fn session_usage_to(session: SessionUsage) -> pb::SessionUsage {
     pb::SessionUsage {
         session_id: session.session_id.to_string(),
         model: session.model,
+        effort: session.effort,
         context_max: session.context_max,
         slices: session.slices.into_iter().map(context_slice_to).collect(),
         turns: session.turns,

@@ -538,3 +538,47 @@ async fn worktrees_and_changes_made_outside_show_without_a_refresh() {
     .await;
     assert_eq!(repo(&snapshot, &root).worktrees.len(), 2);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_merge_conflict_and_a_branch_gone_from_its_remote_are_told() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let remote = daemon.home().join("remote.git");
+    std::fs::create_dir_all(&remote).unwrap();
+    git(&remote, &["init", "-q", "--bare", "-b", "main"]);
+    let root = git_repo(
+        &daemon.home().join("dev/app"),
+        Some(&remote.display().to_string()),
+    );
+    git(&root, &["push", "-q", "-u", "origin", "main"]);
+    git(&root, &["checkout", "-q", "-b", "feat"]);
+    std::fs::write(root.join("README.md"), "feat\n").unwrap();
+    git(&root, &["commit", "-q", "-am", "feat"]);
+    git(&root, &["push", "-q", "-u", "origin", "feat"]);
+    // Merged on the host and deleted: the tracking branch goes with a fetch.
+    git(&root, &["push", "-q", "origin", "--delete", "feat"]);
+    git(&root, &["checkout", "-q", "main"]);
+    std::fs::write(root.join("README.md"), "main\n").unwrap();
+    git(&root, &["commit", "-q", "-am", "main"]);
+    git(&root, &["checkout", "-q", "feat"]);
+    let merge = Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .args(["merge", "-q", "main"])
+        .output()
+        .unwrap();
+    assert!(!merge.status.success(), "README.md conflicts");
+
+    save_namespace(&mut client, "local", &[&root]).await;
+    let snapshot = snapshot_where(&mut client, |s| {
+        s.repositories
+            .iter()
+            .flat_map(|r| &r.worktrees)
+            .any(|w| w.status.as_ref().is_some_and(|st| st.conflicts > 0))
+    })
+    .await;
+    let status = repo(&snapshot, &root).worktrees[0].status.clone().unwrap();
+    assert_eq!(status.conflicts, 1);
+    assert!(status.upstream_gone);
+    assert_eq!(status.upstream, "origin/feat");
+}

@@ -456,17 +456,14 @@ impl WorkspaceService {
     }
 }
 
-/// Worktrees and their status. Errors are kept in the state, not raised: a
-/// moved repository must not break the whole workspace.
+/// Remote, worktrees and their status. Errors are kept in the state, not
+/// raised: a moved repository must not break the whole workspace.
 fn read_repo(git: &dyn Git, mut repo: Repo) -> RepoState {
-    // A repository added before it had a remote (or while git couldn't say)
-    // gets it on the next read. One already known stays: `git remote
-    // get-url` applies `insteadOf` rewrites, which aren't where the
-    // repository lives.
-    if repo.remote.is_none()
-        && let Ok(Some(url)) = git.remote_url(&repo.path)
-    {
-        repo.remote = Some(Remote::parse(&url));
+    // The remote can arrive or change after the repository was added (a
+    // local repository pushed for the first time, a move to another host).
+    // A failed read keeps the known one.
+    if let Ok(url) = git.remote_url(&repo.path) {
+        repo.remote = url.map(|url| Remote::parse(&url));
     }
     match git.worktrees(&repo.path) {
         Ok(mut worktrees) => {

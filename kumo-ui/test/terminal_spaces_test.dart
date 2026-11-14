@@ -42,6 +42,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the status bar tells what the focused agent runs on, following the tab', (tester) async {
+    tester.view.physicalSize = const Size(1440, 960);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final state = AppState(demoWallpaper: true);
+    await tester.pumpWidget(KumoApp(state: state));
+    await tester.pump();
+    final repo = state.workspace.repos.first;
+    final first = repo.worktrees.firstWhere(state.isActiveWorktree);
+    final other = repo.worktrees.firstWhere((w) => !state.isActiveWorktree(w));
+    expect(find.text('Opus 5.5 · high effort'), findsOneWidget);
+
+    // A plain shell has no agent: nothing to tell.
+    state.openWorktree(other);
+    await tester.pump();
+    await tester.tap(find.text('New tab'));
+    await tester.pump();
+    expect(find.text('Opus 5.5 · high effort'), findsNothing);
+
+    state.openWorktree(first);
+    await tester.pump();
+    expect(find.text('Opus 5.5 · high effort'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('removing a worktree from the app closes its terminals, once git removed it', (tester) async {
     tester.view.physicalSize = const Size(1440, 960);
     tester.view.devicePixelRatio = 1;

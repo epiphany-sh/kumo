@@ -1500,6 +1500,8 @@ const WorktreeStatus$json = {
     {'1': 'ahead', '3': 2, '4': 1, '5': 13, '10': 'ahead'},
     {'1': 'behind', '3': 3, '4': 1, '5': 13, '10': 'behind'},
     {'1': 'upstream', '3': 4, '4': 1, '5': 9, '10': 'upstream'},
+    {'1': 'upstream_gone', '3': 5, '4': 1, '5': 8, '10': 'upstreamGone'},
+    {'1': 'conflicts', '3': 6, '4': 1, '5': 13, '10': 'conflicts'},
   ],
 };
 
@@ -1507,7 +1509,8 @@ const WorktreeStatus$json = {
 final $typed_data.Uint8List worktreeStatusDescriptor = $convert.base64Decode(
     'Cg5Xb3JrdHJlZVN0YXR1cxIjCg1jaGFuZ2VkX2ZpbGVzGAEgASgNUgxjaGFuZ2VkRmlsZXMSFA'
     'oFYWhlYWQYAiABKA1SBWFoZWFkEhYKBmJlaGluZBgDIAEoDVIGYmVoaW5kEhoKCHVwc3RyZWFt'
-    'GAQgASgJUgh1cHN0cmVhbQ==');
+    'GAQgASgJUgh1cHN0cmVhbRIjCg11cHN0cmVhbV9nb25lGAUgASgIUgx1cHN0cmVhbUdvbmUSHA'
+    'oJY29uZmxpY3RzGAYgASgNUgljb25mbGljdHM=');
 
 @$core.Deprecated('Use refreshWorkspaceRequestDescriptor instead')
 const RefreshWorkspaceRequest$json = {
@@ -2517,6 +2520,8 @@ const AgentSession$json = {
     {'1': 'asked', '3': 18, '4': 1, '5': 8, '10': 'asked'},
     {'1': 'worked_ms', '3': 19, '4': 1, '5': 4, '10': 'workedMs'},
     {'1': 'tells_asking', '3': 20, '4': 1, '5': 8, '10': 'tellsAsking'},
+    {'1': 'model', '3': 21, '4': 1, '5': 9, '10': 'model'},
+    {'1': 'effort', '3': 22, '4': 1, '5': 9, '10': 'effort'},
   ],
 };
 
@@ -2534,7 +2539,7 @@ final $typed_data.Uint8List agentSessionDescriptor = $convert.base64Decode(
     'YxLkFnZW50RXZlbnRSBmV2ZW50cxIdCgphZ2VudF9uYW1lGBAgASgJUglhZ2VudE5hbWUSHwoL'
     'Y29udGV4dF9kaXIYESABKAlSCmNvbnRleHREaXISFAoFYXNrZWQYEiABKAhSBWFza2VkEhsKCX'
     'dvcmtlZF9tcxgTIAEoBFIId29ya2VkTXMSIQoMdGVsbHNfYXNraW5nGBQgASgIUgt0ZWxsc0Fz'
-    'a2luZw==');
+    'a2luZxIUCgVtb2RlbBgVIAEoCVIFbW9kZWwSFgoGZWZmb3J0GBYgASgJUgZlZmZvcnQ=');
 
 @$core.Deprecated('Use stopAgentRequestDescriptor instead')
 const StopAgentRequest$json = {
@@ -2656,6 +2661,8 @@ const TerminalAgent$json = {
       '10': 'state'
     },
     {'1': 'busy', '3': 6, '4': 1, '5': 8, '10': 'busy'},
+    {'1': 'model', '3': 7, '4': 1, '5': 9, '10': 'model'},
+    {'1': 'effort', '3': 8, '4': 1, '5': 9, '10': 'effort'},
   ],
 };
 
@@ -2664,7 +2671,8 @@ final $typed_data.Uint8List terminalAgentDescriptor = $convert.base64Decode(
     'Cg1UZXJtaW5hbEFnZW50Eh8KC3Rlcm1pbmFsX2lkGAEgASgJUgp0ZXJtaW5hbElkEh8KC3Byb3'
     'ZpZGVyX2lkGAIgASgJUgpwcm92aWRlcklkEhgKB3Byb2dyYW0YAyABKAlSB3Byb2dyYW0SEAoD'
     'Y3dkGAQgASgJUgNjd2QSKQoFc3RhdGUYBSABKA4yEy5rdW1vLnYxLkFnZW50U3RhdGVSBXN0YX'
-    'RlEhIKBGJ1c3kYBiABKAhSBGJ1c3k=');
+    'RlEhIKBGJ1c3kYBiABKAhSBGJ1c3kSFAoFbW9kZWwYByABKAlSBW1vZGVsEhYKBmVmZm9ydBgI'
+    'IAEoCVIGZWZmb3J0');
 
 @$core.Deprecated('Use sendToTerminalRequestDescriptor instead')
 const SendToTerminalRequest$json = {
@@ -2782,6 +2790,7 @@ const SessionUsage$json = {
     {'1': 'turns', '3': 5, '4': 1, '5': 13, '10': 'turns'},
     {'1': 'compact_command', '3': 6, '4': 1, '5': 9, '10': 'compactCommand'},
     {'1': 'read_at', '3': 7, '4': 1, '5': 3, '10': 'readAt'},
+    {'1': 'effort', '3': 8, '4': 1, '5': 9, '10': 'effort'},
   ],
 };
 
@@ -2791,7 +2800,7 @@ final $typed_data.Uint8List sessionUsageDescriptor = $convert.base64Decode(
     'IgASgJUgVtb2RlbBIfCgtjb250ZXh0X21heBgDIAEoBFIKY29udGV4dE1heBItCgZzbGljZXMY'
     'BCADKAsyFS5rdW1vLnYxLkNvbnRleHRTbGljZVIGc2xpY2VzEhQKBXR1cm5zGAUgASgNUgV0dX'
     'JucxInCg9jb21wYWN0X2NvbW1hbmQYBiABKAlSDmNvbXBhY3RDb21tYW5kEhcKB3JlYWRfYXQY'
-    'ByABKANSBnJlYWRBdA==');
+    'ByABKANSBnJlYWRBdBIWCgZlZmZvcnQYCCABKAlSBmVmZm9ydA==');
 
 @$core.Deprecated('Use usageRequestDescriptor instead')
 const UsageRequest$json = {

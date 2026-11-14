@@ -180,4 +180,30 @@ async fn a_repository_without_a_ci_host_is_unsupported() {
     let after = next(&mut stream).await;
     assert_eq!(after.provider(), pb::CiProvider::GithubActions);
     assert_eq!(after.repo, "platform/local");
+
+    // And it follows the repository when it moves to another host.
+    git(
+        &repo,
+        &[
+            "remote",
+            "set-url",
+            "origin",
+            "git@gitlab.com:platform/local.git",
+        ],
+    );
+    client
+        .workspace
+        .refresh(pb::RefreshWorkspaceRequest {})
+        .await
+        .unwrap();
+    client
+        .pipelines
+        .refresh(pb::WorktreeRequest {
+            worktree_path: repo.display().to_string(),
+        })
+        .await
+        .unwrap();
+    let moved = next(&mut stream).await;
+    assert_eq!(moved.provider(), pb::CiProvider::GitlabCi);
+    assert_eq!(moved.repo, "platform/local");
 }

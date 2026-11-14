@@ -79,6 +79,8 @@ class EngineAgentsSource extends AgentsSource {
         cwd: a.cwd,
         state: a.state == pb.AgentState.AGENT_STATE_NEEDS_INPUT ? AgentStatus.needsYou : AgentStatus.running,
         busy: a.busy,
+        model: a.model,
+        effort: a.effort,
       );
 
   @override
@@ -224,6 +226,8 @@ AgentRun agentRunFrom(pb.AgentSession s) => AgentRun(
         tellsAsking: s.tellsAsking,
         worked: Duration(milliseconds: s.workedMs.toInt()),
         stateSince: DateTime.fromMillisecondsSinceEpoch(s.stateSinceUnixMs.toInt()),
+        model: s.model,
+        effort: s.effort,
       );
 
 AgentStep agentStepFrom(pb.AgentEvent e) => AgentStep(
