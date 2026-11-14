@@ -412,6 +412,23 @@ class TerminalsClient extends $grpc.Client {
     return $createUnaryCall(_$list, request, options: options);
   }
 
+  /// The commands remembered for the repository a shell is in, last run
+  /// first: what the history panel lists and the terminal suggests.
+  $grpc.ResponseFuture<$0.HistoryResponse> history(
+    $0.HistoryRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$history, request, options: options);
+  }
+
+  /// Forgets the commands of the repository a shell is in, or all of them.
+  $grpc.ResponseFuture<$0.ForgetHistoryResponse> forgetHistory(
+    $0.ForgetHistoryRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$forgetHistory, request, options: options);
+  }
+
   // method descriptors
 
   static final _$open = $grpc.ClientMethod<$0.OpenRequest, $0.OpenResponse>(
@@ -431,6 +448,16 @@ class TerminalsClient extends $grpc.Client {
       '/kumo.v1.Terminals/List',
       ($0.ListRequest value) => value.writeToBuffer(),
       $0.ListResponse.fromBuffer);
+  static final _$history =
+      $grpc.ClientMethod<$0.HistoryRequest, $0.HistoryResponse>(
+          '/kumo.v1.Terminals/History',
+          ($0.HistoryRequest value) => value.writeToBuffer(),
+          $0.HistoryResponse.fromBuffer);
+  static final _$forgetHistory =
+      $grpc.ClientMethod<$0.ForgetHistoryRequest, $0.ForgetHistoryResponse>(
+          '/kumo.v1.Terminals/ForgetHistory',
+          ($0.ForgetHistoryRequest value) => value.writeToBuffer(),
+          $0.ForgetHistoryResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Terminals')
@@ -466,6 +493,22 @@ abstract class TerminalsServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.ListRequest.fromBuffer(value),
         ($0.ListResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.HistoryRequest, $0.HistoryResponse>(
+        'History',
+        history_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.HistoryRequest.fromBuffer(value),
+        ($0.HistoryResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.ForgetHistoryRequest, $0.ForgetHistoryResponse>(
+            'ForgetHistory',
+            forgetHistory_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.ForgetHistoryRequest.fromBuffer(value),
+            ($0.ForgetHistoryResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.OpenResponse> open_Pre(
@@ -494,6 +537,23 @@ abstract class TerminalsServiceBase extends $grpc.Service {
 
   $async.Future<$0.ListResponse> list(
       $grpc.ServiceCall call, $0.ListRequest request);
+
+  $async.Future<$0.HistoryResponse> history_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.HistoryRequest> $request) async {
+    return history($call, await $request);
+  }
+
+  $async.Future<$0.HistoryResponse> history(
+      $grpc.ServiceCall call, $0.HistoryRequest request);
+
+  $async.Future<$0.ForgetHistoryResponse> forgetHistory_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.ForgetHistoryRequest> $request) async {
+    return forgetHistory($call, await $request);
+  }
+
+  $async.Future<$0.ForgetHistoryResponse> forgetHistory(
+      $grpc.ServiceCall call, $0.ForgetHistoryRequest request);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Workspace')

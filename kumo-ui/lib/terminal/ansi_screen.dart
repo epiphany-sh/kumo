@@ -39,6 +39,11 @@ class AnsiScreen {
   _Mark? _lastPrompt;
   bool _promptLost = false;
 
+  /// Commands the shell said were done (D marks), ever: a client re-reads
+  /// what it remembers when this moves.
+  int get commandsDone => _commandsDone;
+  int _commandsDone = 0;
+
   /// Bytes the terminal must send back to the program (cursor reports).
   final void Function(List<int> bytes)? onReply;
 
@@ -116,6 +121,7 @@ class AnsiScreen {
       lines.add(row.line);
     }
     final (blocks, prompts) = _marked && !_onAltScreen ? _commands() : (const <CommandBlock>[], const <int>[]);
+    final input = _marked && !_onAltScreen ? _input() : null;
     return TermBuffer(
       lines,
       cursorVisible: _cursorVisible,
@@ -126,7 +132,53 @@ class AnsiScreen {
       altScreen: _onAltScreen,
       blocks: blocks,
       prompts: prompts,
+      input: input,
     );
+  }
+
+  _Row _rowAt(int line) => line < _scrollback.length ? _scrollback[line] : _grid[line - _scrollback.length];
+
+  /// What you typed at the prompt: from where the shell said you type (its
+  /// B mark, the end of the prompt) to the cursor. Null when the last mark
+  /// before the cursor is another (a command runs), or when the line went
+  /// on to a row of its own (a second line of input).
+  PromptInput? _input() {
+    final cursorLine = _scrollback.length + _cy;
+    final end = _wrapPending ? _cols : math.min(_cx, _cols);
+    // A prompt is near the cursor; a long line of input a few rows up.
+    for (var i = cursorLine; i >= 0 && i > cursorLine - 64; i--) {
+      final marks = _rowAt(i).marks;
+      if (marks == null || marks.isEmpty) continue;
+      _Mark? last;
+      for (final m in marks) {
+        if (i < cursorLine || m.col <= end) last = m;
+      }
+      if (last == null) continue;
+      if (last.kind != _Mark.input) return null;
+      final text = StringBuffer();
+      for (var j = i; j <= cursorLine; j++) {
+        final row = _rowAt(j);
+        if (j < cursorLine && !row.wrapped) return null;
+        final from = j == i ? math.min(last.col, row.length) : 0;
+        final to = j == cursorLine ? math.min(end, row.length) : row.length;
+        for (var x = from; x < to; x++) {
+          final r = row._runes[x];
+          if (r != _Row.continuation) text.writeCharCode(r);
+        }
+      }
+      final row = _rowAt(cursorLine);
+      // Text right at the cursor: you moved back into the line, or another
+      // tool draws its own suggestion there.
+      final trailing = end < row.length && row._runes[end] != 0x20 || _wrapPending && cursorLine + 1 < _scrollback.length + _grid.length && row.wrapped;
+      // Where the line has room: up to what's drawn further right on it (a
+      // right prompt).
+      var room = 0;
+      for (var x = end; x < row.length && row._runes[x] == 0x20; x++) {
+        room++;
+      }
+      return PromptInput(text.toString(), trailing: trailing, room: room);
+    }
+    return null;
   }
 
   /// The commands the marks on the rows describe, in order, and the line
@@ -384,11 +436,13 @@ class AnsiScreen {
     final kind = switch (parts[1]) {
       'A' => _Mark.prompt,
       'C' => _Mark.output,
+      'B' => _Mark.input,
       'D' => _Mark.done,
-      _ => null, // B (prompt end), E (command line), P…: not needed
+      _ => null, // E (command line), P (folder)…: the daemon reads them
     };
     if (kind == null) return;
     final exit = kind == _Mark.done && parts.length > 2 ? int.tryParse(parts[2]) : null;
+    if (kind == _Mark.done) _commandsDone++;
     final mark = _Mark(kind, col: _cx, at: _clock(), exit: exit);
     if (kind == _Mark.prompt) {
       _lastPrompt = mark;
@@ -766,6 +820,9 @@ class _Mark {
   static const prompt = 0;
   static const output = 1;
   static const done = 2;
+
+  /// Where you type: the end of the prompt (B).
+  static const input = 3;
 
   final int kind;
   final int col;

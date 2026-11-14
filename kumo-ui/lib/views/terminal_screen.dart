@@ -16,6 +16,7 @@ import '../engine/kumo_engine.dart';
 import '../shell/screen_chrome.dart';
 import '../shell/side_panel.dart';
 import '../theme/palette.dart';
+import '../terminal/command_marks.dart' show YourLines;
 import '../terminal/mock_terminal.dart';
 import '../terminal/pane_layout.dart';
 import '../terminal/terminal_surface.dart';
@@ -158,6 +159,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       directory: _directoryOf(key),
       adopt: adopt ? () => _adoptRunning(key) : null,
       onExit: (_) => _closeExited(id),
+      rememberCommands: _rememberCommands,
     );
     space.tabs.insert(0, _TermTab('t-$id', _single(id), id));
     if (space.tabs.length > 1) space.active++;
@@ -318,11 +320,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
     }
   }
 
+  /// Settings → Appearance → Your lines in the terminal.
+  bool get _rememberCommands => _app?.setting<bool>(YourLines.keyRemember, true) ?? true;
+
   String _newShell() {
     final n = ++_shellSeq;
     final id = 'sh-$n';
     final engine = _engine;
-    _surfaces[id] = engine == null ? (_spaceKey == _homeKey ? MockSessions.homeShell(n) : MockSessions.shell(n)) : GrpcTerminalSurface.shell(engine, directory: _directoryOf(_spaceKey), onExit: (_) => _closeExited(id));
+    _surfaces[id] = engine == null ? (_spaceKey == _homeKey ? MockSessions.homeShell(n) : MockSessions.shell(n)) : GrpcTerminalSurface.shell(engine, directory: _directoryOf(_spaceKey), onExit: (_) => _closeExited(id), rememberCommands: _rememberCommands);
     return id;
   }
 

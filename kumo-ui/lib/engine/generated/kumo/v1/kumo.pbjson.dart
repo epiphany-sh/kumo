@@ -917,6 +917,13 @@ const OpenRequest$json = {
       '5': 8,
       '10': 'shellIntegration'
     },
+    {
+      '1': 'remember_commands',
+      '3': 8,
+      '4': 1,
+      '5': 8,
+      '10': 'rememberCommands'
+    },
   ],
   '3': [OpenRequest_EnvEntry$json],
 };
@@ -936,8 +943,9 @@ final $typed_data.Uint8List openRequestDescriptor = $convert.base64Decode(
     'CgtPcGVuUmVxdWVzdBIYCgdwcm9ncmFtGAEgASgJUgdwcm9ncmFtEhIKBGFyZ3MYAiADKAlSBG'
     'FyZ3MSEAoDY3dkGAMgASgJUgNjd2QSLwoDZW52GAQgAygLMh0ua3Vtby52MS5PcGVuUmVxdWVz'
     'dC5FbnZFbnRyeVIDZW52EhIKBGNvbHMYBSABKA1SBGNvbHMSEgoEcm93cxgGIAEoDVIEcm93cx'
-    'IrChFzaGVsbF9pbnRlZ3JhdGlvbhgHIAEoCFIQc2hlbGxJbnRlZ3JhdGlvbho2CghFbnZFbnRy'
-    'eRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFsdWU6AjgB');
+    'IrChFzaGVsbF9pbnRlZ3JhdGlvbhgHIAEoCFIQc2hlbGxJbnRlZ3JhdGlvbhIrChFyZW1lbWJl'
+    'cl9jb21tYW5kcxgIIAEoCFIQcmVtZW1iZXJDb21tYW5kcxo2CghFbnZFbnRyeRIQCgNrZXkYAS'
+    'ABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFsdWU6AjgB');
 
 @$core.Deprecated('Use openResponseDescriptor instead')
 const OpenResponse$json = {
@@ -1155,6 +1163,104 @@ final $typed_data.Uint8List terminalInfoDescriptor = $convert.base64Decode(
     'CgxUZXJtaW5hbEluZm8SHwoLdGVybWluYWxfaWQYASABKAlSCnRlcm1pbmFsSWQSGAoHcHJvZ3'
     'JhbRgCIAEoCVIHcHJvZ3JhbRIWCgZleGl0ZWQYAyABKAhSBmV4aXRlZBIbCglleGl0X2NvZGUY'
     'BCABKAVSCGV4aXRDb2RlEhAKA2N3ZBgFIAEoCVIDY3dk');
+
+@$core.Deprecated('Use historyRequestDescriptor instead')
+const HistoryRequest$json = {
+  '1': 'HistoryRequest',
+  '2': [
+    {'1': 'terminal_id', '3': 1, '4': 1, '5': 9, '10': 'terminalId'},
+    {'1': 'limit', '3': 2, '4': 1, '5': 13, '10': 'limit'},
+  ],
+};
+
+/// Descriptor for `HistoryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List historyRequestDescriptor = $convert.base64Decode(
+    'Cg5IaXN0b3J5UmVxdWVzdBIfCgt0ZXJtaW5hbF9pZBgBIAEoCVIKdGVybWluYWxJZBIUCgVsaW'
+    '1pdBgCIAEoDVIFbGltaXQ=');
+
+@$core.Deprecated('Use historyResponseDescriptor instead')
+const HistoryResponse$json = {
+  '1': 'HistoryResponse',
+  '2': [
+    {
+      '1': 'entries',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.HistoryEntry',
+      '10': 'entries'
+    },
+    {'1': 'repo', '3': 2, '4': 1, '5': 9, '10': 'repo'},
+    {'1': 'cwd', '3': 3, '4': 1, '5': 9, '10': 'cwd'},
+  ],
+};
+
+/// Descriptor for `HistoryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List historyResponseDescriptor = $convert.base64Decode(
+    'Cg9IaXN0b3J5UmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIVLmt1bW8udjEuSGlzdG9yeUVudH'
+    'J5UgdlbnRyaWVzEhIKBHJlcG8YAiABKAlSBHJlcG8SEAoDY3dkGAMgASgJUgNjd2Q=');
+
+@$core.Deprecated('Use historyEntryDescriptor instead')
+const HistoryEntry$json = {
+  '1': 'HistoryEntry',
+  '2': [
+    {'1': 'command', '3': 1, '4': 1, '5': 9, '10': 'command'},
+    {'1': 'runs', '3': 2, '4': 1, '5': 13, '10': 'runs'},
+    {
+      '1': 'last_run_unix_nanos',
+      '3': 3,
+      '4': 1,
+      '5': 4,
+      '10': 'lastRunUnixNanos'
+    },
+    {
+      '1': 'last_exit',
+      '3': 4,
+      '4': 1,
+      '5': 5,
+      '9': 0,
+      '10': 'lastExit',
+      '17': true
+    },
+    {'1': 'last_cwd', '3': 5, '4': 1, '5': 9, '10': 'lastCwd'},
+  ],
+  '8': [
+    {'1': '_last_exit'},
+  ],
+};
+
+/// Descriptor for `HistoryEntry`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List historyEntryDescriptor = $convert.base64Decode(
+    'CgxIaXN0b3J5RW50cnkSGAoHY29tbWFuZBgBIAEoCVIHY29tbWFuZBISCgRydW5zGAIgASgNUg'
+    'RydW5zEi0KE2xhc3RfcnVuX3VuaXhfbmFub3MYAyABKARSEGxhc3RSdW5Vbml4TmFub3MSIAoJ'
+    'bGFzdF9leGl0GAQgASgFSABSCGxhc3RFeGl0iAEBEhkKCGxhc3RfY3dkGAUgASgJUgdsYXN0Q3'
+    'dkQgwKCl9sYXN0X2V4aXQ=');
+
+@$core.Deprecated('Use forgetHistoryRequestDescriptor instead')
+const ForgetHistoryRequest$json = {
+  '1': 'ForgetHistoryRequest',
+  '2': [
+    {'1': 'terminal_id', '3': 1, '4': 1, '5': 9, '10': 'terminalId'},
+    {'1': 'everything', '3': 2, '4': 1, '5': 8, '10': 'everything'},
+  ],
+};
+
+/// Descriptor for `ForgetHistoryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List forgetHistoryRequestDescriptor = $convert.base64Decode(
+    'ChRGb3JnZXRIaXN0b3J5UmVxdWVzdBIfCgt0ZXJtaW5hbF9pZBgBIAEoCVIKdGVybWluYWxJZB'
+    'IeCgpldmVyeXRoaW5nGAIgASgIUgpldmVyeXRoaW5n');
+
+@$core.Deprecated('Use forgetHistoryResponseDescriptor instead')
+const ForgetHistoryResponse$json = {
+  '1': 'ForgetHistoryResponse',
+  '2': [
+    {'1': 'forgotten', '3': 1, '4': 1, '5': 13, '10': 'forgotten'},
+  ],
+};
+
+/// Descriptor for `ForgetHistoryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List forgetHistoryResponseDescriptor = $convert.base64Decode(
+    'ChVGb3JnZXRIaXN0b3J5UmVzcG9uc2USHAoJZm9yZ290dGVuGAEgASgNUglmb3Jnb3R0ZW4=');
 
 @$core.Deprecated('Use watchWorkspaceRequestDescriptor instead')
 const WatchWorkspaceRequest$json = {

@@ -18,7 +18,9 @@ import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/context_menu.dart';
 import '../widgets/kicons.dart';
+import 'command_history.dart';
 import 'command_marks.dart';
+import 'history_panel.dart';
 import 'grid_renderer.dart';
 import 'row_layout.dart';
 import 'term_selection.dart';
@@ -745,6 +747,15 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     });
   }
 
+  /// The commands this shell's repository ran (context menu).
+  void _openHistory() {
+    final history = _history;
+    if (history == null) return;
+    unawaited(showHistoryPanel(context, history, atPrompt: () => _buffer.input != null).then((_) {
+      if (mounted) _grabKeyboard();
+    }));
+  }
+
   void _menu(Offset at) {
     final has = _selectedText.isNotEmpty;
     final mod = _mac ? '⌘' : 'Ctrl+Shift+';
@@ -763,6 +774,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
           if (widget.surface.interactive) KMenuItem(icon: KIcons.paste, label: 'Paste', shortcut: '${mod}V', onTap: () => then(_paste)),
           KMenuItem(icon: KIcons.selectAll, label: 'Select all', shortcut: _mac ? '⌘A' : null, onTap: () => then(_selectAll)),
           if (canClear) KMenuItem(icon: KIcons.trash, label: 'Clear scrollback', onTap: () => then(_clearScrollback)),
+          if (_history != null) KMenuItem(icon: KIcons.clock, label: 'Command history…', onTap: () => then(_openHistory)),
         ]);
       },
     );
@@ -870,6 +882,31 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     return false;
   }
 
+  /// The commands this terminal's shell ran, when it remembers them.
+  CommandHistorySource? get _history {
+    final surface = widget.surface;
+    return surface is CommandHistorySource ? surface as CommandHistorySource : null;
+  }
+
+  /// What's suggested after what you typed, now (Settings: Suggest).
+  String? get _suggestion {
+    final history = _history;
+    if (!_yl.suggest || history == null || _top != null) return null;
+    return suggestionFor(_buffer, history.history.value);
+  }
+
+  /// → takes the suggestion, ⌥→ its next word. Without one they go to the
+  /// shell as always.
+  bool _acceptKey(KeyEvent event) {
+    if (event is KeyUpEvent || event.logicalKey != LogicalKeyboardKey.arrowRight) return false;
+    final keys = HardwareKeyboard.instance;
+    if (keys.isShiftPressed || keys.isControlPressed || keys.isMetaPressed) return false;
+    final rest = _suggestion;
+    if (rest == null) return false;
+    widget.surface.sendBytes(utf8.encode(keys.isAltPressed ? nextWord(rest) : rest));
+    return true;
+  }
+
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     final surface = widget.surface;
     final modes = surface is TerminalModes ? surface : null;
@@ -893,6 +930,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
       }
     }
     if (!surface.interactive) return KeyEventResult.ignored;
+    if (_acceptKey(event)) return KeyEventResult.handled;
     if (_selectKey(event, modes)) return KeyEventResult.handled;
     final bytes = terminalInputFor(event, applicationCursorKeys: modes?.applicationCursorKeys ?? false);
     if (bytes == null) return KeyEventResult.ignored;
@@ -960,6 +998,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
             barColor: c.text3.withValues(alpha: _barDrag || _barHover ? 0.55 : 0.35),
             yourLines: _yl,
             markColor: _yl.colorFor(c),
+            history: _yl.suggest && _top == null ? _history?.history : null,
           ),
         ),
       );
@@ -1102,7 +1141,8 @@ class _TerminalPainter extends CustomPainter {
     required this.barColor,
     this.yourLines = const YourLines(),
     this.markColor = YourLines.defaultColor,
-  }) : super(repaint: buffer);
+    this.history,
+  }) : super(repaint: history == null ? buffer : Listenable.merge([buffer, history]));
 
   final ValueListenable<TermBuffer> buffer;
   final TerminalGridRenderer renderer;
@@ -1126,6 +1166,9 @@ class _TerminalPainter extends CustomPainter {
 
   /// The marks' color on this terminal (dark or light background).
   final Color markColor;
+
+  /// What its shell ran, to suggest from; null suggests nothing.
+  final ValueListenable<CommandHistory>? history;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1180,6 +1223,11 @@ class _TerminalPainter extends CustomPainter {
         final right = to > from ? to * cellWidth : from * cellWidth + cellWidth / 2;
         canvas.drawRect(Rect.fromLTWH(padding.left + from * cellWidth, _textY(i), right - from * cellWidth, lineExtent), paint);
       }
+    }
+    final history = this.history;
+    if (history != null && cursor != null && cursor.$1 >= start && cursor.$1 < end) {
+      final rest = suggestionFor(b, history.value);
+      if (rest != null) _paintSuggestion(canvas, rest, b.input!.room, cursor.$2, _textY(cursor.$1));
     }
     if (cursor != null) {
       if (b.cursorVisible && cursor.$1 >= start && cursor.$1 < end) {
@@ -1312,6 +1360,22 @@ class _TerminalPainter extends CustomPainter {
     }
   }
 
+  /// The rest of a command you ran, in gray from the cursor, as far as the
+  /// row has room (a right prompt stays clear).
+  void _paintSuggestion(Canvas canvas, String rest, int room, int column, double top) {
+    final runes = rest.runes.toList();
+    final shown = runes.length >= room ? String.fromCharCodes(runes.take(math.max(0, room - 1))) : rest;
+    if (shown.isEmpty) return;
+    final tp = TextPainter(
+      text: TextSpan(text: shown, style: style.copyWith(color: palette.text3.withValues(alpha: 0.75))),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+      strutStyle: StrutStyle.fromTextStyle(style, forceStrutHeight: true),
+    )..layout();
+    tp.paint(canvas, Offset(padding.left + column * cellWidth, top));
+    tp.dispose();
+  }
+
   /// Mocks: a "❯ " prompt and a block after the last line.
   void _paintPromptCursor(Canvas canvas, double y) {
     final prompt = TextPainter(text: TextSpan(text: '❯ ', style: style.copyWith(color: palette.acc)), textDirection: TextDirection.ltr)..layout();
@@ -1341,7 +1405,8 @@ class _TerminalPainter extends CustomPainter {
       old.showBar != showBar ||
       old.barColor != barColor ||
       old.yourLines != yourLines ||
-      old.markColor != markColor;
+      old.markColor != markColor ||
+      old.history != history;
 }
 
 /// The room kept under an agent's terminal for "it's asking you something".

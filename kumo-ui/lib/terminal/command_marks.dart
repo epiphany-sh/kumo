@@ -151,6 +151,7 @@ class YourLines {
     this.light,
     this.meta = true,
     this.sticky = true,
+    this.suggest = true,
   });
 
   static const defaultColor = Color(0xFFFFA43D);
@@ -178,6 +179,10 @@ class YourLines {
   /// The command stays on top while its output scrolls.
   final bool sticky;
 
+  /// As you type at the prompt, the rest of a command you ran shows in
+  /// gray; → takes it.
+  final bool suggest;
+
   static const keyOn = 'terminal.marks.on';
   static const keyStyle = 'terminal.marks.style';
   static const keyDark = 'terminal.marks.dark';
@@ -187,8 +192,12 @@ class YourLines {
   static const keyBar = 'terminal.marks.bar';
   static const keyMeta = 'terminal.marks.meta';
   static const keySticky = 'terminal.stickyCommand';
+  static const keySuggest = 'terminal.suggest';
 
-  static bool isKey(String key) => key.startsWith('terminal.marks.') || key == keySticky;
+  /// New shells remember the commands they run (read when one opens).
+  static const keyRemember = 'terminal.remember';
+
+  static bool isKey(String key) => key.startsWith('terminal.marks.') || key == keySticky || key == keySuggest;
 
   factory YourLines.from(Preferences p) {
     final own = p.get<String>(keyLightMode, 'auto') == 'own';
@@ -201,6 +210,7 @@ class YourLines {
       light: own ? parseHexColor(p.get<String>(keyLight, '')) : null,
       meta: p.get<bool>(keyMeta, true),
       sticky: p.get<bool>(keySticky, true),
+      suggest: p.get<bool>(keySuggest, true),
     );
   }
 
@@ -218,10 +228,11 @@ class YourLines {
       other.dark == dark &&
       other.light == light &&
       other.meta == meta &&
-      other.sticky == sticky;
+      other.sticky == sticky &&
+      other.suggest == suggest;
 
   @override
-  int get hashCode => Object.hash(marks, band, bandAlpha, bar, dark, light, meta, sticky);
+  int get hashCode => Object.hash(marks, band, bandAlpha, bar, dark, light, meta, sticky, suggest);
 }
 
 /// How far the mark sits from the pane's left edge, and from its right

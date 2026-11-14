@@ -15,7 +15,7 @@ use kumo_application::profiles::{GitEnvironment, OpenProfile, ProfileServices};
 use kumo_application::pulls::{PullRequestPorts, PullRequestService};
 use kumo_application::releases::{ReleasePorts, ReleaseService};
 use kumo_application::tasks::{TaskPorts, TaskService, TaskTiming};
-use kumo_application::terminal::TerminalService;
+use kumo_application::terminal::{CommandHistory, TerminalService};
 use kumo_application::test_runs::{TestPorts, TestService};
 use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
 use kumo_domain::agents::{CliHomes, ProgramLocator, SharedCliHomes};
@@ -36,10 +36,12 @@ use kumo_infrastructure::ci::{
 };
 use kumo_infrastructure::docs::{ConfluenceDocs, VaultDocs};
 use kumo_infrastructure::fs::{LocalFileStore, LocalProjectReader};
-use kumo_infrastructure::git::{FsRepoFinder, GitCli};
+use kumo_infrastructure::git::{FsRepoFinder, GitCli, GitDirLocator};
 use kumo_infrastructure::profiles::profile_dir;
 use kumo_infrastructure::secrets::{KeychainSecretStore, MemorySecretStore};
-use kumo_infrastructure::storage::{SqliteAgentStore, SqliteTaskStore, SqliteWorkspaceStore};
+use kumo_infrastructure::storage::{
+    SqliteAgentStore, SqliteHistoryStore, SqliteTaskStore, SqliteWorkspaceStore,
+};
 use kumo_infrastructure::tasks::{
     BearConnector, GitHubConnector, JiraConnector, ObsidianConnector, TodoistConnector,
 };
@@ -144,7 +146,16 @@ impl ProfileOpener {
         // Filled in once the services it reads exist (below); git and
         // terminals read it on every run.
         let env = ProfileEnv::default();
-        let terminals = Arc::new(self.terminals.scoped(profile.id.clone(), env.clone()));
+        // What its shells run is remembered in its database, per repository.
+        let history = CommandHistory::new(
+            Arc::new(SqliteHistoryStore::open(&db)?),
+            Arc::new(GitDirLocator),
+        );
+        let terminals = Arc::new(
+            self.terminals
+                .scoped(profile.id.clone(), env.clone())
+                .with_history(history),
+        );
         let git = GitCli::for_profile(env.clone());
         let (secrets, host_tokens) = self.secrets.for_profile(&profile.id);
 
