@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use kumo_application::terminal::RepoHistory;
 use kumo_domain::terminal::{
     LaunchSpec, TerminalError, TerminalEvent, TerminalInfo, TerminalSize, TerminalStatus,
 };
@@ -53,6 +54,26 @@ pub fn terminal_info_to(info: TerminalInfo) -> pb::TerminalInfo {
             .unwrap_or_default(),
         exited: exit.is_some(),
         exit_code: exit.unwrap_or_default(),
+    }
+}
+
+/// A repository's remembered commands and the folder the shell is in.
+pub fn history_to(history: RepoHistory, cwd: Option<PathBuf>) -> pb::HistoryResponse {
+    let path = |p: Option<PathBuf>| p.map(|p| p.display().to_string()).unwrap_or_default();
+    pb::HistoryResponse {
+        entries: history
+            .entries
+            .into_iter()
+            .map(|entry| pb::HistoryEntry {
+                command: entry.command,
+                runs: entry.runs,
+                last_run_unix_nanos: entry.last_run.as_unix_nanos(),
+                last_exit: entry.last_exit,
+                last_cwd: path(entry.last_cwd),
+            })
+            .collect(),
+        repo: path(history.repo),
+        cwd: path(cwd),
     }
 }
 

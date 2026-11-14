@@ -1569,6 +1569,7 @@ class OpenRequest extends $pb.GeneratedMessage {
     $core.int? cols,
     $core.int? rows,
     $core.bool? shellIntegration,
+    $core.bool? rememberCommands,
   }) {
     final result = OpenRequest._();
     if (program != null) result.program = program;
@@ -1578,6 +1579,7 @@ class OpenRequest extends $pb.GeneratedMessage {
     if (cols != null) result.cols = cols;
     if (rows != null) result.rows = rows;
     if (shellIntegration != null) result.shellIntegration = shellIntegration;
+    if (rememberCommands != null) result.rememberCommands = rememberCommands;
     return result;
   }
 
@@ -1605,6 +1607,7 @@ class OpenRequest extends $pb.GeneratedMessage {
     ..aI(5, _omitFieldNames ? '' : 'cols', fieldType: $pb.PbFieldType.OU3)
     ..aI(6, _omitFieldNames ? '' : 'rows', fieldType: $pb.PbFieldType.OU3)
     ..aOB(7, _omitFieldNames ? '' : 'shellIntegration')
+    ..aOB(8, _omitFieldNames ? '' : 'rememberCommands')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1683,6 +1686,17 @@ class OpenRequest extends $pb.GeneratedMessage {
   $core.bool hasShellIntegration() => $_has(6);
   @$pb.TagNumber(7)
   void clearShellIntegration() => $_clearField(7);
+
+  /// With shell_integration: remember the commands it runs (per repository,
+  /// in the profile's database), for History.
+  @$pb.TagNumber(8)
+  $core.bool get rememberCommands => $_getBF(7);
+  @$pb.TagNumber(8)
+  set rememberCommands($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasRememberCommands() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearRememberCommands() => $_clearField(8);
 }
 
 class OpenResponse extends $pb.GeneratedMessage {
@@ -2529,6 +2543,394 @@ class TerminalInfo extends $pb.GeneratedMessage {
   $core.bool hasCwd() => $_has(4);
   @$pb.TagNumber(5)
   void clearCwd() => $_clearField(5);
+}
+
+class HistoryRequest extends $pb.GeneratedMessage {
+  factory HistoryRequest({
+    $core.String? terminalId,
+    $core.int? limit,
+  }) {
+    final result = HistoryRequest._();
+    if (terminalId != null) result.terminalId = terminalId;
+    if (limit != null) result.limit = limit;
+    return result;
+  }
+
+  HistoryRequest._();
+
+  factory HistoryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      HistoryRequest()..mergeFromBuffer(data, registry);
+  factory HistoryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      HistoryRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HistoryRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: HistoryRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'terminalId')
+    ..aI(2, _omitFieldNames ? '' : 'limit', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HistoryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HistoryRequest copyWith(void Function(HistoryRequest) updates) =>
+      super.copyWith((message) => updates(message as HistoryRequest))
+          as HistoryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use HistoryRequest() / HistoryRequest.new instead')
+  static HistoryRequest create() => HistoryRequest._();
+  static $pb.GeneratedMessage $_createMessage() => HistoryRequest._();
+  @$core.override
+  HistoryRequest createEmptyInstance() => HistoryRequest._();
+  @$core.pragma('dart2js:noInline')
+  static HistoryRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<HistoryRequest>(
+          HistoryRequest.$_createMessage);
+  static HistoryRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get terminalId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set terminalId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTerminalId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTerminalId() => $_clearField(1);
+
+  /// Most entries returned; 0 is the default (1000).
+  @$pb.TagNumber(2)
+  $core.int get limit => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set limit($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLimit() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLimit() => $_clearField(2);
+}
+
+class HistoryResponse extends $pb.GeneratedMessage {
+  factory HistoryResponse({
+    $core.Iterable<HistoryEntry>? entries,
+    $core.String? repo,
+    $core.String? cwd,
+  }) {
+    final result = HistoryResponse._();
+    if (entries != null) result.entries.addAll(entries);
+    if (repo != null) result.repo = repo;
+    if (cwd != null) result.cwd = cwd;
+    return result;
+  }
+
+  HistoryResponse._();
+
+  factory HistoryResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      HistoryResponse()..mergeFromBuffer(data, registry);
+  factory HistoryResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      HistoryResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HistoryResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: HistoryResponse.$_createMessage)
+    ..pPM<HistoryEntry>(1, _omitFieldNames ? '' : 'entries',
+        subBuilder: HistoryEntry.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'repo')
+    ..aOS(3, _omitFieldNames ? '' : 'cwd')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HistoryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HistoryResponse copyWith(void Function(HistoryResponse) updates) =>
+      super.copyWith((message) => updates(message as HistoryResponse))
+          as HistoryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use HistoryResponse() / HistoryResponse.new instead')
+  static HistoryResponse create() => HistoryResponse._();
+  static $pb.GeneratedMessage $_createMessage() => HistoryResponse._();
+  @$core.override
+  HistoryResponse createEmptyInstance() => HistoryResponse._();
+  @$core.pragma('dart2js:noInline')
+  static HistoryResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<HistoryResponse>(
+          HistoryResponse.$_createMessage);
+  static HistoryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<HistoryEntry> get entries => $_getList(0);
+
+  /// The repository's main checkout; empty for what ran outside one.
+  @$pb.TagNumber(2)
+  $core.String get repo => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set repo($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRepo() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRepo() => $_clearField(2);
+
+  /// The folder the shell is in now.
+  @$pb.TagNumber(3)
+  $core.String get cwd => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set cwd($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCwd() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCwd() => $_clearField(3);
+}
+
+class HistoryEntry extends $pb.GeneratedMessage {
+  factory HistoryEntry({
+    $core.String? command,
+    $core.int? runs,
+    $fixnum.Int64? lastRunUnixNanos,
+    $core.int? lastExit,
+    $core.String? lastCwd,
+  }) {
+    final result = HistoryEntry._();
+    if (command != null) result.command = command;
+    if (runs != null) result.runs = runs;
+    if (lastRunUnixNanos != null) result.lastRunUnixNanos = lastRunUnixNanos;
+    if (lastExit != null) result.lastExit = lastExit;
+    if (lastCwd != null) result.lastCwd = lastCwd;
+    return result;
+  }
+
+  HistoryEntry._();
+
+  factory HistoryEntry.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      HistoryEntry()..mergeFromBuffer(data, registry);
+  factory HistoryEntry.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      HistoryEntry()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HistoryEntry',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: HistoryEntry.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'command')
+    ..aI(2, _omitFieldNames ? '' : 'runs', fieldType: $pb.PbFieldType.OU3)
+    ..a<$fixnum.Int64>(
+        3, _omitFieldNames ? '' : 'lastRunUnixNanos', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aI(4, _omitFieldNames ? '' : 'lastExit')
+    ..aOS(5, _omitFieldNames ? '' : 'lastCwd')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HistoryEntry clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HistoryEntry copyWith(void Function(HistoryEntry) updates) =>
+      super.copyWith((message) => updates(message as HistoryEntry))
+          as HistoryEntry;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use HistoryEntry() / HistoryEntry.new instead')
+  static HistoryEntry create() => HistoryEntry._();
+  static $pb.GeneratedMessage $_createMessage() => HistoryEntry._();
+  @$core.override
+  HistoryEntry createEmptyInstance() => HistoryEntry._();
+  @$core.pragma('dart2js:noInline')
+  static HistoryEntry getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<HistoryEntry>(
+          HistoryEntry.$_createMessage);
+  static HistoryEntry? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get command => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set command($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCommand() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCommand() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get runs => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set runs($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRuns() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRuns() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get lastRunUnixNanos => $_getI64(2);
+  @$pb.TagNumber(3)
+  set lastRunUnixNanos($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasLastRunUnixNanos() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearLastRunUnixNanos() => $_clearField(3);
+
+  /// Status of its last run, when the shell reported one.
+  @$pb.TagNumber(4)
+  $core.int get lastExit => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set lastExit($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasLastExit() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearLastExit() => $_clearField(4);
+
+  /// Where it last ran; empty when the shell didn't say.
+  @$pb.TagNumber(5)
+  $core.String get lastCwd => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set lastCwd($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasLastCwd() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearLastCwd() => $_clearField(5);
+}
+
+class ForgetHistoryRequest extends $pb.GeneratedMessage {
+  factory ForgetHistoryRequest({
+    $core.String? terminalId,
+    $core.bool? everything,
+  }) {
+    final result = ForgetHistoryRequest._();
+    if (terminalId != null) result.terminalId = terminalId;
+    if (everything != null) result.everything = everything;
+    return result;
+  }
+
+  ForgetHistoryRequest._();
+
+  factory ForgetHistoryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ForgetHistoryRequest()..mergeFromBuffer(data, registry);
+  factory ForgetHistoryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ForgetHistoryRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ForgetHistoryRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ForgetHistoryRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'terminalId')
+    ..aOB(2, _omitFieldNames ? '' : 'everything')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ForgetHistoryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ForgetHistoryRequest copyWith(void Function(ForgetHistoryRequest) updates) =>
+      super.copyWith((message) => updates(message as ForgetHistoryRequest))
+          as ForgetHistoryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ForgetHistoryRequest() / ForgetHistoryRequest.new instead')
+  static ForgetHistoryRequest create() => ForgetHistoryRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ForgetHistoryRequest._();
+  @$core.override
+  ForgetHistoryRequest createEmptyInstance() => ForgetHistoryRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ForgetHistoryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ForgetHistoryRequest>(
+          ForgetHistoryRequest.$_createMessage);
+  static ForgetHistoryRequest? _defaultInstance;
+
+  /// The shell whose repository's commands go; with `everything`, may be
+  /// empty.
+  @$pb.TagNumber(1)
+  $core.String get terminalId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set terminalId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTerminalId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTerminalId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get everything => $_getBF(1);
+  @$pb.TagNumber(2)
+  set everything($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEverything() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEverything() => $_clearField(2);
+}
+
+class ForgetHistoryResponse extends $pb.GeneratedMessage {
+  factory ForgetHistoryResponse({
+    $core.int? forgotten,
+  }) {
+    final result = ForgetHistoryResponse._();
+    if (forgotten != null) result.forgotten = forgotten;
+    return result;
+  }
+
+  ForgetHistoryResponse._();
+
+  factory ForgetHistoryResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ForgetHistoryResponse()..mergeFromBuffer(data, registry);
+  factory ForgetHistoryResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ForgetHistoryResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ForgetHistoryResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: ForgetHistoryResponse.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'forgotten', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ForgetHistoryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ForgetHistoryResponse copyWith(
+          void Function(ForgetHistoryResponse) updates) =>
+      super.copyWith((message) => updates(message as ForgetHistoryResponse))
+          as ForgetHistoryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ForgetHistoryResponse() / ForgetHistoryResponse.new instead')
+  static ForgetHistoryResponse create() => ForgetHistoryResponse._();
+  static $pb.GeneratedMessage $_createMessage() => ForgetHistoryResponse._();
+  @$core.override
+  ForgetHistoryResponse createEmptyInstance() => ForgetHistoryResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ForgetHistoryResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ForgetHistoryResponse>(
+          ForgetHistoryResponse.$_createMessage);
+  static ForgetHistoryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get forgotten => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set forgotten($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasForgotten() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearForgotten() => $_clearField(1);
 }
 
 class WatchWorkspaceRequest extends $pb.GeneratedMessage {

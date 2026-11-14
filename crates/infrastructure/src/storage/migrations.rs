@@ -113,6 +113,17 @@ const STEPS: &[&str] = &[
     CREATE INDEX agent_def_plays_by_agent ON agent_def_plays (scope, repo_path, name, started);",
     // 7: the CLI a test run ran on; until now they all ran on Claude Code
     "ALTER TABLE agent_def_plays ADD COLUMN provider TEXT NOT NULL DEFAULT 'claude';",
+    // 8: the commands run in the terminals, per repository ('' outside one)
+    "CREATE TABLE command_history (
+        repo        TEXT NOT NULL,
+        command     TEXT NOT NULL,
+        runs        INTEGER NOT NULL,
+        last_run    INTEGER NOT NULL,
+        last_exit   INTEGER,
+        last_cwd    TEXT,
+        PRIMARY KEY (repo, command)
+    );
+    CREATE INDEX command_history_recent ON command_history (repo, last_run DESC);",
 ];
 
 #[cfg(test)]

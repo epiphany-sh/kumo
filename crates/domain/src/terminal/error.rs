@@ -1,4 +1,4 @@
-use super::TerminalId;
+use super::{HistoryError, TerminalId};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum TerminalError {
@@ -16,4 +16,6 @@ pub enum TerminalError {
     Io(String),
     #[error("terminal session is closed")]
     SessionClosed,
+    #[error(transparent)]
+    History(#[from] HistoryError),
 }

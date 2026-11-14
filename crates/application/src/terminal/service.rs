@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use kumo_domain::profiles::{ProfileEnv, ProfileId};
 use kumo_domain::terminal::{
-    LaunchSpec, NoShellIntegration, PtySystem, ShellIntegration, TerminalError, TerminalId,
-    TerminalInfo, TerminalStatus,
+    CommandMarks, LaunchSpec, NoShellIntegration, PtySystem, ShellIntegration, TerminalError,
+    TerminalId, TerminalInfo, TerminalStatus,
 };
 
 use super::registry::SessionRegistry;
-use super::{SessionConfig, Subscription, TerminalSession};
+use super::session::Recorder;
+use super::{CommandHistory, RepoHistory, SessionConfig, Subscription, TerminalSession};
 
 /// A client attached to a session: a handle to drive it and its output.
 #[derive(Debug)]
@@ -30,6 +31,8 @@ pub struct TerminalService {
     scope: Option<ProfileId>,
     /// What the profile's processes get (git identity, credentials, key).
     env: ProfileEnv,
+    /// Where the profile's shells' commands are remembered.
+    history: Option<CommandHistory>,
 }
 
 impl std::fmt::Debug for TerminalService {
@@ -51,6 +54,7 @@ impl TerminalService {
             registry: Arc::default(),
             scope: None,
             env: ProfileEnv::default(),
+            history: None,
         }
     }
 
@@ -71,7 +75,15 @@ impl TerminalService {
             registry: Arc::clone(&self.registry),
             scope: Some(profile),
             env,
+            history: None,
         }
+    }
+
+    /// Shells opened with [`Self::open_shell`] remember their commands in
+    /// `history`.
+    pub fn with_history(mut self, history: CommandHistory) -> Self {
+        self.history = Some(history);
+        self
     }
 
     /// The profile this service is scoped to; None sees every terminal.
@@ -81,19 +93,86 @@ impl TerminalService {
 
     /// Spawns the program on a new PTY. Must be called within a Tokio runtime.
     pub fn open(&self, spec: LaunchSpec) -> Result<TerminalId, TerminalError> {
+        self.spawn(spec, None)
+    }
+
+    fn spawn(
+        &self,
+        spec: LaunchSpec,
+        recorder: Option<Recorder>,
+    ) -> Result<TerminalId, TerminalError> {
         let spec = spec.with_default_env(self.env.get().env());
         let process = self.pty.spawn(&spec)?;
         let id = TerminalId::generate();
-        let session = TerminalSession::start(id.clone(), &spec, process, &self.config);
+        let session = TerminalSession::start(id.clone(), &spec, process, &self.config, recorder);
         self.registry.insert(session, self.scope.clone());
         tracing::info!(terminal = %id, program = spec.program(), "terminal opened");
         Ok(id)
     }
 
     /// Like [`Self::open`], for the user's interactive shell: it reports
-    /// its prompts and commands (see [`ShellIntegration`]).
-    pub fn open_shell(&self, spec: LaunchSpec) -> Result<TerminalId, TerminalError> {
-        self.open(self.shells.apply(spec))
+    /// its prompts and commands (see [`ShellIntegration`]), and the ones it
+    /// runs are remembered when `remember` (see [`Self::history`]).
+    pub fn open_shell(
+        &self,
+        spec: LaunchSpec,
+        remember: bool,
+    ) -> Result<TerminalId, TerminalError> {
+        // Fresh for each shell: its command lines are signed with it.
+        let nonce = TerminalId::generate().to_string();
+        let spec = self.shells.apply(spec, &nonce);
+        let recorder = Recorder::new(
+            CommandMarks::new(nonce),
+            self.history.clone().filter(|_| remember),
+        );
+        self.spawn(spec, Some(recorder))
+    }
+
+    /// The commands remembered for the repository the terminal's shell is
+    /// in (what it ran outside one, elsewhere), last run first, and the
+    /// folder it's in.
+    pub async fn history(
+        &self,
+        id: &TerminalId,
+        limit: usize,
+    ) -> Result<(RepoHistory, Option<std::path::PathBuf>), TerminalError> {
+        let cwd = self.registry.get(id, self.scope.as_ref())?.current_dir();
+        let Some(history) = self.history.clone() else {
+            return Ok((
+                RepoHistory {
+                    repo: None,
+                    entries: Vec::new(),
+                },
+                cwd,
+            ));
+        };
+        let dir = cwd.clone();
+        let found = blocking(move || history.recent(dir.as_deref(), limit)).await?;
+        Ok((found, cwd))
+    }
+
+    /// Forgets the commands of the repository the terminal's shell is in,
+    /// or every command when `everything`. Returns how many.
+    pub async fn forget_history(
+        &self,
+        id: Option<&TerminalId>,
+        everything: bool,
+    ) -> Result<usize, TerminalError> {
+        let cwd = match id {
+            Some(id) => self.registry.get(id, self.scope.as_ref())?.current_dir(),
+            None => None,
+        };
+        let Some(history) = self.history.clone() else {
+            return Ok(0);
+        };
+        blocking(move || {
+            if everything {
+                history.forget_all()
+            } else {
+                history.forget(cwd.as_deref())
+            }
+        })
+        .await
     }
 
     /// Attaches to a session, optionally replaying buffered output first.
@@ -149,4 +228,14 @@ impl TerminalService {
             }
         }
     }
+}
+
+/// Runs a store call off the async threads.
+async fn blocking<T: Send + 'static>(
+    call: impl FnOnce() -> Result<T, kumo_domain::terminal::HistoryError> + Send + 'static,
+) -> Result<T, TerminalError> {
+    tokio::task::spawn_blocking(call)
+        .await
+        .map_err(|e| TerminalError::Io(e.to_string()))?
+        .map_err(TerminalError::from)
 }
