@@ -904,6 +904,18 @@ class AppState extends ChangeNotifier {
     return changes.error;
   }
 
+  /// A new folder (and its missing parents), kept with an empty `.gitkeep`:
+  /// git doesn't track empty folders. Returns why not, or null.
+  Future<String?> createFolder(String raw) async {
+    final path = cleanPath(raw);
+    if (path.isEmpty) return 'Give the folder a name';
+    if (pathExists(path)) return '$path already exists';
+    final changes = _changes;
+    await changes.write('$path/.gitkeep', '');
+    if (!identical(changes, _changes)) return null;
+    return changes.error;
+  }
+
   /// Renames or moves a file or folder; its tabs and unsaved edits follow.
   /// Returns why not, or null.
   Future<String?> movePath(String from, String raw) async {
