@@ -746,12 +746,17 @@ class AppState extends ChangeNotifier {
   ContextTab? get activeContext => _home ? null : _tabs.activeContext;
 
   /// Opens (or goes to) the worktree's [t] tab in the Terminal view.
+  ///
+  /// The Files tab has its own tree: an open side panel showing Files moves
+  /// to Source control instead of repeating it. A hidden panel stays hidden,
+  /// and the saved choice of tab isn't touched.
   void openContext(ContextTab t) {
     _home = false;
     final tabs = _tabs;
     if (!tabs.context.contains(t)) tabs.context.add(t);
     tabs.activeContext = t;
     _view = KumoView.terminal;
+    if (t == ContextTab.files && _sidePanelOpen && _sidePanelTab == SidePanelTab.files) _sidePanelTab = SidePanelTab.git;
     notifyListeners();
   }
 
