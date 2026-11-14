@@ -61,27 +61,32 @@ impl CiClient for GitHubActions {
     }
 
     fn latest_run(&self, target: &CiTarget, token: &str) -> Result<Option<CiRun>, CiProblem> {
+        Ok(self.runs(target, token)?.into_iter().next())
+    }
+
+    fn runs(&self, target: &CiTarget, token: &str) -> Result<Vec<CiRun>, CiProblem> {
         let headers = Self::headers(token);
         let base = Self::base(target);
-        let runs = self.http.get_json(
+        let listed = self.http.get_json(
             &format!(
-                "{base}/actions/runs?branch={}&per_page=1",
+                "{base}/actions/runs?branch={}&per_page={RUNS_LISTED}",
                 enc(&target.branch)
             ),
             &headers,
         )?;
-        let Some(run) = runs["workflow_runs"].get(0) else {
-            return Ok(None);
-        };
-        let jobs = self.http.get_json(
-            &format!("{base}/actions/runs/{}/jobs?per_page=100", id(&run["id"])),
-            &headers,
-        )?;
-        let mut run = parse_run(run, &jobs);
-        for job in run.jobs.iter_mut().filter(|j| j.state == CiState::Failed) {
-            job.failure = self.failure(&base, &job.id, &headers);
+        let mut runs = Vec::new();
+        for run in latest_commit_runs(&listed) {
+            let jobs = self.http.get_json(
+                &format!("{base}/actions/runs/{}/jobs?per_page=100", id(&run["id"])),
+                &headers,
+            )?;
+            let mut run = parse_run(run, &jobs);
+            for job in run.jobs.iter_mut().filter(|j| j.state == CiState::Failed) {
+                job.failure = self.failure(&base, &job.id, &headers);
+            }
+            runs.push(run);
         }
-        Ok(Some(run))
+        Ok(runs)
     }
 
     fn rerun_failed(&self, target: &CiTarget, token: &str, run: &CiRun) -> Result<(), CiProblem> {
@@ -102,6 +107,47 @@ impl CiClient for GitHubActions {
             user["login"].as_str().unwrap_or("?")
         ))
     }
+}
+
+/// Runs asked for per poll: enough for every workflow of a commit, and the
+/// re-runs and cancelled ones around them.
+const RUNS_LISTED: usize = 30;
+/// Runs shown per commit (each costs a request for its jobs).
+const RUNS_SHOWN: usize = 8;
+
+/// A commit usually starts one run per workflow, and a pull request's
+/// checks are only some of them. From the branch's runs, newest first: the
+/// ones of the newest run's commit, one per workflow and event (the newest:
+/// re-runs replace what they re-ran), the pull request's first.
+fn latest_commit_runs(listed: &Value) -> Vec<&Value> {
+    let all = listed["workflow_runs"]
+        .as_array()
+        .map_or(&[][..], Vec::as_slice);
+    let Some(sha) = all.first().map(|run| &run["head_sha"]) else {
+        return Vec::new();
+    };
+    let mut seen = Vec::new();
+    let mut runs: Vec<&Value> = all
+        .iter()
+        .filter(|run| &run["head_sha"] == sha)
+        .filter(|run| {
+            let key = (&run["workflow_id"], &run["event"]);
+            let new = !seen.contains(&key);
+            seen.push(key);
+            new
+        })
+        .take(RUNS_SHOWN)
+        .collect();
+    // Stable: each group keeps the newest first.
+    runs.sort_by_key(|run| !for_pull_request(run));
+    runs
+}
+
+/// `pull_request` and `pull_request_target`: what the PR page lists.
+fn for_pull_request(run: &Value) -> bool {
+    run["event"]
+        .as_str()
+        .is_some_and(|event| event.starts_with("pull_request"))
 }
 
 /// `status` + `conclusion` of a run or job.
@@ -160,6 +206,8 @@ pub(super) fn parse_run(run: &Value, jobs: &Value) -> CiRun {
                 }
             })
             .collect(),
+        workflow: run["name"].as_str().unwrap_or_default().to_owned(),
+        pull_request: for_pull_request(run),
     }
 }
 
@@ -239,6 +287,73 @@ mod tests {
         assert_eq!(run.jobs[2].duration_ms, None);
         assert!(run.jobs[2].started_at.is_some());
         assert!(run.active(), "a job is still running");
+        assert_eq!((run.workflow.as_str(), run.pull_request), ("CI", false));
+    }
+
+    #[test]
+    fn a_commit_shows_each_workflow_once_and_the_pull_requests_first() {
+        let run = |id: u64, workflow: u64, event: &str, sha: &str| serde_json::json!({ "id": id, "workflow_id": workflow, "event": event, "head_sha": sha });
+        // Newest first, as GitHub lists them.
+        let listed = serde_json::json!({ "workflow_runs": [
+            run(9, 1, "push", "bbb"),
+            run(8, 2, "pull_request", "bbb"),
+            run(7, 3, "pull_request_target", "bbb"),
+            run(6, 2, "pull_request", "bbb"),
+            run(5, 2, "push", "bbb"),
+            run(4, 2, "pull_request", "aaa"),
+        ]});
+        let ids: Vec<u64> = latest_commit_runs(&listed)
+            .iter()
+            .map(|r| r["id"].as_u64().unwrap())
+            .collect();
+        assert_eq!(
+            ids,
+            [8, 7, 9, 5],
+            "the PR's checks, then the rest; not the run a re-run replaced, nor older commits"
+        );
+        assert!(latest_commit_runs(&serde_json::json!({ "workflow_runs": [] })).is_empty());
+        assert!(latest_commit_runs(&serde_json::json!({})).is_empty());
+    }
+
+    #[test]
+    fn every_run_of_the_commit_comes_with_its_jobs() {
+        let server = TestServer::start(|r| {
+            match r.path.as_str() {
+            p if p.contains("/actions/runs?") => (
+                200,
+                serde_json::json!({ "workflow_runs": [
+                    { "id": 2, "name": "deploy", "workflow_id": 20, "event": "push", "head_sha": "bbb", "status": "in_progress", "run_number": 4 },
+                    { "id": 1, "name": "ci", "workflow_id": 10, "event": "pull_request", "head_sha": "bbb", "status": "completed", "conclusion": "success", "run_number": 31 },
+                ]})
+                .to_string(),
+            ),
+            p if p.contains("/actions/runs/1/jobs") => (
+                200,
+                r#"{"jobs":[{"id":11,"name":"test","status":"completed","conclusion":"success"},{"id":12,"name":"lint","status":"completed","conclusion":"success"}]}"#.to_owned(),
+            ),
+            p if p.contains("/actions/runs/2/jobs") => (
+                200,
+                r#"{"jobs":[{"id":21,"name":"staging","status":"in_progress"}]}"#.to_owned(),
+            ),
+            _ => (404, r#"{"message":"Not Found"}"#.to_owned()),
+        }
+        });
+        let client = GitHubActions::default();
+        let runs = client.runs(&target(&server.url), "t").unwrap();
+        let seen: Vec<_> = runs
+            .iter()
+            .map(|r| (r.workflow.as_str(), r.pull_request, r.jobs.len()))
+            .collect();
+        assert_eq!(seen, [("ci", true, 2), ("deploy", false, 1)]);
+        assert_eq!(
+            client
+                .latest_run(&target(&server.url), "t")
+                .unwrap()
+                .unwrap()
+                .id,
+            "1",
+            "the pull request's run is the one on top"
+        );
     }
 
     #[test]
@@ -278,7 +393,7 @@ mod tests {
                 ("GET", p) if p.starts_with("/repos/pricing/price-admin/actions/runs?") => {
                     assert_eq!(
                         p,
-                        "/repos/pricing/price-admin/actions/runs?branch=feat%2FPRC-412-bulk-discounts&per_page=1"
+                        "/repos/pricing/price-admin/actions/runs?branch=feat%2FPRC-412-bulk-discounts&per_page=30"
                     );
                     if r.header("if-none-match") == Some("\"runs-1\"") {
                         (304, etag("\"runs-1\""), String::new())

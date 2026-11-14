@@ -2124,7 +2124,9 @@ String _contextBadge(AgentContextItem item) {
 }
 
 /// CI runs of the selected worktree's branch, from its repository's host
-/// (GitHub Actions, GitLab CI, Bitbucket Pipelines). Problems — a token
+/// (GitHub Actions, GitLab CI, Bitbucket Pipelines). A commit with several
+/// workflows shows them all: the pull request's checks first, then the
+/// runs that started for something else (a push). Problems — a token
 /// without access, an expired one, an outage — read as plain sentences with
 /// the fix one click away; the provider's own words show small underneath.
 class PipelinesCard extends StatelessWidget {
@@ -2136,10 +2138,11 @@ class PipelinesCard extends StatelessWidget {
     final c = context.c;
     final p = s.pipelines;
     final provider = p.provider;
-    final run = p.latest;
+    final runs = p.runs;
+    final run = runs.firstOrNull;
     final problem = p.problem;
     final stale = problem != null && problem.keepsLastRun;
-    final (pill, pillColor, pillBg) = switch (run?.state) {
+    final (pill, pillColor, pillBg) = switch (_overall(runs)) {
       _ when stale => ('Stale', c.warn, c.warnSoft),
       CiState.running => ('Running', c.acc, c.accSoft),
       CiState.queued => ('Queued', c.text2, c.tile),
@@ -2149,6 +2152,10 @@ class PipelinesCard extends StatelessWidget {
       CiState.skipped => ('Skipped', c.text2, c.tile),
       null => ('', c.text2, c.tile),
     };
+    // Two sections only when the commit has runs of both kinds.
+    final checks = [for (final r in runs) if (r.pullRequest) r];
+    final rest = [for (final r in runs) if (!r.pullRequest) r];
+    final sections = checks.isNotEmpty && rest.isNotEmpty;
     final checked = p.checkedAt == null ? 'not checked yet' : 'checked ${_ago(p.checkedAt!)}';
     void settings() => showSettingsDialog(context, initial: SettingsTab.repos);
 
@@ -2183,7 +2190,8 @@ class PipelinesCard extends StatelessWidget {
           break;
       }
     } else if (run != null && provider != null) {
-      if (run.state.finished && run.hasFailedJobs) action('Re-run failed jobs', busy ? null : p.rerunFailed, primary: true);
+      final failed = runs.where((r) => r.state.finished && r.hasFailedJobs).firstOrNull;
+      if (failed != null) action('Re-run failed jobs', busy ? null : () => p.rerunFailed(failed), primary: true);
       action('Open in ${provider.label}', run.url.isEmpty ? null : () => openUrl(run.url));
     }
 
@@ -2212,21 +2220,14 @@ class PipelinesCard extends StatelessWidget {
           Text('Select a worktree to see its pipelines.', style: sans(12, color: c.text3))
         else if (p.loading && run == null && problem == null)
           Text('Asking ${provider?.label ?? 'the CI'}…', style: sans(12, color: c.text3)),
-        if (run != null) ...[
-          // One line: a long label (`run #8812 · attempt 2`) ellipsizes
-          // instead of overflowing the panel.
-          Text.rich(
-            TextSpan(children: [
-              TextSpan(text: '${run.label} · ${run.shortSha}', style: mono(11.5, color: c.text2)),
-              const WidgetSpan(child: SizedBox(width: 8)),
-              TextSpan(text: _runNote(run), style: sans(11.5, color: c.text3)),
-            ]),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 6),
-          for (final j in run.jobs) _JobRow(job: j, stale: stale),
-        ],
+        if (sections) ...[
+          _RunsHeading(provider == CiProvider.gitlabCi ? 'Merge request' : 'Pull request', count: checks.length),
+          for (final r in checks) _RunBlock(run: r, stale: stale, named: true),
+          const SizedBox(height: 8),
+          _RunsHeading('Other runs', count: rest.length),
+          for (final r in rest) _RunBlock(run: r, stale: stale, named: true),
+        ] else
+          for (final r in runs) _RunBlock(run: r, stale: stale, named: runs.length > 1),
         if (problem != null) ...[
           if (run != null) const SizedBox(height: 6),
           _ProblemBox(problem: problem, provider: provider ?? CiProvider.githubActions, repo: p.repo),
@@ -2247,6 +2248,15 @@ class PipelinesCard extends StatelessWidget {
     );
   }
 
+  /// One state for all the runs: still going, else the worst ending.
+  static CiState? _overall(List<CiRun> runs) {
+    const order = [CiState.running, CiState.queued, CiState.failed, CiState.canceled, CiState.passed, CiState.skipped];
+    for (final state in order) {
+      if (runs.any((r) => r.state == state)) return state;
+    }
+    return null;
+  }
+
   static String _runNote(CiRun run) {
     final total = run.jobs.length;
     final at = run.createdAt == null ? '' : 'started ${_ago(run.createdAt!)}';
@@ -2257,6 +2267,61 @@ class PipelinesCard extends StatelessWidget {
       _ => run.state.name,
     };
     return [if (at.isNotEmpty) at, progress].join(' · ');
+  }
+}
+
+/// "Pull request · 2" over a group of runs.
+class _RunsHeading extends StatelessWidget {
+  const _RunsHeading(this.label, {required this.count});
+  final String label;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(count > 1 ? '$label · $count' : label, style: sans(11, weight: FontWeight.w600, color: c.text3, letterSpacing: 0.2)),
+    );
+  }
+}
+
+/// One run: its line (a click opens it on the provider) and its jobs.
+/// [named] leads with the workflow, where there are several runs.
+class _RunBlock extends StatelessWidget {
+  const _RunBlock({required this.run, required this.stale, required this.named});
+  final CiRun run;
+  final bool stale;
+  final bool named;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final name = named ? run.workflow : '';
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      KPressable(
+        onTap: run.url.isEmpty ? null : () => openUrl(run.url),
+        semanticLabel: '${name.isEmpty ? run.label : name}, ${run.state.name}',
+        // One line: a long label (`run #8812 · attempt 2`) ellipsizes
+        // instead of overflowing the panel.
+        builder: (context, hover, focus) => Text.rich(
+          TextSpan(children: [
+            if (name.isNotEmpty) ...[
+              TextSpan(text: name, style: sans(12, weight: FontWeight.w600, color: hover || focus ? c.acc : c.text)),
+              const WidgetSpan(child: SizedBox(width: 8)),
+            ],
+            TextSpan(text: '${run.label} · ${run.shortSha}', style: mono(11.5, color: c.text2)),
+            const WidgetSpan(child: SizedBox(width: 8)),
+            TextSpan(text: PipelinesCard._runNote(run), style: sans(11.5, color: c.text3)),
+          ]),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      const SizedBox(height: 6),
+      for (final j in run.jobs) _JobRow(job: j, stale: stale),
+      if (named) const SizedBox(height: 6),
+    ]);
   }
 }
 

@@ -26,6 +26,8 @@ struct Script {
     calls: AtomicUsize,
     targets: Mutex<Vec<CiTarget>>,
     reruns: Mutex<Vec<String>>,
+    /// Runs of the same commit, after the latest.
+    others: Mutex<Vec<CiRun>>,
 }
 
 impl Script {
@@ -53,6 +55,14 @@ impl CiClient for Script {
         } else {
             answers.front().cloned().unwrap_or(Ok(None))
         }
+    }
+
+    fn runs(&self, target: &CiTarget, token: &str) -> Result<Vec<CiRun>, CiProblem> {
+        let mut runs: Vec<CiRun> = self.latest_run(target, token)?.into_iter().collect();
+        if !runs.is_empty() {
+            runs.extend(self.others.lock().unwrap().iter().cloned());
+        }
+        Ok(runs)
     }
 
     fn rerun_failed(&self, _: &CiTarget, _: &str, run: &CiRun) -> Result<(), CiProblem> {
@@ -175,6 +185,8 @@ fn run(id: &str, state: CiState) -> CiRun {
             failure: None,
             url: String::new(),
         }],
+        workflow: String::new(),
+        pull_request: false,
     }
 }
 
@@ -433,6 +445,20 @@ async fn reruns_the_failed_jobs_of_the_latest_run() {
         .await
         .unwrap_err();
     assert!(stale.to_string().contains("isn't the branch's latest"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_other_runs_of_the_commit_come_along_and_can_be_rerun() {
+    let f = fixture("git@github.com:pricing/app.git");
+    *f.script.others.lock().unwrap() = vec![run("8", CiState::Running), run("9", CiState::Failed)];
+    f.script.then(Ok(Some(run("7", CiState::Passed))));
+    let mut rx = f.service.watch(Path::new(WT)).unwrap();
+    let s = next(&mut rx).await;
+    assert_eq!(s.latest.as_ref().unwrap().id, "7");
+    let others: Vec<_> = s.others.iter().map(|r| r.id.as_str()).collect();
+    assert_eq!(others, ["8", "9"]);
+    f.service.rerun_failed(Path::new(WT), "9").await.unwrap();
+    assert_eq!(*f.script.reruns.lock().unwrap(), ["9"]);
 }
 
 #[tokio::test(flavor = "multi_thread")]

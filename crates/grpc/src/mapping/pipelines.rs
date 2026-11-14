@@ -54,6 +54,8 @@ fn run_to(run: &CiRun) -> pb::CiRun {
         finished_at: ms(run.finished_at),
         url: run.url.clone(),
         jobs: run.jobs.iter().map(job_to).collect(),
+        workflow: run.workflow.clone(),
+        pull_request: run.pull_request,
     }
 }
 
@@ -83,6 +85,7 @@ pub fn pipelines_snapshot_to(snapshot: &PipelinesSnapshot) -> pb::PipelinesSnaps
         repo: snapshot.repo.clone(),
         branch: snapshot.branch.clone(),
         latest: snapshot.latest.as_ref().map(run_to),
+        others: snapshot.others.iter().map(run_to).collect(),
         problem: snapshot.problem.as_ref().map(ci_problem_to),
         checked_at: ms(snapshot.checked_at),
     }
@@ -124,6 +127,8 @@ mod tests {
                 failure: Some("bulk_test.go:88 · expected 3 rows, got 2".into()),
                 url: String::new(),
             }],
+            workflow: "ci".into(),
+            pull_request: true,
         };
         let mut problem = CiProblem::new(
             CiProblemKind::Unreachable,
@@ -134,7 +139,8 @@ mod tests {
             provider: Some(CiProvider::GitHubActions),
             repo: "a/b".into(),
             branch: "feat/x".into(),
-            latest: Some(run),
+            latest: Some(run.clone()),
+            others: vec![run],
             problem: Some(problem),
             checked_at: None,
         });

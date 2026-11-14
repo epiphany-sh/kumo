@@ -3987,6 +3987,14 @@ const PipelinesSnapshot$json = {
       '17': true
     },
     {'1': 'checked_at', '3': 6, '4': 1, '5': 3, '10': 'checkedAt'},
+    {
+      '1': 'others',
+      '3': 7,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.CiRun',
+      '10': 'others'
+    },
   ],
   '8': [
     {'1': '_latest'},
@@ -4000,7 +4008,8 @@ final $typed_data.Uint8List pipelinesSnapshotDescriptor = $convert.base64Decode(
     'RlclIIcHJvdmlkZXISEgoEcmVwbxgCIAEoCVIEcmVwbxIWCgZicmFuY2gYAyABKAlSBmJyYW5j'
     'aBIrCgZsYXRlc3QYBCABKAsyDi5rdW1vLnYxLkNpUnVuSABSBmxhdGVzdIgBARIxCgdwcm9ibG'
     'VtGAUgASgLMhIua3Vtby52MS5DaVByb2JsZW1IAVIHcHJvYmxlbYgBARIdCgpjaGVja2VkX2F0'
-    'GAYgASgDUgljaGVja2VkQXRCCQoHX2xhdGVzdEIKCghfcHJvYmxlbQ==');
+    'GAYgASgDUgljaGVja2VkQXQSJgoGb3RoZXJzGAcgAygLMg4ua3Vtby52MS5DaVJ1blIGb3RoZX'
+    'JzQgkKB19sYXRlc3RCCgoIX3Byb2JsZW0=');
 
 @$core.Deprecated('Use ciRunDescriptor instead')
 const CiRun$json = {
@@ -4022,6 +4031,8 @@ const CiRun$json = {
     {'1': 'finished_at', '3': 7, '4': 1, '5': 3, '10': 'finishedAt'},
     {'1': 'url', '3': 8, '4': 1, '5': 9, '10': 'url'},
     {'1': 'jobs', '3': 9, '4': 3, '5': 11, '6': '.kumo.v1.CiJob', '10': 'jobs'},
+    {'1': 'workflow', '3': 10, '4': 1, '5': 9, '10': 'workflow'},
+    {'1': 'pull_request', '3': 11, '4': 1, '5': 8, '10': 'pullRequest'},
   ],
 };
 
@@ -4031,7 +4042,8 @@ final $typed_data.Uint8List ciRunDescriptor = $convert.base64Decode(
     'NoYRgDIAEoCVIIc2hvcnRTaGESFAoFdGl0bGUYBCABKAlSBXRpdGxlEiYKBXN0YXRlGAUgASgO'
     'MhAua3Vtby52MS5DaVN0YXRlUgVzdGF0ZRIdCgpjcmVhdGVkX2F0GAYgASgDUgljcmVhdGVkQX'
     'QSHwoLZmluaXNoZWRfYXQYByABKANSCmZpbmlzaGVkQXQSEAoDdXJsGAggASgJUgN1cmwSIgoE'
-    'am9icxgJIAMoCzIOLmt1bW8udjEuQ2lKb2JSBGpvYnM=');
+    'am9icxgJIAMoCzIOLmt1bW8udjEuQ2lKb2JSBGpvYnMSGgoId29ya2Zsb3cYCiABKAlSCHdvcm'
+    'tmbG93EiEKDHB1bGxfcmVxdWVzdBgLIAEoCFILcHVsbFJlcXVlc3Q=');
 
 @$core.Deprecated('Use ciJobDescriptor instead')
 const CiJob$json = {
