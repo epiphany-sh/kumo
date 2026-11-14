@@ -63,14 +63,14 @@ void main() {
     expect(find.descendant(of: scope, matching: find.text('11')), findsOneWidget);
     expect(find.descendant(of: scope, matching: find.text('17')), findsOneWidget);
     expect(find.text('Mine · 4 sources'), findsOneWidget);
-    expect(find.text('Jira · Pricing, GitHub, Obsidian, Todoist · synced 1 min ago'), findsOneWidget);
+    expect(find.text('Jira · Platform, GitHub, Obsidian, Todoist · synced 1 min ago'), findsOneWidget);
     expect(find.text('11 yours of 17 · 3 in worktrees'), findsOneWidget);
     expect(find.text('⌘K finds a ticket by key or title'), findsOneWidget);
     expect(find.text('migraciones'), findsWidgets);
     expect(find.text('Generación automática de precios para los canales (Hijas)'), findsNothing, reason: 'unassigned: not mine');
 
     // Source chips count within the scope.
-    expect(find.descendant(of: find.widgetWithText(KPressable, 'Jira · Pricing'), matching: find.text('7')), findsOneWidget);
+    expect(find.descendant(of: find.widgetWithText(KPressable, 'Jira · Platform'), matching: find.text('7')), findsOneWidget);
 
     await tester.tap(find.descendant(of: scope, matching: find.text('Everyone')));
     await tester.pump();
@@ -78,7 +78,7 @@ void main() {
     expect(find.text('Everyone · 4 sources'), findsOneWidget);
     expect(find.text('17 tasks · 11 yours · 3 in worktrees'), findsOneWidget);
     expect(find.text('Generación automática de precios para los canales (Hijas)'), findsOneWidget);
-    expect(find.descendant(of: find.widgetWithText(KPressable, 'Jira · Pricing'), matching: find.text('13')), findsOneWidget);
+    expect(find.descendant(of: find.widgetWithText(KPressable, 'Jira · Platform'), matching: find.text('13')), findsOneWidget);
 
     // A new board opens where the user left it.
     await tester.pumpWidget(const SizedBox());
@@ -127,13 +127,13 @@ void main() {
 
   testWidgets('cards: rich for a Jira story, degraded for an Obsidian to-do', (tester) async {
     await _pump(tester);
-    // PRC-11355: epic, labels, points, subtasks, comments; its status is
+    // TSK-11355: epic, labels, points, subtasks, comments; its status is
     // the column's, so it doesn't repeat.
     const story = 'migraciones';
-    expect(_inCard(story, find.text('PRC-11355')), findsOneWidget);
+    expect(_inCard(story, find.text('TSK-11355')), findsOneWidget);
     expect(_inCard(story, find.text('Low')), findsOneWidget);
-    expect(_inCard(story, find.text('Migración a Graviton')), findsOneWidget);
-    expect(_inCard(story, find.text('graviton')), findsOneWidget);
+    expect(_inCard(story, find.text('Migración a arm64')), findsOneWidget);
+    expect(_inCard(story, find.text('arm64')), findsOneWidget);
     expect(_inCard(story, find.text('db')), findsOneWidget);
     expect(_inCard(story, find.text('5 pts')), findsOneWidget);
     expect(_inCard(story, find.text('1/4')), findsOneWidget);
@@ -150,9 +150,9 @@ void main() {
     expect(_inCard(note, find.byType(TagChip)), findsOneWidget, reason: 'just the OB badge');
 
     // A sub-task of a story shows its parent; a linked worktree its agent.
-    expect(_inCard('Migrar job de precios', find.text('PRC-11355')), findsOneWidget);
+    expect(_inCard('Migrar job de precios', find.text('TSK-11355')), findsOneWidget);
     expect(_inCard('Bulk discounts by category', find.text('Claude Code · working')), findsOneWidget);
-    expect(_inCard('Bulk discounts by category', find.text('feat/PRC-412-bulk-discounts')), findsOneWidget);
+    expect(_inCard('Bulk discounts by category', find.text('feat/TSK-412-bulk-discounts')), findsOneWidget);
     expect(_inCard('Bulk discounts by category', find.text('Descuentos por volumen')), findsOneWidget);
     expect(_inCard('Rounding error on installment prices', find.text('Codex CLI · needs you')), findsOneWidget);
     expect(_inCard('Warm cache on deploy', find.text('Claude Code · finished')), findsOneWidget);
@@ -166,8 +166,8 @@ void main() {
     state.setSetting(TasksScreen.scopeSetting, 'everyone');
     await tester.pump();
 
-    expect(_inCard('Migracion a Graviton (Parte 4/4)', find.text('Blocked')), findsOneWidget);
-    expect(_inCard('Migracion a Graviton (Parte 4/4)', find.text('Migración a Graviton')), findsOneWidget, reason: 'a sub-task under an epic shows the epic');
+    expect(_inCard('Migracion a arm64 (Parte 4/4)', find.text('Blocked')), findsOneWidget);
+    expect(_inCard('Migracion a arm64 (Parte 4/4)', find.text('Migración a arm64')), findsOneWidget, reason: 'a sub-task under an epic shows the epic');
     expect(_inCard('migraciones', find.text('Blocked')), findsNothing, reason: 'its blocker is done');
 
     // "Code Review" and "QA" say more than In review; "In Progress" doesn't.
@@ -176,7 +176,7 @@ void main() {
     expect(_inCard('Analisis: Migracion a Envoy', find.text('Backlog')), findsOneWidget);
     expect(_inCard('Analisis: Migracion a Envoy', find.text('2026.23 · next')), findsOneWidget);
     expect(_inCard('Bulk discounts by category', find.text('In Progress')), findsNothing);
-    expect(_inCard('Retry on 502 from pricing API', find.text('Open')), findsNothing);
+    expect(_inCard('Retry on 502 from platform API', find.text('Open')), findsNothing);
 
     // The overdue bug: closed sprint, two labels and +1, overdue with an icon.
     const bug = 'Generación automática de precios para los canales (Hijas)';
@@ -206,32 +206,32 @@ void main() {
     expect(find.byType(TaskDetailPanel), findsNothing);
     await tester.tap(find.text('migraciones').first);
     await tester.pump();
-    expect(_panel(tester).taskId, 'mock-JI/PRC-11355');
+    expect(_panel(tester).taskId, 'mock-JI/TSK-11355');
     expect(find.text('↑ ↓ switch tickets · Esc closes'), findsOneWidget);
 
     // In progress is sorted High, High, Low; In review comes next.
     await _key(tester, LogicalKeyboardKey.arrowDown);
-    expect(_panel(tester).taskId, 'mock-JI/PRC-405');
+    expect(_panel(tester).taskId, 'mock-JI/TSK-405');
     await _key(tester, LogicalKeyboardKey.arrowUp);
     await _key(tester, LogicalKeyboardKey.arrowUp);
-    expect(_panel(tester).taskId, 'mock-JI/PRC-398');
+    expect(_panel(tester).taskId, 'mock-JI/TSK-398');
     _panel(tester).onStep!(-1);
     await tester.pump();
-    expect(_panel(tester).taskId, 'mock-JI/PRC-412');
+    expect(_panel(tester).taskId, 'mock-JI/TSK-412');
 
     // Opening a linked ticket keeps a way back; ↓ walks on from the board.
-    _panel(tester).onOpen('mock-JI/PRC-11280');
+    _panel(tester).onOpen('mock-JI/TSK-11280');
     await tester.pump();
-    expect(_panel(tester).taskId, 'mock-JI/PRC-11280');
+    expect(_panel(tester).taskId, 'mock-JI/TSK-11280');
     expect(_panel(tester).canGoBack, isTrue);
     _panel(tester).onBack!();
     await tester.pump();
-    expect(_panel(tester).taskId, 'mock-JI/PRC-412');
+    expect(_panel(tester).taskId, 'mock-JI/TSK-412');
     expect(_panel(tester).canGoBack, isFalse);
-    _panel(tester).onOpen('mock-JI/PRC-11280');
+    _panel(tester).onOpen('mock-JI/TSK-11280');
     await tester.pump();
     await _key(tester, LogicalKeyboardKey.arrowDown);
-    expect(_panel(tester).taskId, 'mock-JI/PRC-398');
+    expect(_panel(tester).taskId, 'mock-JI/TSK-398');
     expect(_panel(tester).canGoBack, isFalse);
 
     // Expanded: the panel takes the view; Esc goes back to the side panel,
@@ -263,7 +263,7 @@ void main() {
     await tester.tap(find.widgetWithText(TextField, 'Filter tasks'));
     await tester.pump();
     await _key(tester, LogicalKeyboardKey.arrowDown);
-    expect(_panel(tester).taskId, 'mock-JI/PRC-11355');
+    expect(_panel(tester).taskId, 'mock-JI/TSK-11355');
     // Esc leaves the field first, then closes.
     await _key(tester, LogicalKeyboardKey.escape);
     expect(find.byType(TaskDetailPanel), findsOneWidget);
@@ -291,7 +291,7 @@ void main() {
     expect(find.byType(TaskDetailPanel), findsOneWidget);
     await _key(tester, LogicalKeyboardKey.arrowDown);
     await tester.pump(const Duration(milliseconds: 300));
-    expect(_panel(tester).taskId, 'mock-JI/PRC-398');
+    expect(_panel(tester).taskId, 'mock-JI/TSK-398');
     expect(tester.takeException(), isNull);
   });
 }

@@ -54,13 +54,13 @@ void main() {
     await tester.tap(find.byTooltip(ContextTab.files.tooltip));
     await tester.pump();
     expect(find.byType(WorktreeFilesTree), findsOneWidget);
-    expect(find.text('Files · PRC-412'), findsOneWidget);
+    expect(find.text('Files · TSK-412'), findsOneWidget);
 
     await tester.tap(find.byTooltip(ContextTab.git.tooltip));
     await tester.pump();
     expect(find.byType(SourceControlPanel), findsOneWidget);
     expect(find.text('Commits on this branch'), findsOneWidget);
-    expect(find.text('Git · PRC-412'), findsOneWidget);
+    expect(find.text('Git · TSK-412'), findsOneWidget);
 
     // A commit of the branch opens what it changed; Escape closes it.
     await tester.pump();
@@ -127,7 +127,7 @@ void main() {
     );
 
     // A worktree in the sidebar takes you back to its context.
-    await tester.tap(find.text('feat/PRC-412-bulk-discounts').first);
+    await tester.tap(find.text('feat/TSK-412-bulk-discounts').first);
     await tester.pump();
     expect(state.inHome, isFalse);
     expect(find.byType(SidePanel), findsOneWidget);
@@ -155,7 +155,7 @@ void main() {
     await tester.tap(find.byTooltip(ContextTab.files.tooltip));
     await tester.pump();
     const many = [
-      'cmd/price-admin/main.go', 'config/app.yaml', 'deploy/k8s/values.yaml', 'go.mod',
+      'cmd/repo-a/main.go', 'config/app.yaml', 'deploy/k8s/values.yaml', 'go.mod',
       'internal/discount/bulk.go', 'internal/discount/bulk_test.go', 'internal/discount/discount.go',
       'internal/discount/legacy_v1.go', 'internal/discount/repository.go', 'internal/discount/service.go',
       'internal/http/handler.go', 'internal/http/routes.go', 'internal/kafka/bulk_consumer.go',

@@ -533,10 +533,10 @@ mod tests {
     }
 
     const HIT: &str = r#"{"content":{"id":"98311","type":"page","title":"Discount rules v3",
-        "_links":{"webui":"/spaces/PRC/pages/98311/Discount+rules+v3"},
+        "_links":{"webui":"/spaces/TSK/pages/98311/Discount+rules+v3"},
         "version":{"when":"2026-10-25T12:00:00.000Z","by":{"displayName":"Lucía"}}},
         "excerpt":"Only the @@@hl@@@highest@@@endhl@@@ rule &amp; nothing else",
-        "resultGlobalContainer":{"title":"Pricing"},"lastModified":"2026-10-25T12:00:00.000Z"}"#;
+        "resultGlobalContainer":{"title":"Platform"},"lastModified":"2026-10-25T12:00:00.000Z"}"#;
 
     fn route(r: &crate::test_server::Request) -> (u16, String) {
         let path = r.path.as_str();
@@ -566,13 +566,13 @@ mod tests {
                     "id": "98311", "title": "Discount rules v3", "spaceId": "65538",
                     "version": {"createdAt": "2026-10-25T12:00:00.000Z", "authorId": "acc-1"},
                     "body": {"atlas_doc_format": {"value": adf, "representation": "atlas_doc_format"}},
-                    "_links": {"webui": "/spaces/PRC/pages/98311", "base": "https://acme.atlassian.net/wiki"}
+                    "_links": {"webui": "/spaces/TSK/pages/98311", "base": "https://acme.atlassian.net/wiki"}
                 });
                 (200, page.to_string())
             }
             "/wiki/api/v2/spaces/65538" => (
                 200,
-                r#"{"id":"65538","key":"PRC","name":"Pricing","homepageId":"100"}"#.into(),
+                r#"{"id":"65538","key":"TSK","name":"Platform","homepageId":"100"}"#.into(),
             ),
             "/wiki/rest/api/user?accountId=acc-1" => (200, r#"{"displayName":"Lucía"}"#.into()),
             _ => (404, r#"{"message":"not found"}"#.into()),
@@ -590,12 +590,12 @@ mod tests {
         assert_eq!(d.id.as_str(), "jira1/98311");
         assert_eq!(
             (d.title.as_str(), d.place.as_str()),
-            ("Discount rules v3", "Pricing")
+            ("Discount rules v3", "Platform")
         );
         assert_eq!(d.author.as_deref(), Some("Lucía"));
         assert_eq!(
             d.url,
-            "https://acme.atlassian.net/wiki/spaces/PRC/pages/98311/Discount+rules+v3"
+            "https://acme.atlassian.net/wiki/spaces/TSK/pages/98311/Discount+rules+v3"
         );
         assert!(d.updated_at.is_some());
         let first = &server.requests()[0];
@@ -623,11 +623,11 @@ mod tests {
             .read(&source(&server.url), Some("tok"), "98311")
             .unwrap();
         assert_eq!(doc.markdown, "## Scope\n\nList prices only.");
-        assert_eq!(doc.path, ["Pricing"]);
+        assert_eq!(doc.path, ["Platform"]);
         assert_eq!(doc.summary.author.as_deref(), Some("Lucía"));
         assert_eq!(
             doc.summary.url,
-            "https://acme.atlassian.net/wiki/spaces/PRC/pages/98311"
+            "https://acme.atlassian.net/wiki/spaces/TSK/pages/98311"
         );
         assert!(matches!(
             ConfluenceDocs::default().read(&source(&server.url), Some("t"), "../x"),
@@ -639,7 +639,7 @@ mod tests {
         ));
     }
 
-    /// Spaces (two answers, one personal space), Pricing's root pages (its
+    /// Spaces (two answers, one personal space), Platform's root pages (its
     /// home page and an archived one), and children mixing content types.
     fn browse_route(path: &str) -> Option<(u16, String)> {
         let (route, query) = path.split_once('?').unwrap_or((path, ""));
@@ -649,15 +649,15 @@ mod tests {
                 r#"{{"results":[{{"id":"7","key":"ENG","name":"engineering","type":"collaboration","status":"current"}}],"_links":{{{base}}}}}"#
             ),
             "/wiki/api/v2/spaces" => format!(
-                r#"{{"results":[{{"id":"65538","key":"PRC","name":"Pricing","type":"global","status":"current"}},
+                r#"{{"results":[{{"id":"65538","key":"TSK","name":"Platform","type":"global","status":"current"}},
                 {{"id":"9","key":"~ana","name":"Ana","type":"personal","status":"current"}}],
                 "_links":{{"next":"/wiki/api/v2/spaces?cursor=2&limit=201",{base}}}}}"#
             ),
             "/wiki/api/v2/spaces/65538/pages" => format!(
                 r#"{{"results":[{{"id":"300","title":"Zz old","status":"archived","spaceId":"65538",
-                "_links":{{"webui":"/spaces/PRC/pages/300/Zz+old"}}}},
-                {{"id":"100","title":"Pricing Home","status":"current","spaceId":"65538",
-                "version":{{"createdAt":"2026-10-25T12:00:00.000Z"}},"_links":{{"webui":"/spaces/PRC/overview"}}}}],
+                "_links":{{"webui":"/spaces/TSK/pages/300/Zz+old"}}}},
+                {{"id":"100","title":"Platform Home","status":"current","spaceId":"65538",
+                "version":{{"createdAt":"2026-10-25T12:00:00.000Z"}},"_links":{{"webui":"/spaces/TSK/overview"}}}}],
                 "_links":{{{base}}}}}"#
             ),
             "/wiki/api/v2/pages/100/direct-children" => format!(
@@ -701,7 +701,7 @@ mod tests {
             level(&spaces),
             [
                 ("space:7", "engineering", None, ""),
-                ("space:65538", "Pricing", None, "")
+                ("space:65538", "Platform", None, "")
             ],
             "every answer, by title"
         );
@@ -734,15 +734,15 @@ mod tests {
         );
         assert!(!truncated);
         let doc = pages[1].doc.as_ref().unwrap();
-        assert_eq!(doc.place, "Pricing");
+        assert_eq!(doc.place, "Platform");
         assert_eq!(
             doc.url,
-            "https://acme.atlassian.net/wiki/spaces/PRC/pages/98311"
+            "https://acme.atlassian.net/wiki/spaces/TSK/pages/98311"
         );
         assert_eq!(pages[1].children, 1);
         assert_eq!(
             pages[2].doc.as_ref().unwrap().url,
-            "https://acme.atlassian.net/wiki/spaces/PRC/pages/300/Zz+old"
+            "https://acme.atlassian.net/wiki/spaces/TSK/pages/300/Zz+old"
         );
         // The node's doc reads like any page.
         let read = ConfluenceDocs::default()
@@ -764,9 +764,9 @@ mod tests {
             [("page:401", "Examples", Some("jira1/401"), "")]
         );
         assert!(truncated, "a next page is left");
-        assert_eq!(children[0].doc.as_ref().unwrap().place, "Pricing");
+        assert_eq!(children[0].doc.as_ref().unwrap().place, "Platform");
         let (spaces, truncated) = docs.browse(&src, Some("tok"), None, 1).unwrap();
-        assert_eq!(level(&spaces), [("space:65538", "Pricing", None, "")]);
+        assert_eq!(level(&spaces), [("space:65538", "Platform", None, "")]);
         assert!(truncated);
         for bad in ["page:../x", "space:", "folder:1", "98311"] {
             assert!(

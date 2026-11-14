@@ -42,8 +42,8 @@ class _Agents extends MockAgentsSource {
 class _Prs extends MockPullRequests {
   @override
   Future<BranchPullRequest> forBranch(String worktreePath, {bool refresh = false}) async => BranchPullRequest(
-        pullRequest: worktreePath.endsWith('PRC-412')
-            ? const PullRequestInfo(number: 521, label: '#521', title: 'bulk discounts', author: 'someone', branch: 'feat/PRC-412-bulk-discounts', state: PrOpenState.merged)
+        pullRequest: worktreePath.endsWith('TSK-412')
+            ? const PullRequestInfo(number: 521, label: '#521', title: 'bulk discounts', author: 'someone', branch: 'feat/TSK-412-bulk-discounts', state: PrOpenState.merged)
             : null,
       );
 }

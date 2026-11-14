@@ -70,9 +70,9 @@ mod tests {
     fn defaults_to_home_wt_repo_branch() {
         let location = WorktreeLocation::new("/home/me");
         let path = location
-            .resolve("", "price-admin", &branch("feat/PRC-1"))
+            .resolve("", "repo-a", &branch("feat/TSK-1"))
             .unwrap();
-        assert_eq!(path, PathBuf::from("/home/me/wt/price-admin/feat-PRC-1"));
+        assert_eq!(path, PathBuf::from("/home/me/wt/repo-a/feat-TSK-1"));
     }
 
     #[test]

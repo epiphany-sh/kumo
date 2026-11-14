@@ -865,9 +865,9 @@ enum AgentContextKind {
 // A ticket, page or piece of code an agent was given.
 message AgentContext {
   AgentContextKind kind = 1;
-  // e.g. "PRC-412 · Bulk discounts by category".
+  // e.g. "TSK-412 · Bulk discounts by category".
   string title = 2;
-  // Where it lives, e.g. "Jira" or "Confluence · Pricing".
+  // Where it lives, e.g. "Jira" or "Confluence · Platform".
   string detail = 3;
   string url = 4;
   // Its id where it comes from (a task's or a page's), when Kumo has one:
@@ -1344,7 +1344,7 @@ message Task {
   // The source's id, a slash, and the id the task has in its source.
   string id = 1;
   string source_id = 2;
-  // Short label: issue key (PRC-412, #18), project or note.
+  // Short label: issue key (TSK-412, #18), project or note.
   string key = 3;
   string title = 4;
   TaskStatus status = 5;
@@ -1357,7 +1357,7 @@ message Task {
   string context = 9;
   repeated string labels = 10;
   uint64 updated_unix_ms = 11;
-  // Branch to work on it, e.g. "feat/PRC-412-bulk-discounts".
+  // Branch to work on it, e.g. "feat/TSK-412-bulk-discounts".
   string suggested_branch = 12;
 
   TaskType type = 13;
@@ -2012,7 +2012,7 @@ message MergedPr {
   string ref = 1;
   string title = 2;
   string author = 3;
-  // `PRC-412`; empty when none.
+  // `TSK-412`; empty when none.
   string ticket = 4;
 }
 

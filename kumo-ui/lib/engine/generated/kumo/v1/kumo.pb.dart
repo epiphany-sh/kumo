@@ -7546,7 +7546,7 @@ class AgentContext extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearKind() => $_clearField(1);
 
-  /// e.g. "PRC-412 · Bulk discounts by category".
+  /// e.g. "TSK-412 · Bulk discounts by category".
   @$pb.TagNumber(2)
   $core.String get title => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -7556,7 +7556,7 @@ class AgentContext extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearTitle() => $_clearField(2);
 
-  /// Where it lives, e.g. "Jira" or "Confluence · Pricing".
+  /// Where it lives, e.g. "Jira" or "Confluence · Platform".
   @$pb.TagNumber(3)
   $core.String get detail => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -11187,7 +11187,7 @@ class Task extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearSourceId() => $_clearField(2);
 
-  /// Short label: issue key (PRC-412, #18), project or note.
+  /// Short label: issue key (TSK-412, #18), project or note.
   @$pb.TagNumber(3)
   $core.String get key => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -11266,7 +11266,7 @@ class Task extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   void clearUpdatedUnixMs() => $_clearField(11);
 
-  /// Branch to work on it, e.g. "feat/PRC-412-bulk-discounts".
+  /// Branch to work on it, e.g. "feat/TSK-412-bulk-discounts".
   @$pb.TagNumber(12)
   $core.String get suggestedBranch => $_getSZ(11);
   @$pb.TagNumber(12)
@@ -16560,7 +16560,7 @@ class MergedPr extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearAuthor() => $_clearField(3);
 
-  /// `PRC-412`; empty when none.
+  /// `TSK-412`; empty when none.
   @$pb.TagNumber(4)
   $core.String get ticket => $_getSZ(3);
   @$pb.TagNumber(4)

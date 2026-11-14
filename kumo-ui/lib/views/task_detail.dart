@@ -209,7 +209,7 @@ class _TaskDetailState extends State<TaskDetailPanel> {
 
   void _openRef(TaskRef ref, TaskEntry? task) => widget.onOpen(_refId(ref, task));
 
-  /// A key in the text ("PRC-11300"), in the current ticket's source.
+  /// A key in the text ("TSK-11300"), in the current ticket's source.
   void _openKey(String key, TaskEntry? task) => _openRef(TaskRef(key: key, title: key), task);
 
   Future<void> _copy(String url) async {

@@ -190,7 +190,7 @@ pub fn file_name(text: &str, extension: &str) -> String {
     )
 }
 
-/// The ticket key in a context title: "PRC-412 · Bulk discounts" → PRC-412.
+/// The ticket key in a context title: "TSK-412 · Bulk discounts" → TSK-412.
 pub fn task_key(title: &str) -> &str {
     title.split(" · ").next().unwrap_or(title).trim()
 }
@@ -342,9 +342,9 @@ mod tests {
     fn the_index_lists_every_item() {
         let written = vec![
             WrittenContext {
-                item: item(ContextKind::Task, "PRC-412 · Bulk", ""),
+                item: item(ContextKind::Task, "TSK-412 · Bulk", ""),
                 files: vec![ContextFile {
-                    name: "PRC-412.md".into(),
+                    name: "TSK-412.md".into(),
                     text: String::new(),
                 }],
                 problem: None,
@@ -356,7 +356,7 @@ mod tests {
             },
         ];
         let index = context_index(&written);
-        assert!(index.contains("- Ticket: PRC-412 · Bulk → PRC-412.md\n"));
+        assert!(index.contains("- Ticket: TSK-412 · Bulk → TSK-412.md\n"));
         assert!(index.contains(
             "- Link: example.com/a (https://example.com/a) · couldn’t be read: HTTP 404\n"
         ));
@@ -366,7 +366,7 @@ mod tests {
     fn names_numbers_and_keys() {
         assert_eq!(file_name("../etc/passwd", "md"), "etc-passwd.md");
         assert_eq!(file_name("", "txt"), "item.txt");
-        assert_eq!(task_key("PRC-412 · Bulk discounts"), "PRC-412");
+        assert_eq!(task_key("TSK-412 · Bulk discounts"), "TSK-412");
         assert_eq!(
             pull_number(&item(ContextKind::PullRequest, "#521 · Bulk", "")),
             Some(521)

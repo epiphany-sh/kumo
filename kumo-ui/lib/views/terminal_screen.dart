@@ -493,7 +493,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       return [
         StatusText('1 agent needs you', color: c.warn, dot: true, flexible: true),
         const StatusText('2 agents running', flexible: true),
-        const StatusText('gke-staging · pricing', icon: KIcons.cluster, flexible: true),
+        const StatusText('gke-staging · platform', icon: KIcons.cluster, flexible: true),
       ];
     }
     final waiting = s.agents.runs.where((r) => r.status == AgentStatus.needsYou).length;
@@ -515,7 +515,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
     };
   }
 
-  String _tabLabel(String id) => id == 'agent' ? 'claude · PRC-412' : (_surfaces[id]?.title ?? id);
+  String _tabLabel(String id) => id == 'agent' ? 'claude · TSK-412' : (_surfaces[id]?.title ?? id);
 
   Widget _terminalArea(BuildContext context, KumoPalette chrome) {
     final c = context.c;
@@ -803,7 +803,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
 }
 
 /// Short name of a branch for tab titles: the ticket key when it has one
-/// (`feat/PRC-412-bulk-discounts` → `PRC-412`), else its last segment.
+/// (`feat/TSK-412-bulk-discounts` → `TSK-412`), else its last segment.
 String _shortBranch(String branch) {
   final key = RegExp(r'[A-Z][A-Z0-9]+-\d+').firstMatch(branch)?.group(0);
   if (key != null) return key;

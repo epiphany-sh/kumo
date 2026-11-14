@@ -37,7 +37,7 @@ void main() {
       label: '#518',
       title: 'fix: rounding',
       author: pb.Person(id: 'tomas', name: 'Tomás'),
-      branch: 'fix/PRC-398-rounding',
+      branch: 'fix/TSK-398-rounding',
       base: 'main',
       review: pb.ReviewState.REVIEW_STATE_CHANGES_REQUESTED,
       reviewRequestedFromYou: true,

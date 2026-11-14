@@ -316,7 +316,7 @@ typedef RepoActivityFactory = RepoActivitySource Function(Repo repo, List<Worktr
 // Design mocks
 // ---------------------------------------------------------------------------
 
-/// The design's team activity for price-admin, price-reader-v2 and
+/// The design's team activity for repo-a, repo-b and
 /// users-permissions (teammates Lucía, Tomás, Valentina and Nico; Mauri is
 /// "you"). Other repositories are empty. Synchronous and timer-free, so
 /// widget tests can leave it to the view to dispose.
@@ -418,9 +418,9 @@ class MockRepoActivity extends RepoActivitySource {
   static String _urlOf(Repo repo, String number) {
     final n = number.replaceAll(RegExp(r'[^0-9]'), '');
     return switch (repo.host) {
-      'GL' => 'https://gitlab.com/pricing/${repo.name}/-/merge_requests/$n',
-      'BB' => 'https://bitbucket.org/pricing/${repo.name}/pull-requests/$n',
-      _ => 'https://github.com/pricing/${repo.name}/pull/$n',
+      'GL' => 'https://gitlab.com/platform/${repo.name}/-/merge_requests/$n',
+      'BB' => 'https://bitbucket.org/platform/${repo.name}/pull-requests/$n',
+      _ => 'https://github.com/platform/${repo.name}/pull/$n',
     };
   }
   late final List<RepoBranch> _branches;
@@ -531,7 +531,7 @@ class MockRepoActivity extends RepoActivitySource {
   @override
   List<RepoRelease> get releases => [for (final r in _releases) r.release];
   @override
-  int get olderReleases => repo.name == 'price-admin' ? 8 : 0;
+  int get olderReleases => repo.name == 'repo-a' ? 8 : 0;
 
   @override
   Future<ReleaseRange> releaseRange(RepoRelease release, {RepoRelease? since}) async {
@@ -629,7 +629,7 @@ class _RepoData {
 }
 
 const _designData = <String, _RepoData>{
-  'price-admin': _RepoData(
+  'repo-a': _RepoData(
     runsProblem: null,
     commits: [
       ('a3f9c12', 'feat: price history endpoint', 'Tomás', 24, '#520', ''),
@@ -640,30 +640,30 @@ const _designData = <String, _RepoData>{
       ('8a20c4e', 'fix: nil pointer on empty price list', 'Nico', 4320, '#512', ''),
       ('63e9f1a', 'docs: rollback runbook for price imports', 'Lucía', 4520, '', ''),
       ('c0d47b8', 'feat: audit fields on price changes', 'Tomás', 5760, '#507', ''),
-      ('d41f7c3', 'test: cover malformed CSV rows', 'Lucía', 2, '', 'feat/PRC-415-csv-validation'),
-      ('7be2f41', 'feat: batch upsert with CopyFrom', 'Mauri', 2, '', 'feat/PRC-412-bulk-discounts'),
-      ('b3e0c19', 'fix: round half-up after discount', 'Mauri', 6, '', 'fix/PRC-398-rounding'),
-      ('2c9a0e5', 'feat: BulkDiscount aggregate', 'Mauri', 9, '', 'feat/PRC-412-bulk-discounts'),
-      ('5e0b9a8', 'feat: block edits below minimum margin', 'Valentina', 50, '', 'feat/PRC-405-margin-guard'),
+      ('d41f7c3', 'test: cover malformed CSV rows', 'Lucía', 2, '', 'feat/TSK-415-csv-validation'),
+      ('7be2f41', 'feat: batch upsert with CopyFrom', 'Mauri', 2, '', 'feat/TSK-412-bulk-discounts'),
+      ('b3e0c19', 'fix: round half-up after discount', 'Mauri', 6, '', 'fix/TSK-398-rounding'),
+      ('2c9a0e5', 'feat: BulkDiscount aggregate', 'Mauri', 9, '', 'feat/TSK-412-bulk-discounts'),
+      ('5e0b9a8', 'feat: block edits below minimum margin', 'Valentina', 50, '', 'feat/TSK-405-margin-guard'),
       ('91ac3e6', 'refactor: move rule evaluation to engine pkg', 'Tomás', 72, '', 'refactor/rules-engine'),
       ('b7d2e14', 'chore: bump golangci-lint to v1.61', 'Nico', 128, '', 'chore/golangci-1.61'),
       ('f08c3a7', 'refactor: extract rule interfaces', 'Tomás', 150, '', 'refactor/rules-engine'),
     ],
     prs: [
-      ('#525', 'feat: validate CSV imports before apply', 'Lucía', 'feat/PRC-415-csv-validation', RepoPrState.reviewRequested, true),
+      ('#525', 'feat: validate CSV imports before apply', 'Lucía', 'feat/TSK-415-csv-validation', RepoPrState.reviewRequested, true),
       ('#524', 'chore: bump golangci-lint to v1.61', 'Nico', 'chore/golangci-1.61', RepoPrState.approved, false),
-      ('#523', 'feat: margin guardrails on price edits', 'Valentina', 'feat/PRC-405-margin-guard', RepoPrState.reviewRequested, true),
-      ('#521', 'feat: bulk discounts by category', 'Mauri', 'feat/PRC-412-bulk-discounts', RepoPrState.draft, false),
-      ('#517', 'refactor: split pricing rules engine', 'Tomás', 'refactor/rules-engine', RepoPrState.changesRequested, false),
+      ('#523', 'feat: margin guardrails on price edits', 'Valentina', 'feat/TSK-405-margin-guard', RepoPrState.reviewRequested, true),
+      ('#521', 'feat: bulk discounts by category', 'Mauri', 'feat/TSK-412-bulk-discounts', RepoPrState.draft, false),
+      ('#517', 'refactor: split platform rules engine', 'Tomás', 'refactor/rules-engine', RepoPrState.changesRequested, false),
     ],
     runs: [
-      ('run #8816', 'feat/PRC-415-csv-validation', CiState.queued, 'test: cover malformed CSV rows', 'Lucía', 1, -1, 'd41f7c3', [
+      ('run #8816', 'feat/TSK-415-csv-validation', CiState.queued, 'test: cover malformed CSV rows', 'Lucía', 1, -1, 'd41f7c3', [
         ('build', CiState.queued, -1, ''),
         ('golangci-lint', CiState.queued, -1, ''),
         ('unit tests', CiState.queued, -1, ''),
         ('integration · testcontainers', CiState.queued, -1, ''),
       ]),
-      ('run #8815', 'feat/PRC-412-bulk-discounts', CiState.running, 'feat: batch upsert with CopyFrom', 'Mauri', 1, 65, '7be2f41', [
+      ('run #8815', 'feat/TSK-412-bulk-discounts', CiState.running, 'feat: batch upsert with CopyFrom', 'Mauri', 1, 65, '7be2f41', [
         ('build', CiState.passed, 41, ''),
         ('golangci-lint', CiState.passed, 24, ''),
         ('unit tests', CiState.running, -1, ''),
@@ -676,7 +676,7 @@ const _designData = <String, _RepoData>{
         ('integration · testcontainers', CiState.failed, 104, 'TestPriceHistory/range_query: expected 12 rows, got 0'),
         ('deploy to staging', CiState.skipped, -1, ''),
       ]),
-      ('run #8813', 'feat/PRC-405-margin-guard', CiState.passed, 'feat: block edits below minimum margin', 'Valentina', 48, 348, '5e0b9a8', [
+      ('run #8813', 'feat/TSK-405-margin-guard', CiState.passed, 'feat: block edits below minimum margin', 'Valentina', 48, 348, '5e0b9a8', [
         ('build', CiState.passed, 66, ''),
         ('golangci-lint', CiState.passed, 44, ''),
         ('unit tests', CiState.passed, 139, ''),
@@ -703,16 +703,16 @@ const _designData = <String, _RepoData>{
       ]),
     ],
     branches: [
-      ('main', 'Tomás', 24, 'up to date', '~/dev/price-admin'),
-      ('feat/PRC-412-bulk-discounts', 'Mauri', 2, '↑2 ↓1', '~/wt/price-admin/PRC-412'),
-      ('fix/PRC-398-rounding', 'Mauri', 6, '↑1 ↓1', '~/wt/price-admin/PRC-398'),
-      ('feat/PRC-415-csv-validation', 'Lucía', 2, '↑1 ↓0', ''),
-      ('feat/PRC-405-margin-guard', 'Valentina', 50, '↑1 ↓1', ''),
+      ('main', 'Tomás', 24, 'up to date', '~/dev/repo-a'),
+      ('feat/TSK-412-bulk-discounts', 'Mauri', 2, '↑2 ↓1', '~/wt/repo-a/TSK-412'),
+      ('fix/TSK-398-rounding', 'Mauri', 6, '↑1 ↓1', '~/wt/repo-a/TSK-398'),
+      ('feat/TSK-415-csv-validation', 'Lucía', 2, '↑1 ↓0', ''),
+      ('feat/TSK-405-margin-guard', 'Valentina', 50, '↑1 ↓1', ''),
       ('refactor/rules-engine', 'Tomás', 72, '↑2 ↓2', ''),
       ('chore/golangci-1.61', 'Nico', 128, '↑1 ↓2', ''),
     ],
   ),
-  'price-reader-v2': _RepoData(
+  'repo-b': _RepoData(
     runsProblem: null,
     commits: [
       ('4c2a9e7', 'fix: log cache misses at debug level', 'Tomás', 35, '!232', ''),
@@ -722,7 +722,7 @@ const _designData = <String, _RepoData>{
       ('0d6e7a3', 'perf: batch Mongo lookups for price lists', 'Lucía', 4400, '!224', ''),
       ('5f1b8c9', 'fix: handle missing currency on legacy SKUs', 'Mauri', 5760, '!221', ''),
       ('a2e4d70', 'feat: expose p95 latency metric', 'Nico', 7200, '!219', ''),
-      ('9c3f0b1', 'test: contract tests for price-admin events', 'Lucía', 8640, '!217', ''),
+      ('9c3f0b1', 'test: contract tests for repo-a events', 'Lucía', 8640, '!217', ''),
       ('6d0f2b8', 'feat: per-tenant cache namespaces', 'Valentina', 5, '', 'feat/tenant-cache'),
       ('a81c3d2', 'perf: warm cache on deploy', 'Mauri', 39, '', 'perf/cache-warmup'),
       ('2b7e9c4', 'fix: retry with jittered backoff', 'Lucía', 182, '', 'fix/consumer-backoff'),
@@ -820,8 +820,8 @@ const _designData = <String, _RepoData>{
       ]),
     ],
     branches: [
-      ('main', 'Tomás', 35, '↓1 origin', '~/dev/price-reader-v2'),
-      ('perf/cache-warmup', 'Mauri', 39, '↑1 ↓1', '~/wt/price-reader-v2/cache'),
+      ('main', 'Tomás', 35, '↓1 origin', '~/dev/repo-b'),
+      ('perf/cache-warmup', 'Mauri', 39, '↑1 ↓1', '~/wt/repo-b/cache'),
       ('feat/tenant-cache', 'Valentina', 5, '↑1 ↓0', ''),
       ('fix/consumer-backoff', 'Lucía', 182, '↑2 ↓1', ''),
     ],

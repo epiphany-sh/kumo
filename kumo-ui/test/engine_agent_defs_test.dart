@@ -16,7 +16,7 @@ void main() {
     instructions: 'You review.\n\nDon’t change any file.',
     knowledge: ['docs/conventions.md'],
     scope: AgentScope.project,
-    repo: 'price-admin',
+    repo: 'repo-a',
     maxMinutes: 5,
     maxCostUsd: 1.5,
     triggers: [AgentTrigger.pullRequest],
@@ -24,14 +24,14 @@ void main() {
 
   group('agent files', () {
     test('an agent goes as its file and settings and comes back the same', () {
-      final file = agentDefFileTo(reviewer, repoPath: '/w/price-admin');
+      final file = agentDefFileTo(reviewer, repoPath: '/w/repo-a');
       expect(file.scope, pb.AgentDefScope.AGENT_DEF_SCOPE_PROJECT);
-      expect((file.repoPath, file.repoName, file.name), ('/w/price-admin', 'price-admin', 'go-pr-reviewer'));
+      expect((file.repoPath, file.repoName, file.name), ('/w/repo-a', 'repo-a', 'go-pr-reviewer'));
       expect(file.markdown, reviewer.toMarkdown());
       expect(file.settings.maxMinutes, 5);
       expect(file.settings.maxCostUsd, 1.5);
       expect(file.settings.triggers, [pb.AgentDefTrigger.AGENT_DEF_TRIGGER_PULL_REQUEST]);
-      expect(agentDefFrom(file), reviewer.copyWith(repoPath: '/w/price-admin'), reason: 'names aren’t unique: it remembers which');
+      expect(agentDefFrom(file), reviewer.copyWith(repoPath: '/w/repo-a'), reason: 'names aren’t unique: it remembers which');
     });
 
     test('a personal agent has no repository; no settings mean no limits', () {

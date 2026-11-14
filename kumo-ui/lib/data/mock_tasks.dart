@@ -7,7 +7,7 @@ import 'tasks_source.dart';
 /// Tasks.dc.html), for [MockTasksSource] (the app without a daemon, widget
 /// tests).
 ///
-/// Ids are `<sourceId>/<key>` (`mock-JI/PRC-11355`, `mock-GH/zen-engine#42`)
+/// Ids are `<sourceId>/<key>` (`mock-JI/TSK-11355`, `mock-GH/repo-d#42`)
 /// so refs can point at them; personal to-dos, whose key is a note or a
 /// project, use the design's id instead (`mock-OB/ob-aws`,
 /// `mock-TD/td-kafka`, `mock-TD/td-runbook`). [id] maps a design id to it.
@@ -20,7 +20,7 @@ final class MockTasks {
   static const _openDone = {TaskColumn.todo, TaskColumn.done};
 
   static const _sources = [
-    ('JI', 'Jira · Pricing', TaskSourceKind.jira, _all),
+    ('JI', 'Jira · Platform', TaskSourceKind.jira, _all),
     ('GH', 'GitHub', TaskSourceKind.github, _openDone),
     ('OB', 'Obsidian', TaskSourceKind.obsidian, _openDone),
     ('TD', 'Todoist', TaskSourceKind.todoist, _openDone),
@@ -60,14 +60,14 @@ final class MockTasks {
 
   static DateTime _day(int offset) => _today.add(Duration(days: offset));
 
-  /// Pricing 2026.21 (closed), 2026.22 (active, 7 days left), 2026.23 (next).
-  static TaskSprint get previousSprint => TaskSprint(name: 'Pricing 2026.21', state: SprintState.closed, start: _day(-21), end: _day(-8));
-  static TaskSprint get currentSprint => TaskSprint(name: 'Pricing 2026.22', state: SprintState.active, start: _day(-7), end: _day(7));
-  static TaskSprint get nextSprint => TaskSprint(name: 'Pricing 2026.23', state: SprintState.future, start: _day(8), end: _day(21));
+  /// Platform 2026.21 (closed), 2026.22 (active, 7 days left), 2026.23 (next).
+  static TaskSprint get previousSprint => TaskSprint(name: 'Platform 2026.21', state: SprintState.closed, start: _day(-21), end: _day(-8));
+  static TaskSprint get currentSprint => TaskSprint(name: 'Platform 2026.22', state: SprintState.active, start: _day(-7), end: _day(7));
+  static TaskSprint get nextSprint => TaskSprint(name: 'Platform 2026.23', state: SprintState.future, start: _day(8), end: _day(21));
 
   // ---- Tickets ----
 
-  /// The Kumo id of a design id ("PRC-11355" → "mock-JI/PRC-11355").
+  /// The Kumo id of a design id ("TSK-11355" → "mock-JI/TSK-11355").
   static String id(String designId) => _byDesignId[designId]?.kumoId ?? designId;
 
   static final Map<String, _T> _byDesignId = {for (final t in _data) t.id: t};
@@ -125,14 +125,14 @@ final class MockTasks {
   }
 
   static const _worktrees = {
-    'feat/PRC-412-bulk-discounts': ('~/wt/price-admin/PRC-412', 'Claude Code', AgentStatus.running, 'Edit internal/kafka/bulk_consumer.go'),
-    'fix/PRC-398-rounding': ('~/wt/price-admin/PRC-398', 'Codex CLI', AgentStatus.needsYou, 'Waiting: migration on staging'),
-    'perf/cache-warmup': ('~/wt/price-reader-v2/cache', 'Claude Code', AgentStatus.done, 'MR !231 · pipeline passed'),
+    'feat/TSK-412-bulk-discounts': ('~/wt/repo-a/TSK-412', 'Claude Code', AgentStatus.running, 'Edit internal/kafka/bulk_consumer.go'),
+    'fix/TSK-398-rounding': ('~/wt/repo-a/TSK-398', 'Codex CLI', AgentStatus.needsYou, 'Waiting: migration on staging'),
+    'perf/cache-warmup': ('~/wt/repo-b/cache', 'Claude Code', AgentStatus.done, 'MR !231 · pipeline passed'),
   };
 
   static String _url(_T t) => switch (t.src) {
-        'JI' => 'https://jira.pricing.local/browse/${t.key}',
-        'GH' => 'https://github.com/pricing/zen-engine/issues/42',
+        'JI' => 'https://jira.platform.local/browse/${t.key}',
+        'GH' => 'https://github.com/platform/repo-d/issues/42',
         _ => '',
       };
 
@@ -156,7 +156,7 @@ final class MockTasks {
       priority: t.pri,
       due: t.due == null ? '' : _iso(_day(t.due!)),
       url: _url(t),
-      context: switch (t.src) { 'JI' => 'Pricing', 'GH' => 'pricing/zen-engine', _ => t.key },
+      context: switch (t.src) { 'JI' => 'Platform', 'GH' => 'platform/repo-d', _ => t.key },
       labels: t.labels,
       updated: DateTime.now().subtract(t.updated),
       suggestedBranch: t.branch.isNotEmpty ? t.branch : '${t.type == TaskType.bug ? 'fix' : 'feat'}/${t.key}-${_slug(t.title)}',
@@ -199,63 +199,63 @@ final class MockTasks {
 
   static const _data = <_T>[
     // To do
-    _T('PRC-10599', 'JI', TaskType.bug, 'Generación automática de precios para los canales (Hijas)', TaskColumn.todo,
+    _T('TSK-10599', 'JI', TaskType.bug, 'Generación automática de precios para los canales (Hijas)', TaskColumn.todo,
         status: 'To Do', pri: TaskPriority.high, pts: 3, sprint: 'prev', due: -2, labels: ['canales', 'hotfix', 'marketplace'], comments: 14, updated: Duration(hours: 2)),
-    _T('PRC-11354', 'JI', TaskType.subtask, 'Migracion a Graviton (Parte 4/4)', TaskColumn.todo,
-        status: 'To Do', pri: TaskPriority.low, sprint: 'cur', parent: 'PRC-11300', as: 'me', blockedBy: ['PRC-11355'], comments: 1, updated: _d),
-    _T('PRC-11321', 'JI', TaskType.task, 'Analisis: Migracion a Envoy', TaskColumn.todo,
+    _T('TSK-11354', 'JI', TaskType.subtask, 'Migracion a arm64 (Parte 4/4)', TaskColumn.todo,
+        status: 'To Do', pri: TaskPriority.low, sprint: 'cur', parent: 'TSK-11300', as: 'me', blockedBy: ['TSK-11355'], comments: 1, updated: _d),
+    _T('TSK-11321', 'JI', TaskType.task, 'Analisis: Migracion a Envoy', TaskColumn.todo,
         status: 'Backlog', pri: TaskPriority.medium, pts: 3, sprint: 'next', as: 'tomas', labels: ['infra'], comments: 2, updated: Duration(days: 3)),
-    _T('PRC-11371', 'JI', TaskType.story, 'Precios por zona de envío en checkout', TaskColumn.todo,
-        status: 'To Do', pri: TaskPriority.medium, pts: 8, sprint: 'cur', epic: 'PRC-11250', as: 'valentina', labels: ['checkout'], updated: _d),
-    _T('zen-engine#42', 'GH', TaskType.issue, 'Retry on 502 from pricing API', TaskColumn.todo,
+    _T('TSK-11371', 'JI', TaskType.story, 'Precios por zona de envío en checkout', TaskColumn.todo,
+        status: 'To Do', pri: TaskPriority.medium, pts: 8, sprint: 'cur', epic: 'TSK-11250', as: 'valentina', labels: ['checkout'], updated: _d),
+    _T('repo-d#42', 'GH', TaskType.issue, 'Retry on 502 from platform API', TaskColumn.todo,
         status: 'Open', as: 'me', labels: ['bug', 'api'], comments: 3, updated: _d),
     _T('ob-aws', 'OB', TaskType.todo, 'Revisar costos de AWS', TaskColumn.todo, key: 'Weekly.md', due: 3, as: 'me', updated: Duration(days: 2)),
     _T('td-kafka', 'TD', TaskType.todo, 'Rotate staging Kafka credentials', TaskColumn.todo,
         key: 'Inbox', pri: TaskPriority.high, due: 0, as: 'me', labels: ['ops'], updated: Duration(hours: 5)),
     // In progress
-    _T('PRC-11355', 'JI', TaskType.story, 'migraciones', TaskColumn.doing,
-        status: 'In Progress', pri: TaskPriority.low, pts: 5, sprint: 'cur', epic: 'PRC-11300', as: 'me', labels: ['graviton', 'db'],
-        subs: ['PRC-11356', 'PRC-11357', 'PRC-11358', 'PRC-11359'], blockedBy: ['PRC-11340'], comments: 6, updated: Duration(hours: 3)),
-    _T('PRC-412', 'JI', TaskType.story, 'Bulk discounts by category', TaskColumn.doing,
-        status: 'In Progress', pri: TaskPriority.high, pts: 8, sprint: 'cur', epic: 'PRC-11280', as: 'me', labels: ['api'],
-        branch: 'feat/PRC-412-bulk-discounts', comments: 2, updated: Duration(minutes: 20)),
-    _T('PRC-398', 'JI', TaskType.bug, 'Rounding error on installment prices', TaskColumn.doing,
-        status: 'In Progress', pri: TaskPriority.high, pts: 2, sprint: 'cur', as: 'me', labels: ['bug'], branch: 'fix/PRC-398-rounding', comments: 2, updated: _h),
-    _T('PRC-11366', 'JI', TaskType.task, 'Alertas de margen negativo en Grafana', TaskColumn.doing,
+    _T('TSK-11355', 'JI', TaskType.story, 'migraciones', TaskColumn.doing,
+        status: 'In Progress', pri: TaskPriority.low, pts: 5, sprint: 'cur', epic: 'TSK-11300', as: 'me', labels: ['arm64', 'db'],
+        subs: ['TSK-11356', 'TSK-11357', 'TSK-11358', 'TSK-11359'], blockedBy: ['TSK-11340'], comments: 6, updated: Duration(hours: 3)),
+    _T('TSK-412', 'JI', TaskType.story, 'Bulk discounts by category', TaskColumn.doing,
+        status: 'In Progress', pri: TaskPriority.high, pts: 8, sprint: 'cur', epic: 'TSK-11280', as: 'me', labels: ['api'],
+        branch: 'feat/TSK-412-bulk-discounts', comments: 2, updated: Duration(minutes: 20)),
+    _T('TSK-398', 'JI', TaskType.bug, 'Rounding error on installment prices', TaskColumn.doing,
+        status: 'In Progress', pri: TaskPriority.high, pts: 2, sprint: 'cur', as: 'me', labels: ['bug'], branch: 'fix/TSK-398-rounding', comments: 2, updated: _h),
+    _T('TSK-11366', 'JI', TaskType.task, 'Alertas de margen negativo en Grafana', TaskColumn.doing,
         status: 'In Progress', pri: TaskPriority.medium, pts: 3, sprint: 'cur', as: 'nico', labels: ['observability'], comments: 1, updated: Duration(hours: 4)),
     // In review
-    _T('PRC-405', 'JI', TaskType.story, 'Warm cache on deploy', TaskColumn.review,
+    _T('TSK-405', 'JI', TaskType.story, 'Warm cache on deploy', TaskColumn.review,
         status: 'Code Review', pri: TaskPriority.medium, pts: 3, sprint: 'cur', as: 'me', branch: 'perf/cache-warmup', comments: 1, updated: _d),
-    _T('PRC-11338', 'JI', TaskType.story, 'Validación de márgenes en carga masiva', TaskColumn.review,
-        status: 'QA', pri: TaskPriority.medium, pts: 5, sprint: 'cur', epic: 'PRC-11280', as: 'ana', comments: 1, updated: Duration(hours: 6)),
+    _T('TSK-11338', 'JI', TaskType.story, 'Validación de márgenes en carga masiva', TaskColumn.review,
+        status: 'QA', pri: TaskPriority.medium, pts: 5, sprint: 'cur', epic: 'TSK-11280', as: 'ana', comments: 1, updated: Duration(hours: 6)),
     // Done
-    _T('PRC-11340', 'JI', TaskType.task, 'Limpieza de ofertas de canales', TaskColumn.done,
+    _T('TSK-11340', 'JI', TaskType.task, 'Limpieza de ofertas de canales', TaskColumn.done,
         status: 'Done', pri: TaskPriority.medium, pts: 3, sprint: 'cur', as: 'lucia', comments: 1, updated: Duration(days: 2)),
-    _T('PRC-11356', 'JI', TaskType.subtask, 'Migrar job de precios', TaskColumn.done,
-        status: 'Done', pri: TaskPriority.low, parent: 'PRC-11355', as: 'me', updated: Duration(days: 4)),
-    _T('PRC-377', 'JI', TaskType.bug, 'Fix currency rounding in exports', TaskColumn.done,
+    _T('TSK-11356', 'JI', TaskType.subtask, 'Migrar job de precios', TaskColumn.done,
+        status: 'Done', pri: TaskPriority.low, parent: 'TSK-11355', as: 'me', updated: Duration(days: 4)),
+    _T('TSK-377', 'JI', TaskType.bug, 'Fix currency rounding in exports', TaskColumn.done,
         status: 'Done', pri: TaskPriority.medium, pts: 2, sprint: 'prev', as: 'me', updated: Duration(days: 10)),
-    _T('td-runbook', 'TD', TaskType.todo, 'Update pricing on-call runbook', TaskColumn.done, key: 'Inbox', pri: TaskPriority.low, as: 'me', updated: Duration(days: 1)),
+    _T('td-runbook', 'TD', TaskType.todo, 'Update platform on-call runbook', TaskColumn.done, key: 'Inbox', pri: TaskPriority.low, as: 'me', updated: Duration(days: 1)),
     // Not on the board: epics, the rest of the sub-tasks, an old duplicate.
-    _T('PRC-11300', 'JI', TaskType.epic, 'Migración a Graviton', TaskColumn.doing,
-        board: false, status: 'In Progress', pri: TaskPriority.medium, as: 'ana', color: 'violet', subs: ['PRC-11351', 'PRC-11352', 'PRC-11353', 'PRC-11354', 'PRC-11355'], updated: Duration(hours: 5)),
-    _T('PRC-11280', 'JI', TaskType.epic, 'Descuentos por volumen', TaskColumn.doing,
-        board: false, status: 'In Progress', pri: TaskPriority.medium, as: 'ana', color: 'teal', subs: ['PRC-412', 'PRC-11338'], updated: Duration(hours: 5)),
-    _T('PRC-11250', 'JI', TaskType.epic, 'Precios regionales', TaskColumn.todo,
-        board: false, status: 'To Do', pri: TaskPriority.medium, as: 'valentina', color: 'amber', subs: ['PRC-11371'], updated: _d),
-    _T('PRC-11351', 'JI', TaskType.subtask, 'Migracion a Graviton (Parte 1/4)', TaskColumn.done,
-        board: false, status: 'Done', pri: TaskPriority.low, parent: 'PRC-11300', as: 'lucia', updated: Duration(days: 18)),
-    _T('PRC-11352', 'JI', TaskType.subtask, 'Migracion a Graviton (Parte 2/4)', TaskColumn.done,
-        board: false, status: 'Done', pri: TaskPriority.low, parent: 'PRC-11300', as: 'tomas', updated: Duration(days: 11)),
-    _T('PRC-11353', 'JI', TaskType.subtask, 'Migracion a Graviton (Parte 3/4)', TaskColumn.doing,
-        board: false, status: 'In Progress', pri: TaskPriority.low, parent: 'PRC-11300', as: 'nico', updated: Duration(hours: 5)),
-    _T('PRC-11357', 'JI', TaskType.subtask, 'Analisis', TaskColumn.doing,
-        board: false, status: 'In Progress', pri: TaskPriority.low, parent: 'PRC-11355', as: 'me', updated: Duration(hours: 5)),
-    _T('PRC-11358', 'JI', TaskType.subtask, 'actualizar planilla', TaskColumn.todo,
-        board: false, status: 'To Do', pri: TaskPriority.low, parent: 'PRC-11355', as: 'me', updated: Duration(days: 14)),
-    _T('PRC-11359', 'JI', TaskType.subtask, 'verificacion en entornos', TaskColumn.todo,
-        board: false, status: 'To Do', pri: TaskPriority.low, parent: 'PRC-11355', as: 'me', updated: Duration(days: 14)),
-    _T('PRC-10577', 'JI', TaskType.bug, 'Precios duplicados en canal Hijas', TaskColumn.done,
+    _T('TSK-11300', 'JI', TaskType.epic, 'Migración a arm64', TaskColumn.doing,
+        board: false, status: 'In Progress', pri: TaskPriority.medium, as: 'ana', color: 'violet', subs: ['TSK-11351', 'TSK-11352', 'TSK-11353', 'TSK-11354', 'TSK-11355'], updated: Duration(hours: 5)),
+    _T('TSK-11280', 'JI', TaskType.epic, 'Descuentos por volumen', TaskColumn.doing,
+        board: false, status: 'In Progress', pri: TaskPriority.medium, as: 'ana', color: 'teal', subs: ['TSK-412', 'TSK-11338'], updated: Duration(hours: 5)),
+    _T('TSK-11250', 'JI', TaskType.epic, 'Precios regionales', TaskColumn.todo,
+        board: false, status: 'To Do', pri: TaskPriority.medium, as: 'valentina', color: 'amber', subs: ['TSK-11371'], updated: _d),
+    _T('TSK-11351', 'JI', TaskType.subtask, 'Migracion a arm64 (Parte 1/4)', TaskColumn.done,
+        board: false, status: 'Done', pri: TaskPriority.low, parent: 'TSK-11300', as: 'lucia', updated: Duration(days: 18)),
+    _T('TSK-11352', 'JI', TaskType.subtask, 'Migracion a arm64 (Parte 2/4)', TaskColumn.done,
+        board: false, status: 'Done', pri: TaskPriority.low, parent: 'TSK-11300', as: 'tomas', updated: Duration(days: 11)),
+    _T('TSK-11353', 'JI', TaskType.subtask, 'Migracion a arm64 (Parte 3/4)', TaskColumn.doing,
+        board: false, status: 'In Progress', pri: TaskPriority.low, parent: 'TSK-11300', as: 'nico', updated: Duration(hours: 5)),
+    _T('TSK-11357', 'JI', TaskType.subtask, 'Analisis', TaskColumn.doing,
+        board: false, status: 'In Progress', pri: TaskPriority.low, parent: 'TSK-11355', as: 'me', updated: Duration(hours: 5)),
+    _T('TSK-11358', 'JI', TaskType.subtask, 'actualizar planilla', TaskColumn.todo,
+        board: false, status: 'To Do', pri: TaskPriority.low, parent: 'TSK-11355', as: 'me', updated: Duration(days: 14)),
+    _T('TSK-11359', 'JI', TaskType.subtask, 'verificacion en entornos', TaskColumn.todo,
+        board: false, status: 'To Do', pri: TaskPriority.low, parent: 'TSK-11355', as: 'me', updated: Duration(days: 14)),
+    _T('TSK-10577', 'JI', TaskType.bug, 'Precios duplicados en canal Hijas', TaskColumn.done,
         board: false, status: 'Done', pri: TaskPriority.medium, as: 'tomas', updated: Duration(days: 29)),
   ];
 }
@@ -287,7 +287,7 @@ final class _T {
     this.updated = Duration.zero,
   }) : _key = key;
 
-  /// The design's id ("PRC-11355", "ob-aws").
+  /// The design's id ("TSK-11355", "ob-aws").
   final String id;
   final String src;
   final TaskType type;

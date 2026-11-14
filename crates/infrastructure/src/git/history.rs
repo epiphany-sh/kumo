@@ -507,14 +507,14 @@ mod tests {
         write(d, "added.md", b"# Hi\n");
         write(d, "logo.png", &[0, 9, 9, 9, 0, 5]);
         git(d, &["add", "-A"]);
-        commit(d, 2, "feat: everything\n\nThe body.\n\nPRC-1");
+        commit(d, 2, "feat: everything\n\nThe body.\n\nTSK-1");
 
         let cli = GitCli::default();
         let sha = git(d, &["rev-parse", "HEAD"]);
         let parent = git(d, &["rev-parse", "--short", "HEAD~1"]);
         let detail = cli.show_commit(d, &sha[..10]).unwrap();
         assert_eq!(detail.sha, sha);
-        assert_eq!(detail.body, "The body.\n\nPRC-1");
+        assert_eq!(detail.body, "The body.\n\nTSK-1");
         assert_eq!(detail.parents, std::slice::from_ref(&parent));
         assert_eq!(detail.time_unix, 1_700_000_120);
         let mut rows: Vec<_> = detail

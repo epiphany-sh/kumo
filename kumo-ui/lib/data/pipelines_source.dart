@@ -254,8 +254,8 @@ class MockPipelinesSource extends PipelinesSource {
   MockPipelinesSource({
     this.scenario = MockPipelinesScenario.running,
     this.provider = CiProvider.githubActions,
-    this.repo = 'pricing/price-admin',
-    this.branch = 'feat/PRC-412-bulk-discounts',
+    this.repo = 'platform/repo-a',
+    this.branch = 'feat/TSK-412-bulk-discounts',
     this.latency = const Duration(milliseconds: 600),
     this.unpushed = 2,
   }) {

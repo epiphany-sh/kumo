@@ -19,11 +19,11 @@
     "isPullRequest": false,
     "labels": [],
     "number": 7,
-    "repository": {"name": "zen-engine", "nameWithOwner": "pricing/zen-engine"},
+    "repository": {"name": "repo-d", "nameWithOwner": "platform/repo-d"},
     "state": "open",
-    "title": "Retry on 502 from pricing API",
+    "title": "Retry on 502 from platform API",
     "updatedAt": "2026-10-26T09:00:00Z",
-    "url": "https://github.com/pricing/zen-engine/issues/7"
+    "url": "https://github.com/platform/repo-d/issues/7"
   },
   {
     "assignees": [],

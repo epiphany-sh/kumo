@@ -51,7 +51,7 @@ void main() {
     final field = find.byWidgetPredicate((w) => w is EditableText && w.controller.text.contains(' files'));
     final message = tester.widget<EditableText>(field).controller.text;
     expect(message, matches(RegExp(r'^(Add|Update|Delete|Rename) 4 files')));
-    expect(message, isNot(contains('PRC-412')));
+    expect(message, isNot(contains('TSK-412')));
 
     await tester.tap(find.text('Commit').first);
     await tester.pump();

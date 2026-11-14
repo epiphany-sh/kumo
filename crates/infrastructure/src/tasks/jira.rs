@@ -927,7 +927,7 @@ fn pick_transition(transitions: &[Value], status: TaskStatus) -> Option<String> 
     candidates.min().map(|(_, _, id)| id)
 }
 
-/// `PRC-412`: project key, dash, number.
+/// `TSK-412`: project key, dash, number.
 fn is_issue_key(key: &str) -> bool {
     key.split_once('-').is_some_and(|(project, number)| {
         !project.is_empty()

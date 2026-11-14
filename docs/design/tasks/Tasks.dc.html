@@ -42,7 +42,7 @@ body{margin:0}
 <button style="display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 14px; border: 1px solid {{c.chipBorder}}; background: {{c.chip}}; box-shadow: {{c.chipShadow}}; color: {{c.text}}; font: inherit; text-align: left; cursor: pointer;">
 <span aria-hidden="true" style="width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: {{c.accFill}}; color: {{c.accText}}; font-weight: 700; font-size: 14px;">P</span>
 <span style="display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0;">
-<span style="font-weight: 600;">pricing</span>
+<span style="font-weight: 600;">platform</span>
 <span style="font-size: 11.5px; color: {{c.text3}};">3 repos · 6 worktrees</span>
 </span>
 <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px; fill: none; stroke: {{c.text3}}; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;"><path d="{{i.chevUpDown}}"></path></svg>
@@ -353,7 +353,7 @@ body{margin:0}
 </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"translucency":{"editor":"range","min":0.25,"max":0.9,"step":0.05,"default":0.55},"scope":{"editor":"enum","options":["mine","everyone"],"default":"mine","section":"Board"},"empty":{"editor":"enum","options":["off","noneMine","noMatch","noSources"],"default":"off","section":"Board"},"failing":{"editor":"boolean","default":false,"section":"Board"},"sheet":{"editor":"enum","options":["false","cards"],"default":"false","section":"Board"},"detail":{"editor":"enum","options":["closed","open","loading","offline","expanded"],"default":"closed","section":"Detail"},"ticket":{"editor":"enum","options":["PRC-11355","PRC-10599","PRC-11354","zen-engine#42","ob-aws","PRC-412"],"default":"PRC-11355","section":"Detail"},"scrolled":{"editor":"boolean","default":false,"section":"Detail"},"comments":{"editor":"enum","options":["recent","all"],"default":"recent","section":"Detail"},"$preview":{"width":1440,"height":960}}'>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"translucency":{"editor":"range","min":0.25,"max":0.9,"step":0.05,"default":0.55},"scope":{"editor":"enum","options":["mine","everyone"],"default":"mine","section":"Board"},"empty":{"editor":"enum","options":["off","noneMine","noMatch","noSources"],"default":"off","section":"Board"},"failing":{"editor":"boolean","default":false,"section":"Board"},"sheet":{"editor":"enum","options":["false","cards"],"default":"false","section":"Board"},"detail":{"editor":"enum","options":["closed","open","loading","offline","expanded"],"default":"closed","section":"Detail"},"ticket":{"editor":"enum","options":["TSK-11355","TSK-10599","TSK-11354","repo-d#42","ob-aws","TSK-412"],"default":"TSK-11355","section":"Detail"},"scrolled":{"editor":"boolean","default":false,"section":"Detail"},"comments":{"editor":"enum","options":["recent","all"],"default":"recent","section":"Detail"},"$preview":{"width":1440,"height":960}}'>
 class Component extends DCLogic {
   tokens(theme, a) {
     if (theme === 'light') {
@@ -467,8 +467,8 @@ class Component extends DCLogic {
     const wtRemoved = wst.wtRemoved || {};
     const wset = function (p) { wtSelf.setState(p); };
     const repos = [
-      { name: 'price-admin', host: 'GH', trees: [['main', 'clean', 'idle'], ['feat/PRC-412-bulk-discounts', 'Claude · running', 'run', true], ['fix/PRC-398-rounding', 'Codex · needs you', 'warn']] },
-      { name: 'price-reader-v2', host: 'GL', trees: [['main', 'clean', 'idle'], ['perf/cache-warmup', 'MR !231 · ready', 'ok']] },
+      { name: 'repo-a', host: 'GH', trees: [['main', 'clean', 'idle'], ['feat/TSK-412-bulk-discounts', 'Claude · running', 'run', true], ['fix/TSK-398-rounding', 'Codex · needs you', 'warn']] },
+      { name: 'repo-b', host: 'GL', trees: [['main', 'clean', 'idle'], ['perf/cache-warmup', 'MR !231 · ready', 'ok']] },
       { name: 'users-permissions', host: 'BB', trees: [['main', 'clean', 'idle'], ['feat/audit-log', 'Gemini · running', 'run']] }
     ].map(function (r) {
       return {
@@ -520,7 +520,7 @@ class Component extends DCLogic {
     const nm = theme === 'dark'
       ? { bg: 'rgba(30,32,44,0.86)', border: 'rgba(255,255,255,0.14)', shadow: 'inset 0 1px 0 rgba(255,255,255,0.14), 0 0 0 0.5px rgba(0,0,0,0.5), 0 18px 48px rgba(0,0,0,0.5)', danger: '#FF8A8A', dangerFill: '#E5484D', key: 'rgba(236,238,246,0.42)' }
       : { bg: 'rgba(255,255,255,0.9)', border: 'rgba(255,255,255,0.95)', shadow: 'inset 0 1px 0 #fff, 0 0 0 0.5px rgba(20,20,40,0.14), 0 18px 48px rgba(40,40,90,0.20)', danger: '#B42318', dangerFill: '#D92D20', key: 'rgba(21,22,28,0.42)' };
-    const namespaces = [{ id: 'pricing', repos: repos.slice(0, 2) }, { id: 'identity', repos: repos.slice(2) }]
+    const namespaces = [{ id: 'platform', repos: repos.slice(0, 2) }, { id: 'identity', repos: repos.slice(2) }]
       .filter(function (n) { return !removed[n.id]; })
       .map(function (n) {
         const name = nsNames[n.id] || n.id;
@@ -641,7 +641,7 @@ class Component extends DCLogic {
     };
   }
   inl(text, ctx) {
-    const re = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\)|@(?:Ana Gómez|Mauri|Tomás|Lucía|Valentina|Nico)|PRC-\d+)/g;
+    const re = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\)|@(?:Ana Gómez|Mauri|Tomás|Lucía|Valentina|Nico)|TSK-\d+)/g;
     const out = [];
     let last = 0, m;
     const seg = function (kind, t, extra) {
@@ -792,16 +792,16 @@ class Component extends DCLogic {
   ticketData() {
     const D11355 = [
       '## Contexto',
-      'Como parte de PRC-11300 movemos los servicios de Pricing a instancias Graviton (arm64). Este ticket cubre las **migraciones de base** que hay que correr antes del cambio de nodos. @Ana Gómez confirmó la ventana del jueves 30 a las 22 h.',
+      'Como parte de TSK-11300 movemos los servicios de Platform a instancias arm64 (arm64). Este ticket cubre las **migraciones de base** que hay que correr antes del cambio de nodos. @Ana Gómez confirmó la ventana del jueves 30 a las 22 h.',
       '## Pasos',
-      '1. Congelar las escrituras del job de precios (PRC-11356).',
+      '1. Congelar las escrituras del job de precios (TSK-11356).',
       '2. Correr las migraciones en staging, por lotes de 500k filas.',
       '3. Comparar conteos de `price_history` antes y después.',
       '4. Actualizar la planilla de seguimiento y verificar en todos los entornos.',
       '### Chequeos previos',
       '- [x] Backup de `price_history`',
       '- [x] Snapshot del RDS de staging',
-      '- [ ] Avisar en #pricing-oncall antes de empezar',
+      '- [ ] Avisar en #platform-oncall antes de empezar',
       '### Conteo de control',
       '```sql',
       '-- precios por canal en la última semana',
@@ -818,8 +818,8 @@ class Component extends DCLogic {
       '| dev | m6i.large | m7g.large | Listo |',
       '| staging | m6i.large | m7g.large | Hoy |',
       '| prod | m6i.xlarge | m7g.xlarge | Pendiente |',
-      'Detalle del rollout en el [Runbook de migraciones](https://wiki.pricing.local/runbooks/migraciones).',
-      '![Diagrama del rollout, 1280×720](graviton-rollout.png)'
+      'Detalle del rollout en el [Runbook de migraciones](https://wiki.platform.local/runbooks/migraciones).',
+      '![Diagrama del rollout, 1280×720](arm64-rollout.png)'
     ].join('\n');
     const D10599 = [
       'Desde el deploy del lunes 6, las **cuentas hijas** de los canales marketplace no reciben precio nuevo. El job `generar_precios_hijas` termina sin errores pero no publica en `prices.v2`.',
@@ -840,24 +840,24 @@ class Component extends DCLogic {
       ['ana', 'Oct 22', 'Te lo asigno para este sprint. La ventana de mantenimiento es el **jueves 30 a las 22 h**.'],
       ['tomas', 'Oct 23', 'Ojo que `price_history` tiene unos 40 M de filas en prod, conviene correrlo por lotes.'],
       ['me', 'Oct 24', 'Dale, lo parto en lotes de 500k. Dejo el script en el MR.'],
-      ['lucia', 'Oct 26', 'Ya cerré PRC-11340, las ofertas viejas no deberían molestar.'],
+      ['lucia', 'Oct 26', 'Ya cerré TSK-11340, las ofertas viejas no deberían molestar.'],
       ['ana', 'yesterday', '@Mauri ¿llegamos con staging antes del jueves?'],
-      ['me', '3 h ago', 'Sí, staging hoy a la tarde. Queda **verificacion en entornos** (PRC-11359) para mañana.']
+      ['me', '3 h ago', 'Sí, staging hoy a la tarde. Queda **verificacion en entornos** (TSK-11359) para mañana.']
     ];
     const C10599 = [
       ['valentina', 'Oct 9', 'Las hijas no reciben precio nuevo desde el deploy del lunes. Adjunto el log.'],
       ['nico', 'Oct 9', 'Confirmo: `generar_precios_hijas` termina OK pero no publica nada.'],
       ['ana', 'Oct 10', 'Lo subo a High. @Valentina ¿cuántos canales están afectados?'],
       ['valentina', 'Oct 10', '12 canales hijas, todos de marketplace.'],
-      ['tomas', 'Oct 13', 'Puede ser el cambio de topic de PRC-10577. El consumer sigue escuchando `prices.v1`.'],
+      ['tomas', 'Oct 13', 'Puede ser el cambio de topic de TSK-10577. El consumer sigue escuchando `prices.v1`.'],
       ['nico', 'Oct 14', 'No es eso, el topic está bien. El problema es el filtro por `parent_channel_id`.'],
       ['lucia', 'Oct 16', 'Mientras tanto lo publico a mano cada mañana.'],
       ['ana', 'Oct 20', 'Queda fuera del sprint 2026.21, lo arrastramos.'],
       ['valentina', 'Oct 22', 'Hoy volvió a fallar: dos canales con el precio de la semana pasada.'],
       ['nico', 'Oct 23', 'Dejé en la descripción el query para detectar las hijas sin precio.'],
       ['tomas', 'Oct 24', 'Sigue sin asignar, ¿alguien lo toma?'],
-      ['ana', 'Oct 26', '@Mauri cuando cierres PRC-11355, ¿lo podés mirar?'],
-      ['me', 'yesterday', 'Sí, mañana lo veo. Parece el mismo filtro que tocamos en PRC-11340.'],
+      ['ana', 'Oct 26', '@Mauri cuando cierres TSK-11355, ¿lo podés mirar?'],
+      ['me', 'yesterday', 'Sí, mañana lo veo. Parece el mismo filtro que tocamos en TSK-11340.'],
       ['lucia', '2 h ago', 'Hoy también lo publiqué a mano. Marketplace volvió a preguntar.']
     ];
     const AC11355 = [
@@ -868,53 +868,53 @@ class Component extends DCLogic {
     ].join('\n');
     return [
       // To do
-      { id: 'PRC-10599', src: 'JI', type: 'bug', key: 'PRC-10599', title: 'Generación automática de precios para los canales (Hijas)', col: 'todo', status: 'To Do', pri: 'high', pts: 3, sprint: 'prev', due: '2026-10-26', as: null, rep: 'valentina', labels: ['canales', 'hotfix', 'marketplace'], comps: ['price-engine'], fix: '2026.11', created: 'Oct 9, 2026', updated: '2 h ago', desc: D10599,
-        ac: '- [ ] Las 12 hijas reciben precio en la corrida de las 6 h\n- [ ] Alerta si una hija queda más de 24 h sin precio', links: [['relates', 'PRC-11340'], ['duplicates', 'PRC-10577']], attach: [['precios-hijas-2026-10-25.log', 'Log', '2.4 MB'], ['canales-afectados.csv', 'CSV', '3 KB']], cm: C10599 },
-      { id: 'PRC-11354', src: 'JI', type: 'subtask', key: 'PRC-11354', title: 'Migracion a Graviton (Parte 4/4)', col: 'todo', status: 'To Do', pri: 'low', sprint: 'cur', parent: 'PRC-11300', as: 'me', rep: 'ana', comps: ['price-reader-v2'], created: 'Oct 14, 2026', updated: 'yesterday',
-        desc: 'Último tramo: mover `price-reader-v2` a nodos arm64 cuando terminen las migraciones de PRC-11355.', links: [['blockedBy', 'PRC-11355']], cm: [['ana', 'Oct 24', 'Arrancá cuando esté verde staging.']] },
-      { id: 'PRC-11321', src: 'JI', type: 'task', key: 'PRC-11321', title: 'Analisis: Migracion a Envoy', col: 'todo', status: 'Backlog', pri: 'medium', pts: 3, sprint: 'next', as: 'tomas', rep: 'ana', labels: ['infra'], created: 'Oct 2, 2026', updated: 'Oct 25',
-        desc: 'Evaluar reemplazar el balanceador actual por Envoy en `price-reader-v2`. Comparar latencia p99 y costo.', links: [['relates', 'PRC-11355']], cm: [['tomas', 'Oct 20', 'Lo dejo para el próximo sprint.'], ['nico', 'Oct 25', 'Sumo: medir también el retry budget.']] },
-      { id: 'PRC-11371', src: 'JI', type: 'story', key: 'PRC-11371', title: 'Precios por zona de envío en checkout', col: 'todo', status: 'To Do', pri: 'medium', pts: 8, sprint: 'cur', epic: 'PRC-11250', as: 'valentina', rep: 'ana', labels: ['checkout'], created: 'Oct 21, 2026', updated: 'Oct 27',
+      { id: 'TSK-10599', src: 'JI', type: 'bug', key: 'TSK-10599', title: 'Generación automática de precios para los canales (Hijas)', col: 'todo', status: 'To Do', pri: 'high', pts: 3, sprint: 'prev', due: '2026-10-26', as: null, rep: 'valentina', labels: ['canales', 'hotfix', 'marketplace'], comps: ['engine'], fix: '2026.11', created: 'Oct 9, 2026', updated: '2 h ago', desc: D10599,
+        ac: '- [ ] Las 12 hijas reciben precio en la corrida de las 6 h\n- [ ] Alerta si una hija queda más de 24 h sin precio', links: [['relates', 'TSK-11340'], ['duplicates', 'TSK-10577']], attach: [['precios-hijas-2026-10-25.log', 'Log', '2.4 MB'], ['canales-afectados.csv', 'CSV', '3 KB']], cm: C10599 },
+      { id: 'TSK-11354', src: 'JI', type: 'subtask', key: 'TSK-11354', title: 'Migracion a arm64 (Parte 4/4)', col: 'todo', status: 'To Do', pri: 'low', sprint: 'cur', parent: 'TSK-11300', as: 'me', rep: 'ana', comps: ['repo-b'], created: 'Oct 14, 2026', updated: 'yesterday',
+        desc: 'Último tramo: mover `repo-b` a nodos arm64 cuando terminen las migraciones de TSK-11355.', links: [['blockedBy', 'TSK-11355']], cm: [['ana', 'Oct 24', 'Arrancá cuando esté verde staging.']] },
+      { id: 'TSK-11321', src: 'JI', type: 'task', key: 'TSK-11321', title: 'Analisis: Migracion a Envoy', col: 'todo', status: 'Backlog', pri: 'medium', pts: 3, sprint: 'next', as: 'tomas', rep: 'ana', labels: ['infra'], created: 'Oct 2, 2026', updated: 'Oct 25',
+        desc: 'Evaluar reemplazar el balanceador actual por Envoy en `repo-b`. Comparar latencia p99 y costo.', links: [['relates', 'TSK-11355']], cm: [['tomas', 'Oct 20', 'Lo dejo para el próximo sprint.'], ['nico', 'Oct 25', 'Sumo: medir también el retry budget.']] },
+      { id: 'TSK-11371', src: 'JI', type: 'story', key: 'TSK-11371', title: 'Precios por zona de envío en checkout', col: 'todo', status: 'To Do', pri: 'medium', pts: 8, sprint: 'cur', epic: 'TSK-11250', as: 'valentina', rep: 'ana', labels: ['checkout'], created: 'Oct 21, 2026', updated: 'Oct 27',
         desc: 'Mostrar en checkout el precio final según la zona de envío.' },
-      { id: 'zen-engine#42', src: 'GH', type: 'issue', key: 'zen-engine#42', title: 'Retry on 502 from pricing API', col: 'todo', status: 'Open', as: 'me', rep: 'nico', labels: ['bug', 'api'], repo: 'pricing/zen-engine', created: 'Oct 24, 2026', updated: 'yesterday',
-        desc: 'The pricing client gives up on the first `502 Bad Gateway`. During deploys we see bursts of 502s for about 20 s.\n### Proposal\n- Retry idempotent `GET`s up to 3 times with jittered backoff\n- Respect `Retry-After`\n- Never retry `POST /prices`',
-        cm: [['nico', 'Oct 24', 'Seen again in staging during the 14:00 deploy.'], ['me', 'Oct 25', 'Taking it. Will reuse the backoff from `price-reader-v2`.'], ['tomas', 'yesterday', 'Please keep the total budget under 2 s.']] },
+      { id: 'repo-d#42', src: 'GH', type: 'issue', key: 'repo-d#42', title: 'Retry on 502 from platform API', col: 'todo', status: 'Open', as: 'me', rep: 'nico', labels: ['bug', 'api'], repo: 'platform/repo-d', created: 'Oct 24, 2026', updated: 'yesterday',
+        desc: 'The platform client gives up on the first `502 Bad Gateway`. During deploys we see bursts of 502s for about 20 s.\n### Proposal\n- Retry idempotent `GET`s up to 3 times with jittered backoff\n- Respect `Retry-After`\n- Never retry `POST /prices`',
+        cm: [['nico', 'Oct 24', 'Seen again in staging during the 14:00 deploy.'], ['me', 'Oct 25', 'Taking it. Will reuse the backoff from `repo-b`.'], ['tomas', 'yesterday', 'Please keep the total budget under 2 s.']] },
       { id: 'ob-aws', src: 'OB', type: 'todo', key: 'Weekly.md', title: 'Revisar costos de AWS', col: 'todo', due: '2026-10-31', as: 'me', note: 'Weekly.md', line: 14,
         desc: '## Semana 44\n- [x] Mandar resumen del sprint\n- [ ] Revisar costos de AWS\n- [ ] Pedir acceso a Cost Explorer para Tomás' },
       { id: 'td-kafka', src: 'TD', type: 'todo', key: 'Inbox', title: 'Rotate staging Kafka credentials', col: 'todo', pri: 'high', due: '2026-10-28', as: 'me', labels: ['ops'], desc: 'Old ones expire on Friday.' },
       // In progress
-      { id: 'PRC-11355', src: 'JI', type: 'story', key: 'PRC-11355', title: 'migraciones', col: 'doing', status: 'In Progress', pri: 'low', pts: 5, sprint: 'cur', epic: 'PRC-11300', as: 'me', rep: 'ana', labels: ['graviton', 'db'], comps: ['price-admin', 'price-reader-v2'], fix: '2026.11', created: 'Oct 14, 2026', updated: '3 h ago',
-        time: { est: '3d', logged: '1d 4h', rem: '1d 6h', l: 12, r: 14 }, subs: ['PRC-11356', 'PRC-11357', 'PRC-11358', 'PRC-11359'], links: [['blockedBy', 'PRC-11340'], ['relates', 'PRC-11321']],
-        attach: [['graviton-rollout.png', 'PNG image', '412 KB'], ['price_history_counts.csv', 'CSV', '88 KB'], ['migracion-graviton.pdf', 'PDF', '1.2 MB']], desc: D11355, ac: AC11355, cm: C11355 },
-      { id: 'PRC-412', src: 'JI', type: 'story', key: 'PRC-412', title: 'Bulk discounts by category', col: 'doing', status: 'In Progress', pri: 'high', pts: 8, sprint: 'cur', epic: 'PRC-11280', as: 'me', rep: 'ana', labels: ['api'], branch: 'feat/PRC-412-bulk-discounts', created: 'Oct 15, 2026', updated: '20 min ago',
-        desc: 'Admins set a discount for a whole category; `price-admin` publishes one event per affected SKU.', ac: '- [x] Discount applies to every SKU in the category\n- [ ] One Kafka event per SKU, in batches', cm: [['ana', 'Oct 23', 'Remember the 30% cap.'], ['me', 'Oct 27', 'Consumer done, now the admin API.']] },
-      { id: 'PRC-398', src: 'JI', type: 'bug', key: 'PRC-398', title: 'Rounding error on installment prices', col: 'doing', status: 'In Progress', pri: 'high', pts: 2, sprint: 'cur', as: 'me', rep: 'lucia', labels: ['bug'], branch: 'fix/PRC-398-rounding', created: 'Oct 20, 2026', updated: '1 h ago',
+      { id: 'TSK-11355', src: 'JI', type: 'story', key: 'TSK-11355', title: 'migraciones', col: 'doing', status: 'In Progress', pri: 'low', pts: 5, sprint: 'cur', epic: 'TSK-11300', as: 'me', rep: 'ana', labels: ['arm64', 'db'], comps: ['repo-a', 'repo-b'], fix: '2026.11', created: 'Oct 14, 2026', updated: '3 h ago',
+        time: { est: '3d', logged: '1d 4h', rem: '1d 6h', l: 12, r: 14 }, subs: ['TSK-11356', 'TSK-11357', 'TSK-11358', 'TSK-11359'], links: [['blockedBy', 'TSK-11340'], ['relates', 'TSK-11321']],
+        attach: [['arm64-rollout.png', 'PNG image', '412 KB'], ['price_history_counts.csv', 'CSV', '88 KB'], ['migracion-arm64.pdf', 'PDF', '1.2 MB']], desc: D11355, ac: AC11355, cm: C11355 },
+      { id: 'TSK-412', src: 'JI', type: 'story', key: 'TSK-412', title: 'Bulk discounts by category', col: 'doing', status: 'In Progress', pri: 'high', pts: 8, sprint: 'cur', epic: 'TSK-11280', as: 'me', rep: 'ana', labels: ['api'], branch: 'feat/TSK-412-bulk-discounts', created: 'Oct 15, 2026', updated: '20 min ago',
+        desc: 'Admins set a discount for a whole category; `repo-a` publishes one event per affected SKU.', ac: '- [x] Discount applies to every SKU in the category\n- [ ] One Kafka event per SKU, in batches', cm: [['ana', 'Oct 23', 'Remember the 30% cap.'], ['me', 'Oct 27', 'Consumer done, now the admin API.']] },
+      { id: 'TSK-398', src: 'JI', type: 'bug', key: 'TSK-398', title: 'Rounding error on installment prices', col: 'doing', status: 'In Progress', pri: 'high', pts: 2, sprint: 'cur', as: 'me', rep: 'lucia', labels: ['bug'], branch: 'fix/TSK-398-rounding', created: 'Oct 20, 2026', updated: '1 h ago',
         desc: '12 installments of $1,000.01 add up to $12,000.10 instead of $12,000.12.', cm: [['lucia', 'Oct 20', 'Happens only with 12 and 18 installments.'], ['me', 'Oct 26', 'Fixed in the formatter; the migration is waiting on staging.']] },
-      { id: 'PRC-11366', src: 'JI', type: 'task', key: 'PRC-11366', title: 'Alertas de margen negativo en Grafana', col: 'doing', status: 'In Progress', pri: 'medium', pts: 3, sprint: 'cur', as: 'nico', rep: 'ana', labels: ['observability'], created: 'Oct 21, 2026', updated: 'today',
+      { id: 'TSK-11366', src: 'JI', type: 'task', key: 'TSK-11366', title: 'Alertas de margen negativo en Grafana', col: 'doing', status: 'In Progress', pri: 'medium', pts: 3, sprint: 'cur', as: 'nico', rep: 'ana', labels: ['observability'], created: 'Oct 21, 2026', updated: 'today',
         desc: 'Alertar cuando un SKU queda con margen negativo más de 10 minutos.', cm: [['nico', 'today', 'Dashboard listo, faltan las alertas.']] },
       // In review
-      { id: 'PRC-405', src: 'JI', type: 'story', key: 'PRC-405', title: 'Warm cache on deploy', col: 'review', status: 'Code Review', pri: 'medium', pts: 3, sprint: 'cur', as: 'me', rep: 'tomas', branch: 'perf/cache-warmup', created: 'Oct 16, 2026', updated: 'yesterday',
-        desc: 'Preload the 5,000 most read prices before `price-reader-v2` takes traffic.', cm: [['tomas', 'yesterday', 'MR !231 looks good, one nit on the timeout.']] },
-      { id: 'PRC-11338', src: 'JI', type: 'story', key: 'PRC-11338', title: 'Validación de márgenes en carga masiva', col: 'review', status: 'QA', pri: 'medium', pts: 5, sprint: 'cur', epic: 'PRC-11280', as: 'ana', rep: 'valentina', created: 'Oct 8, 2026', updated: 'today',
+      { id: 'TSK-405', src: 'JI', type: 'story', key: 'TSK-405', title: 'Warm cache on deploy', col: 'review', status: 'Code Review', pri: 'medium', pts: 3, sprint: 'cur', as: 'me', rep: 'tomas', branch: 'perf/cache-warmup', created: 'Oct 16, 2026', updated: 'yesterday',
+        desc: 'Preload the 5,000 most read prices before `repo-b` takes traffic.', cm: [['tomas', 'yesterday', 'MR !231 looks good, one nit on the timeout.']] },
+      { id: 'TSK-11338', src: 'JI', type: 'story', key: 'TSK-11338', title: 'Validación de márgenes en carga masiva', col: 'review', status: 'QA', pri: 'medium', pts: 5, sprint: 'cur', epic: 'TSK-11280', as: 'ana', rep: 'valentina', created: 'Oct 8, 2026', updated: 'today',
         desc: 'Rechazar filas del CSV que dejan margen por debajo del mínimo de la categoría.', cm: [['valentina', 'Oct 27', 'En QA con el archivo de octubre.']] },
       // Done
-      { id: 'PRC-11340', src: 'JI', type: 'task', key: 'PRC-11340', title: 'Limpieza de ofertas de canales', col: 'done', status: 'Done', pri: 'medium', pts: 3, sprint: 'cur', as: 'lucia', rep: 'ana', created: 'Oct 6, 2026', updated: 'Oct 26',
-        desc: 'Borrar ofertas vencidas de los canales antes de la migración.', links: [['blocks', 'PRC-11355']], cm: [['lucia', 'Oct 26', 'Listo, 18k ofertas borradas.']] },
-      { id: 'PRC-11356', src: 'JI', type: 'subtask', key: 'PRC-11356', title: 'Migrar job de precios', col: 'done', status: 'Done', pri: 'low', parent: 'PRC-11355', as: 'me', rep: 'ana', created: 'Oct 14, 2026', updated: 'Oct 24', desc: 'Correr el job de precios en un nodo arm64.' },
-      { id: 'PRC-377', src: 'JI', type: 'bug', key: 'PRC-377', title: 'Fix currency rounding in exports', col: 'done', status: 'Done', pri: 'medium', pts: 2, sprint: 'prev', as: 'me', rep: 'lucia', created: 'Oct 1, 2026', updated: 'Oct 18', desc: 'PR #518 merged.' },
-      { id: 'td-runbook', src: 'TD', type: 'todo', key: 'Inbox', title: 'Update pricing on-call runbook', col: 'done', pri: 'low', as: 'me', desc: 'Done by Claude, in Notion.' },
+      { id: 'TSK-11340', src: 'JI', type: 'task', key: 'TSK-11340', title: 'Limpieza de ofertas de canales', col: 'done', status: 'Done', pri: 'medium', pts: 3, sprint: 'cur', as: 'lucia', rep: 'ana', created: 'Oct 6, 2026', updated: 'Oct 26',
+        desc: 'Borrar ofertas vencidas de los canales antes de la migración.', links: [['blocks', 'TSK-11355']], cm: [['lucia', 'Oct 26', 'Listo, 18k ofertas borradas.']] },
+      { id: 'TSK-11356', src: 'JI', type: 'subtask', key: 'TSK-11356', title: 'Migrar job de precios', col: 'done', status: 'Done', pri: 'low', parent: 'TSK-11355', as: 'me', rep: 'ana', created: 'Oct 14, 2026', updated: 'Oct 24', desc: 'Correr el job de precios en un nodo arm64.' },
+      { id: 'TSK-377', src: 'JI', type: 'bug', key: 'TSK-377', title: 'Fix currency rounding in exports', col: 'done', status: 'Done', pri: 'medium', pts: 2, sprint: 'prev', as: 'me', rep: 'lucia', created: 'Oct 1, 2026', updated: 'Oct 18', desc: 'PR #518 merged.' },
+      { id: 'td-runbook', src: 'TD', type: 'todo', key: 'Inbox', title: 'Update platform on-call runbook', col: 'done', pri: 'low', as: 'me', desc: 'Done by Claude, in Notion.' },
       // Not on the board: epics, the rest of the sub-tasks, an old duplicate
-      { id: 'PRC-11300', src: 'JI', type: 'epic', key: 'PRC-11300', title: 'Migración a Graviton', board: false, status: 'In Progress', pri: 'medium', as: 'ana', rep: 'ana', color: 'violet', created: 'Sep 30, 2026', updated: 'today',
-        desc: 'Mover todos los servicios de Pricing a instancias Graviton (arm64) antes de fin de año.', subs: ['PRC-11351', 'PRC-11352', 'PRC-11353', 'PRC-11354', 'PRC-11355'] },
-      { id: 'PRC-11280', src: 'JI', type: 'epic', key: 'PRC-11280', title: 'Descuentos por volumen', board: false, status: 'In Progress', pri: 'medium', as: 'ana', rep: 'ana', color: 'teal', created: 'Sep 12, 2026', updated: 'today', desc: 'Descuentos por categoría y por cantidad.', subs: ['PRC-412', 'PRC-11338'] },
-      { id: 'PRC-11250', src: 'JI', type: 'epic', key: 'PRC-11250', title: 'Precios regionales', board: false, status: 'To Do', pri: 'medium', as: 'valentina', rep: 'ana', color: 'amber', created: 'Sep 2, 2026', updated: 'Oct 27', desc: 'Precio por zona de envío.', subs: ['PRC-11371'] },
-      { id: 'PRC-11351', src: 'JI', type: 'subtask', key: 'PRC-11351', title: 'Migracion a Graviton (Parte 1/4)', board: false, status: 'Done', pri: 'low', parent: 'PRC-11300', as: 'lucia', rep: 'ana', created: 'Oct 1, 2026', updated: 'Oct 10' },
-      { id: 'PRC-11352', src: 'JI', type: 'subtask', key: 'PRC-11352', title: 'Migracion a Graviton (Parte 2/4)', board: false, status: 'Done', pri: 'low', parent: 'PRC-11300', as: 'tomas', rep: 'ana', created: 'Oct 1, 2026', updated: 'Oct 17' },
-      { id: 'PRC-11353', src: 'JI', type: 'subtask', key: 'PRC-11353', title: 'Migracion a Graviton (Parte 3/4)', board: false, status: 'In Progress', pri: 'low', parent: 'PRC-11300', as: 'nico', rep: 'ana', created: 'Oct 1, 2026', updated: 'today' },
-      { id: 'PRC-11357', src: 'JI', type: 'subtask', key: 'PRC-11357', title: 'Analisis', board: false, status: 'In Progress', pri: 'low', parent: 'PRC-11355', as: 'me', rep: 'ana', created: 'Oct 14, 2026', updated: 'today' },
-      { id: 'PRC-11358', src: 'JI', type: 'subtask', key: 'PRC-11358', title: 'actualizar planilla', board: false, status: 'To Do', pri: 'low', parent: 'PRC-11355', as: 'me', rep: 'ana', created: 'Oct 14, 2026', updated: 'Oct 14' },
-      { id: 'PRC-11359', src: 'JI', type: 'subtask', key: 'PRC-11359', title: 'verificacion en entornos', board: false, status: 'To Do', pri: 'low', parent: 'PRC-11355', as: 'me', rep: 'ana', created: 'Oct 14, 2026', updated: 'Oct 14' },
-      { id: 'PRC-10577', src: 'JI', type: 'bug', key: 'PRC-10577', title: 'Precios duplicados en canal Hijas', board: false, status: 'Done', pri: 'medium', as: 'tomas', rep: 'valentina', created: 'Sep 18, 2026', updated: 'Sep 29', desc: 'Cerrado: se movió el topic a `prices.v2`.' }
+      { id: 'TSK-11300', src: 'JI', type: 'epic', key: 'TSK-11300', title: 'Migración a arm64', board: false, status: 'In Progress', pri: 'medium', as: 'ana', rep: 'ana', color: 'violet', created: 'Sep 30, 2026', updated: 'today',
+        desc: 'Mover todos los servicios de Platform a instancias arm64 (arm64) antes de fin de año.', subs: ['TSK-11351', 'TSK-11352', 'TSK-11353', 'TSK-11354', 'TSK-11355'] },
+      { id: 'TSK-11280', src: 'JI', type: 'epic', key: 'TSK-11280', title: 'Descuentos por volumen', board: false, status: 'In Progress', pri: 'medium', as: 'ana', rep: 'ana', color: 'teal', created: 'Sep 12, 2026', updated: 'today', desc: 'Descuentos por categoría y por cantidad.', subs: ['TSK-412', 'TSK-11338'] },
+      { id: 'TSK-11250', src: 'JI', type: 'epic', key: 'TSK-11250', title: 'Precios regionales', board: false, status: 'To Do', pri: 'medium', as: 'valentina', rep: 'ana', color: 'amber', created: 'Sep 2, 2026', updated: 'Oct 27', desc: 'Precio por zona de envío.', subs: ['TSK-11371'] },
+      { id: 'TSK-11351', src: 'JI', type: 'subtask', key: 'TSK-11351', title: 'Migracion a arm64 (Parte 1/4)', board: false, status: 'Done', pri: 'low', parent: 'TSK-11300', as: 'lucia', rep: 'ana', created: 'Oct 1, 2026', updated: 'Oct 10' },
+      { id: 'TSK-11352', src: 'JI', type: 'subtask', key: 'TSK-11352', title: 'Migracion a arm64 (Parte 2/4)', board: false, status: 'Done', pri: 'low', parent: 'TSK-11300', as: 'tomas', rep: 'ana', created: 'Oct 1, 2026', updated: 'Oct 17' },
+      { id: 'TSK-11353', src: 'JI', type: 'subtask', key: 'TSK-11353', title: 'Migracion a arm64 (Parte 3/4)', board: false, status: 'In Progress', pri: 'low', parent: 'TSK-11300', as: 'nico', rep: 'ana', created: 'Oct 1, 2026', updated: 'today' },
+      { id: 'TSK-11357', src: 'JI', type: 'subtask', key: 'TSK-11357', title: 'Analisis', board: false, status: 'In Progress', pri: 'low', parent: 'TSK-11355', as: 'me', rep: 'ana', created: 'Oct 14, 2026', updated: 'today' },
+      { id: 'TSK-11358', src: 'JI', type: 'subtask', key: 'TSK-11358', title: 'actualizar planilla', board: false, status: 'To Do', pri: 'low', parent: 'TSK-11355', as: 'me', rep: 'ana', created: 'Oct 14, 2026', updated: 'Oct 14' },
+      { id: 'TSK-11359', src: 'JI', type: 'subtask', key: 'TSK-11359', title: 'verificacion en entornos', board: false, status: 'To Do', pri: 'low', parent: 'TSK-11355', as: 'me', rep: 'ana', created: 'Oct 14, 2026', updated: 'Oct 14' },
+      { id: 'TSK-10577', src: 'JI', type: 'bug', key: 'TSK-10577', title: 'Precios duplicados en canal Hijas', board: false, status: 'Done', pri: 'medium', as: 'tomas', rep: 'valentina', created: 'Sep 18, 2026', updated: 'Sep 29', desc: 'Cerrado: se movió el topic a `prices.v2`.' }
     ];
   }
   renderVals() {
@@ -938,7 +938,7 @@ class Component extends DCLogic {
     const noSrc = emptyMode === 'noSources';
     const detailMode = P.detail || 'closed';
     const sheet = P.sheet === 'cards';
-    const startId = P.ticket || 'PRC-11355';
+    const startId = P.ticket || 'TSK-11355';
     const TODAY = Date.UTC(2026, 9, 28);
     const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -951,7 +951,7 @@ class Component extends DCLogic {
     const failing = flag(P.failing) && !st.failFixed;
     const syncedAt = st.syncedAt || this._t0;
     const sources = noSrc ? [] : [
-      { id: 'JI', name: 'Jira · Pricing', kind: 'jira', remote: true, writable: ALL, mineRule: 'assigned to you' },
+      { id: 'JI', name: 'Jira · Platform', kind: 'jira', remote: true, writable: ALL, mineRule: 'assigned to you' },
       { id: 'GH', name: 'GitHub', kind: 'github', remote: true, writable: ['todo', 'done'], mineRule: 'assignee:@me' },
       { id: 'OB', name: 'Obsidian', kind: 'obsidian', remote: false, writable: ['todo', 'done'], mineRule: 'personal' },
       { id: 'TD', name: 'Todoist', kind: 'todoist', remote: true, writable: ['todo', 'done'], mineRule: 'personal', error: failing ? 'the API token was rejected (401). Paste a new one in Settings.' : '' }
@@ -973,9 +973,9 @@ class Component extends DCLogic {
     };
 
     const SPRINT = {
-      prev: { name: 'Pricing 2026.21', dates: 'Oct 7 – Oct 20', state: 'Closed', short: '2026.21 · closed', title: 'Sprint Pricing 2026.21 has closed; this was carried over' },
-      cur: { name: 'Pricing 2026.22', dates: 'Oct 21 – Nov 4', state: 'Active · 7 days left', short: '', title: '' },
-      next: { name: 'Pricing 2026.23', dates: 'Nov 5 – Nov 18', state: 'Next', short: '2026.23 · next', title: 'Planned for the next sprint, Pricing 2026.23' }
+      prev: { name: 'Platform 2026.21', dates: 'Oct 7 – Oct 20', state: 'Closed', short: '2026.21 · closed', title: 'Sprint Platform 2026.21 has closed; this was carried over' },
+      cur: { name: 'Platform 2026.22', dates: 'Oct 21 – Nov 4', state: 'Active · 7 days left', short: '', title: '' },
+      next: { name: 'Platform 2026.23', dates: 'Nov 5 – Nov 18', state: 'Next', short: '2026.23 · next', title: 'Planned for the next sprint, Platform 2026.23' }
     };
     const TYPE = {
       story: ['Story', 'story'], bug: ['Bug', 'bug'], task: ['Task', 'taskType'], subtask: ['Sub-task', 'subtask'], epic: ['Epic', 'epic'],
@@ -1004,7 +1004,7 @@ class Component extends DCLogic {
       return t.status || '';
     };
     // "Nothing assigned to you" sample: your Jira tickets went to teammates.
-    const REASSIGN = { 'PRC-11354': 'tomas', 'PRC-11355': 'tomas', 'PRC-412': 'ana', 'PRC-398': 'lucia', 'PRC-405': 'nico', 'PRC-11356': 'tomas', 'PRC-377': 'lucia' };
+    const REASSIGN = { 'TSK-11354': 'tomas', 'TSK-11355': 'tomas', 'TSK-412': 'ana', 'TSK-398': 'lucia', 'TSK-405': 'nico', 'TSK-11356': 'tomas', 'TSK-377': 'lucia' };
     const assigneeOf = function (t) { return emptyMode === 'noneMine' && t.src === 'JI' && t.as === 'me' ? (REASSIGN[t.id] || 'ana') : t.as; };
     const personal = function (t) { return t.src === 'OB' || t.src === 'TD'; };
     const isMine = function (t) { return personal(t) || assigneeOf(t) === 'me'; };
@@ -1028,11 +1028,11 @@ class Component extends DCLogic {
 
     // Worktrees linked to tasks (the sidebar's worktrees).
     const RUNS = {
-      'feat/PRC-412-bulk-discounts': { provider: 'Claude Code', status: 'working', lastLine: 'Edit internal/kafka/bulk_consumer.go' },
-      'fix/PRC-398-rounding': { provider: 'Codex CLI', status: 'needs you', lastLine: 'Waiting: migration on staging' },
+      'feat/TSK-412-bulk-discounts': { provider: 'Claude Code', status: 'working', lastLine: 'Edit internal/kafka/bulk_consumer.go' },
+      'fix/TSK-398-rounding': { provider: 'Codex CLI', status: 'needs you', lastLine: 'Waiting: migration on staging' },
       'perf/cache-warmup': { provider: 'Claude Code', status: 'finished', lastLine: 'MR !231 · pipeline passed' }
     };
-    const REPOOF = { 'feat/PRC-412-bulk-discounts': 'price-admin', 'fix/PRC-398-rounding': 'price-admin', 'perf/cache-warmup': 'price-reader-v2' };
+    const REPOOF = { 'feat/TSK-412-bulk-discounts': 'repo-a', 'fix/TSK-398-rounding': 'repo-a', 'perf/cache-warmup': 'repo-b' };
     const initialLinks = {};
     TK.forEach(function (t) { if (t.branch) initialLinks[t.id] = [{ branch: t.branch, path: '~/wt/' + REPOOF[t.branch] + '/' + t.branch.split('/').pop(), run: RUNS[t.branch] || null }]; });
     const links = st.links || initialLinks;
@@ -1470,7 +1470,7 @@ class Component extends DCLogic {
 
       // Start form: repositories of the sidebar's namespaces, base = their branches.
       const nsRemoved = st.nsRemoved || {};
-      const nsOf = ['pricing', 'pricing', 'identity'];
+      const nsOf = ['platform', 'platform', 'identity'];
       const allRepos = (base.repos || []).filter(function (r, n) { return !nsRemoved[nsOf[n]]; });
       const form = st.form || {};
       const repo = allRepos.filter(function (r) { return r.name === form.repo; })[0] || allRepos[0] || null;
@@ -1539,14 +1539,14 @@ class Component extends DCLogic {
     // ---- Card sheet
     const sheetRows = !sheet ? [] : [
       ['Mine', 'What you see by default. Nothing on the card repeats the column it sits in.', [
-        ['PRC-11355', 'Story · everything filled in'], ['PRC-10599', 'Bug · overdue, carried over from a closed sprint'], ['PRC-11354', 'Sub-task · parent epic, blocked'],
-        ['zen-engine#42', 'GitHub issue · labels, no priority'], ['ob-aws', 'Obsidian · a checkbox with a date']], false],
+        ['TSK-11355', 'Story · everything filled in'], ['TSK-10599', 'Bug · overdue, carried over from a closed sprint'], ['TSK-11354', 'Sub-task · parent epic, blocked'],
+        ['repo-d#42', 'GitHub issue · labels, no priority'], ['ob-aws', 'Obsidian · a checkbox with a date']], false],
       ['Everyone', 'Same cards with the assignee. Yours say “You”; nobody’s say “Unassigned”.', [
-        ['PRC-11355', 'Story · yours'], ['PRC-10599', 'Bug · unassigned'], ['PRC-11354', 'Sub-task · yours'],
-        ['zen-engine#42', 'GitHub issue · yours'], ['ob-aws', 'Obsidian · personal, so no avatar']], true],
+        ['TSK-11355', 'Story · yours'], ['TSK-10599', 'Bug · unassigned'], ['TSK-11354', 'Sub-task · yours'],
+        ['repo-d#42', 'GitHub issue · yours'], ['ob-aws', 'Obsidian · personal, so no avatar']], true],
       ['States', 'Selection, agents at work and the Jira status when it differs from the column.', [
-        ['PRC-11355', 'Selected (panel open)', 'sel'], ['PRC-412', 'Agent working in its worktree'], ['PRC-398', 'Agent needs you'],
-        ['PRC-11338', 'Teammate · Jira status “QA” in In review'], ['PRC-11321', 'Teammate · next sprint, “Backlog”']], true]
+        ['TSK-11355', 'Selected (panel open)', 'sel'], ['TSK-412', 'Agent working in its worktree'], ['TSK-398', 'Agent needs you'],
+        ['TSK-11338', 'Teammate · Jira status “QA” in In review'], ['TSK-11321', 'Teammate · next sprint, “Backlog”']], true]
     ].map(function (r) {
       return {
         label: r[0], note: r[1],

@@ -355,7 +355,7 @@ async fn a_run_starts_claude_with_its_agent_and_its_context() {
         },
         pb::AgentContext {
             kind: pb::AgentContextKind::Task.into(),
-            title: "PRC-1 · Nowhere".into(),
+            title: "TSK-1 · Nowhere".into(),
             ..Default::default()
         },
     ];
@@ -402,7 +402,7 @@ async fn a_run_starts_claude_with_its_agent_and_its_context() {
         "{index}"
     );
     assert!(
-        index.contains("- Ticket: PRC-1 · Nowhere · couldn’t be read:"),
+        index.contains("- Ticket: TSK-1 · Nowhere · couldn’t be read:"),
         "{index}"
     );
 

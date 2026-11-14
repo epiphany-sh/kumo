@@ -310,16 +310,16 @@ async fn timeline_and_context_follow_what_the_agent_does() {
     connect(&mut client, "claude", true).await;
     let ticket = pb::AgentContext {
         kind: pb::AgentContextKind::Task.into(),
-        title: "PRC-412 · Bulk discounts".into(),
+        title: "TSK-412 · Bulk discounts".into(),
         detail: "Jira".into(),
-        url: "https://acme.atlassian.net/browse/PRC-412".into(),
+        url: "https://acme.atlassian.net/browse/TSK-412".into(),
         ..Default::default()
     };
     let session = client
         .agents
         .start(pb::StartAgentRequest {
             context: vec![ticket.clone()],
-            ..start(&wt, "", "do PRC-412")
+            ..start(&wt, "", "do TSK-412")
         })
         .await
         .unwrap()
@@ -339,7 +339,7 @@ async fn timeline_and_context_follow_what_the_agent_does() {
         steps,
         [
             (pb::AgentEventKind::Started, "Claude Code"),
-            (pb::AgentEventKind::Context, "PRC-412 · Bulk discounts"),
+            (pb::AgentEventKind::Context, "TSK-412 · Bulk discounts"),
             (pb::AgentEventKind::Ran, "make test"),
             (pb::AgentEventKind::Edited, "src/a.rs"),
             (pb::AgentEventKind::Waiting, "Done"),
@@ -350,7 +350,7 @@ async fn timeline_and_context_follow_what_the_agent_does() {
     let page = pb::AgentContext {
         kind: pb::AgentContextKind::Doc.into(),
         title: "Discount rules v3".into(),
-        detail: "Confluence · Pricing".into(),
+        detail: "Confluence · Platform".into(),
         url: String::new(),
         ..Default::default()
     };

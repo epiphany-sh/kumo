@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn finds_the_api_of_each_host() {
-        let gh = host("git@github.com:pricing/price-admin.git").unwrap();
+        let gh = host("git@github.com:platform/repo-a.git").unwrap();
         assert_eq!(
             (gh.provider, gh.host.as_str(), gh.api.as_str()),
             (
@@ -74,7 +74,7 @@ mod tests {
         );
         let ghe = host("https://github.acme.dev/team/app.git").unwrap();
         assert_eq!(ghe.api, "https://github.acme.dev/api/v3");
-        let gl = host("ssh://git@gitlab.example.com:2222/pricing/sub/app.git").unwrap();
+        let gl = host("ssh://git@gitlab.example.com:2222/platform/sub/app.git").unwrap();
         assert_eq!(
             (gl.provider, gl.host.as_str(), gl.api.as_str()),
             (

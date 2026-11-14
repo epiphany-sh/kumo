@@ -97,7 +97,7 @@ impl ReleaseClient for Host {
         self.releases
     }
     fn list(&self, target: &CiTarget, token: &str, _: usize) -> Result<Vec<Release>, CiProblem> {
-        assert_eq!((target.repo.as_str(), token), ("pricing/app", "ghp"));
+        assert_eq!((target.repo.as_str(), token), ("platform/app", "ghp"));
         self.lists.fetch_add(1, Ordering::SeqCst);
         Ok(vec![
             release("v2.0.0", ReleaseKind::Draft, 400),
@@ -172,7 +172,7 @@ fn fixture(releases: bool) -> Fixture {
         repos: vec![RepoState {
             repo: Repo::new(
                 PathBuf::from(MAIN),
-                Some(Remote::parse("git@github.com:pricing/app.git")),
+                Some(Remote::parse("git@github.com:platform/app.git")),
             ),
             worktrees: Vec::new(),
             error: None,

@@ -378,8 +378,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let v = dir.path();
         write(
-            &v.join("PRC-412 scratchpad.md"),
-            "---\ntags: [prc]\n---\n# Bulk\n\nDiscounts by category.\n",
+            &v.join("TSK-412 scratchpad.md"),
+            "---\ntags: [tsk]\n---\n# Bulk\n\nDiscounts by category.\n",
             10,
         );
         write(
@@ -410,7 +410,7 @@ mod tests {
         assert_eq!(
             titles,
             [
-                ("PRC-412 scratchpad", name.as_str()),
+                ("TSK-412 scratchpad", name.as_str()),
                 ("pgx CopyFrom notes", "eng"),
                 ("Deploy", "eng/runbooks")
             ]
@@ -444,11 +444,11 @@ mod tests {
     fn reads_a_note_without_front_matter_and_stays_in_the_vault() {
         let dir = vault_dir();
         let src = source(dir.path());
-        let doc = VaultDocs.read(&src, None, "PRC-412 scratchpad.md").unwrap();
+        let doc = VaultDocs.read(&src, None, "TSK-412 scratchpad.md").unwrap();
         assert_eq!(doc.markdown, "# Bulk\n\nDiscounts by category.");
         assert_eq!(
             doc.file.as_deref(),
-            Some(dir.path().join("PRC-412 scratchpad.md").as_path())
+            Some(dir.path().join("TSK-412 scratchpad.md").as_path())
         );
         let nested = VaultDocs
             .read(&src, None, "eng/pgx CopyFrom notes.md")
@@ -481,7 +481,7 @@ mod tests {
             titles(&root),
             [
                 ("eng", "eng", 2, false),
-                ("PRC-412 scratchpad.md", "PRC-412 scratchpad", 0, true)
+                ("TSK-412 scratchpad.md", "TSK-412 scratchpad", 0, true)
             ],
             "no .obsidian, no folder without notes"
         );

@@ -38,13 +38,13 @@ class AgentTerminals {
         'mock:a1' => MockSessions.agent(),
         'mock:a2' => MockAgentTerminals.codex(),
         'mock:a3' => MockAgentTerminals.gemini(),
-        'mock:a4' => MockAgentTerminals.finished('Claude Code', '~/wt/price-reader-v2/cache', 'PRC-405: warm the cache on deploy.', [
+        'mock:a4' => MockAgentTerminals.finished('Claude Code', '~/wt/repo-b/cache', 'TSK-405: warm the cache on deploy.', [
             'Pushed perf/cache-warmup and opened MR !231.',
             'Pipeline passed, 12 of 12 jobs. MR !231 is ready for review.',
           ]),
-        'mock:a5' => MockAgentTerminals.finished('Claude Code', '~/notes/pricing', 'Update the pricing on-call runbook with the new cache warm-up.', ['Updated 2 sections of the Pricing runbook in Notion.']),
+        'mock:a5' => MockAgentTerminals.finished('Claude Code', '~/notes/platform', 'Update the platform on-call runbook with the new cache warm-up.', ['Updated 2 sections of the Platform runbook in Notion.']),
         'mock:reviewer' => MockAgentTerminals.reviewer(),
-        'mock:reviewer-done' => MockAgentTerminals.finished('go-pr-reviewer', '~/wt/price-admin/PRC-398', 'Review PR #517.', [
+        'mock:reviewer-done' => MockAgentTerminals.finished('go-pr-reviewer', '~/wt/repo-a/TSK-398', 'Review PR #517.', [
             'Nothing to reuse: the rounding helper it adds is new, and nothing else in the repo rounds installments.',
           ]),
         'mock:researcher' => MockAgentTerminals.finished('researcher', '~/.kumo/scratch/researcher-2', 'Compare Kafka clients for Go.', [

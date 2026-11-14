@@ -340,8 +340,8 @@ mod tests {
                 api: api.into(),
                 web: "https://gitlab.example.com".into(),
             },
-            repo: "pricing/price-admin".into(),
-            branch: "feat/PRC-412-bulk-discounts".into(),
+            repo: "platform/repo-a".into(),
+            branch: "feat/TSK-412-bulk-discounts".into(),
         }
     }
 
@@ -350,18 +350,18 @@ mod tests {
         let server = TestServer::start(|r| match (r.method.as_str(), r.path.as_str()) {
             (
                 "GET",
-                "/projects/pricing%2Fprice-admin/pipelines?ref=feat%2FPRC-412-bulk-discounts&per_page=1",
+                "/projects/platform%2Frepo-a/pipelines?ref=feat%2FTSK-412-bulk-discounts&per_page=1",
             ) => (
                 200,
                 include_str!("fixtures/gitlab_pipelines.json").to_owned(),
             ),
-            ("GET", "/projects/pricing%2Fprice-admin/pipelines/991204417/jobs?per_page=100") => {
+            ("GET", "/projects/platform%2Frepo-a/pipelines/991204417/jobs?per_page=100") => {
                 (200, include_str!("fixtures/gitlab_jobs.json").to_owned())
             }
-            ("GET", "/projects/pricing%2Fprice-admin/jobs/7710021/trace") => {
+            ("GET", "/projects/platform%2Frepo-a/jobs/7710021/trace") => {
                 (200, include_str!("fixtures/gitlab_trace.txt").to_owned())
             }
-            ("POST", "/projects/pricing%2Fprice-admin/pipelines/991204417/retry") => {
+            ("POST", "/projects/platform%2Frepo-a/pipelines/991204417/retry") => {
                 (201, r#"{"id":991204417,"status":"pending"}"#.to_owned())
             }
             _ => (404, r#"{"message":"404 Not Found"}"#.to_owned()),
@@ -389,22 +389,22 @@ mod tests {
 
     #[test]
     fn the_merge_requests_pipeline_comes_first_then_the_branchs() {
-        let p = "/projects/pricing%2Fprice-admin";
+        let p = "/projects/platform%2Frepo-a";
         let jobs = |name: &str| format!(r#"[{{"id":1,"name":"{name}","status":"success"}}]"#);
         let route = move |branch_sha: &'static str| {
             move |r: &crate::test_server::Request| {
                 match r.path.as_str() {
                 x if x.starts_with(&format!("{p}/pipelines?ref=")) => (
                     200,
-                    format!(r#"[{{"id":70,"iid":7,"sha":"{branch_sha}","ref":"feat/PRC-412-bulk-discounts","status":"success"}}]"#),
+                    format!(r#"[{{"id":70,"iid":7,"sha":"{branch_sha}","ref":"feat/TSK-412-bulk-discounts","status":"success"}}]"#),
                 ),
-                x if x.starts_with(&format!("{p}/merge_requests?source_branch=feat%2FPRC-412-bulk-discounts&state=opened")) => {
+                x if x.starts_with(&format!("{p}/merge_requests?source_branch=feat%2FTSK-412-bulk-discounts&state=opened")) => {
                     (200, r#"[{"iid":231,"sha":"bbb"}]"#.to_owned())
                 }
                 x if x == format!("{p}/merge_requests/231/pipelines?per_page=20") => (
                     200,
                     // A merged-results pipeline runs on its own commit.
-                    r#"[{"id":70,"sha":"bbb","ref":"feat/PRC-412-bulk-discounts","status":"success"},
+                    r#"[{"id":70,"sha":"bbb","ref":"feat/TSK-412-bulk-discounts","status":"success"},
                         {"id":81,"iid":8,"sha":"merged","ref":"refs/merge-requests/231/head","status":"running"},
                         {"id":60,"sha":"aaa","ref":"refs/merge-requests/231/head","status":"failed"}]"#
                         .to_owned(),

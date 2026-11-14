@@ -91,7 +91,7 @@ extension _Actions on _TaskDetailState {
     ]);
   }
 
-  /// "feat/PRC-11355-migraciones · price-admin · Claude Code".
+  /// "feat/TSK-11355-migraciones · repo-a · Claude Code".
   String _preview(AppState s) {
     final repo = _repo == null ? s.workspace.repos.firstOrNull : s.workspace.repo(_repo!);
     final agents = s.agents.connected;

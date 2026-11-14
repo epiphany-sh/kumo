@@ -24,14 +24,14 @@ const _mine = RepoPullRequest(
   number: '#521',
   title: 'feat: bulk discounts by category',
   author: 'Mauri',
-  branch: 'feat/PRC-412-bulk-discounts',
+  branch: 'feat/TSK-412-bulk-discounts',
   state: RepoPrState.draft,
   mine: true,
   base: 'main',
 );
 
 PrAgentTarget _target({String host = 'GH', bool inWorktree = true, RepoPullRequest pr = _mine}) =>
-    PrAgentTarget(pr: pr, repoName: 'price-admin', host: host, base: 'main', inWorktree: inWorktree);
+    PrAgentTarget(pr: pr, repoName: 'repo-a', host: host, base: 'main', inWorktree: inWorktree);
 
 void main() {
   group('prompts', () {
@@ -45,7 +45,7 @@ void main() {
 
     test('without the PR’s worktree it reads the branch from origin', () {
       final p = prAgentPrompt(PrAgentJob.explain, _target(inWorktree: false));
-      expect(p, contains('git diff origin/main...origin/feat/PRC-412-bulk-discounts'));
+      expect(p, contains('git diff origin/main...origin/feat/TSK-412-bulk-discounts'));
       expect(p, contains('don’t check it out'));
     });
 
@@ -65,21 +65,21 @@ void main() {
     test('the description goes to the draft file, with what was picked', () {
       final p = prDescriptionPrompt(
         _target(),
-        draftPath: '/tmp/kumo-pr/price-admin-521.md',
-        titlePath: '/tmp/kumo-pr/price-admin-521.title.txt',
-        ticket: 'Bulk discounts by category\n\nTask PRC-412 (Jira).',
+        draftPath: '/tmp/kumo-pr/repo-a-521.md',
+        titlePath: '/tmp/kumo-pr/repo-a-521.title.txt',
+        ticket: 'Bulk discounts by category\n\nTask TSK-412 (Jira).',
         templatePath: '.github/pull_request_template.md',
         length: PrDescriptionLength.short,
         extra: 'the flag stays off in production',
       );
-      expect(p, contains('`/tmp/kumo-pr/price-admin-521.md`'));
-      expect(p, contains('`/tmp/kumo-pr/price-admin-521.title.txt`'));
+      expect(p, contains('`/tmp/kumo-pr/repo-a-521.md`'));
+      expect(p, contains('`/tmp/kumo-pr/repo-a-521.title.txt`'));
       expect(p, contains('.github/pull_request_template.md'));
       expect(p, contains('gh pr view 521 --json body'));
       expect(p, contains('Length: ${PrDescriptionLength.short.hint}'));
       expect(p, contains('Also: the flag stays off in production'));
       expect(p, contains('don’t edit the pull request'));
-      expect(p, endsWith('Task PRC-412 (Jira).'));
+      expect(p, endsWith('Task TSK-412 (Jira).'));
     });
 
     test('without a ticket or commits, it isn’t told to read them', () {
@@ -95,16 +95,16 @@ void main() {
     });
 
     test('the ticket key comes from the branch', () {
-      expect(ticketKeyIn('feat/PRC-412-bulk-discounts'), 'PRC-412');
+      expect(ticketKeyIn('feat/TSK-412-bulk-discounts'), 'TSK-412');
       expect(ticketKeyIn('chore/golangci-1.61'), isNull);
     });
   });
 
   test('the mock edits pull requests in place', () async {
-    final repo = Mock.repoNamed('price-admin')!;
+    final repo = Mock.repoNamed('repo-a')!;
     final a = MockRepoActivity(repo, repo.worktrees);
     final pr = a.pullRequests.firstWhere((p) => p.number == '#521');
-    expect(pr.url, 'https://github.com/pricing/price-admin/pull/521');
+    expect(pr.url, 'https://github.com/platform/repo-a/pull/521');
     expect(a.prsEditable, isTrue);
     await a.editPr(pr, draft: false, body: 'Hello');
     expect(a.pullRequests.firstWhere((p) => p.number == '#521').state, RepoPrState.reviewRequested);

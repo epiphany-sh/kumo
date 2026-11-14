@@ -378,8 +378,8 @@ mod tests {
                 api: api.into(),
                 web: "https://github.com".into(),
             },
-            repo: "pricing/price-admin".into(),
-            branch: "feat/PRC-412-bulk-discounts".into(),
+            repo: "platform/repo-a".into(),
+            branch: "feat/TSK-412-bulk-discounts".into(),
         }
     }
 
@@ -390,10 +390,10 @@ mod tests {
         let server = TestServer::with_headers(move |r| {
             let etag = |tag: &str| vec![("ETag".to_owned(), tag.to_owned())];
             match (r.method.as_str(), r.path.as_str()) {
-                ("GET", p) if p.starts_with("/repos/pricing/price-admin/actions/runs?") => {
+                ("GET", p) if p.starts_with("/repos/platform/repo-a/actions/runs?") => {
                     assert_eq!(
                         p,
-                        "/repos/pricing/price-admin/actions/runs?branch=feat%2FPRC-412-bulk-discounts&per_page=30"
+                        "/repos/platform/repo-a/actions/runs?branch=feat%2FTSK-412-bulk-discounts&per_page=30"
                     );
                     if r.header("if-none-match") == Some("\"runs-1\"") {
                         (304, etag("\"runs-1\""), String::new())
@@ -418,10 +418,9 @@ mod tests {
                         include_str!("fixtures/github_annotations.json").to_owned(),
                     )
                 }
-                (
-                    "POST",
-                    "/repos/pricing/price-admin/actions/runs/11896352187/rerun-failed-jobs",
-                ) => (201, Vec::new(), String::new()),
+                ("POST", "/repos/platform/repo-a/actions/runs/11896352187/rerun-failed-jobs") => {
+                    (201, Vec::new(), String::new())
+                }
                 _ => (404, Vec::new(), r#"{"message":"Not Found"}"#.to_owned()),
             }
         });

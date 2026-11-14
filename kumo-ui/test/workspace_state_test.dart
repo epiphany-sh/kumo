@@ -29,14 +29,14 @@ class _RecordingSource extends MockWorkspaceSource {
 }
 
 void main() {
-  const feature = 'feat/PRC-412-bulk-discounts';
+  const feature = 'feat/TSK-412-bulk-discounts';
 
   test('removing a worktree reaches git only when the undo window closes', () async {
     final source = _RecordingSource();
     final s = AppState(workspace: source);
-    final repo = source.repo('price-admin')!;
+    final repo = source.repo('repo-a')!;
 
-    s.deleteWorktree('price-admin', feature);
+    s.deleteWorktree('repo-a', feature);
     expect(s.worktreesOf(repo).map((w) => w.branch), isNot(contains(feature)), reason: 'hidden at once');
     expect(source.removed, isEmpty, reason: 'nothing destructive while undo is possible');
 
@@ -44,19 +44,19 @@ void main() {
     expect(source.removed, isEmpty);
     expect(s.worktreesOf(repo).map((w) => w.branch), contains(feature));
 
-    s.deleteWorktree('price-admin', feature);
+    s.deleteWorktree('repo-a', feature);
     s.dismissUndo(); // what the 8 s timer does
     await Future<void>.delayed(Duration.zero);
-    expect(source.removed, ['~/wt/price-admin/PRC-412']);
+    expect(source.removed, ['~/wt/repo-a/TSK-412']);
     s.dispose();
   });
 
   test('a worktree with changes comes back with an offer to delete it anyway', () async {
     final source = _RecordingSource()..answer = const WorktreeRemoval(removed: false, changedFiles: 2);
     final s = AppState(workspace: source);
-    final repo = source.repo('price-admin')!;
+    final repo = source.repo('repo-a')!;
 
-    s.deleteWorktree('price-admin', feature, deleteBranch: true);
+    s.deleteWorktree('repo-a', feature, deleteBranch: true);
     s.dismissUndo();
     await Future<void>.delayed(Duration.zero);
     expect(s.worktreesOf(repo).map((w) => w.branch), contains(feature), reason: 'git kept it');
@@ -77,7 +77,7 @@ void main() {
   test('a branch git keeps is said, with nothing to undo', () async {
     final source = _RecordingSource()..answer = const WorktreeRemoval(branchKept: "branch $feature has commits that aren't merged");
     final s = AppState(workspace: source);
-    s.deleteWorktree('price-admin', feature, deleteBranch: true);
+    s.deleteWorktree('repo-a', feature, deleteBranch: true);
     s.dismissUndo();
     await Future<void>.delayed(Duration.zero);
     expect(s.undo?.message, "Branch $feature has commits that aren't merged: kept");
@@ -88,23 +88,23 @@ void main() {
   test('a new undoable action commits the previous one', () {
     final source = _RecordingSource();
     final s = AppState(workspace: source);
-    s.deleteNamespace('pricing');
+    s.deleteNamespace('platform');
     expect(source.deletedNamespaces, isEmpty);
     s.deleteNamespace('identity');
-    expect(source.deletedNamespaces, ['pricing']);
+    expect(source.deletedNamespaces, ['platform']);
     s.undoLast();
-    expect(source.deletedNamespaces, ['pricing'], reason: 'identity was restored, never deleted');
+    expect(source.deletedNamespaces, ['platform'], reason: 'identity was restored, never deleted');
     expect(s.namespaces.map((n) => n.id), ['identity']);
     s.dispose();
   });
 
   test('worktrees are selected by path: the same branch in two repos is not ambiguous', () {
     final s = AppState();
-    final reader = s.workspace.repo('price-reader-v2')!;
+    final reader = s.workspace.repo('repo-b')!;
     final main = reader.worktrees.firstWhere((w) => w.isMain);
     s.selectWorktree(main.branch, path: main.path);
-    expect(s.activeRepo?.name, 'price-reader-v2');
-    final adminMain = s.workspace.repo('price-admin')!.worktrees.firstWhere((w) => w.isMain);
+    expect(s.activeRepo?.name, 'repo-b');
+    final adminMain = s.workspace.repo('repo-a')!.worktrees.firstWhere((w) => w.isMain);
     expect(s.isActiveWorktree(adminMain), isFalse, reason: 'also "main", other repo');
     s.dispose();
   });

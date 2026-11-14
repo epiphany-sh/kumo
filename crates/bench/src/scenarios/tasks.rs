@@ -151,7 +151,7 @@ pub async fn run(client: &mut KumoClient) -> anyhow::Result<()> {
 
 fn write_vault(vault: &Path) -> anyhow::Result<()> {
     let words = [
-        "deploy", "kafka", "pricing", "review", "rotate", "invoice", "migrate", "cache",
+        "deploy", "kafka", "platform", "review", "rotate", "invoice", "migrate", "cache",
     ];
     for n in 0..NOTES {
         let folder = vault.join(format!("Area {}", n % 10));

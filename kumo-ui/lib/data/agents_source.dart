@@ -78,10 +78,10 @@ class AgentContextItem {
   const AgentContextItem({required this.kind, required this.title, this.detail = '', this.url = '', this.id = ''});
   final AgentContextKind kind;
 
-  /// e.g. "PRC-412 · Bulk discounts by category".
+  /// e.g. "TSK-412 · Bulk discounts by category".
   final String title;
 
-  /// Where it lives, e.g. "Jira" or "Confluence · Pricing".
+  /// Where it lives, e.g. "Jira" or "Confluence · Platform".
   final String detail;
   final String url;
 
@@ -352,10 +352,10 @@ class MockAgentsSource extends AgentsSource {
   @override
   List<AgentRun> get runs => const [];
 
-  /// In the design, `claude` typed by hand in zsh 2 of feat/PRC-412.
+  /// In the design, `claude` typed by hand in zsh 2 of feat/TSK-412.
   @override
   List<TerminalAgent> get terminalAgents => const [
-        TerminalAgent(terminalId: 'mock:zsh2', providerId: 'claude', name: 'claude', terminalTitle: 'zsh 2', cwd: '~/wt/price-admin/PRC-412'),
+        TerminalAgent(terminalId: 'mock:zsh2', providerId: 'claude', name: 'claude', terminalTitle: 'zsh 2', cwd: '~/wt/repo-a/TSK-412'),
       ];
 
   /// What [sendToTerminal] typed.
