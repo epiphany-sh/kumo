@@ -6,8 +6,10 @@ mod changes;
 mod cli;
 mod history;
 mod repo_finder;
+mod repo_locator;
 mod runs;
 mod tags;
 
 pub use cli::GitCli;
 pub use repo_finder::FsRepoFinder;
+pub use repo_locator::GitDirLocator;

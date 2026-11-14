@@ -1,6 +1,7 @@
 //! Kumo's shell integration: zsh, bash and fish report their prompts and
-//! the commands run at them (OSC 133), through scripts loaded on top of the
-//! user's own startup files, which load as they always do.
+//! the commands run at them (OSC 133, and 633 for the line run and its
+//! folder), through scripts loaded on top of the user's own startup files,
+//! which load as they always do.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -58,7 +59,7 @@ impl ShellScripts {
 }
 
 impl ShellIntegration for ShellScripts {
-    fn apply(&self, spec: LaunchSpec) -> LaunchSpec {
+    fn apply(&self, spec: LaunchSpec, nonce: &str) -> LaunchSpec {
         let Some(shell) = Shell::of(spec.program()) else {
             return spec;
         };
@@ -66,6 +67,9 @@ impl ShellIntegration for ShellScripts {
         if !spec.args().iter().all(|arg| interactive(arg)) {
             return spec;
         }
+        // The scripts keep it in a shell variable and drop it from the
+        // environment, so what the shell runs doesn't get it.
+        let spec = spec.with_var("KUMO_NONCE", nonce);
         match shell {
             // zsh reads `.zshenv` from ZDOTDIR first: Kumo's puts the
             // user's ZDOTDIR back and reads theirs.
@@ -160,32 +164,35 @@ mod tests {
 
     #[test]
     fn zsh_starts_from_kumo_s_zdotdir_and_keeps_the_user_s() {
-        let applied =
-            scripts().apply(spec("/bin/zsh", &["-l"]).with_var("ZDOTDIR", "/home/u/.config/zsh"));
+        let applied = scripts().apply(
+            spec("/bin/zsh", &["-l"]).with_var("ZDOTDIR", "/home/u/.config/zsh"),
+            "n0nce",
+        );
         assert_eq!(applied.args(), ["-l"]);
         assert_eq!(applied.var("ZDOTDIR"), Some(script("zsh").as_str()));
         assert_eq!(
             applied.var("KUMO_USER_ZDOTDIR"),
             Some("/home/u/.config/zsh")
         );
+        assert_eq!(applied.var("KUMO_NONCE"), Some("n0nce"));
     }
 
     #[test]
     fn bash_reads_kumo_s_script_and_is_told_it_was_a_login_shell() {
-        let applied = scripts().apply(spec("/bin/bash", &["-l"]));
+        let applied = scripts().apply(spec("/bin/bash", &["-l"]), "n0nce");
         assert_eq!(
             applied.args(),
             ["--init-file", script("kumo.bash").as_str(), "-i"]
         );
         assert_eq!(applied.var("KUMO_BASH_LOGIN"), Some("1"));
 
-        let applied = scripts().apply(spec("bash", &[]));
+        let applied = scripts().apply(spec("bash", &[]), "n0nce");
         assert_eq!(applied.var("KUMO_BASH_LOGIN"), None);
     }
 
     #[test]
     fn fish_sources_kumo_s_script_after_its_own() {
-        let applied = scripts().apply(spec("/opt/homebrew/bin/fish", &["-l"]));
+        let applied = scripts().apply(spec("/opt/homebrew/bin/fish", &["-l"]), "n0nce");
         assert_eq!(applied.args()[..2], ["-l", "--init-command"]);
         assert_eq!(
             applied.var("KUMO_FISH_INTEGRATION"),
@@ -204,7 +211,7 @@ mod tests {
         ] {
             let before = spec(program, args);
             assert_eq!(
-                scripts().apply(before.clone()),
+                scripts().apply(before.clone(), "n0nce"),
                 before,
                 "{program} {args:?}"
             );

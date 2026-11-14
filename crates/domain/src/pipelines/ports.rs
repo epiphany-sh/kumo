@@ -13,6 +13,12 @@ pub trait CiClient: Send + Sync + 'static {
     /// The latest run of the branch, with its jobs; None when it has none.
     fn latest_run(&self, target: &CiTarget, token: &str) -> Result<Option<CiRun>, CiProblem>;
 
+    /// Every run of the branch's latest commit, with their jobs: the pull
+    /// request's first, then the rest. Where a commit has one run, that one.
+    fn runs(&self, target: &CiTarget, token: &str) -> Result<Vec<CiRun>, CiProblem> {
+        Ok(self.latest_run(target, token)?.into_iter().collect())
+    }
+
     /// Re-runs the failed jobs of `run` (or the whole run where the
     /// provider can't re-run single jobs).
     fn rerun_failed(&self, target: &CiTarget, token: &str, run: &CiRun) -> Result<(), CiProblem>;

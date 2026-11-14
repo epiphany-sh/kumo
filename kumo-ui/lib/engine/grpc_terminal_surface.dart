@@ -8,6 +8,7 @@ import 'package:grpc/grpc.dart';
 
 import '../platform/os/host_os.dart';
 import '../terminal/ansi_screen.dart';
+import '../terminal/command_history.dart';
 import '../terminal/terminal_surface.dart';
 import 'generated/kumo/v1/kumo.pbgrpc.dart';
 import 'kumo_engine.dart';
@@ -16,13 +17,16 @@ import 'kumo_engine.dart';
 ///
 /// Output is parsed as it arrives but published at most once per frame
 /// (kumo.md §5.6). Keystrokes typed before the stream is up are queued.
-class GrpcTerminalSurface implements TerminalModes {
+class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
   /// Opens the user's login shell in [directory] (their home directory by
   /// default). The PTY is opened at the pane's real size, once it is first
   /// laid out.
   ///
   /// [adopt] may hand over a terminal the daemon already runs instead.
-  GrpcTerminalSurface.shell(this._engine, {String? directory, this.onExit, Future<TerminalInfo?> Function()? adopt})
+  ///
+  /// With [rememberCommands], the daemon remembers what it runs (Settings →
+  /// Terminal).
+  GrpcTerminalSurface.shell(this._engine, {String? directory, this.onExit, Future<TerminalInfo?> Function()? adopt, this.rememberCommands = true})
       : title = _shellName,
         cwd = _shorten(directory),
         _directory = directory,
@@ -47,6 +51,7 @@ class GrpcTerminalSurface implements TerminalModes {
         cwd = _shorten(directory),
         _directory = directory,
         _existingId = terminalId,
+        rememberCommands = false,
         _adopt = null {
     _run();
   }
@@ -61,6 +66,10 @@ class GrpcTerminalSurface implements TerminalModes {
 
   /// Called with the exit code when the process ends.
   final void Function(int exitCode)? onExit;
+
+  /// A new shell remembers what it runs (one adopted or re-attached keeps
+  /// what it was opened with).
+  final bool rememberCommands;
 
   @override
   final String title;
@@ -79,12 +88,79 @@ class GrpcTerminalSurface implements TerminalModes {
   bool _frameScheduled = false;
   bool _disposed = false;
   Timer? _resizeTimer;
+  final _history = ValueNotifier(CommandHistory.empty);
+  int _seenDone = -1;
+  Timer? _historyTimer;
+  Future<void>? _historyRead;
 
   @override
   ValueListenable<TermBuffer> get buffer => _buffer;
 
   @override
   bool get interactive => true;
+
+  @override
+  ValueListenable<CommandHistory> get history => _history;
+
+  @override
+  Future<void> refreshHistory() {
+    final id = _terminalId;
+    final conn = _engine.current;
+    if (id == null || conn == null || _disposed) return Future.value();
+    // One read at a time: a burst of finished commands (a replay) needs
+    // only the last.
+    return _historyRead ??= () async {
+      try {
+        final reply = await conn.terminals.history(HistoryRequest(terminalId: id));
+        if (_disposed) return;
+        _history.value = CommandHistory(
+          [
+            for (final e in reply.entries)
+              HistoryItem(
+                e.command,
+                runs: e.runs,
+                lastRun: DateTime.fromMicrosecondsSinceEpoch((e.lastRunUnixNanos ~/ 1000).toInt()),
+                lastExit: e.hasLastExit() ? e.lastExit : null,
+                lastCwd: e.lastCwd,
+              ),
+          ],
+          cwd: reply.cwd,
+          repo: reply.repo,
+        );
+      } on Object {
+        // An older daemon, or gone: no history to suggest from.
+      } finally {
+        _historyRead = null;
+      }
+    }();
+  }
+
+  @override
+  Future<int> forgetHistory({bool everything = false}) async {
+    final id = _terminalId;
+    final conn = _engine.current;
+    if (id == null || conn == null) return 0;
+    final reply = await conn.terminals.forgetHistory(ForgetHistoryRequest(terminalId: id, everything: everything));
+    await refreshHistory();
+    return reply.forgotten;
+  }
+
+  @override
+  void insertCommand(String command, {bool run = false}) {
+    // ⌃E ⌃U: to the end of the line, then erase it, in emacs-style line
+    // editing (zsh, bash and fish by default).
+    final line = command.contains('\n') && bracketedPaste ? '\x1b[200~$command\x1b[201~' : command;
+    sendBytes([0x05, 0x15, ...utf8.encode(line), if (run) 0x0d]);
+  }
+
+  /// A command finished: what the daemon remembers changed.
+  void _historyMaybeChanged() {
+    final done = _screen.commandsDone;
+    if (done == _seenDone) return;
+    _seenDone = done;
+    _historyTimer?.cancel();
+    _historyTimer = Timer(const Duration(milliseconds: 60), refreshHistory);
+  }
 
   @override
   bool get applicationCursorKeys => _screen.applicationCursorKeys;
@@ -140,6 +216,7 @@ class GrpcTerminalSurface implements TerminalModes {
       _pending.clear();
 
       final output = _output = conn.terminals.attach(input.stream);
+      unawaited(refreshHistory());
       await for (final message in output) {
         if (message.hasOutput()) {
           _screen.feed(message.output.data);
@@ -171,6 +248,7 @@ class GrpcTerminalSurface implements TerminalModes {
       rows: rows,
       // zsh, bash and fish mark what you run (see YourLines).
       shellIntegration: true,
+      rememberCommands: rememberCommands,
     );
   }
 
@@ -198,6 +276,7 @@ class GrpcTerminalSurface implements TerminalModes {
   void _render() {
     if (_disposed) return;
     _buffer.value = _screen.snapshot(seq: _seq);
+    _historyMaybeChanged();
   }
 
   @override
@@ -241,11 +320,13 @@ class GrpcTerminalSurface implements TerminalModes {
     if (_disposed) return;
     _disposed = true;
     _resizeTimer?.cancel();
+    _historyTimer?.cancel();
     final conn = _engine.current;
     if (killOnClose && conn != null && _terminalId != null) unawaited(_closeRemote(conn));
     _input?.close();
     _output?.cancel();
     _buffer.dispose();
+    _history.dispose();
   }
 
   Future<void> _closeRemote(EngineConnection conn) async {

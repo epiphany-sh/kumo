@@ -18,7 +18,7 @@ pub fn status_from(error: TerminalError) -> Status {
         TerminalError::Spawn(_) | TerminalError::SessionClosed => {
             Status::failed_precondition(message)
         }
-        TerminalError::Io(_) => Status::internal(message),
+        TerminalError::Io(_) | TerminalError::History(_) => Status::internal(message),
     }
 }
 

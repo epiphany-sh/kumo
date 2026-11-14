@@ -83,7 +83,7 @@ class TermLine {
 /// screen state (dirty-line diffs from the daemon); in M0/M1 raw bytes.
 @immutable
 class TermBuffer {
-  const TermBuffer(this.lines, {this.cursorVisible = true, this.cursor, this.seq = 0, this.dropped = 0, this.reflows = 0, this.altScreen = false, this.blocks = const [], this.prompts = const []});
+  const TermBuffer(this.lines, {this.cursorVisible = true, this.cursor, this.seq = 0, this.dropped = 0, this.reflows = 0, this.altScreen = false, this.blocks = const [], this.prompts = const [], this.input});
   final List<TermLine> lines;
   final bool cursorVisible;
 
@@ -114,6 +114,10 @@ class TermBuffer {
   /// an empty line), in order: each gets room above it.
   final List<int> prompts;
 
+  /// What you've typed at the prompt, up to the cursor, when the shell
+  /// marks where you type: what the terminal suggests a command for.
+  final PromptInput? input;
+
   /// [more] lines at the end; [block] marks the first of them as something
   /// you sent (mocks: a steer message), which ends the block before it.
   TermBuffer append(List<TermLine> more, {int maxLines = 5000, bool block = false}) {
@@ -128,6 +132,22 @@ class TermBuffer {
     ];
     return TermBuffer(trimmed, cursorVisible: cursorVisible, cursor: cursor, seq: seq + 1, dropped: dropped + cut, blocks: kept);
   }
+}
+
+/// The line you're typing at a shell's prompt, up to the cursor.
+@immutable
+class PromptInput {
+  const PromptInput(this.text, {this.trailing = false, this.room = 0});
+
+  final String text;
+
+  /// Something is drawn right at the cursor: you moved back into the line,
+  /// or another tool (zsh-autosuggestions) shows its own suggestion.
+  final bool trailing;
+
+  /// Free cells from the cursor to the end of its row, or to what's drawn
+  /// further right on it (a right prompt).
+  final int room;
 }
 
 /// What the UI needs from a terminal session. Implemented by the mocks and

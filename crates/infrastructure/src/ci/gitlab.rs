@@ -50,30 +50,102 @@ impl GitLabCi {
     }
 }
 
+impl GitLabCi {
+    /// The newest pipeline of the branch's open merge request, with the
+    /// merge request's head commit. Best effort: without it the branch's
+    /// own pipeline shows alone.
+    fn request_pipeline(
+        &self,
+        base: &str,
+        branch: &str,
+        headers: &[Header],
+    ) -> Option<(String, Value)> {
+        let requests = self
+            .http
+            .get_json(
+                &format!(
+                    "{base}/merge_requests?source_branch={}&state=opened&order_by=updated_at&sort=desc&per_page=1",
+                    enc(branch)
+                ),
+                headers,
+            )
+            .ok()?;
+        let request = requests.get(0)?;
+        let head = request["sha"].as_str()?.to_owned();
+        let pipelines = self
+            .http
+            .get_json(
+                &format!(
+                    "{base}/merge_requests/{}/pipelines?per_page=20",
+                    id(&request["iid"])
+                ),
+                headers,
+            )
+            .ok()?;
+        // Newest first; the list can carry the branch's pipelines too.
+        let pipeline = pipelines.as_array()?.iter().find(|p| {
+            p["ref"]
+                .as_str()
+                .is_some_and(|r| r.starts_with("refs/merge-requests/"))
+        })?;
+        Some((head, pipeline.clone()))
+    }
+}
+
 impl CiClient for GitLabCi {
     fn provider(&self) -> CiProvider {
         CiProvider::GitLabCi
     }
 
     fn latest_run(&self, target: &CiTarget, token: &str) -> Result<Option<CiRun>, CiProblem> {
+        Ok(self.runs(target, token)?.into_iter().next())
+    }
+
+    /// The merge request's pipeline, then the branch's. A merge request
+    /// pipeline hangs from the merge request's own ref, so asking for the
+    /// branch's pipelines never lists it.
+    fn runs(&self, target: &CiTarget, token: &str) -> Result<Vec<CiRun>, CiProblem> {
         let headers = Self::headers(token);
         let base = Self::base(target);
         let pipelines = self.http.get_json(
             &format!("{base}/pipelines?ref={}&per_page=1", enc(&target.branch)),
             &headers,
         )?;
-        let Some(pipeline) = pipelines.get(0) else {
-            return Ok(None);
-        };
-        let jobs = self.http.get_json(
-            &format!("{base}/pipelines/{}/jobs?per_page=100", id(&pipeline["id"])),
-            &headers,
-        )?;
-        let mut run = parse_run(pipeline, &jobs);
-        for job in run.jobs.iter_mut().filter(|j| j.state == CiState::Failed) {
-            job.failure = self.failure(&base, &job.id, &headers);
+        let of_branch = pipelines.get(0);
+        let of_request = self.request_pipeline(&base, &target.branch, &headers);
+        let mut picked: Vec<(&Value, bool)> = Vec::new();
+        if let Some((_, pipeline)) = &of_request {
+            picked.push((pipeline, true));
         }
-        Ok(Some(run))
+        if let Some(pipeline) = of_branch {
+            // Next to the merge request's, only the one of the same commit:
+            // an older one is from before the merge request had pipelines.
+            let same = |(head, request): &(String, Value)| {
+                pipeline["sha"].as_str() == Some(head) && pipeline["id"] != request["id"]
+            };
+            if of_request.as_ref().is_none_or(same) {
+                picked.push((pipeline, false));
+            }
+        }
+        let mut runs = Vec::new();
+        for (pipeline, for_request) in picked {
+            let jobs = self.http.get_json(
+                &format!("{base}/pipelines/{}/jobs?per_page=100", id(&pipeline["id"])),
+                &headers,
+            )?;
+            let mut run = parse_run(pipeline, &jobs);
+            run.pull_request = for_request;
+            run.workflow = if for_request {
+                "merge request".to_owned()
+            } else {
+                "branch".to_owned()
+            };
+            for job in run.jobs.iter_mut().filter(|j| j.state == CiState::Failed) {
+                job.failure = self.failure(&base, &job.id, &headers);
+            }
+            runs.push(run);
+        }
+        Ok(runs)
     }
 
     fn rerun_failed(&self, target: &CiTarget, token: &str, run: &CiRun) -> Result<(), CiProblem> {
@@ -149,6 +221,8 @@ pub(super) fn parse_run(pipeline: &Value, jobs: &Value) -> CiRun {
                 }
             })
             .collect(),
+        workflow: String::new(),
+        pull_request: false,
     }
 }
 
@@ -304,9 +378,60 @@ mod tests {
         client
             .rerun_failed(&target(&server.url), "glpat-secret", &run)
             .unwrap();
+        assert!(
+            !run.pull_request,
+            "no merge request: the branch's pipeline alone"
+        );
         let requests = server.requests();
         assert_eq!(requests[0].header("private-token"), Some("glpat-secret"));
         assert_eq!(requests.last().unwrap().method, "POST");
+    }
+
+    #[test]
+    fn the_merge_requests_pipeline_comes_first_then_the_branchs() {
+        let p = "/projects/platform%2Frepo-a";
+        let jobs = |name: &str| format!(r#"[{{"id":1,"name":"{name}","status":"success"}}]"#);
+        let route = move |branch_sha: &'static str| {
+            move |r: &crate::test_server::Request| {
+                match r.path.as_str() {
+                x if x.starts_with(&format!("{p}/pipelines?ref=")) => (
+                    200,
+                    format!(r#"[{{"id":70,"iid":7,"sha":"{branch_sha}","ref":"feat/TSK-412-bulk-discounts","status":"success"}}]"#),
+                ),
+                x if x.starts_with(&format!("{p}/merge_requests?source_branch=feat%2FTSK-412-bulk-discounts&state=opened")) => {
+                    (200, r#"[{"iid":231,"sha":"bbb"}]"#.to_owned())
+                }
+                x if x == format!("{p}/merge_requests/231/pipelines?per_page=20") => (
+                    200,
+                    // A merged-results pipeline runs on its own commit.
+                    r#"[{"id":70,"sha":"bbb","ref":"feat/TSK-412-bulk-discounts","status":"success"},
+                        {"id":81,"iid":8,"sha":"merged","ref":"refs/merge-requests/231/head","status":"running"},
+                        {"id":60,"sha":"aaa","ref":"refs/merge-requests/231/head","status":"failed"}]"#
+                        .to_owned(),
+                ),
+                x if x == format!("{p}/pipelines/81/jobs?per_page=100") => (200, jobs("test")),
+                x if x == format!("{p}/pipelines/70/jobs?per_page=100") => (200, jobs("deploy")),
+                _ => (404, r#"{"message":"404 Not Found"}"#.to_owned()),
+            }
+            }
+        };
+        let server = TestServer::start(route("bbb"));
+        let runs = GitLabCi::default()
+            .runs(&target(&server.url), "glpat-secret")
+            .unwrap();
+        let seen: Vec<_> = runs
+            .iter()
+            .map(|r| (r.id.as_str(), r.pull_request, r.jobs[0].name.as_str()))
+            .collect();
+        assert_eq!(seen, [("81", true, "test"), ("70", false, "deploy")]);
+        assert_eq!(runs[0].state, CiState::Running);
+
+        let server = TestServer::start(route("aaa"));
+        let runs = GitLabCi::default()
+            .runs(&target(&server.url), "glpat-secret")
+            .unwrap();
+        assert_eq!(runs.len(), 1, "the branch's pipeline is of an older commit");
+        assert_eq!(runs[0].id, "81");
     }
 
     #[test]

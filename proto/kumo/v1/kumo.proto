@@ -192,6 +192,11 @@ service Terminals {
   // Kills the process (if still running) and forgets the session.
   rpc Close(CloseRequest) returns (CloseResponse);
   rpc List(ListRequest) returns (ListResponse);
+  // The commands remembered for the repository a shell is in, last run
+  // first: what the history panel lists and the terminal suggests.
+  rpc History(HistoryRequest) returns (HistoryResponse);
+  // Forgets the commands of the repository a shell is in, or all of them.
+  rpc ForgetHistory(ForgetHistoryRequest) returns (ForgetHistoryResponse);
 }
 
 message OpenRequest {
@@ -206,6 +211,9 @@ message OpenRequest {
   // bash and fish mark each prompt and command with OSC 133). Ignored for
   // other programs and when there are arguments other than -l / -i.
   bool shell_integration = 7;
+  // With shell_integration: remember the commands it runs (per repository,
+  // in the profile's database), for History.
+  bool remember_commands = 8;
 }
 
 message OpenResponse {
@@ -274,6 +282,41 @@ message TerminalInfo {
   // Where it started (absolute); empty if it started in the daemon's own
   // directory. Lets a UI put terminals back with their worktree.
   string cwd = 5;
+}
+
+message HistoryRequest {
+  string terminal_id = 1;
+  // Most entries returned; 0 is the default (1000).
+  uint32 limit = 2;
+}
+
+message HistoryResponse {
+  repeated HistoryEntry entries = 1;
+  // The repository's main checkout; empty for what ran outside one.
+  string repo = 2;
+  // The folder the shell is in now.
+  string cwd = 3;
+}
+
+message HistoryEntry {
+  string command = 1;
+  uint32 runs = 2;
+  uint64 last_run_unix_nanos = 3;
+  // Status of its last run, when the shell reported one.
+  optional int32 last_exit = 4;
+  // Where it last ran; empty when the shell didn't say.
+  string last_cwd = 5;
+}
+
+message ForgetHistoryRequest {
+  // The shell whose repository's commands go; with `everything`, may be
+  // empty.
+  string terminal_id = 1;
+  bool everything = 2;
+}
+
+message ForgetHistoryResponse {
+  uint32 forgotten = 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -1647,6 +1690,9 @@ message PipelinesSnapshot {
   optional CiProblem problem = 5;
   // When the provider last answered (Unix ms, 0 = never).
   int64 checked_at = 6;
+  // The other runs of latest's commit: the pull request's first, then the
+  // ones that ran for something else (a push, a schedule).
+  repeated CiRun others = 7;
 }
 
 message CiRun {
@@ -1663,6 +1709,10 @@ message CiRun {
   int64 finished_at = 7;
   string url = 8;
   repeated CiJob jobs = 9;
+  // The workflow it is a run of ("ci"); empty where a commit has one run.
+  string workflow = 10;
+  // It ran for the branch's pull request (its checks).
+  bool pull_request = 11;
 }
 
 message CiJob {

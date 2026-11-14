@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
 import '../data/agents_source.dart';
-import '../data/models.dart' show AgentStatus;
+import '../data/models.dart' show AgentStatus, Repo;
+import '../data/repo_activity.dart' show RepoCommit;
 import '../data/worktree_changes.dart' show CommitInfo;
 import '../editor/file_view.dart';
 import '../overlays/new_agent_dialog.dart';
@@ -15,7 +16,9 @@ import '../engine/grpc_terminal_surface.dart';
 import '../engine/kumo_engine.dart';
 import '../shell/screen_chrome.dart';
 import '../shell/side_panel.dart';
+import 'git_screen.dart' show showRepoCommit;
 import '../theme/palette.dart';
+import '../terminal/command_marks.dart' show YourLines;
 import '../terminal/mock_terminal.dart';
 import '../terminal/pane_layout.dart';
 import '../terminal/terminal_surface.dart';
@@ -158,6 +161,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       directory: _directoryOf(key),
       adopt: adopt ? () => _adoptRunning(key) : null,
       onExit: (_) => _closeExited(id),
+      rememberCommands: _rememberCommands,
     );
     space.tabs.insert(0, _TermTab('t-$id', _single(id), id));
     if (space.tabs.length > 1) space.active++;
@@ -318,11 +322,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
     }
   }
 
+  /// Settings → Appearance → Your lines in the terminal.
+  bool get _rememberCommands => _app?.setting<bool>(YourLines.keyRemember, true) ?? true;
+
   String _newShell() {
     final n = ++_shellSeq;
     final id = 'sh-$n';
     final engine = _engine;
-    _surfaces[id] = engine == null ? (_spaceKey == _homeKey ? MockSessions.homeShell(n) : MockSessions.shell(n)) : GrpcTerminalSurface.shell(engine, directory: _directoryOf(_spaceKey), onExit: (_) => _closeExited(id));
+    _surfaces[id] = engine == null ? (_spaceKey == _homeKey ? MockSessions.homeShell(n) : MockSessions.shell(n)) : GrpcTerminalSurface.shell(engine, directory: _directoryOf(_spaceKey), onExit: (_) => _closeExited(id), rememberCommands: _rememberCommands);
     return id;
   }
 
@@ -1276,34 +1283,54 @@ class _BranchCommitsState extends State<_BranchCommits> {
     final c = context.c;
     _load();
     final commits = _commits ?? const <CommitInfo>[];
+    final repo = s.activeRepo;
     final ahead = s.changes.pushed ? s.commitsAhead : commits.length;
     final note = !s.changes.pushed ? 'not published yet' : (ahead == 0 ? 'all pushed' : '$ahead not pushed');
     return Section(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      // Rows inset 6 px for their hover: the text lines up at 16.
+      padding: const EdgeInsets.fromLTRB(10, 14, 10, 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Icon(KIcons.branch, size: 15, color: c.acc),
-          const SizedBox(width: 8),
-          Expanded(child: Text('Commits on this branch', style: sans(12.5, weight: FontWeight.w600, color: c.text))),
-          Text(note, style: sans(11.5, color: c.text3)),
-        ]),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Row(children: [
+            Icon(KIcons.branch, size: 15, color: c.acc),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Commits on this branch', style: sans(12.5, weight: FontWeight.w600, color: c.text))),
+            Text(note, style: sans(11.5, color: c.text3)),
+          ]),
+        ),
         const SizedBox(height: 8),
-        if (_commits == null) Text('Reading history…', style: sans(12, color: c.text3)),
-        if (_commits != null && commits.isEmpty) Text('No commits yet.', style: sans(12, color: c.text3)),
+        if (_commits == null) Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Text('Reading history…', style: sans(12, color: c.text3))),
+        if (_commits != null && commits.isEmpty) Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Text('No commits yet.', style: sans(12, color: c.text3))),
         for (var i = 0; i < commits.length; i++)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(children: [
-              Text(commits[i].shortSha, style: mono(11.5, color: c.text3)),
-              const SizedBox(width: 9),
-              Expanded(child: Text(commits[i].subject, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: c.text))),
-              if (i < ahead) ...[const SizedBox(width: 8), TagChip('not pushed', color: c.warn, background: c.warnSoft)],
-              const SizedBox(width: 8),
-              Text('${commits[i].author} · ${_ago(commits[i].time)}', style: sans(11.5, color: c.text3)),
-            ]),
+          KPressable(
+            onTap: repo == null ? null : () => _open(context, repo, commits, i),
+            semanticLabel: 'Show what ${commits[i].shortSha} changed: ${commits[i].subject}',
+            builder: (context, hover, focus) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              decoration: BoxDecoration(color: hover || focus ? c.tile : null, borderRadius: BorderRadius.circular(7)),
+              child: Row(children: [
+                Text(commits[i].shortSha, style: mono(11.5, color: hover || focus ? c.acc : c.text3)),
+                const SizedBox(width: 9),
+                Expanded(child: Text(commits[i].subject, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, color: c.text))),
+                if (i < ahead) ...[const SizedBox(width: 8), TagChip('not pushed', color: c.warn, background: c.warnSoft)],
+                const SizedBox(width: 8),
+                Text('${commits[i].author} · ${_ago(commits[i].time)}', style: sans(11.5, color: c.text3)),
+              ]),
+            ),
           ),
       ]),
     );
+  }
+
+  /// The Git view's commit sheet on [commits]`[index]`; ↑ ↓ move through
+  /// the branch's commits.
+  void _open(BuildContext context, Repo repo, List<CommitInfo> commits, int index) {
+    final branch = AppScope.read(context).activeWorktree;
+    final list = [
+      for (final k in commits) RepoCommit(sha: k.sha, shortSha: k.shortSha, subject: k.subject, author: k.author, time: k.time, branch: branch),
+    ];
+    showRepoCommit(context, repo, list, index);
   }
 
   static String _ago(DateTime t) {
