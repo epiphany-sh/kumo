@@ -5,6 +5,7 @@
 mod common;
 
 use common::{TIMEOUT, TestDaemon, git, git_repo, save_namespace};
+use kumo_grpc::client::KumoClient;
 use kumo_proto::v1 as pb;
 
 async fn next(stream: &mut tonic::Streaming<pb::PipelinesSnapshot>) -> pb::PipelinesSnapshot {
@@ -153,5 +154,41 @@ async fn a_repository_without_a_ci_host_is_unsupported() {
     assert_eq!(
         first.problem.unwrap().kind(),
         pb::CiProblemKind::Unsupported
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_remote_added_after_registering_brings_its_host() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let repo = git_repo(&daemon.home().join("dev/late"), None);
+    save_namespace(&mut client, "late", &[&repo]).await;
+    let hosts = |mut client: KumoClient| async move {
+        client
+            .pipelines
+            .list_hosts(pb::ListHostsRequest {})
+            .await
+            .unwrap()
+            .into_inner()
+            .hosts
+    };
+    assert!(hosts(client.clone()).await.is_empty());
+
+    // Pushed for the first time after it was in the workspace.
+    git(
+        &repo,
+        &["remote", "add", "origin", "git@github.com:pricing/late.git"],
+    );
+    client
+        .workspace
+        .refresh(pb::RefreshWorkspaceRequest {})
+        .await
+        .unwrap();
+
+    let after = hosts(client).await;
+    assert_eq!(after.len(), 1);
+    assert_eq!(
+        (after[0].host.as_str(), after[0].repos.as_slice()),
+        ("github.com", &["pricing/late".to_owned()][..])
     );
 }

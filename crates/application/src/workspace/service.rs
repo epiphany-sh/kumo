@@ -125,7 +125,10 @@ impl WorkspaceService {
             .into_iter()
             .flatten()
         {
-            state.repos.insert(read.repo.path.clone(), read);
+            let path = read.repo.path.clone();
+            let before = state.repos.insert(path.clone(), read);
+            self.store_remote_if_changed(before.map(|b| b.repo), &state.repos[&path].repo)
+                .await;
         }
         self.publish(&mut state);
     }
@@ -420,8 +423,33 @@ impl WorkspaceService {
         let read = tokio::task::spawn_blocking(move || read_repo(git.as_ref(), repo))
             .await
             .unwrap_or_else(|e| unreachable_read(&path, &e));
-        state.repos.insert(read.repo.path.clone(), read);
+        let before = state.repos.insert(read.repo.path.clone(), read);
+        self.store_remote_if_changed(before.map(|b| b.repo), &state.repos[&path].repo)
+            .await;
         &state.repos[&path]
+    }
+
+    /// Saves the repository when git's remote is no longer the stored one
+    /// (an `origin` added or moved after it was registered), so the next
+    /// load starts from it. A failed save is logged: the read still stands.
+    async fn store_remote_if_changed(&self, before: Option<Repo>, after: &Repo) {
+        if before.is_none_or(|b| b.remote == after.remote) {
+            return;
+        }
+        let store = Arc::clone(&self.ports.store);
+        let saved = after.clone();
+        match blocking(move || store.save_repo(&saved)).await {
+            Ok(()) => tracing::info!(
+                repo = %after.path.display(),
+                remote = after.remote.as_ref().map_or("none", |r| r.url.as_str()),
+                "repository remote changed"
+            ),
+            Err(error) => tracing::warn!(
+                repo = %after.path.display(),
+                %error,
+                "couldn't store the repository's new remote"
+            ),
+        }
     }
 
     async fn reread_if_changed(&self, state: &mut State, before: RepoState) {
@@ -437,9 +465,14 @@ impl WorkspaceService {
     }
 }
 
-/// Worktrees and their status. Errors are kept in the state, not raised: a
-/// moved repository must not break the whole workspace.
-fn read_repo(git: &dyn Git, repo: Repo) -> RepoState {
+/// Remote, worktrees and their status. Errors are kept in the state, not
+/// raised: a moved repository must not break the whole workspace.
+fn read_repo(git: &dyn Git, mut repo: Repo) -> RepoState {
+    // The remote can change after the repository was registered (a local
+    // repository pushed for the first time); a failed read keeps the known one.
+    if let Ok(url) = git.remote_url(&repo.path) {
+        repo.remote = url.map(|url| Remote::parse(&url));
+    }
     match git.worktrees(&repo.path) {
         Ok(mut worktrees) => {
             for worktree in &mut worktrees {
