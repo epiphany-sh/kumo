@@ -76,6 +76,10 @@ pub struct CiRun {
     pub finished_at: Option<Timestamp>,
     pub url: String,
     pub jobs: Vec<CiJob>,
+    /// The workflow it is a run of (`ci`), where a commit can have several.
+    pub workflow: String,
+    /// It ran for the branch's pull request (its checks).
+    pub pull_request: bool,
 }
 
 impl CiRun {
@@ -186,6 +190,8 @@ pub struct PipelinesSnapshot {
     pub repo: String,
     pub branch: String,
     pub latest: Option<CiRun>,
+    /// The other runs of the same commit, the pull request's first.
+    pub others: Vec<CiRun>,
     pub problem: Option<CiProblem>,
     /// When the provider last answered.
     pub checked_at: Option<Timestamp>,
@@ -243,6 +249,8 @@ mod tests {
             finished_at: None,
             url: String::new(),
             jobs: vec![job(CiState::Failed)],
+            workflow: String::new(),
+            pull_request: false,
         };
         assert!(!run.active());
         assert_eq!(run.short_sha(), "4e1b2c0");

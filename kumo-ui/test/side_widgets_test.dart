@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/data/agents_source.dart';
 import 'package:kumo_ui/data/models.dart';
 import 'package:kumo_ui/data/tests_source.dart';
+import 'package:kumo_ui/shell/screen_chrome.dart';
 import 'package:kumo_ui/shell/side_panel.dart';
 import 'package:kumo_ui/theme/kumo_theme.dart';
 import 'package:kumo_ui/theme/palette.dart';
@@ -254,5 +256,93 @@ void main() {
     await tester.pump();
     expect(find.text('Started Claude Code'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  group('widget heights', () {
+    const resizer = 'Drag to resize · double-click to fit content';
+    // An agent with enough to say that its card is well over the minimum.
+    AgentRun busy(String path) => _run(path, context: const [_ticket], steps: [AgentStep(at: _t0, kind: AgentStepKind.edited, text: 'a.go')]);
+    double cardHeight(WidgetTester tester) => tester.getSize(find.byType(Section).first).height;
+    ScrollPosition inner(WidgetTester tester) => tester.state<ScrollableState>(find.descendant(of: find.byType(Section).first, matching: find.byType(Scrollable)).first).position;
+    ScrollPosition list(WidgetTester tester) => tester.state<ScrollableState>(find.descendant(of: find.byType(ReorderableListView), matching: find.byType(Scrollable)).first).position;
+
+    testWidgets('the gap under a widget drags its height between the minimum and its content', (tester) async {
+      final agents = _Agents();
+      final (state, path) = await _pump(tester, agents: agents);
+      agents.set([busy(path)]);
+      await tester.pump();
+      final full = cardHeight(tester);
+      expect(full, greaterThan(AppState.minWidgetHeight + 40));
+      expect(inner(tester).maxScrollExtent, 0, reason: 'everything fits: nothing to scroll');
+
+      // Up past the minimum: stops there, and the rest scrolls inside.
+      await tester.drag(find.byTooltip(resizer).first, const Offset(0, -600));
+      await tester.pump();
+      expect(state.widgetHeight(InspectorWidget.agent), AppState.minWidgetHeight);
+      expect(cardHeight(tester), AppState.minWidgetHeight);
+      expect(inner(tester).maxScrollExtent, closeTo(full - AppState.minWidgetHeight, 0.01));
+      expect(state.prefs.get<Map<String, Object?>>('widgets.heights', const {}), {'agent': AppState.minWidgetHeight});
+
+      // Down past its content: stops where everything shows.
+      await tester.drag(find.byTooltip(resizer).first, const Offset(0, 900));
+      await tester.pump();
+      expect(cardHeight(tester), closeTo(full, 0.01));
+      expect(state.widgetHeight(InspectorWidget.agent), closeTo(full, 0.01));
+
+      // Double-click: back to following the content.
+      state.setWidgetHeight(InspectorWidget.agent, 150);
+      await tester.pump();
+      expect(cardHeight(tester), 150);
+      await tester.tap(find.byTooltip(resizer).first);
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.tap(find.byTooltip(resizer).first);
+      await tester.pumpAndSettle();
+      expect(state.widgetHeight(InspectorWidget.agent), isNull);
+      expect(cardHeight(tester), closeTo(full, 0.01));
+      expect(state.prefs.get<Map<String, Object?>>('widgets.heights', const {}), isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the keyboard resizes too, and a saved height comes back', (tester) async {
+      final agents = _Agents();
+      final (state, path) = await _pump(tester, agents: agents);
+      agents.set([busy(path)]);
+      await tester.pump();
+      final full = cardHeight(tester);
+      Focus.of(tester.element(find.byTooltip(resizer).first)).requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pump();
+      expect(state.widgetHeight(InspectorWidget.agent), closeTo(full - 16, 0.01));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(cardHeight(tester), closeTo(full, 0.01), reason: 'never taller than its content');
+
+      final again = AppState(prefs: state.prefs..set('widgets.heights', {'agent': 180, 'changes': 5000, 'gone': 300}));
+      expect(again.widgetHeight(InspectorWidget.agent), 180);
+      expect(again.widgetHeight(InspectorWidget.changes), AppState.maxWidgetHeight);
+      again.removeWidget(InspectorWidget.agent);
+      expect(again.widgetHeight(InspectorWidget.agent), isNull);
+    });
+
+    testWidgets('no widget is taller than the panel, and scrolling past its end moves the list', (tester) async {
+      final agents = _Agents();
+      final (state, path) = await _pump(tester, agents: agents);
+      agents.set([busy(path)]);
+      tester.view.physicalSize = const Size(420, 360);
+      await tester.pump();
+      expect(state.widgetHeight(InspectorWidget.agent), isNull);
+      final shown = cardHeight(tester);
+      expect(shown, lessThan(list(tester).viewportDimension));
+      final hidden = inner(tester).maxScrollExtent;
+      expect(hidden, greaterThan(0), reason: 'the card stopped at the panel’s height');
+
+      await tester.drag(find.byType(Section).first, Offset(0, -(hidden + 80)));
+      await tester.pumpAndSettle();
+      expect(inner(tester).pixels, hidden);
+      expect(list(tester).pixels, greaterThan(40), reason: 'the rest of the drag went to the list');
+      expect(tester.takeException(), isNull);
+    });
   });
 }

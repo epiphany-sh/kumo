@@ -47,6 +47,13 @@ void main() {
     expect(run.done, 3);
   });
 
+  test('a run says its workflow and whether it is one of the pull request’s checks', () {
+    final check = ciRunFrom(pb.CiRun(id: '1', label: 'run #31', workflow: 'ci', pullRequest: true));
+    expect((check.workflow, check.pullRequest), ('ci', true));
+    final old = ciRunFrom(pb.CiRun(id: '1', label: 'run #31'));
+    expect((old.workflow, old.pullRequest), ('', false), reason: 'an older kumod doesn’t say');
+  });
+
   test('every problem kind maps, with its extras', () {
     final kinds = {
       pb.CiProblemKind.CI_PROBLEM_KIND_NOT_CONNECTED: CiProblemKind.notConnected,

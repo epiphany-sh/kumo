@@ -13703,6 +13703,7 @@ class PipelinesSnapshot extends $pb.GeneratedMessage {
     CiRun? latest,
     CiProblem? problem,
     $fixnum.Int64? checkedAt,
+    $core.Iterable<CiRun>? others,
   }) {
     final result = PipelinesSnapshot._();
     if (provider != null) result.provider = provider;
@@ -13711,6 +13712,7 @@ class PipelinesSnapshot extends $pb.GeneratedMessage {
     if (latest != null) result.latest = latest;
     if (problem != null) result.problem = problem;
     if (checkedAt != null) result.checkedAt = checkedAt;
+    if (others != null) result.others.addAll(others);
     return result;
   }
 
@@ -13736,6 +13738,8 @@ class PipelinesSnapshot extends $pb.GeneratedMessage {
     ..aOM<CiProblem>(5, _omitFieldNames ? '' : 'problem',
         subBuilder: CiProblem.$_createMessage)
     ..aInt64(6, _omitFieldNames ? '' : 'checkedAt')
+    ..pPM<CiRun>(7, _omitFieldNames ? '' : 'others',
+        subBuilder: CiRun.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -13821,6 +13825,11 @@ class PipelinesSnapshot extends $pb.GeneratedMessage {
   $core.bool hasCheckedAt() => $_has(5);
   @$pb.TagNumber(6)
   void clearCheckedAt() => $_clearField(6);
+
+  /// The other runs of latest's commit: the pull request's first, then the
+  /// ones that ran for something else (a push, a schedule).
+  @$pb.TagNumber(7)
+  $pb.PbList<CiRun> get others => $_getList(6);
 }
 
 class CiRun extends $pb.GeneratedMessage {
@@ -13834,6 +13843,8 @@ class CiRun extends $pb.GeneratedMessage {
     $fixnum.Int64? finishedAt,
     $core.String? url,
     $core.Iterable<CiJob>? jobs,
+    $core.String? workflow,
+    $core.bool? pullRequest,
   }) {
     final result = CiRun._();
     if (id != null) result.id = id;
@@ -13845,6 +13856,8 @@ class CiRun extends $pb.GeneratedMessage {
     if (finishedAt != null) result.finishedAt = finishedAt;
     if (url != null) result.url = url;
     if (jobs != null) result.jobs.addAll(jobs);
+    if (workflow != null) result.workflow = workflow;
+    if (pullRequest != null) result.pullRequest = pullRequest;
     return result;
   }
 
@@ -13871,6 +13884,8 @@ class CiRun extends $pb.GeneratedMessage {
     ..aOS(8, _omitFieldNames ? '' : 'url')
     ..pPM<CiJob>(9, _omitFieldNames ? '' : 'jobs',
         subBuilder: CiJob.$_createMessage)
+    ..aOS(10, _omitFieldNames ? '' : 'workflow')
+    ..aOB(11, _omitFieldNames ? '' : 'pullRequest')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -13971,6 +13986,26 @@ class CiRun extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(9)
   $pb.PbList<CiJob> get jobs => $_getList(8);
+
+  /// The workflow it is a run of ("ci"); empty where a commit has one run.
+  @$pb.TagNumber(10)
+  $core.String get workflow => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set workflow($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasWorkflow() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearWorkflow() => $_clearField(10);
+
+  /// It ran for the branch's pull request (its checks).
+  @$pb.TagNumber(11)
+  $core.bool get pullRequest => $_getBF(10);
+  @$pb.TagNumber(11)
+  set pullRequest($core.bool value) => $_setBool(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasPullRequest() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearPullRequest() => $_clearField(11);
 }
 
 class CiJob extends $pb.GeneratedMessage {

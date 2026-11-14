@@ -5,6 +5,7 @@ import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/app/kumo_app.dart';
 import 'package:kumo_ui/shell/side_panel.dart';
 import 'package:kumo_ui/shell/sidebar.dart';
+import 'package:kumo_ui/views/git_screen.dart';
 
 Future<AppState> _pump(WidgetTester tester) async {
   tester.view.physicalSize = const Size(1440, 960);
@@ -60,6 +61,16 @@ void main() {
     expect(find.byType(SourceControlPanel), findsOneWidget);
     expect(find.text('Commits on this branch'), findsOneWidget);
     expect(find.text('Git · PRC-412'), findsOneWidget);
+
+    // A commit of the branch opens what it changed; Escape closes it.
+    await tester.pump();
+    await tester.tap(find.text('feat: BulkDiscount aggregate'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CommitSheet), findsOneWidget);
+    expect(find.text('feat: BulkDiscount aggregate'), findsNWidgets(2), reason: 'the row, and the sheet’s title');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(CommitSheet), findsNothing);
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyW);

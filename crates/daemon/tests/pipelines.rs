@@ -154,4 +154,30 @@ async fn a_repository_without_a_ci_host_is_unsupported() {
         first.problem.unwrap().kind(),
         pb::CiProblemKind::Unsupported
     );
+    // The remote arrives after the repository was added: the next look at
+    // the workspace finds it.
+    git(
+        &repo,
+        &[
+            "remote",
+            "add",
+            "origin",
+            "git@github.com:pricing/local.git",
+        ],
+    );
+    client
+        .workspace
+        .refresh(pb::RefreshWorkspaceRequest {})
+        .await
+        .unwrap();
+    client
+        .pipelines
+        .refresh(pb::WorktreeRequest {
+            worktree_path: repo.display().to_string(),
+        })
+        .await
+        .unwrap();
+    let after = next(&mut stream).await;
+    assert_eq!(after.provider(), pb::CiProvider::GithubActions);
+    assert_eq!(after.repo, "pricing/local");
 }

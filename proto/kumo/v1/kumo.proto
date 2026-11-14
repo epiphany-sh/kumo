@@ -1690,6 +1690,9 @@ message PipelinesSnapshot {
   optional CiProblem problem = 5;
   // When the provider last answered (Unix ms, 0 = never).
   int64 checked_at = 6;
+  // The other runs of latest's commit: the pull request's first, then the
+  // ones that ran for something else (a push, a schedule).
+  repeated CiRun others = 7;
 }
 
 message CiRun {
@@ -1706,6 +1709,10 @@ message CiRun {
   int64 finished_at = 7;
   string url = 8;
   repeated CiJob jobs = 9;
+  // The workflow it is a run of ("ci"); empty where a commit has one run.
+  string workflow = 10;
+  // It ran for the branch's pull request (its checks).
+  bool pull_request = 11;
 }
 
 message CiJob {

@@ -124,7 +124,7 @@ struct Poller {
 #[derive(Default)]
 struct PollState {
     /// Shown, marked stale, while the host is rate limiting or unreachable.
-    last_run: Option<CiRun>,
+    last_runs: Vec<CiRun>,
     checked_at: Option<Timestamp>,
     /// Consecutive unreachable answers, for the backoff.
     failures: u32,
@@ -227,17 +227,18 @@ impl PipelinesService {
         let worktree = self.inner.worktree(worktree)?;
         let (client, target, token) = self.inner.context(&worktree).await?;
         let known = match self.inner.poller(&worktree) {
-            Some(p) => p.state.lock().await.last_run.clone(),
-            None => None,
+            Some(p) => p.state.lock().await.last_runs.clone(),
+            None => Vec::new(),
         };
-        let run = match known.filter(|r| r.id == run_id) {
+        let run = match known.into_iter().find(|r| r.id == run_id) {
             Some(run) => run,
             None => {
                 let (c, t, k) = (Arc::clone(&client), target.clone(), token.clone());
-                blocking(move || c.latest_run(&t, &k))
+                blocking(move || c.runs(&t, &k))
                     .await?
                     .map_err(PipelinesError::Ci)?
-                    .filter(|r| r.id == run_id)
+                    .into_iter()
+                    .find(|r| r.id == run_id)
                     .ok_or_else(|| {
                         PipelinesError::Invalid(format!(
                             "run {run_id} isn't the branch's latest any more"
@@ -615,13 +616,13 @@ impl Inner {
         };
         snapshot.branch = local.name.clone().unwrap_or_default();
         let (Some(_), Some(branch)) = (&local.upstream, local.remote_name()) else {
-            st.last_run = None;
+            st.last_runs.clear();
             let mut problem = CiProblem::of(CiProblemKind::NotPushed);
             problem.commits_waiting = local.unpushed;
             return fail(&mut snapshot, problem, t.idle);
         };
         let Some(token) = self.token(&host).await else {
-            st.last_run = None;
+            st.last_runs.clear();
             return fail(
                 &mut snapshot,
                 CiProblem::of(CiProblemKind::NotConnected),
@@ -643,20 +644,20 @@ impl Inner {
             branch: branch.to_owned(),
             host,
         };
-        let answer = blocking(move || client.latest_run(&target, &token)).await;
+        let answer = blocking(move || client.runs(&target, &token)).await;
         let answer = answer
             .unwrap_or_else(|e| Err(CiProblem::new(CiProblemKind::Unreachable, e.to_string())));
         match answer {
-            Ok(run) => {
+            Ok(runs) => {
                 st.failures = 0;
                 st.checked_at = Some(now);
-                let delay = if run.as_ref().is_some_and(CiRun::active) {
+                let delay = if runs.iter().any(CiRun::active) {
                     t.active
                 } else {
                     t.idle
                 };
-                st.last_run = run.clone();
-                snapshot.latest = run;
+                st.last_runs.clone_from(&runs);
+                show(&mut snapshot, runs);
                 snapshot.checked_at = Some(now);
                 (snapshot, delay)
             }
@@ -672,20 +673,27 @@ impl Inner {
                 problem.retry_at = Some(Timestamp::from_unix_nanos(
                     now.as_unix_nanos() + u64::try_from(delay.as_nanos()).unwrap_or(u64::MAX),
                 ));
-                snapshot.latest = st.last_run.clone();
+                show(&mut snapshot, st.last_runs.clone());
                 snapshot.checked_at = st.checked_at;
                 fail(&mut snapshot, problem, delay)
             }
             Err(problem) => {
                 // The provider answered: it's the token or the repository.
                 st.failures = 0;
-                st.last_run = None;
+                st.last_runs.clear();
                 st.checked_at = Some(now);
                 snapshot.checked_at = Some(now);
                 fail(&mut snapshot, problem, t.idle * 2)
             }
         }
     }
+}
+
+/// The first run is the one on top; the rest go under it.
+fn show(snapshot: &mut PipelinesSnapshot, runs: Vec<CiRun>) {
+    let mut runs = runs.into_iter();
+    snapshot.latest = runs.next();
+    snapshot.others = runs.collect();
 }
 
 /// 15 s, 30 s, 1 min… up to `max_retry`.

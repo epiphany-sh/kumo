@@ -135,6 +135,11 @@ class AppState extends ChangeNotifier {
     _sidePanelRight = p.get<bool>('sidePanel.right', false);
     _sidePanelOpen = p.get<bool>('sidePanel.onLaunch', true);
     _sidebarWidth = p.get<num>('sidebar.width', defaultSidebarWidth).toDouble().clamp(minSidebarWidth, maxSidebarWidth).toDouble();
+    final heights = p.get<Map<String, Object?>>('widgets.heights', const {});
+    for (final w in InspectorWidget.values) {
+      final h = heights[w.name];
+      if (h is num) _widgetHeights[w] = h.toDouble().clamp(minWidgetHeight, maxWidgetHeight).toDouble();
+    }
     // The workspace this window opens on: the one it was opened for (a new
     // window), else the last one.
     final want = initialProfile ?? p.get<String>('profile.current', '');
@@ -172,6 +177,9 @@ class AppState extends ChangeNotifier {
     demoWallpaper = other.demoWallpaper;
     _sidebarVisible = other._sidebarVisible;
     _sidebarWidth = other._sidebarWidth;
+    _widgetHeights
+      ..clear()
+      ..addAll(other._widgetHeights);
     _sidePanelRight = other._sidePanelRight;
     notifyListeners();
   }
@@ -1040,8 +1048,33 @@ class AppState extends ChangeNotifier {
 
   void removeWidget(InspectorWidget w) {
     _widgets = [for (final x in _widgets) if (x != w) x];
+    if (_widgetHeights.remove(w) != null) saveWidgetHeights();
     notifyListeners();
   }
+
+  /// How tall a widget may get before its content scrolls: its bottom edge
+  /// drags between [minWidgetHeight] and [maxWidgetHeight] (the panel also
+  /// stops it at its own height and at the widget's content). Without one
+  /// a widget is as tall as its content, up to the panel's height.
+  static const minWidgetHeight = 120.0;
+  static const maxWidgetHeight = 900.0;
+  final Map<InspectorWidget, double> _widgetHeights = {};
+  double? widgetHeight(InspectorWidget w) => _widgetHeights[w];
+
+  /// null goes back to the content's height.
+  void setWidgetHeight(InspectorWidget w, double? height) {
+    final h = height?.clamp(minWidgetHeight, maxWidgetHeight).toDouble();
+    if (h == _widgetHeights[w]) return;
+    if (h == null) {
+      _widgetHeights.remove(w);
+    } else {
+      _widgetHeights[w] = h;
+    }
+    notifyListeners();
+  }
+
+  /// Keeps the heights for the next launch (once a drag ends, not per frame).
+  void saveWidgetHeights() => prefs.set('widgets.heights', _widgetHeights.isEmpty ? null : {for (final e in _widgetHeights.entries) e.key.name: e.value});
 
   bool _agentPaused = false;
   bool get agentPaused => _agentPaused;
