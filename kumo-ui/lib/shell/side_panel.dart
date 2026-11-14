@@ -1154,30 +1154,37 @@ class _WidgetsTab extends StatelessWidget {
     final list = s.widgets;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Expanded(
-        child: ReorderableListView(
-          buildDefaultDragHandles: false,
-          padding: const EdgeInsets.fromLTRB(10, 12, 10, 4),
-          proxyDecorator: (child, index, animation) => Material(type: MaterialType.transparency, child: child),
-          onReorder: s.reorderWidget,
-          children: [
-            for (var i = 0; i < list.length; i++)
-              Padding(
-                key: ValueKey(list[i]),
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _WidgetCard(widgetKind: list[i], index: i, count: list.length),
-              ),
-          ],
-        ),
+        // No widget gets taller than the list showing it: past that its
+        // content scrolls inside the card.
+        child: LayoutBuilder(builder: (context, box) {
+          final tallest = (box.maxHeight - 16 - _resizerHeight).clamp(AppState.minWidgetHeight, AppState.maxWidgetHeight).toDouble();
+          return ReorderableListView(
+            buildDefaultDragHandles: false,
+            padding: const EdgeInsets.fromLTRB(10, 12, 10, 4),
+            proxyDecorator: (child, index, animation) => Material(type: MaterialType.transparency, child: child),
+            onReorder: s.reorderWidget,
+            children: [
+              for (var i = 0; i < list.length; i++) _WidgetCard(key: ValueKey(list[i]), widgetKind: list[i], index: i, count: list.length, tallest: tallest),
+            ],
+          );
+        }),
       ),
       const Padding(padding: EdgeInsets.fromLTRB(10, 0, 10, 10), child: _AddWidgetButton()),
     ]);
   }
 }
 
+/// The gap under each widget, which drags its height.
+const _resizerHeight = 10.0;
+
 /// Frame of one inspector widget: hover grip to drag (reorder), right-click
-/// for Move up / Move down / Remove.
+/// for Move up / Move down / Remove, and the gap under it drags its height.
+/// Content that doesn't fit the height scrolls inside the card.
 class _WidgetCard extends StatefulWidget {
-  const _WidgetCard({required this.widgetKind, required this.index, required this.count});
+  const _WidgetCard({super.key, required this.widgetKind, required this.index, required this.count, required this.tallest});
+
+  /// The most the card may measure here (the list's height).
+  final double tallest;
   final InspectorWidget widgetKind;
   final int index;
   final int count;
@@ -1188,6 +1195,21 @@ class _WidgetCard extends StatefulWidget {
 
 class _WidgetCardState extends State<_WidgetCard> {
   bool _hover = false;
+  final _scroll = ScrollController();
+  final _card = GlobalKey();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// The card's height now and with all of its content showing.
+  (double, double) _heights() {
+    final now = (_card.currentContext?.findRenderObject() as RenderBox?)?.size.height ?? 0;
+    final hidden = _scroll.hasClients && _scroll.position.hasContentDimensions ? _scroll.position.maxScrollExtent : 0.0;
+    return (now, now + hidden);
+  }
 
   void _menu(Offset at) {
     final s = AppScope.read(context);
@@ -1216,6 +1238,16 @@ class _WidgetCardState extends State<_WidgetCard> {
                   s.moveWidget(w, 1);
                 },
         ),
+        if (s.widgetHeight(w) != null)
+          KMenuItem(
+            icon: KIcons.gauge,
+            label: 'Fit height to content',
+            onTap: () {
+              close();
+              s.setWidgetHeight(w, null);
+              s.saveWidgetHeights();
+            },
+          ),
         const KMenuDivider(),
         KMenuItem(
           icon: KIcons.close,
@@ -1233,46 +1265,176 @@ class _WidgetCardState extends State<_WidgetCard> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        onSecondaryTapDown: (d) => _menu(d.globalPosition),
-        child: Semantics(
-          label: '${widget.widgetKind.label} widget. Right-click for Move up, Move down, Remove',
-          child: Stack(children: [
-            _widgetBody(widget.widgetKind),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: ReorderableDragStartListener(
-                  index: widget.index,
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.grab,
-                    child: Tooltip(
-                      message: 'Drag to reorder · right-click for options',
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 150),
-                        opacity: _hover ? 0.75 : 0,
-                        child: Container(
-                          width: 44,
-                          height: 14,
-                          alignment: Alignment.center,
-                          child: Container(width: 30, height: 4, decoration: BoxDecoration(color: c.text3, borderRadius: BorderRadius.circular(2))),
+    final s = AppScope.of(context);
+    final w = widget.widgetKind;
+    final limit = (s.widgetHeight(w) ?? widget.tallest).clamp(AppState.minWidgetHeight, widget.tallest).toDouble();
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      MouseRegion(
+        key: _card,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          onSecondaryTapDown: (d) => _menu(d.globalPosition),
+          child: Semantics(
+            label: '${w.label} widget. Right-click for Move up, Move down, Remove',
+            child: Stack(children: [
+              SectionViewport(maxHeight: limit, controller: _scroll, child: _widgetBody(w)),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: ReorderableDragStartListener(
+                    index: widget.index,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.grab,
+                      child: Tooltip(
+                        message: 'Drag to reorder · right-click for options',
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 150),
+                          opacity: _hover ? 0.75 : 0,
+                          child: Container(
+                            width: 44,
+                            height: 14,
+                            alignment: Alignment.center,
+                            child: Container(width: 30, height: 4, decoration: BoxDecoration(color: c.text3, borderRadius: BorderRadius.circular(2))),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
+            ]),
+          ),
+        ),
+      ),
+      _WidgetResizer(widgetKind: w, tallest: widget.tallest, heights: _heights),
+    ]);
+  }
+}
+
+/// The 10 px gap under a widget, which drags its height: from
+/// [AppState.minWidgetHeight] up to its content or the panel's height,
+/// whichever is less. A grip shows on hover, focus and while dragging;
+/// double-click goes back to the content's height; with the keyboard, ↑ ↓
+/// change it (⇧ for bigger steps).
+class _WidgetResizer extends StatefulWidget {
+  const _WidgetResizer({required this.widgetKind, required this.tallest, required this.heights});
+  final InspectorWidget widgetKind;
+  final double tallest;
+
+  /// The card's height now and with all of its content showing.
+  final (double, double) Function() heights;
+
+  @override
+  State<_WidgetResizer> createState() => _WidgetResizerState();
+}
+
+class _WidgetResizerState extends State<_WidgetResizer> {
+  bool _hover = false;
+  bool _focus = false;
+  bool _dragging = false;
+  double _startHeight = 0;
+  double _startY = 0;
+  double _most = 0;
+
+  /// The most the card can measure: all of its content, if the panel has
+  /// room for it.
+  double _mostOf(double full) => full.clamp(AppState.minWidgetHeight, widget.tallest).toDouble();
+
+  void _set(AppState s, double height) => s.setWidgetHeight(widget.widgetKind, height.clamp(AppState.minWidgetHeight, _most).toDouble());
+
+  void _by(AppState s, double dy) {
+    final (now, full) = widget.heights();
+    _most = _mostOf(full);
+    // Nothing to give or take on a widget that is already this small.
+    if (full <= AppState.minWidgetHeight) return;
+    _set(s, now + dy);
+    s.saveWidgetHeights();
+  }
+
+  void _reset(AppState s) {
+    s.setWidgetHeight(widget.widgetKind, null);
+    s.saveWidgetHeights();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    final on = _hover || _focus || _dragging;
+    final set = s.widgetHeight(widget.widgetKind);
+    return Semantics(
+      label: 'Resize ${widget.widgetKind.label} widget',
+      value: set == null ? 'Fits its content' : '${set.round()} pixels',
+      increasedValue: set == null ? 'Fits its content' : '${(set + 16).clamp(AppState.minWidgetHeight, widget.tallest).round()} pixels',
+      decreasedValue: set == null ? 'Shorter than its content' : '${(set - 16).clamp(AppState.minWidgetHeight, widget.tallest).round()} pixels',
+      onIncrease: () => _by(s, 16),
+      onDecrease: () => _by(s, -16),
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.resizeRow,
+        onShowHoverHighlight: (v) => setState(() => _hover = v),
+        onShowFocusHighlight: (v) => setState(() => _focus = v),
+        shortcuts: const {
+          SingleActivator(LogicalKeyboardKey.arrowUp): _ResizeWidget(-16),
+          SingleActivator(LogicalKeyboardKey.arrowDown): _ResizeWidget(16),
+          SingleActivator(LogicalKeyboardKey.arrowUp, shift: true): _ResizeWidget(-40),
+          SingleActivator(LogicalKeyboardKey.arrowDown, shift: true): _ResizeWidget(40),
+        },
+        actions: {
+          _ResizeWidget: CallbackAction<_ResizeWidget>(onInvoke: (i) {
+            _by(s, i.dy);
+            return null;
+          }),
+        },
+        child: Tooltip(
+          message: 'Drag to resize · double-click to fit content',
+          waitDuration: const Duration(milliseconds: 600),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            // From where the drag started, so the edge stays under the
+            // pointer even after hitting a limit.
+            onVerticalDragStart: (d) {
+              final (now, full) = widget.heights();
+              setState(() {
+                _dragging = true;
+                _startHeight = now;
+                _startY = d.globalPosition.dy;
+                _most = _mostOf(full);
+              });
+            },
+            onVerticalDragUpdate: (d) => _set(s, _startHeight + d.globalPosition.dy - _startY),
+            onVerticalDragEnd: (_) {
+              setState(() => _dragging = false);
+              s.saveWidgetHeights();
+            },
+            onVerticalDragCancel: () => setState(() => _dragging = false),
+            onDoubleTap: () => _reset(s),
+            child: SizedBox(
+              height: _resizerHeight,
+              child: Center(
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 150),
+                  opacity: on ? 1 : 0,
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: _dragging ? c.acc : c.text3, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+              ),
             ),
-          ]),
+          ),
         ),
       ),
     );
   }
+}
+
+class _ResizeWidget extends Intent {
+  const _ResizeWidget(this.dy);
+  final double dy;
 }
 
 Widget _widgetBody(InspectorWidget w) => switch (w) {
