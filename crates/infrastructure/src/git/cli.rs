@@ -120,7 +120,10 @@ impl Git for GitCli {
         if let Some(origin) = names.iter().position(|r| *r == "origin") {
             names.swap(0, origin);
         }
-        let url = self.run(repo, ["remote", "get-url", names[0]])?;
+        // As configured: `get-url` would apply `url.*.insteadOf` and name a
+        // mirror instead of the repository's host.
+        let key = format!("remote.{}.url", names[0]);
+        let url = self.run(repo, ["config", "--get", key.as_str()])?;
         Ok(Some(url.trim().to_owned()).filter(|u| !u.is_empty()))
     }
 
@@ -351,6 +354,38 @@ mod tests {
             .exec(&repo, ["status", "--porcelain=v2"])
             .unwrap();
         assert!(!marker.exists());
+    }
+
+    #[test]
+    fn the_remote_is_the_configured_url_not_its_rewrite() {
+        use std::process::Command;
+
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path();
+        let git = |args: &[&str]| {
+            let done = Command::new("git")
+                .arg("-C")
+                .arg(repo)
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(done.status.success(), "{done:?}");
+        };
+        git(&["init", "-q"]);
+        let cli = GitCli::default();
+        assert_eq!(cli.remote_url(repo).unwrap(), None);
+
+        git(&["remote", "add", "upstream", "git@gitlab.com:o/x.git"]);
+        git(&["remote", "add", "origin", "https://github.com/o/x.git"]);
+        git(&[
+            "config",
+            "url./srv/mirror/.insteadOf",
+            "https://github.com/",
+        ]);
+        assert_eq!(
+            cli.remote_url(repo).unwrap().as_deref(),
+            Some("https://github.com/o/x.git")
+        );
     }
 
     #[test]
