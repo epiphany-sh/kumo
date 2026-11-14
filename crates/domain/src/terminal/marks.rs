@@ -23,6 +23,33 @@ pub struct CommandRun {
     pub took: Option<Duration>,
 }
 
+/// What a shell is doing, as its marks say.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ShellActivity {
+    /// The command running now, if one.
+    pub running: Option<RunningCommand>,
+    /// The last command that ran to its end (a prompt alone isn't one).
+    pub last: Option<FinishedCommand>,
+}
+
+/// A command between its output start (133;C) and its done (133;D).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunningCommand {
+    /// As typed; empty when the shell didn't sign it (a space first).
+    pub command: String,
+    pub started_at: Timestamp,
+}
+
+/// A command that ran to its end.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FinishedCommand {
+    /// As typed; empty when the shell didn't sign it.
+    pub command: String,
+    /// Its status, when the shell reported one.
+    pub exit: Option<i32>,
+    pub finished_at: Timestamp,
+}
+
 /// Longest mark read: a longer one is someone's output, or a command too
 /// long to suggest, and is skipped.
 const MAX_MARK: usize = 8192;
@@ -44,6 +71,11 @@ pub struct CommandMarks {
     pending: Option<Pending>,
     /// Between a command's output start and its done.
     running: bool,
+    /// When the running command's output started.
+    running_since: Option<Timestamp>,
+    last: Option<FinishedCommand>,
+    /// Goes up whenever [`Self::activity`] changes.
+    changes: u64,
 }
 
 #[derive(Debug)]
@@ -72,6 +104,35 @@ impl CommandMarks {
             cwd: None,
             pending: None,
             running: false,
+            running_since: None,
+            last: None,
+            changes: 0,
+        }
+    }
+
+    /// Goes up whenever [`Self::activity`] changes: cheap to check after
+    /// each chunk.
+    pub fn changes(&self) -> u64 {
+        self.changes
+    }
+
+    /// The command running and the last one done.
+    pub fn activity(&self) -> ShellActivity {
+        let command = |pending: &Option<Pending>| {
+            pending
+                .as_ref()
+                .map(|p| p.command.clone())
+                .unwrap_or_default()
+        };
+        ShellActivity {
+            running: self
+                .running_since
+                .filter(|_| self.running)
+                .map(|started_at| RunningCommand {
+                    command: command(&self.pending),
+                    started_at,
+                }),
+            last: self.last.clone(),
         }
     }
 
@@ -166,23 +227,45 @@ impl CommandMarks {
         match kind {
             b"A" => {
                 // A command sent but never started (or never done) is gone.
-                self.running = false;
+                if std::mem::take(&mut self.running) {
+                    self.changes += 1;
+                }
+                self.running_since = None;
                 self.pending = None;
             }
             b"C" => {
+                if !self.running {
+                    self.running_since = Some(at);
+                    self.changes += 1;
+                }
                 self.running = true;
                 if let Some(pending) = &mut self.pending {
                     pending.started_at.get_or_insert(at);
                 }
             }
             b"D" => {
-                self.running = false;
+                let (code, _) = split(rest);
+                let exit = std::str::from_utf8(code).ok().and_then(|c| c.parse().ok());
+                // The shells mark D at every prompt: only one after C ends
+                // a command (Enter on an empty line runs none).
+                if std::mem::take(&mut self.running) {
+                    self.last = Some(FinishedCommand {
+                        command: self
+                            .pending
+                            .as_ref()
+                            .map(|p| p.command.clone())
+                            .unwrap_or_default(),
+                        exit,
+                        finished_at: at,
+                    });
+                    self.changes += 1;
+                }
+                self.running_since = None;
                 if let Some(pending) = self.pending.take() {
-                    let (code, _) = split(rest);
                     done.push(CommandRun {
                         command: pending.command,
                         cwd: pending.cwd,
-                        exit: std::str::from_utf8(code).ok().and_then(|c| c.parse().ok()),
+                        exit,
                         started_at: pending.started_at.unwrap_or(pending.sent_at),
                         took: pending.started_at.map(|start| at.since(start)),
                     });
@@ -323,6 +406,60 @@ mod tests {
             }]
         );
         assert_eq!(marks.cwd(), Some(&PathBuf::from(abs("/w/repo"))));
+    }
+
+    #[test]
+    fn activity_says_what_runs_and_how_the_last_command_ended() {
+        let mut marks = CommandMarks::new(NONCE);
+        assert_eq!(marks.activity(), ShellActivity::default());
+        feed(
+            &mut marks,
+            "\x1b]133;A\x07$ \x1b]633;E;npm run dev;n0nce\x07\x1b]133;C\x07",
+            10,
+        );
+        assert_eq!(
+            marks.activity().running,
+            Some(RunningCommand {
+                command: "npm run dev".into(),
+                started_at: at(10),
+            })
+        );
+        assert_eq!(marks.activity().last, None);
+
+        feed(&mut marks, "\x1b]133;D;130\x07", 50);
+        let ended = FinishedCommand {
+            command: "npm run dev".into(),
+            exit: Some(130),
+            finished_at: at(50),
+        };
+        assert_eq!(marks.activity().running, None);
+        assert_eq!(marks.activity().last, Some(ended.clone()));
+
+        // Enter on an empty line: the shell marks D again, but nothing ran.
+        feed(&mut marks, "\x1b]133;D;0\x07\x1b]133;A\x07$ ", 60);
+        assert_eq!(marks.activity().last, Some(ended));
+        assert_eq!(
+            marks.changes(),
+            2,
+            "started, then done: the prompt changed nothing"
+        );
+    }
+
+    #[test]
+    fn a_command_kept_out_of_the_history_still_counts_as_running_and_done() {
+        let mut marks = CommandMarks::new(NONCE);
+        feed(
+            &mut marks,
+            "\x1b]133;A\x07$ \x1b]633;E; ls;n0nce\x07\x1b]133;C\x07",
+            0,
+        );
+        assert_eq!(
+            marks.activity().running.map(|r| r.command),
+            Some(String::new())
+        );
+        let done = feed(&mut marks, "\x1b]133;D;2\x07", 5);
+        assert!(done.is_empty(), "not remembered");
+        assert_eq!(marks.activity().last.and_then(|l| l.exit), Some(2));
     }
 
     #[test]

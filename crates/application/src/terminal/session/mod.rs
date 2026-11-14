@@ -12,8 +12,8 @@ use std::time::Instant;
 
 use bytes::Bytes;
 use kumo_domain::terminal::{
-    LaunchSpec, PtyKiller, PtyMaster, PtyProcess, TerminalError, TerminalId, TerminalInfo,
-    TerminalSize, TerminalStatus, is_answer,
+    LaunchSpec, PtyKiller, PtyMaster, PtyProcess, ShellActivity, TerminalError, TerminalId,
+    TerminalInfo, TerminalSize, TerminalStatus, is_answer,
 };
 use kumo_domain::time::Timestamp;
 use tokio::sync::{mpsc, oneshot};
@@ -24,7 +24,7 @@ use super::SessionConfig;
 use hub::OutputHub;
 use pump::Pump;
 pub(in crate::terminal) use recorder::Recorder;
-use recorder::ShellCwd;
+use recorder::{SharedActivity, ShellCwd};
 
 type SharedMaster = Arc<Mutex<Option<Box<dyn PtyMaster>>>>;
 
@@ -47,6 +47,8 @@ pub struct TerminalSession {
     answered_at: Mutex<Option<Instant>>,
     /// A shell's folder, as it says at each prompt.
     shell_cwd: Option<ShellCwd>,
+    /// A shell's command running and last one done.
+    shell_activity: Option<SharedActivity>,
 }
 
 impl std::fmt::Debug for TerminalSession {
@@ -90,6 +92,7 @@ impl TerminalSession {
         ));
         let master: SharedMaster = Arc::new(Mutex::new(Some(master)));
         let shell_cwd = recorder.as_ref().map(Recorder::cwd);
+        let shell_activity = recorder.as_ref().map(Recorder::activity);
 
         let pump = Pump {
             id: id.clone(),
@@ -123,6 +126,7 @@ impl TerminalSession {
             resized_at: Mutex::new(None),
             answered_at: Mutex::new(None),
             shell_cwd,
+            shell_activity,
         })
     }
 
@@ -151,6 +155,12 @@ impl TerminalSession {
             .as_ref()
             .and_then(|cwd| lock(cwd).clone())
             .or_else(|| self.cwd.clone())
+    }
+
+    /// What its shell is doing; None for a program that isn't a shell
+    /// with Kumo's integration.
+    pub fn shell_activity(&self) -> Option<ShellActivity> {
+        self.shell_activity.as_ref().map(|a| lock(a).clone())
     }
 
     /// Subscribes to output. See [`Subscription`] for ordering guarantees.

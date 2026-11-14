@@ -1236,6 +1236,119 @@ final $typed_data.Uint8List historyEntryDescriptor = $convert.base64Decode(
     'bGFzdF9leGl0GAQgASgFSABSCGxhc3RFeGl0iAEBEhkKCGxhc3RfY3dkGAUgASgJUgdsYXN0Q3'
     'dkQgwKCl9sYXN0X2V4aXQ=');
 
+@$core.Deprecated('Use watchTerminalsRequestDescriptor instead')
+const WatchTerminalsRequest$json = {
+  '1': 'WatchTerminalsRequest',
+};
+
+/// Descriptor for `WatchTerminalsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List watchTerminalsRequestDescriptor =
+    $convert.base64Decode('ChVXYXRjaFRlcm1pbmFsc1JlcXVlc3Q=');
+
+@$core.Deprecated('Use terminalsActivityDescriptor instead')
+const TerminalsActivity$json = {
+  '1': 'TerminalsActivity',
+  '2': [
+    {
+      '1': 'shells',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.ShellActivity',
+      '10': 'shells'
+    },
+  ],
+};
+
+/// Descriptor for `TerminalsActivity`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List terminalsActivityDescriptor = $convert.base64Decode(
+    'ChFUZXJtaW5hbHNBY3Rpdml0eRIuCgZzaGVsbHMYASADKAsyFi5rdW1vLnYxLlNoZWxsQWN0aX'
+    'ZpdHlSBnNoZWxscw==');
+
+@$core.Deprecated('Use shellActivityDescriptor instead')
+const ShellActivity$json = {
+  '1': 'ShellActivity',
+  '2': [
+    {'1': 'terminal_id', '3': 1, '4': 1, '5': 9, '10': 'terminalId'},
+    {'1': 'cwd', '3': 2, '4': 1, '5': 9, '10': 'cwd'},
+    {
+      '1': 'running',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.RunningCommand',
+      '10': 'running'
+    },
+    {
+      '1': 'last',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.kumo.v1.FinishedCommand',
+      '10': 'last'
+    },
+  ],
+};
+
+/// Descriptor for `ShellActivity`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List shellActivityDescriptor = $convert.base64Decode(
+    'Cg1TaGVsbEFjdGl2aXR5Eh8KC3Rlcm1pbmFsX2lkGAEgASgJUgp0ZXJtaW5hbElkEhAKA2N3ZB'
+    'gCIAEoCVIDY3dkEjEKB3J1bm5pbmcYAyABKAsyFy5rdW1vLnYxLlJ1bm5pbmdDb21tYW5kUgdy'
+    'dW5uaW5nEiwKBGxhc3QYBCABKAsyGC5rdW1vLnYxLkZpbmlzaGVkQ29tbWFuZFIEbGFzdA==');
+
+@$core.Deprecated('Use runningCommandDescriptor instead')
+const RunningCommand$json = {
+  '1': 'RunningCommand',
+  '2': [
+    {'1': 'command', '3': 1, '4': 1, '5': 9, '10': 'command'},
+    {
+      '1': 'started_unix_nanos',
+      '3': 2,
+      '4': 1,
+      '5': 4,
+      '10': 'startedUnixNanos'
+    },
+  ],
+};
+
+/// Descriptor for `RunningCommand`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List runningCommandDescriptor = $convert.base64Decode(
+    'Cg5SdW5uaW5nQ29tbWFuZBIYCgdjb21tYW5kGAEgASgJUgdjb21tYW5kEiwKEnN0YXJ0ZWRfdW'
+    '5peF9uYW5vcxgCIAEoBFIQc3RhcnRlZFVuaXhOYW5vcw==');
+
+@$core.Deprecated('Use finishedCommandDescriptor instead')
+const FinishedCommand$json = {
+  '1': 'FinishedCommand',
+  '2': [
+    {'1': 'command', '3': 1, '4': 1, '5': 9, '10': 'command'},
+    {
+      '1': 'exit_code',
+      '3': 2,
+      '4': 1,
+      '5': 5,
+      '9': 0,
+      '10': 'exitCode',
+      '17': true
+    },
+    {
+      '1': 'finished_unix_nanos',
+      '3': 3,
+      '4': 1,
+      '5': 4,
+      '10': 'finishedUnixNanos'
+    },
+  ],
+  '8': [
+    {'1': '_exit_code'},
+  ],
+};
+
+/// Descriptor for `FinishedCommand`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List finishedCommandDescriptor = $convert.base64Decode(
+    'Cg9GaW5pc2hlZENvbW1hbmQSGAoHY29tbWFuZBgBIAEoCVIHY29tbWFuZBIgCglleGl0X2NvZG'
+    'UYAiABKAVIAFIIZXhpdENvZGWIAQESLgoTZmluaXNoZWRfdW5peF9uYW5vcxgDIAEoBFIRZmlu'
+    'aXNoZWRVbml4TmFub3NCDAoKX2V4aXRfY29kZQ==');
+
 @$core.Deprecated('Use forgetHistoryRequestDescriptor instead')
 const ForgetHistoryRequest$json = {
   '1': 'ForgetHistoryRequest',

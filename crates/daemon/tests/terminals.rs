@@ -464,3 +464,75 @@ async fn a_shell_not_asked_to_remember_keeps_nothing() {
     attached.send(b"exit\n").await;
     attached.read_to_exit().await;
 }
+
+/// The next snapshot of the shells that `want` accepts.
+async fn activity_until(
+    stream: &mut tonic::Streaming<pb::TerminalsActivity>,
+    want: impl Fn(&pb::TerminalsActivity) -> bool,
+) -> pb::TerminalsActivity {
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            let snapshot = stream.message().await.unwrap().expect("the watch ended");
+            if want(&snapshot) {
+                return snapshot;
+            }
+        }
+    })
+    .await
+    .expect("no such snapshot")
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn watch_says_what_each_shell_runs_and_how_its_last_command_ended() {
+    let Some(zsh) = installed("zsh") else {
+        eprintln!("zsh isn't installed: skipped");
+        return;
+    };
+    let daemon = TestDaemon::start().await;
+    let home = daemon.home();
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::write(home.join(".zshrc"), "PS1='$ '\n").unwrap();
+    let mut client = daemon.client().await;
+    let mut watch = client
+        .terminals
+        .watch(pb::WatchTerminalsRequest {})
+        .await
+        .unwrap()
+        .into_inner();
+    let id = open_shell(&mut client, &zsh, &home, true).await;
+    let mut attached = Attached::new(&mut client, &id, true).await;
+    attached.read_until_count("\x1b]133;D;", 1).await;
+
+    let shell = |s: &pb::TerminalsActivity| s.shells.iter().find(|x| x.terminal_id == id).cloned();
+    let first = activity_until(&mut watch, |s| shell(s).is_some()).await;
+    let first = shell(&first).unwrap();
+    assert!(
+        first.running.is_none() && first.last.is_none(),
+        "a prompt alone ran nothing"
+    );
+
+    attached.send(b"false\n").await;
+    let failed = activity_until(&mut watch, |s| shell(s).and_then(|x| x.last).is_some()).await;
+    let last = shell(&failed).unwrap().last.unwrap();
+    assert_eq!((last.command.as_str(), last.exit_code), ("false", Some(1)));
+
+    attached.send(b"sleep 2\n").await;
+    let running = activity_until(&mut watch, |s| shell(s).and_then(|x| x.running).is_some()).await;
+    assert_eq!(shell(&running).unwrap().running.unwrap().command, "sleep 2");
+    let done = activity_until(&mut watch, |s| {
+        shell(s)
+            .and_then(|x| x.last)
+            .is_some_and(|l| l.command == "sleep 2")
+    })
+    .await;
+    let done = shell(&done).unwrap();
+    assert!(done.running.is_none());
+    assert_eq!(done.last.unwrap().exit_code, Some(0));
+    assert_eq!(
+        std::path::Path::new(&done.cwd).canonicalize().unwrap(),
+        home.canonicalize().unwrap()
+    );
+
+    attached.send(b"exit\n").await;
+    attached.read_to_exit().await;
+}

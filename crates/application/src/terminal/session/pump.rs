@@ -89,6 +89,9 @@ impl Pump {
         };
         tracing::debug!(terminal = %self.id, code = exit.code(), batches = seq, "terminal exited");
         self.hub.finish(exit).await;
+        if let Some(recorder) = &self.recorder {
+            recorder.ended();
+        }
         exit
     }
 }
