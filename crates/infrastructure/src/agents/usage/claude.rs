@@ -8,6 +8,9 @@
 //! `<dir>/status.json` and then runs the user's own status line, if any,
 //! so it still shows. `--settings` applies to that session only: the
 //! user's settings files are never touched.
+//!
+//! Claude Code started by hand in a terminal has none of that: its
+//! transcript is read instead (see [`super::claude_transcript`]).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -20,6 +23,8 @@ use kumo_domain::agents::{
 };
 use kumo_domain::time::Timestamp;
 use serde_json::{Map, Value, json};
+
+use super::claude_transcript::ClaudeTranscripts;
 
 const SETTINGS: &str = "settings.json";
 const STATUS: &str = "status.json";
@@ -35,6 +40,8 @@ pub struct ClaudeStatusLine {
     config_dir: PathBuf,
     /// When each session's `status.json` was last read.
     seen: Mutex<HashMap<AgentSessionId, SystemTime>>,
+    /// Sessions started by hand, which have no status line of Kumo's.
+    transcripts: ClaudeTranscripts,
 }
 
 impl ClaudeStatusLine {
@@ -48,6 +55,7 @@ impl ClaudeStatusLine {
             root: root.to_owned(),
             config_dir: config_dir.to_owned(),
             seen: Mutex::default(),
+            transcripts: ClaudeTranscripts::new(config_dir),
         }
     }
 
@@ -76,6 +84,9 @@ impl UsageSource for ClaudeStatusLine {
     }
 
     fn read(&self, target: &UsageTarget) -> Option<UsageReading> {
+        if target.pid.is_some() {
+            return self.transcripts.read(target);
+        }
         let path = self.dir(&target.session_id).join(STATUS);
         let modified = std::fs::metadata(&path).and_then(|m| m.modified()).ok()?;
         {
@@ -89,6 +100,7 @@ impl UsageSource for ClaudeStatusLine {
     }
 
     fn forget(&self, target: &UsageTarget) {
+        self.transcripts.forget(target);
         self.seen
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -198,8 +210,14 @@ pub fn parse_status(raw: &str) -> Option<UsageReading> {
         .and_then(Value::as_str)
         .filter(|m| !m.trim().is_empty())
         .map(str::to_owned);
+    let effort = status
+        .pointer("/effort/level")
+        .and_then(Value::as_str)
+        .filter(|e| !e.trim().is_empty())
+        .map(str::to_owned);
     Some(UsageReading {
         model,
+        effort,
         context: status.get("context_window").and_then(context_of),
         plan: status.get("rate_limits").and_then(plan_of),
     })
@@ -365,6 +383,7 @@ mod tests {
             early,
             UsageReading {
                 model: Some("Sonnet".into()),
+                effort: None,
                 context: None,
                 plan: None,
             }
@@ -559,6 +578,7 @@ mod tests {
             session_id: AgentSessionId::parse("s1").unwrap(),
             worktree: data.path().to_owned(),
             started_at: Timestamp::now(),
+            pid: None,
         };
         let args = source.launch_args(&target).unwrap();
         let settings = std::fs::read_to_string(&args[1]).unwrap();
@@ -584,6 +604,7 @@ mod tests {
             session_id: AgentSessionId::parse("s1").unwrap(),
             worktree: repo.path().to_owned(),
             started_at: Timestamp::now(),
+            pid: None,
         };
         let args = source.launch_args(&target).unwrap();
         let settings = std::fs::read_to_string(&args[1]).unwrap();
@@ -600,6 +621,7 @@ mod tests {
             session_id: AgentSessionId::parse("s1").unwrap(),
             worktree: home.path().to_owned(),
             started_at: Timestamp::now(),
+            pid: None,
         };
         let args = source.launch_args(&target).unwrap();
         assert_eq!(args[0], "--settings");

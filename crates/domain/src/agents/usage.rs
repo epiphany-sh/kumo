@@ -108,6 +108,8 @@ pub struct SessionUsage {
     pub session_id: AgentSessionId,
     /// Empty when unknown.
     pub model: String,
+    /// How hard it thinks ("high"); empty when unknown.
+    pub effort: String,
     /// 0 when unknown.
     pub context_max: u64,
     pub slices: Vec<ContextSlice>,
@@ -146,22 +148,51 @@ pub struct PlanReading {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct UsageReading {
     pub model: Option<String>,
+    /// The reasoning effort, as the CLI names it ("high", "xhigh").
+    pub effort: Option<String>,
     pub context: Option<ContextReading>,
     pub plan: Option<PlanReading>,
 }
 
 impl UsageReading {
     pub fn is_empty(&self) -> bool {
-        self.model.is_none() && self.context.is_none() && self.plan.is_none()
+        self.model.is_none()
+            && self.effort.is_none()
+            && self.context.is_none()
+            && self.plan.is_none()
     }
 
     /// `newer` over `self`, part by part.
     pub fn merged(self, newer: UsageReading) -> UsageReading {
         UsageReading {
             model: newer.model.or(self.model),
+            effort: newer.effort.or(self.effort),
             context: newer.context.or(self.context),
             plan: newer.plan.or(self.plan),
         }
+    }
+
+    /// The model and effort it reports; empty parts where it doesn't.
+    pub fn agent_model(&self) -> AgentModel {
+        AgentModel {
+            model: self.model.clone().unwrap_or_default(),
+            effort: self.effort.clone().unwrap_or_default(),
+        }
+    }
+}
+
+/// What an agent runs on, as its CLI last reported it: the model
+/// ("Opus 5.5", "gpt-6-sol") and the reasoning effort ("high"). Either is
+/// empty while unknown; nothing is guessed from settings.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AgentModel {
+    pub model: String,
+    pub effort: String,
+}
+
+impl AgentModel {
+    pub fn is_empty(&self) -> bool {
+        self.model.is_empty() && self.effort.is_empty()
     }
 }
 
@@ -171,6 +202,9 @@ pub struct UsageTarget {
     pub session_id: AgentSessionId,
     pub worktree: PathBuf,
     pub started_at: Timestamp,
+    /// The CLI's process, when known: a CLI started by hand in a terminal,
+    /// which Kumo didn't launch with its own arguments.
+    pub pid: Option<u32>,
 }
 
 /// Reads one CLI's own reports of its usage. Blocks.
@@ -239,6 +273,7 @@ mod tests {
     fn a_newer_reading_keeps_what_it_lacks_from_the_older() {
         let older = UsageReading {
             model: Some("Opus".into()),
+            effort: Some("high".into()),
             context: Some(ContextReading {
                 max: 200_000,
                 tokens: 5_000,
@@ -254,6 +289,7 @@ mod tests {
         };
         let merged = older.merged(newer);
         assert_eq!(merged.model.as_deref(), Some("Opus"));
+        assert_eq!(merged.effort.as_deref(), Some("high"));
         assert_eq!(merged.context.unwrap().tokens, 9_000);
     }
 }

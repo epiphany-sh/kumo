@@ -8,9 +8,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use kumo_domain::agents::{
-    AccountProblem, AgentSession, AgentSessionId, AgentState, ContextSlice, ContextSliceKind,
-    PlanReading, PlanUsage, SessionUsage, UsageReading, UsageReport, UsageSource, UsageTarget,
-    UsageWindow,
+    AccountProblem, AgentModel, AgentSession, AgentSessionId, AgentState, ContextSlice,
+    ContextSliceKind, PlanReading, PlanUsage, SessionUsage, UsageReading, UsageReport, UsageSource,
+    UsageTarget, UsageWindow,
 };
 use kumo_domain::time::Timestamp;
 
@@ -73,6 +73,11 @@ impl UsageState {
                 read_at: None,
             },
         );
+    }
+
+    /// What session `id` runs on, as last read.
+    pub(super) fn model_of(&self, id: &AgentSessionId) -> Option<AgentModel> {
+        self.sessions.get(id).map(|f| f.reading.agent_model())
     }
 
     /// Stops following a session; what its source needs to clean up.
@@ -260,6 +265,7 @@ impl UsageState {
                 Some(SessionUsage {
                     session_id: session.id.clone(),
                     model: reading.model.clone().unwrap_or_default(),
+                    effort: reading.effort.clone().unwrap_or_default(),
                     context_max: reading.context.map_or(0, |c| c.max),
                     // No breakdown by kind is reported: one total.
                     slices: reading
@@ -338,6 +344,10 @@ pub(super) async fn follow(
             if let Some(plan) = plan {
                 service.save_plan(plan).await;
             }
+            let model = service.usage_lock().model_of(&target.session_id);
+            if let Some(model) = model {
+                service.set_model(&target.session_id, model);
+            }
         }
         if matches!(state, AgentState::Exited(_)) {
             break;
@@ -392,6 +402,7 @@ mod tests {
             events: Vec::new(),
             agent_name: None,
             context_dir: None,
+            model: AgentModel::default(),
         }
     }
 
@@ -400,12 +411,14 @@ mod tests {
             session_id: AgentSessionId::parse(id).unwrap(),
             worktree: PathBuf::from("/wt"),
             started_at: at(0),
+            pid: None,
         }
     }
 
     fn reading(resets_at: u64) -> UsageReading {
         UsageReading {
             model: Some("Opus".into()),
+            effort: Some("high".into()),
             context: Some(ContextReading {
                 max: 200_000,
                 tokens: 15_500,
