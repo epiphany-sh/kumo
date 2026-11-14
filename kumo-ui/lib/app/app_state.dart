@@ -17,6 +17,7 @@ import '../data/changes.dart';
 import '../data/workspace_source.dart';
 import '../data/worktree_changes.dart';
 import '../data/worktree_lights.dart';
+import '../data/shell_activity_source.dart';
 import '../data/models.dart';
 import '../editor/file_buffers.dart';
 import '../platform/app_icon.dart';
@@ -87,6 +88,7 @@ class AppState extends ChangeNotifier {
     WorkspaceSource? workspace,
     WorktreeChanges Function(String worktreePath)? changesFor,
     AgentsSource? agents,
+    ShellActivitySource? shells,
     AgentDefsSource? agentDefs,
     AiUsageSource? usage,
     TasksSource? tasks,
@@ -102,6 +104,7 @@ class AppState extends ChangeNotifier {
   })  : prefs = prefs ?? Preferences.memory(),
         workspace = workspace ?? MockWorkspaceSource(),
         agents = agents ?? MockAgentsSource(),
+        shells = shells ?? NoShellActivity(),
         // The design's agents with the design's daemon; a real daemon needs
         // the AgentDefs service first.
         agentDefs = agentDefs ?? (agents == null ? MockAgentDefs() : UnsupportedAgentDefs()),
@@ -126,6 +129,9 @@ class AppState extends ChangeNotifier {
       ..addListener(_readLights)
       ..addListener(notifyListeners)
       ..addListener(_flushQueued);
+    this.shells
+      ..addListener(_readLights)
+      ..addListener(notifyListeners);
     _readLights();
     this.usage.addListener(notifyListeners);
     this.updates.addListener(notifyListeners);
@@ -1370,31 +1376,51 @@ class AppState extends ChangeNotifier {
   /// Coding agents (optional): connected providers and running sessions.
   final AgentsSource agents;
 
+  /// What the shells in the terminals run (their commands, for the dots).
+  final ShellActivitySource shells;
+
   final _lights = WorktreeLights();
+
+  /// Wakes the sidebar when a running command becomes a server.
+  Timer? _lightsTick;
 
   void _readLights() {
     final entry = activeWorktreeEntry;
     _lights.update(
       runs: agents.runs,
       handTyped: agents.terminalAgents,
+      shells: shells.shells,
+      shellsLoaded: shells.loaded,
       worktrees: [for (final r in workspace.repos) for (final w in r.worktrees) workspace.absolutePathOf(w)],
       looking: entry == null || _home ? null : workspace.absolutePathOf(entry),
     );
+    _tickLights();
   }
 
-  /// What [w]'s dot in the sidebar says, and whether it pulses: an agent
-  /// is working there. Mock worktrees, with no agents, show their drawn
-  /// tone, still.
-  ({WorktreeLight light, bool pulse}) worktreeLight(Worktree w) {
-    final live = _lights.of(workspace.absolutePathOf(w));
-    if (live != WorktreeLight.idle) return (light: live, pulse: live == WorktreeLight.working);
+  void _tickLights() {
+    _lightsTick?.cancel();
+    final now = DateTime.now();
+    final next = _lights.nextChange(now);
+    if (next == null || _disposed) return;
+    _lightsTick = Timer(next.difference(now) + const Duration(milliseconds: 50), () {
+      _tickLights();
+      notifyListeners();
+    });
+  }
+
+  /// What [w]'s dot in the sidebar says and why, and whether it pulses:
+  /// an agent is working there, or a command just started. Mock
+  /// worktrees, with nothing running, show their drawn tone, still.
+  ({WorktreeSignal signal, bool pulse}) worktreeLight(Worktree w) {
+    final live = _lights.of(workspace.absolutePathOf(w), DateTime.now());
+    if (live.light != WorktreeLight.idle) return (signal: live, pulse: live.light == WorktreeLight.working);
     final drawn = switch (w.tone) {
-      WorktreeTone.idle => WorktreeLight.idle,
-      WorktreeTone.running => WorktreeLight.working,
-      WorktreeTone.warn => WorktreeLight.asking,
-      WorktreeTone.ok => WorktreeLight.done,
+      WorktreeTone.idle => WorktreeSignal.none,
+      WorktreeTone.running => const WorktreeSignal(WorktreeLight.working, 'An agent is working'),
+      WorktreeTone.warn => const WorktreeSignal(WorktreeLight.asking, 'An agent needs you'),
+      WorktreeTone.ok => const WorktreeSignal(WorktreeLight.done, 'An agent finished'),
     };
-    return (light: drawn, pulse: false);
+    return (signal: drawn, pulse: false);
   }
 
   /// Your agents (Claude Code subagents): their files, runs and test runs.
@@ -1663,6 +1689,11 @@ class AppState extends ChangeNotifier {
       ..removeListener(_readLights)
       ..removeListener(notifyListeners)
       ..removeListener(_flushQueued)
+      ..dispose();
+    _lightsTick?.cancel();
+    shells
+      ..removeListener(_readLights)
+      ..removeListener(notifyListeners)
       ..dispose();
     agentDefs.dispose();
     agentsRequest.dispose();

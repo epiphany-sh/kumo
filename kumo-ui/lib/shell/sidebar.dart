@@ -979,10 +979,10 @@ class _RepoGroupState extends State<_RepoGroup> {
         // terminals; in the Terminal view it switches the context.
         onTap: () => s.view == KumoView.terminal ? s.selectWorktree(w.branch, path: w.path) : s.openWorktree(w),
         semanticLabel: '${w.branch}, ${w.note}${w.isMain ? ', principal checkout' : ''}'
-            '${_lightSays(dot.light).isEmpty ? '' : ', ${_lightSays(dot.light)}'}${pr == null ? '' : ', ${_prSays(pr)}'}',
+            '${dot.signal.why.isEmpty ? '' : ', ${dot.signal.why}'}${pr == null ? '' : ', ${_prSays(pr)}'}',
         // Long branch names are cut: the whole name and where it lives.
         tooltip: '${w.branch}${w.isMain ? ' · principal checkout' : ''}\n${s.workspace.absolutePathOf(w)}'
-            '${_lightSays(dot.light).isEmpty ? '' : '\n${_lightSays(dot.light)}'}\nRight-click for actions',
+            '${dot.signal.why.isEmpty ? '' : '\n${dot.signal.why}'}\nRight-click for actions',
         selected: s.isActiveWorktree(w) && !s.inHome,
         builder: (context, hover, focus) {
           // The worktree you're standing on: a soft accent background.
@@ -993,7 +993,7 @@ class _RepoGroupState extends State<_RepoGroup> {
             padding: const EdgeInsets.fromLTRB(28, 5, 8, 5),
             decoration: BoxDecoration(color: menu ? c.tile : (sel ? c.accSoft : (hover ? c.tile : null)), borderRadius: BorderRadius.circular(9)),
             child: Row(children: [
-              WorktreeDot(dot.light, pulse: dot.pulse),
+              WorktreeDot(dot.signal.light, pulse: dot.pulse),
               const SizedBox(width: 9),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1168,15 +1168,6 @@ class _WorktreeMenuState extends State<_WorktreeMenu> {
   }
 }
 
-/// What a worktree's dot says, for the tooltip and screen readers.
-String _lightSays(WorktreeLight l) => switch (l) {
-      WorktreeLight.idle => '',
-      WorktreeLight.done => 'An agent finished',
-      WorktreeLight.working => 'An agent is working',
-      WorktreeLight.asking => 'An agent needs you',
-      WorktreeLight.failed => 'An agent failed',
-    };
-
 String _prSays(PullRequestInfo pr) => switch (pr.state) {
       PrOpenState.merged => '${pr.label} merged: this worktree can go',
       PrOpenState.closed => '${pr.label} closed without merging',
@@ -1188,9 +1179,10 @@ String _prSays(PullRequestInfo pr) => switch (pr.state) {
         }}',
     };
 
-/// A worktree's dot: gray with nothing new, green when an agent finished,
-/// the accent (pulsing) while one works, amber when one needs you and red
-/// when one failed.
+/// A worktree's dot: gray with nothing new, green when an agent or a
+/// command finished, the accent while something runs (pulsing while an
+/// agent works or a command just started, steady for a server), amber
+/// when an agent needs you and red when something failed.
 class WorktreeDot extends StatefulWidget {
   const WorktreeDot(this.light, {super.key, this.pulse = false});
   final WorktreeLight light;
@@ -1239,7 +1231,7 @@ class _WorktreeDotState extends State<WorktreeDot> with SingleTickerProviderStat
     final color = switch (widget.light) {
       WorktreeLight.idle => c.text3,
       WorktreeLight.done => c.ok,
-      WorktreeLight.working => c.acc,
+      WorktreeLight.serving || WorktreeLight.working => c.acc,
       WorktreeLight.asking => c.warn,
       WorktreeLight.failed => c.err,
     };
