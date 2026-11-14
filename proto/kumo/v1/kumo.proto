@@ -442,6 +442,11 @@ message WorktreeStatus {
   uint32 behind = 3;
   // e.g. "origin/main"; empty if the branch was never pushed.
   string upstream = 4;
+  // The upstream is set but its branch is gone from the remote (as last
+  // fetched): merged and deleted, most often.
+  bool upstream_gone = 5;
+  // Files with a merge conflict (a merge, rebase or cherry-pick halfway).
+  uint32 conflicts = 6;
 }
 
 message RefreshWorkspaceRequest {}

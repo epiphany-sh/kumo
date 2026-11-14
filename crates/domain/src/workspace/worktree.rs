@@ -34,6 +34,11 @@ pub struct WorktreeStatus {
     pub behind: u32,
     /// e.g. `origin/main`; None if the branch was never pushed.
     pub upstream: Option<String>,
+    /// The upstream is set but its branch is gone from the remote (as last
+    /// fetched): merged and deleted, most often.
+    pub upstream_gone: bool,
+    /// Files with a merge conflict (a merge, rebase or cherry-pick halfway).
+    pub conflicts: u32,
 }
 
 /// Branches of a repository.

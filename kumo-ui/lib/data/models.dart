@@ -19,6 +19,8 @@ class Worktree {
     this.everPushed = true,
     this.principal,
     this.changedFiles,
+    this.conflicts = 0,
+    this.upstreamGone = false,
   });
   final String branch;
   final String note;
@@ -41,6 +43,13 @@ class Worktree {
 
   /// Uncommitted files. Mocks leave it unset and read it from [changes].
   final int? changedFiles;
+
+  /// Files with a merge conflict (a merge, rebase or cherry-pick halfway).
+  final int conflicts;
+
+  /// Its branch was pushed, but is gone from the remote now (as last
+  /// fetched): merged and deleted, most often.
+  final bool upstreamGone;
   int get changed => changedFiles ?? int.tryParse(RegExp(r'^(\d+) files?$').firstMatch(changes)?.group(1) ?? '') ?? 0;
 }
 

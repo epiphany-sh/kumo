@@ -43,6 +43,8 @@ pub fn worktree_to(worktree: &Worktree) -> pb::Worktree {
             ahead: worktree.status.ahead,
             behind: worktree.status.behind,
             upstream: worktree.status.upstream.clone().unwrap_or_default(),
+            upstream_gone: worktree.status.upstream_gone,
+            conflicts: worktree.status.conflicts,
         }),
     }
 }

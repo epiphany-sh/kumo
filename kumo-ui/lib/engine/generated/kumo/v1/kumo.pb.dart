@@ -3744,12 +3744,16 @@ class WorktreeStatus extends $pb.GeneratedMessage {
     $core.int? ahead,
     $core.int? behind,
     $core.String? upstream,
+    $core.bool? upstreamGone,
+    $core.int? conflicts,
   }) {
     final result = WorktreeStatus._();
     if (changedFiles != null) result.changedFiles = changedFiles;
     if (ahead != null) result.ahead = ahead;
     if (behind != null) result.behind = behind;
     if (upstream != null) result.upstream = upstream;
+    if (upstreamGone != null) result.upstreamGone = upstreamGone;
+    if (conflicts != null) result.conflicts = conflicts;
     return result;
   }
 
@@ -3771,6 +3775,8 @@ class WorktreeStatus extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'ahead', fieldType: $pb.PbFieldType.OU3)
     ..aI(3, _omitFieldNames ? '' : 'behind', fieldType: $pb.PbFieldType.OU3)
     ..aOS(4, _omitFieldNames ? '' : 'upstream')
+    ..aOB(5, _omitFieldNames ? '' : 'upstreamGone')
+    ..aI(6, _omitFieldNames ? '' : 'conflicts', fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3832,6 +3838,27 @@ class WorktreeStatus extends $pb.GeneratedMessage {
   $core.bool hasUpstream() => $_has(3);
   @$pb.TagNumber(4)
   void clearUpstream() => $_clearField(4);
+
+  /// The upstream is set but its branch is gone from the remote (as last
+  /// fetched): merged and deleted, most often.
+  @$pb.TagNumber(5)
+  $core.bool get upstreamGone => $_getBF(4);
+  @$pb.TagNumber(5)
+  set upstreamGone($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasUpstreamGone() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearUpstreamGone() => $_clearField(5);
+
+  /// Files with a merge conflict (a merge, rebase or cherry-pick halfway).
+  @$pb.TagNumber(6)
+  $core.int get conflicts => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set conflicts($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasConflicts() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearConflicts() => $_clearField(6);
 }
 
 class RefreshWorkspaceRequest extends $pb.GeneratedMessage {
