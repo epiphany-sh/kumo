@@ -2,15 +2,14 @@
 //!
 //! Each session writes `<codex home>/sessions/YYYY/MM/DD/rollout-*.jsonl`
 //! (checked on codex-cli 0.157). The first line is `session_meta` (the
-//! session's `cwd` and start); `turn_context` lines, one per turn, the
-//! model and reasoning effort; `event_msg` lines of type `token_count`
+//! session's `cwd` and start); `event_msg` lines of type `token_count`
 //! carry the context window and the plan's rate limits. Rollouts left
 //! untouched for days are compressed to `.jsonl.zst`: a running session's
 //! is always plain.
 
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
@@ -21,8 +20,6 @@ use kumo_domain::agents::{
 };
 use kumo_domain::time::Timestamp;
 use serde_json::Value;
-
-use super::lines::complete_lines;
 
 /// Day folders searched for a new session's rollout, newest first.
 const DAYS_SEARCHED: usize = 3;
@@ -172,14 +169,20 @@ pub fn session_meta(line: &str) -> Option<(PathBuf, Timestamp)> {
 /// What the complete lines from `offset` on report, and how many bytes
 /// they took (a line still being written waits for the next read).
 fn read_from(path: &Path, offset: u64) -> std::io::Result<(UsageReading, u64)> {
-    let (text, read) = complete_lines(path, offset)?;
-    let reading = text.lines().fold(UsageReading::default(), |reading, line| {
-        reading.merged(parse_line(line))
-    });
-    Ok((reading, read))
+    let mut file = File::open(path)?;
+    file.seek(SeekFrom::Start(offset))?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    let complete = bytes.iter().rposition(|b| *b == b'\n').map_or(0, |i| i + 1);
+    let reading = String::from_utf8_lossy(&bytes[..complete])
+        .lines()
+        .fold(UsageReading::default(), |reading, line| {
+            reading.merged(parse_line(line))
+        });
+    Ok((reading, complete as u64))
 }
 
-/// What one rollout line reports: the model and effort (`turn_context`) or the
+/// What one rollout line reports: the model (`turn_context`) or the
 /// context window and plan (`token_count`).
 pub fn parse_line(line: &str) -> UsageReading {
     // Most lines are neither, and some are large.
@@ -199,20 +202,11 @@ pub fn parse_line(line: &str) -> UsageReading {
                 .and_then(Value::as_str)
                 .filter(|m| !m.is_empty())
                 .map(str::to_owned),
-            // Absent on models without reasoning: none.
-            effort: Some(
-                payload
-                    .get("effort")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default()
-                    .to_owned(),
-            ),
             ..UsageReading::default()
         },
         Some("event_msg") if payload.get("type").and_then(Value::as_str) == Some("token_count") => {
             UsageReading {
                 model: None,
-                effort: None,
                 context: payload.get("info").and_then(context_of),
                 plan: payload.get("rate_limits").and_then(plan_of),
             }
@@ -384,7 +378,6 @@ mod tests {
             r#"{"type":"turn_context","payload":{"cwd":"/x","model":"gpt-6-sol","effort":"high"}}"#,
         );
         assert_eq!(model.model.as_deref(), Some("gpt-6-sol"));
-        assert_eq!(model.effort.as_deref(), Some("high"));
         assert!(parse_line(r#"{"type":"response_item","payload":{}}"#).is_empty());
         assert!(parse_line("{\"token_count\" broken").is_empty());
     }
@@ -479,7 +472,6 @@ mod tests {
             session_id: AgentSessionId::parse("s1").unwrap(),
             worktree: wt.clone(),
             started_at: parse_utc("2026-10-30T12:00:00Z").unwrap(),
-            pid: None,
         };
         assert_eq!(source.read(&target), None, "no rollout yet");
 

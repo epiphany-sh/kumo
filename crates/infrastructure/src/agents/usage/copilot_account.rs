@@ -44,7 +44,9 @@ impl std::fmt::Debug for CopilotAccount {
 
 impl CopilotAccount {
     pub fn new(home: &Path, locator: Arc<dyn ProgramLocator>) -> Self {
-        let config_dir = super::copilot::copilot_home(home);
+        let config_dir = std::env::var_os("COPILOT_HOME")
+            .filter(|v| !v.is_empty())
+            .map_or_else(|| home.join(".copilot"), PathBuf::from);
         Self {
             config_dir,
             locator,

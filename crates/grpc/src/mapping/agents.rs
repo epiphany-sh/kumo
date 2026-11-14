@@ -65,8 +65,6 @@ pub fn agent_session_to(session: AgentSession) -> pb::AgentSession {
             .context_dir
             .map(|d| d.display().to_string())
             .unwrap_or_default(),
-        model: session.model.model,
-        effort: session.model.effort,
     }
 }
 
@@ -154,8 +152,6 @@ fn terminal_agent_to(agent: &TerminalAgent) -> pb::TerminalAgent {
         cwd: agent.cwd.display().to_string(),
         state: state.into(),
         busy: agent.busy,
-        model: agent.model.model.clone(),
-        effort: agent.model.effort.clone(),
     }
 }
 

@@ -27,8 +27,8 @@ use kumo_infrastructure::agent_defs::{HttpPageReader, LocalAgentDefFiles, Proces
 
 use crate::config::PlanAccounts;
 use kumo_infrastructure::agents::{
-    ClaudeAccount, ClaudeStatusLine, CodexAccount, CodexRollouts, CopilotAccount, CopilotEvents,
-    OsProcesses, ProfileCliHomes, claude_config_dir, codex_home, copilot_home,
+    ClaudeAccount, ClaudeStatusLine, CodexAccount, CodexRollouts, CopilotAccount, OsProcesses,
+    ProfileCliHomes, claude_config_dir, codex_home,
 };
 use kumo_infrastructure::ci::{
     BitbucketPipelines, BitbucketPulls, BitbucketReleases, GhTokenFallback, GitHubActions,
@@ -279,12 +279,10 @@ impl ProfileOpener {
             AgentPorts {
                 store: agent_store.clone(),
                 locator: Arc::clone(locator),
-                // Plan limits, context windows, models and efforts, as the CLIs
-                // report them.
+                // Plan limits and context windows, as the CLIs report them.
                 usage: vec![
                     Arc::new(ClaudeStatusLine::new(&dir.join("agents"), &claude_dir)),
                     Arc::new(CodexRollouts::new(&codex_dir)),
-                    Arc::new(CopilotEvents::new(&copilot_home(home))),
                 ],
                 // The same, asked of each account with the CLI's sign-in,
                 // so it shows with no session running.

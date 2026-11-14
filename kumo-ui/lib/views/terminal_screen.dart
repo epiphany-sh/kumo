@@ -476,7 +476,6 @@ class _TerminalScreenState extends State<TerminalScreen> {
               const StatusText('~ · Home', icon: KIcons.home, monospace: true)
             else
               Flexible(child: StatusText('${s.changes.branch} ↑${s.commitsAhead} ↓${s.changes.behind}', icon: KIcons.branch, monospace: true, flexible: true)),
-            if (_modelStatus(s) case final model?) ...[const SizedBox(width: 16), Flexible(child: model)],
             for (final item in _agentStatus(context, s)) ...[const SizedBox(width: 16), Flexible(child: item)],
           ]),
         ),
@@ -484,39 +483,6 @@ class _TerminalScreenState extends State<TerminalScreen> {
         const StatusText('zsh · UTF-8'),
         if (_engine != null) _EngineStatus(engine: _engine!),
       ],
-    );
-  }
-
-  /// Status bar: the model and effort of the agent in the focused pane of
-  /// the tab showing, as its CLI last reported them; it follows the tab and
-  /// the focus. Nothing while a file or the Git/Files tab covers the
-  /// terminal, for a pane without a running agent, or before its CLI says.
-  Widget? _modelStatus(AppState s) {
-    final id = _focus;
-    if (id == null || s.activeFile != null || s.activeContext != null) return null;
-    final (String, String, String)? info;
-    if (!s.agents.live) {
-      info = id == 'agent' ? ('Claude Code', 'Opus 5.5', 'high') : null;
-    } else {
-      final surface = _surfaces[id];
-      final terminal = _terminalOf[id] ?? (surface is GrpcTerminalSurface ? surface.terminalId : null);
-      final run = terminal == null ? null : s.agents.runs.where((r) => r.terminalId == terminal && r.status != AgentStatus.done).firstOrNull;
-      final typed = terminal == null || run != null ? null : s.agents.terminalAgents.where((a) => a.terminalId == terminal).firstOrNull;
-      String providerName(String id, String fallback) => s.agents.providers.where((p) => p.id == id).firstOrNull?.name ?? fallback;
-      info = run != null
-          ? (run.providerName, run.model, run.effort)
-          : typed != null
-              ? (providerName(typed.providerId, typed.name), typed.model, typed.effort)
-              : null;
-    }
-    if (info == null) return null;
-    final (name, model, effort) = info;
-    if (model.isEmpty && effort.isEmpty) return null;
-    final label = [if (model.isNotEmpty) model, if (effort.isNotEmpty) '$effort effort'].join(' · ');
-    final runsOn = [if (model.isNotEmpty) model, if (effort.isNotEmpty) 'with $effort effort'].join(' ');
-    return Tooltip(
-      message: '$name in this pane runs on $runsOn',
-      child: StatusText(label, icon: KIcons.agent, flexible: true),
     );
   }
 

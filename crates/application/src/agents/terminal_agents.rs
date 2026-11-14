@@ -1,8 +1,6 @@
 //! Agent CLIs started by hand in the profile's terminals (someone typed
 //! `claude` in a shell): what's in each terminal's foreground, read on
 //! output at most once a second, and its screen read like a session's.
-//! What it runs on (model, effort) is read from its CLI's own files, as a
-//! session's usage is, when its provider's usage is read.
 
 use std::collections::HashSet;
 use std::sync::{Arc, Weak};
@@ -10,11 +8,9 @@ use std::time::{Duration, Instant};
 
 use futures::StreamExt;
 use kumo_domain::agents::{
-    ActivityTracker, AgentModel, AgentSessionId, AgentState, ProcessDetails, ProcessInspector,
-    TerminalAgent, UsageReading, UsageSource, UsageTarget, agent_program,
+    ActivityTracker, AgentState, ProcessDetails, ProcessInspector, TerminalAgent, agent_program,
 };
 use kumo_domain::terminal::{TerminalEvent, TerminalId, TerminalStatus};
-use kumo_domain::time::Timestamp;
 
 use super::AgentService;
 use crate::terminal::Attachment;
@@ -29,9 +25,6 @@ const TICK: Duration = Duration::from_millis(250);
 /// A new foreground that isn't an agent is read again for this long: right
 /// after the fork, before its exec, it still looks like the shell.
 const RECHECK_FOR: Duration = Duration::from_secs(5);
-/// How long before it's seen a CLI may have started: its files are
-/// matched by start time.
-const STARTED_BEFORE: Duration = Duration::from_secs(10);
 
 impl AgentService {
     /// Starts following the profile's terminals for agent CLIs started by
@@ -57,15 +50,6 @@ impl AgentService {
                 snapshot.terminal_agents.push(agent);
             }
         });
-    }
-
-    /// Where `provider_id`'s model is read, when its usage is.
-    async fn usage_source_for(&self, provider_id: &str) -> Option<Arc<dyn UsageSource>> {
-        let providers = self.providers().await.ok()?;
-        let view = providers
-            .into_iter()
-            .find(|v| v.provider.id == provider_id)?;
-        self.usage_source(&view.provider)
     }
 
     /// The providers' programs, to tell a CLI by.
@@ -113,48 +97,6 @@ async fn scan(service: Weak<AgentService>, inspector: Arc<dyn ProcessInspector>)
     }
 }
 
-/// Reads what a CLI started by hand runs on.
-struct ModelReader {
-    source: Arc<dyn UsageSource>,
-    target: UsageTarget,
-    reading: UsageReading,
-}
-
-impl ModelReader {
-    async fn start(
-        service: &AgentService,
-        provider_id: &str,
-        pid: u32,
-        cwd: &std::path::Path,
-    ) -> Option<Self> {
-        let source = service.usage_source_for(provider_id).await?;
-        let now = Timestamp::now().as_unix_nanos();
-        let before = u64::try_from(STARTED_BEFORE.as_nanos()).unwrap_or(0);
-        Some(Self {
-            source,
-            target: UsageTarget {
-                session_id: AgentSessionId::generate(),
-                worktree: cwd.to_owned(),
-                started_at: Timestamp::from_unix_nanos(now.saturating_sub(before)),
-                pid: Some(pid),
-            },
-            reading: UsageReading::default(),
-        })
-    }
-
-    async fn read(&mut self) -> AgentModel {
-        let (source, target) = (Arc::clone(&self.source), self.target.clone());
-        if let Ok(Some(new)) = tokio::task::spawn_blocking(move || source.read(&target)).await {
-            self.reading = std::mem::take(&mut self.reading).merged(new);
-        }
-        self.reading.agent_model()
-    }
-
-    fn stop(self) {
-        tokio::task::spawn_blocking(move || self.source.forget(&self.target));
-    }
-}
-
 /// What a terminal's foreground was last time: its pid, and the agent CLI
 /// it is (provider id, program, folder), if one.
 struct Seen {
@@ -180,8 +122,6 @@ async fn follow(
     };
     let mut tracker: Option<ActivityTracker> = None;
     let mut agent: Option<TerminalAgent> = None;
-    // The pid it was started for, and the reader if its usage is read.
-    let mut model_reader: Option<(u32, Option<ModelReader>)> = None;
     let mut checked = Instant::now()
         .checked_sub(QUIET_CHECK_EVERY)
         .unwrap_or_else(Instant::now);
@@ -243,22 +183,6 @@ async fn follow(
                     since: if new { Instant::now() } else { seen.since },
                 };
             }
-            let pid = seen.pid.filter(|_| seen.agent.is_some());
-            if model_reader.as_ref().map(|(p, _)| *p) != pid {
-                if let Some((_, Some(old))) = model_reader.take() {
-                    old.stop();
-                }
-                if let (Some(pid), Some((provider_id, _, cwd))) = (pid, &seen.agent) {
-                    model_reader = Some((
-                        pid,
-                        ModelReader::start(&service, provider_id, pid, cwd).await,
-                    ));
-                }
-            }
-            let model = match model_reader.as_mut() {
-                Some((_, Some(reader))) => reader.read().await,
-                _ => AgentModel::default(),
-            };
             match &seen.agent {
                 Some((provider_id, program, cwd)) => {
                     if tracker.is_none() {
@@ -271,7 +195,6 @@ async fn follow(
                         cwd: cwd.clone(),
                         state: AgentState::Working,
                         busy: true,
-                        model,
                     });
                 }
                 None => {
@@ -292,9 +215,6 @@ async fn follow(
             a
         });
         service.set_terminal_agent(&terminal, shown);
-    }
-    if let Some((_, Some(reader))) = model_reader {
-        reader.stop();
     }
     if let Some(service) = service.upgrade() {
         service.set_terminal_agent(&terminal, None);

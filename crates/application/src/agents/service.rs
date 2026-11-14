@@ -5,9 +5,9 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use kumo_domain::agents::{
-    AccountProblem, AccountUsage, AgentContext, AgentError, AgentEventKind, AgentModel,
-    AgentPreset, AgentProvider, AgentSession, AgentSessionId, AgentState, AgentStore, CliHomes,
-    PRESETS, PlanUsage, PlanUsageStore, ProgramLocator, StoredProvider, TerminalAgent, UsageReport,
+    AccountProblem, AccountUsage, AgentContext, AgentError, AgentEventKind, AgentPreset,
+    AgentProvider, AgentSession, AgentSessionId, AgentState, AgentStore, CliHomes, PRESETS,
+    PlanUsage, PlanUsageStore, ProgramLocator, StoredProvider, TerminalAgent, UsageReport,
     UsageSource, UsageTarget, args_for_cmd, runs_through_cmd,
 };
 use kumo_domain::terminal::{
@@ -370,7 +370,6 @@ impl AgentService {
             session_id: id.clone(),
             worktree: worktree.clone(),
             started_at: Timestamp::now(),
-            pid: None,
         };
         // Their own `--settings` leaves theirs in charge of notifications.
         let own_settings = args.iter().any(|a| a == SETTINGS_FLAG);
@@ -420,7 +419,6 @@ impl AgentService {
             events: Vec::new(),
             agent_name,
             context_dir,
-            model: AgentModel::default(),
         };
         let started = session
             .agent_name
@@ -705,21 +703,8 @@ impl AgentService {
             .map(|s| s.state)
     }
 
-    /// Sets what session `id` runs on; publishes only a change.
-    pub(super) fn set_model(&self, id: &AgentSessionId, model: AgentModel) {
-        let same = self
-            .lock()
-            .sessions
-            .iter()
-            .find(|s| &s.id == id)
-            .is_none_or(|s| s.model == model);
-        if !same {
-            self.update_session(id, |s| s.model = model);
-        }
-    }
-
     /// Where `provider`'s usage is read, when it reports it and that's on.
-    pub(super) fn usage_source(&self, provider: &AgentProvider) -> Option<Arc<dyn UsageSource>> {
+    fn usage_source(&self, provider: &AgentProvider) -> Option<Arc<dyn UsageSource>> {
         if !provider.reads_usage() {
             return None;
         }

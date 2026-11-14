@@ -982,12 +982,6 @@ message AgentSession {
   // Its CLI says when it asks something. False: `asked` is never set, and
   // what's typed could be taken as an answer.
   bool tells_asking = 20;
-  // What it runs on, as its CLI last reported it (Claude Code's status
-  // line, Codex's and Copilot's session files): the model ("Opus 5.5",
-  // "gpt-6-sol") and the reasoning effort ("high"). Empty while unknown or
-  // when its usage isn't read; never guessed from settings.
-  string model = 21;
-  string effort = 22;
 }
 
 message StopAgentRequest {
@@ -1034,10 +1028,6 @@ message TerminalAgent {
   AgentState state = 5;
   // Mid-turn: producing output.
   bool busy = 6;
-  // What it runs on, read from its CLI's own files like a session's (see
-  // AgentSession.model). Empty while unknown.
-  string model = 7;
-  string effort = 8;
 }
 
 message SendToTerminalRequest {
@@ -1097,7 +1087,6 @@ message SessionUsage {
   uint32 turns = 5;                  // 0 = unknown
   string compact_command = 6;        // empty = can't compact
   int64 read_at = 7;                 // unix ms
-  string effort = 8;                 // "high"; empty = unknown
 }
 
 message UsageRequest {}

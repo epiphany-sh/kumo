@@ -83,9 +83,6 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
   StreamController<TerminalInput>? _input;
   ResponseStream<TerminalOutput>? _output;
   String? _terminalId;
-
-  /// The daemon's terminal behind it; null until it's opened.
-  String? get terminalId => _terminalId ?? _existingId;
   int _seq = 0;
   bool _exited = false;
   bool _frameScheduled = false;
