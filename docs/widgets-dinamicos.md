@@ -8,7 +8,7 @@ Estado al 2026-11-14:
 
 | Parte | Estado |
 |---|---|
-| Resize vertical de cada widget, con scroll interno | Implementado en `feat/dinamic-widgets`, sin commitear ni probar a mano con trackpad |
+| Resize vertical de cada widget, con scroll interno | Implementado en `feat/dinamic-widgets` (PR #78), sin probar a mano con trackpad |
 | Ancho del panel redimensionable | Pendiente (hoy fijo en 300 px) |
 | Widgets declarativos (YAML) | Diseño, sin código |
 | Creación de widgets por IA | Diseño, sin código |
