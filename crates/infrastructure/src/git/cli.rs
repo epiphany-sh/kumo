@@ -293,13 +293,16 @@ fn parse_worktrees(porcelain: &str) -> Vec<Worktree> {
     worktrees
 }
 
-/// Parses `git status --porcelain=v2 --branch`.
+/// Parses `git status --porcelain=v2 --branch`. Git leaves out
+/// `branch.ab` when the upstream's commit isn't there: its branch is gone.
 fn parse_status(porcelain: &str) -> WorktreeStatus {
     let mut status = WorktreeStatus::default();
+    let mut counted = false;
     for line in porcelain.lines() {
         if let Some(upstream) = line.strip_prefix("# branch.upstream ") {
             status.upstream = Some(upstream.trim().to_owned());
         } else if let Some(ab) = line.strip_prefix("# branch.ab ") {
+            counted = true;
             for part in ab.split_whitespace() {
                 if let Some(n) = part.strip_prefix('+') {
                     status.ahead = n.parse().unwrap_or(0);
@@ -309,8 +312,12 @@ fn parse_status(porcelain: &str) -> WorktreeStatus {
             }
         } else if !line.starts_with('#') && !line.trim().is_empty() {
             status.changed_files += 1;
+            if line.starts_with("u ") {
+                status.conflicts += 1;
+            }
         }
     }
+    status.upstream_gone = status.upstream.is_some() && !counted;
     status
 }
 
@@ -412,9 +419,34 @@ mod tests {
                 changed_files: 2,
                 ahead: 2,
                 behind: 1,
-                upstream: Some("origin/main".into())
+                upstream: Some("origin/main".into()),
+                upstream_gone: false,
+                conflicts: 0,
             }
         );
+    }
+
+    #[test]
+    fn a_branch_gone_from_its_remote_and_conflicts_are_told() {
+        let gone = parse_status(concat!(
+            "# branch.oid abc\n",
+            "# branch.head feat\n",
+            "# branch.upstream origin/feat\n",
+        ));
+        assert!(gone.upstream_gone);
+        assert_eq!(gone.upstream.as_deref(), Some("origin/feat"));
+
+        let merging = parse_status(concat!(
+            "# branch.oid abc\n",
+            "# branch.head feat\n",
+            "# branch.upstream origin/feat\n",
+            "# branch.ab +0 -0\n",
+            "u UU N... 100644 100644 100644 100644 a b c src/x.rs\n",
+            "u AA N... 000000 100644 100644 100644 0 b c src/y.rs\n",
+            "1 M. N... 100644 100644 100644 a b src/z.rs\n",
+        ));
+        assert!(!merging.upstream_gone);
+        assert_eq!((merging.conflicts, merging.changed_files), (2, 3));
     }
 
     #[test]

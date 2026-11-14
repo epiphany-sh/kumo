@@ -1500,6 +1500,8 @@ const WorktreeStatus$json = {
     {'1': 'ahead', '3': 2, '4': 1, '5': 13, '10': 'ahead'},
     {'1': 'behind', '3': 3, '4': 1, '5': 13, '10': 'behind'},
     {'1': 'upstream', '3': 4, '4': 1, '5': 9, '10': 'upstream'},
+    {'1': 'upstream_gone', '3': 5, '4': 1, '5': 8, '10': 'upstreamGone'},
+    {'1': 'conflicts', '3': 6, '4': 1, '5': 13, '10': 'conflicts'},
   ],
 };
 
@@ -1507,7 +1509,8 @@ const WorktreeStatus$json = {
 final $typed_data.Uint8List worktreeStatusDescriptor = $convert.base64Decode(
     'Cg5Xb3JrdHJlZVN0YXR1cxIjCg1jaGFuZ2VkX2ZpbGVzGAEgASgNUgxjaGFuZ2VkRmlsZXMSFA'
     'oFYWhlYWQYAiABKA1SBWFoZWFkEhYKBmJlaGluZBgDIAEoDVIGYmVoaW5kEhoKCHVwc3RyZWFt'
-    'GAQgASgJUgh1cHN0cmVhbQ==');
+    'GAQgASgJUgh1cHN0cmVhbRIjCg11cHN0cmVhbV9nb25lGAUgASgIUgx1cHN0cmVhbUdvbmUSHA'
+    'oJY29uZmxpY3RzGAYgASgNUgljb25mbGljdHM=');
 
 @$core.Deprecated('Use refreshWorkspaceRequestDescriptor instead')
 const RefreshWorkspaceRequest$json = {

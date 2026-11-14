@@ -247,6 +247,8 @@ class EngineWorkspaceSource extends WorkspaceSource {
       everPushed: pushed,
       principal: w.isMain,
       changedFiles: changed,
+      conflicts: status.conflicts,
+      upstreamGone: status.upstreamGone,
     );
   }
 

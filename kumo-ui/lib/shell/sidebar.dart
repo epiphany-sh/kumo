@@ -972,6 +972,7 @@ class _RepoGroupState extends State<_RepoGroup> {
     final c = context.c;
     final dot = s.worktreeLight(w);
     final pr = s.pullRequestOf(w);
+    final mark = _markOf(w, pr);
     return GestureDetector(
       onSecondaryTapDown: (d) => _openMenu(w, d.globalPosition),
       child: KPressable(
@@ -979,7 +980,7 @@ class _RepoGroupState extends State<_RepoGroup> {
         // terminals; in the Terminal view it switches the context.
         onTap: () => s.view == KumoView.terminal ? s.selectWorktree(w.branch, path: w.path) : s.openWorktree(w),
         semanticLabel: '${w.branch}, ${w.note}${w.isMain ? ', principal checkout' : ''}'
-            '${dot.signal.why.isEmpty ? '' : ', ${dot.signal.why}'}${pr == null ? '' : ', ${_prSays(pr)}'}',
+            '${dot.signal.why.isEmpty ? '' : ', ${dot.signal.why}'}${mark == null ? '' : ', ${mark.says}'}',
         // Long branch names are cut: the whole name and where it lives.
         tooltip: '${w.branch}${w.isMain ? ' · principal checkout' : ''}\n${s.workspace.absolutePathOf(w)}'
             '${dot.signal.why.isEmpty ? '' : '\n${dot.signal.why}'}\nRight-click for actions',
@@ -1025,7 +1026,7 @@ class _RepoGroupState extends State<_RepoGroup> {
                     Text(w.note, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11, color: w.tone == WorktreeTone.warn ? c.warn : c.text3)),
                 ]),
               ),
-              if (pr != null) ...[const SizedBox(width: 6), _PrMark(pr)],
+              if (mark != null) ...[const SizedBox(width: 6), _WorktreeMark(mark)],
             ]),
           );
         },
@@ -1244,20 +1245,43 @@ class _WorktreeDotState extends State<WorktreeDot> with SingleTickerProviderStat
 
 /// The worktree branch's pull request: merged (purple), closed (gray) or
 /// open, colored by its checks.
-class _PrMark extends StatelessWidget {
-  const _PrMark(this.pr);
-  final PullRequestInfo pr;
+/// What shows next to a worktree, at most one: its conflicts first, then
+/// its branch's pull request, then a branch gone from its remote.
+enum _Mark { conflicts, merged, closed, draft, open, gone }
+
+typedef _MarkOf = ({_Mark kind, String says, CiState? checks});
+
+_MarkOf? _markOf(Worktree w, PullRequestInfo? pr) {
+  if (w.conflicts > 0) {
+    return (kind: _Mark.conflicts, says: '${w.conflicts} merge ${w.conflicts == 1 ? 'conflict' : 'conflicts'}', checks: null);
+  }
+  if (pr != null) {
+    final kind = switch (pr.state) {
+      PrOpenState.merged => _Mark.merged,
+      PrOpenState.closed => _Mark.closed,
+      PrOpenState.open => pr.draft ? _Mark.draft : _Mark.open,
+    };
+    return (kind: kind, says: _prSays(pr), checks: pr.checksState);
+  }
+  if (w.upstreamGone) return (kind: _Mark.gone, says: 'Its remote branch is gone: merged or deleted', checks: null);
+  return null;
+}
+
+class _WorktreeMark extends StatelessWidget {
+  const _WorktreeMark(this.mark);
+  final _MarkOf mark;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final (icon, color) = switch (pr.state) {
-      PrOpenState.merged => (KIcons.merged, c.purple),
-      PrOpenState.closed => (KIcons.pullRequest, c.text3),
-      PrOpenState.open when pr.draft => (KIcons.pullRequest, c.text3),
-      PrOpenState.open => (
+    final (icon, color) = switch (mark.kind) {
+      _Mark.conflicts => (KIcons.warning, c.err),
+      _Mark.merged => (KIcons.merged, c.purple),
+      _Mark.gone => (KIcons.merged, c.text3),
+      _Mark.closed || _Mark.draft => (KIcons.pullRequest, c.text3),
+      _Mark.open => (
           KIcons.pullRequest,
-          switch (pr.checksState) {
+          switch (mark.checks) {
             CiState.passed => c.ok,
             CiState.failed => c.err,
             CiState.running || CiState.queued => c.acc,
@@ -1265,6 +1289,6 @@ class _PrMark extends StatelessWidget {
           }
         ),
     };
-    return Tooltip(message: _prSays(pr), child: Icon(icon, size: 14, color: color));
+    return Tooltip(message: mark.says, child: Icon(icon, size: 14, color: color));
   }
 }
