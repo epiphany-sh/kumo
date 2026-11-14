@@ -149,9 +149,16 @@ class AgentRun {
     this.tellsAsking = true,
     this.worked = Duration.zero,
     this.stateSince,
+    this.model = '',
+    this.effort = '',
   });
 
   final String id;
+
+  /// What it runs on, as its CLI last reported it: the model ("Opus 5.5",
+  /// "gpt-6-sol") and the reasoning effort ("high"). Empty while unknown.
+  final String model;
+  final String effort;
 
   /// How long it worked before [stateSince].
   final Duration worked;
@@ -195,8 +202,12 @@ class AgentRun {
 /// `claude` in a shell): the daemon sees each terminal's foreground process.
 @immutable
 class TerminalAgent {
-  const TerminalAgent({required this.terminalId, required this.providerId, required this.name, required this.terminalTitle, required this.cwd, this.state = AgentStatus.running, this.busy = false});
+  const TerminalAgent({required this.terminalId, required this.providerId, required this.name, required this.terminalTitle, required this.cwd, this.state = AgentStatus.running, this.busy = false, this.model = '', this.effort = ''});
   final String terminalId;
+
+  /// What it runs on, as its CLI last reported it (see [AgentRun.model]).
+  final String model;
+  final String effort;
 
   /// The known CLI it is (claude, codex, gemini…).
   final String providerId;

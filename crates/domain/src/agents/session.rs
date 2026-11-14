@@ -5,6 +5,8 @@ use std::time::Duration;
 use crate::terminal::{ExitStatus, TerminalId};
 use crate::time::Timestamp;
 
+use super::usage::AgentModel;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AgentSessionId(String);
 
@@ -65,6 +67,8 @@ pub struct AgentSession {
     pub agent_name: Option<String>,
     /// What it was given for the run, as files (`--add-dir`).
     pub context_dir: Option<PathBuf>,
+    /// The model and effort it runs on, as its CLI last reported them.
+    pub model: AgentModel,
 }
 
 /// Where a piece of context came from.
@@ -186,6 +190,8 @@ pub struct TerminalAgent {
     pub state: AgentState,
     /// Producing output.
     pub busy: bool,
+    /// The model and effort it runs on, as its CLI last reported them.
+    pub model: AgentModel,
 }
 
 /// Runtimes a CLI can be a script of (`node …/claude`, a shell wrapper).
@@ -246,6 +252,7 @@ mod tests {
             events: Vec::new(),
             agent_name: None,
             context_dir: None,
+            model: AgentModel::default(),
         };
         let secs = Duration::from_secs;
         assert_eq!(session.worked_at(at(10)), secs(10));

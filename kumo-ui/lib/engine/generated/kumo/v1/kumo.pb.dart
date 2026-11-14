@@ -8051,6 +8051,8 @@ class AgentSession extends $pb.GeneratedMessage {
     $core.bool? asked,
     $fixnum.Int64? workedMs,
     $core.bool? tellsAsking,
+    $core.String? model,
+    $core.String? effort,
   }) {
     final result = AgentSession._();
     if (id != null) result.id = id;
@@ -8073,6 +8075,8 @@ class AgentSession extends $pb.GeneratedMessage {
     if (asked != null) result.asked = asked;
     if (workedMs != null) result.workedMs = workedMs;
     if (tellsAsking != null) result.tellsAsking = tellsAsking;
+    if (model != null) result.model = model;
+    if (effort != null) result.effort = effort;
     return result;
   }
 
@@ -8118,6 +8122,8 @@ class AgentSession extends $pb.GeneratedMessage {
         19, _omitFieldNames ? '' : 'workedMs', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOB(20, _omitFieldNames ? '' : 'tellsAsking')
+    ..aOS(21, _omitFieldNames ? '' : 'model')
+    ..aOS(22, _omitFieldNames ? '' : 'effort')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8320,6 +8326,28 @@ class AgentSession extends $pb.GeneratedMessage {
   $core.bool hasTellsAsking() => $_has(19);
   @$pb.TagNumber(20)
   void clearTellsAsking() => $_clearField(20);
+
+  /// What it runs on, as its CLI last reported it (Claude Code's status
+  /// line, Codex's and Copilot's session files): the model ("Opus 5.5",
+  /// "gpt-6-sol") and the reasoning effort ("high"). Empty while unknown or
+  /// when its usage isn't read; never guessed from settings.
+  @$pb.TagNumber(21)
+  $core.String get model => $_getSZ(20);
+  @$pb.TagNumber(21)
+  set model($core.String value) => $_setString(20, value);
+  @$pb.TagNumber(21)
+  $core.bool hasModel() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearModel() => $_clearField(21);
+
+  @$pb.TagNumber(22)
+  $core.String get effort => $_getSZ(21);
+  @$pb.TagNumber(22)
+  set effort($core.String value) => $_setString(21, value);
+  @$pb.TagNumber(22)
+  $core.bool hasEffort() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearEffort() => $_clearField(22);
 }
 
 class StopAgentRequest extends $pb.GeneratedMessage {
@@ -8732,6 +8760,8 @@ class TerminalAgent extends $pb.GeneratedMessage {
     $core.String? cwd,
     AgentState? state,
     $core.bool? busy,
+    $core.String? model,
+    $core.String? effort,
   }) {
     final result = TerminalAgent._();
     if (terminalId != null) result.terminalId = terminalId;
@@ -8740,6 +8770,8 @@ class TerminalAgent extends $pb.GeneratedMessage {
     if (cwd != null) result.cwd = cwd;
     if (state != null) result.state = state;
     if (busy != null) result.busy = busy;
+    if (model != null) result.model = model;
+    if (effort != null) result.effort = effort;
     return result;
   }
 
@@ -8763,6 +8795,8 @@ class TerminalAgent extends $pb.GeneratedMessage {
     ..aE<AgentState>(5, _omitFieldNames ? '' : 'state',
         enumValues: AgentState.values)
     ..aOB(6, _omitFieldNames ? '' : 'busy')
+    ..aOS(7, _omitFieldNames ? '' : 'model')
+    ..aOS(8, _omitFieldNames ? '' : 'effort')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8846,6 +8880,26 @@ class TerminalAgent extends $pb.GeneratedMessage {
   $core.bool hasBusy() => $_has(5);
   @$pb.TagNumber(6)
   void clearBusy() => $_clearField(6);
+
+  /// What it runs on, read from its CLI's own files like a session's (see
+  /// AgentSession.model). Empty while unknown.
+  @$pb.TagNumber(7)
+  $core.String get model => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set model($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasModel() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearModel() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get effort => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set effort($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasEffort() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearEffort() => $_clearField(8);
 }
 
 class SendToTerminalRequest extends $pb.GeneratedMessage {
@@ -9283,6 +9337,7 @@ class SessionUsage extends $pb.GeneratedMessage {
     $core.int? turns,
     $core.String? compactCommand,
     $fixnum.Int64? readAt,
+    $core.String? effort,
   }) {
     final result = SessionUsage._();
     if (sessionId != null) result.sessionId = sessionId;
@@ -9292,6 +9347,7 @@ class SessionUsage extends $pb.GeneratedMessage {
     if (turns != null) result.turns = turns;
     if (compactCommand != null) result.compactCommand = compactCommand;
     if (readAt != null) result.readAt = readAt;
+    if (effort != null) result.effort = effort;
     return result;
   }
 
@@ -9318,6 +9374,7 @@ class SessionUsage extends $pb.GeneratedMessage {
     ..aI(5, _omitFieldNames ? '' : 'turns', fieldType: $pb.PbFieldType.OU3)
     ..aOS(6, _omitFieldNames ? '' : 'compactCommand')
     ..aInt64(7, _omitFieldNames ? '' : 'readAt')
+    ..aOS(8, _omitFieldNames ? '' : 'effort')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -9398,6 +9455,15 @@ class SessionUsage extends $pb.GeneratedMessage {
   $core.bool hasReadAt() => $_has(6);
   @$pb.TagNumber(7)
   void clearReadAt() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get effort => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set effort($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasEffort() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearEffort() => $_clearField(8);
 }
 
 class UsageRequest extends $pb.GeneratedMessage {

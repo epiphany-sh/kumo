@@ -9,6 +9,6 @@ pub use homes::ProfileCliHomes;
 pub use locator::ShellPathLocator;
 pub use processes::OsProcesses;
 pub use usage::{
-    ClaudeAccount, ClaudeStatusLine, CodexAccount, CodexRollouts, CopilotAccount,
-    claude_config_dir, codex_home,
+    ClaudeAccount, ClaudeStatusLine, CodexAccount, CodexRollouts, CopilotAccount, CopilotEvents,
+    claude_config_dir, codex_home, copilot_home,
 };
