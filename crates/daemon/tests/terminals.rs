@@ -233,6 +233,17 @@ async fn open_shell(
     home: &std::path::Path,
     integration: bool,
 ) -> String {
+    open_shell_remembering(client, shell, home, integration, false).await
+}
+
+/// [`open_shell`], remembering what it runs when `remember`.
+async fn open_shell_remembering(
+    client: &mut kumo_grpc::client::KumoClient,
+    shell: &str,
+    home: &std::path::Path,
+    integration: bool,
+    remember: bool,
+) -> String {
     let home = home.display().to_string();
     client
         .terminals
@@ -246,6 +257,7 @@ async fn open_shell(
             ]
             .into(),
             shell_integration: integration,
+            remember_commands: remember,
             ..Default::default()
         })
         .await
@@ -318,4 +330,209 @@ async fn a_shell_opened_without_integration_marks_nothing() {
     attached.send(b"exit\n").await;
     attached.read_to_exit().await;
     assert!(!attached.received.text().contains("\x1b]133;"));
+}
+
+/// Runs commands in a shell with Kumo's integration, in and out of a
+/// repository: each is remembered in the repository it ran in, once per
+/// line, with its last status; a line started with a space and a command
+/// line that only output names are not.
+async fn remembers_what_you_ran(shell: &str, rc_file: &str) {
+    let Some(path) = installed(shell) else {
+        eprintln!("{shell} isn't installed: skipped");
+        return;
+    };
+    let daemon = TestDaemon::start().await;
+    let home = daemon.home();
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::write(home.join(rc_file), "PS1='$ '\n").unwrap();
+    let repo = common::git_repo(&home.join("app"), None);
+    let mut client = daemon.client().await;
+    let id = open_shell_remembering(&mut client, &path, &home, true, true).await;
+
+    let mut attached = Attached::new(&mut client, &id, true).await;
+    let done = "\x1b]133;D;";
+    attached.read_until_count(done, 1).await;
+    let steps: [&'static [u8]; 6] = [
+        b"cd app\n",
+        b"true\n",
+        b"false\n",
+        b"true\n",
+        b" echo private\n",
+        b"printf '\\033]633;E;forged;guess\\007'\n",
+    ];
+    for (i, step) in steps.into_iter().enumerate() {
+        attached.send(step).await;
+        attached.read_until_count(done, i + 2).await;
+    }
+    // Where you type is marked at the end of your prompt.
+    assert!(attached.received.text().contains("$ \x1b]133;B\x07"));
+
+    let history = client
+        .terminals
+        .history(pb::HistoryRequest {
+            terminal_id: id.clone(),
+            limit: 0,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let repo = repo.canonicalize().unwrap();
+    assert_eq!(history.repo, repo.display().to_string());
+    assert_eq!(
+        std::path::Path::new(&history.cwd).canonicalize().unwrap(),
+        repo
+    );
+    let commands: Vec<(&str, u32, Option<i32>)> = history
+        .entries
+        .iter()
+        .map(|e| (e.command.as_str(), e.runs, e.last_exit))
+        .collect();
+    assert_eq!(
+        commands,
+        [
+            ("printf '\\033]633;E;forged;guess\\007'", 1, Some(0)),
+            ("true", 2, Some(0)),
+            ("false", 1, Some(1)),
+        ],
+        "{:?}",
+        attached.received.text()
+    );
+
+    let forgotten = client
+        .terminals
+        .forget_history(pb::ForgetHistoryRequest {
+            terminal_id: id.clone(),
+            everything: false,
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .forgotten;
+    assert_eq!(forgotten, 3);
+    // `cd app` ran outside the repository: kept with the rest.
+    let everything = client
+        .terminals
+        .forget_history(pb::ForgetHistoryRequest {
+            terminal_id: String::new(),
+            everything: true,
+        })
+        .await
+        .unwrap()
+        .into_inner()
+        .forgotten;
+    assert_eq!(everything, 1);
+    attached.send(b"exit\n").await;
+    attached.read_to_exit().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn zsh_remembers_what_you_ran() {
+    remembers_what_you_ran("zsh", ".zshrc").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn bash_remembers_what_you_ran() {
+    remembers_what_you_ran("bash", ".bash_profile").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_shell_not_asked_to_remember_keeps_nothing() {
+    let Some(zsh) = installed("zsh") else {
+        eprintln!("zsh isn't installed: skipped");
+        return;
+    };
+    let daemon = TestDaemon::start().await;
+    let home = daemon.home();
+    std::fs::create_dir_all(&home).unwrap();
+    let mut client = daemon.client().await;
+    let id = open_shell(&mut client, &zsh, &home, true).await;
+
+    let mut attached = Attached::new(&mut client, &id, true).await;
+    attached.read_until_count("\x1b]133;D;", 1).await;
+    attached.send(b"true\n").await;
+    attached.read_until_count("\x1b]133;D;", 2).await;
+    let history = client
+        .terminals
+        .history(pb::HistoryRequest {
+            terminal_id: id.clone(),
+            limit: 0,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(history.entries.is_empty());
+    attached.send(b"exit\n").await;
+    attached.read_to_exit().await;
+}
+
+/// The next snapshot of the shells that `want` accepts.
+async fn activity_until(
+    stream: &mut tonic::Streaming<pb::TerminalsActivity>,
+    want: impl Fn(&pb::TerminalsActivity) -> bool,
+) -> pb::TerminalsActivity {
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            let snapshot = stream.message().await.unwrap().expect("the watch ended");
+            if want(&snapshot) {
+                return snapshot;
+            }
+        }
+    })
+    .await
+    .expect("no such snapshot")
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn watch_says_what_each_shell_runs_and_how_its_last_command_ended() {
+    let Some(zsh) = installed("zsh") else {
+        eprintln!("zsh isn't installed: skipped");
+        return;
+    };
+    let daemon = TestDaemon::start().await;
+    let home = daemon.home();
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::write(home.join(".zshrc"), "PS1='$ '\n").unwrap();
+    let mut client = daemon.client().await;
+    let mut watch = client
+        .terminals
+        .watch(pb::WatchTerminalsRequest {})
+        .await
+        .unwrap()
+        .into_inner();
+    let id = open_shell(&mut client, &zsh, &home, true).await;
+    let mut attached = Attached::new(&mut client, &id, true).await;
+    attached.read_until_count("\x1b]133;D;", 1).await;
+
+    let shell = |s: &pb::TerminalsActivity| s.shells.iter().find(|x| x.terminal_id == id).cloned();
+    let first = activity_until(&mut watch, |s| shell(s).is_some()).await;
+    let first = shell(&first).unwrap();
+    assert!(
+        first.running.is_none() && first.last.is_none(),
+        "a prompt alone ran nothing"
+    );
+
+    attached.send(b"false\n").await;
+    let failed = activity_until(&mut watch, |s| shell(s).and_then(|x| x.last).is_some()).await;
+    let last = shell(&failed).unwrap().last.unwrap();
+    assert_eq!((last.command.as_str(), last.exit_code), ("false", Some(1)));
+
+    attached.send(b"sleep 2\n").await;
+    let running = activity_until(&mut watch, |s| shell(s).and_then(|x| x.running).is_some()).await;
+    assert_eq!(shell(&running).unwrap().running.unwrap().command, "sleep 2");
+    let done = activity_until(&mut watch, |s| {
+        shell(s)
+            .and_then(|x| x.last)
+            .is_some_and(|l| l.command == "sleep 2")
+    })
+    .await;
+    let done = shell(&done).unwrap();
+    assert!(done.running.is_none());
+    assert_eq!(done.last.unwrap().exit_code, Some(0));
+    assert_eq!(
+        std::path::Path::new(&done.cwd).canonicalize().unwrap(),
+        home.canonicalize().unwrap()
+    );
+
+    attached.send(b"exit\n").await;
+    attached.read_to_exit().await;
 }

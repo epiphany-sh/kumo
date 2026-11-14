@@ -21,7 +21,7 @@ void main() {
       state: pb.CiState.CI_STATE_FAILED,
       createdAt: Int64(1761660191000),
       finishedAt: Int64(0),
-      url: 'https://github.com/pricing/price-admin/actions/runs/11896352187',
+      url: 'https://github.com/platform/repo-a/actions/runs/11896352187',
       jobs: [
         pb.CiJob(name: 'build', state: pb.CiState.CI_STATE_PASSED, durationMs: Int64(72000)),
         pb.CiJob(
@@ -45,6 +45,13 @@ void main() {
     expect(run.jobs[3].duration, isNull);
     expect(run.hasFailedJobs, isTrue);
     expect(run.done, 3);
+  });
+
+  test('a run says its workflow and whether it is one of the pull request’s checks', () {
+    final check = ciRunFrom(pb.CiRun(id: '1', label: 'run #31', workflow: 'ci', pullRequest: true));
+    expect((check.workflow, check.pullRequest), ('ci', true));
+    final old = ciRunFrom(pb.CiRun(id: '1', label: 'run #31'));
+    expect((old.workflow, old.pullRequest), ('', false), reason: 'an older kumod doesn’t say');
   });
 
   test('every problem kind maps, with its extras', () {
@@ -82,11 +89,11 @@ void main() {
       usesGh: true,
       ghAccount: 'user-1',
       ghAvailable: true,
-      repos: ['pricing/app'],
+      repos: ['platform/app'],
     ))!;
     expect((host.ghAccount, host.ghAvailable), ('user-1', true));
     expect((host.host, host.provider, host.hasToken, host.usesGh), ('github.com', CiProvider.githubActions, false, true));
-    expect(host.repos, ['pricing/app']);
+    expect(host.repos, ['platform/app']);
     expect(ciHostFrom(pb.CiHostInfo(host: 'x', provider: pb.CiProvider.CI_PROVIDER_NONE)), isNull);
   });
 
@@ -116,7 +123,7 @@ void main() {
   });
 
   testWidgets('GitHub signs in with the GitHub CLI, no token needed', (tester) async {
-    final hosts = MockCiHostsSource(hosts: const [CiHostInfo(host: 'github.com', provider: CiProvider.githubActions, ghAvailable: true, repos: ['pricing/app'])]);
+    final hosts = MockCiHostsSource(hosts: const [CiHostInfo(host: 'github.com', provider: CiProvider.githubActions, ghAvailable: true, repos: ['platform/app'])]);
     await _pumpPanel(tester, hosts);
     expect(find.text('Not connected'), findsOneWidget);
     await tester.tap(find.widgetWithText(KButton, 'Connect'));

@@ -130,7 +130,7 @@ mod tests {
         assert_eq!(
             of(
                 "Merge branch 'feat/x' into 'main'",
-                "Adds x\n\nSee merge request pricing/reader!228"
+                "Adds x\n\nSee merge request platform/reader!228"
             )
             .as_deref(),
             Some("!228")

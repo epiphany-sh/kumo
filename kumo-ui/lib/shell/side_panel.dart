@@ -691,10 +691,12 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
   bool _changedOnly = false;
 
   /// The row whose menu is open, the one being renamed, and the folder a
-  /// new file is being named in ('' is the worktree's root).
+  /// new file or folder ([_newFolder]) is being named in ('' is the
+  /// worktree's root).
   String? _menuFor;
   String? _renaming;
   String? _creatingIn;
+  bool _newFolder = false;
   final _name = TextEditingController();
   final _nameFocus = FocusNode();
   String? _nameError;
@@ -744,11 +746,12 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
     _focusName();
   }
 
-  void _startCreate(String dir) {
+  void _startCreate(String dir, {bool folder = false}) {
     _name.clear();
     setState(() {
       _changedOnly = false; // its folder may be hidden
       _creatingIn = dir;
+      _newFolder = folder;
       _renaming = null;
       _nameError = null;
       if (dir.isNotEmpty) _openUpTo(dir);
@@ -763,7 +766,8 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
     }
   }
 
-  /// ↩ in the name field: renames, or creates the file and opens it.
+  /// ↩ in the name field: renames, creates the file and opens it, or
+  /// creates the folder and shows it open.
   Future<void> _submitName() async {
     final s = AppScope.read(context);
     final raw = _name.text.trim();
@@ -788,10 +792,15 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
     } else {
       final dir = _creatingIn ?? '';
       final path = AppState.cleanPath(dir.isEmpty ? raw : '$dir/$raw');
-      error = await s.createFile(path);
-      if (error == null) {
-        _openUpTo(_dirOf(path));
-        widget.onOpen(path);
+      if (_newFolder) {
+        error = await s.createFolder(path);
+        if (error == null) _openUpTo(path);
+      } else {
+        error = await s.createFile(path);
+        if (error == null) {
+          _openUpTo(_dirOf(path));
+          widget.onOpen(path);
+        }
       }
     }
     _busy = false;
@@ -822,6 +831,7 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
         close: close,
         onOpen: dir ? null : () => widget.onOpen(path),
         onNewFile: () => _startCreate(path),
+        onNewFolder: () => _startCreate(path, folder: true),
         onRename: () => _startRename(path),
       ),
     );
@@ -856,6 +866,8 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
       node.files.add(p);
     }
     const newHint = 'name.ext — a/b.ext makes folders';
+    Widget newField(int depth) =>
+        _newFolder ? _field(depth, KIcons.folder, hint: 'name — a/b makes nested folders') : _field(depth, KIcons.file, hint: newHint);
     final rows = <Widget>[];
     void walk(_Dir node, int depth) {
       for (final name in node.dirs.keys.toList()..sort()) {
@@ -883,7 +895,7 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
             onMenu: (at) => _menu(at, d.key, dir: true),
           ));
         }
-        if (open && _creatingIn == d.key) rows.add(_field(depth + 1, KIcons.file, hint: newHint));
+        if (open && _creatingIn == d.key) rows.add(newField(depth + 1));
         if (open) walk(d, depth + 1);
       }
       final files = [...node.files]..sort((a, b) => a.split('/').last.compareTo(b.split('/').last));
@@ -912,7 +924,7 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
       }
     }
 
-    if (_creatingIn == '') rows.add(_field(0, KIcons.file, hint: newHint));
+    if (_creatingIn == '') rows.add(newField(0));
     walk(root, 0);
     final pending = s.pendingChanges;
     final added = pending.where((f) => f.kind == 'A').length;
@@ -946,6 +958,11 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
           onTap: () => _startCreate(_dirOf(widget.selected)),
         ),
         KIconButton(
+          icon: KIcons.folderAdd,
+          label: 'New folder (or right-click a folder)',
+          onTap: () => _startCreate(_dirOf(widget.selected), folder: true),
+        ),
+        KIconButton(
           icon: KIcons.collapseAll,
           label: 'Collapse all',
           onTap: () => setState(() {
@@ -968,12 +985,21 @@ class _WorktreeFilesTreeState extends State<WorktreeFilesTree> {
 
 /// Right-click on a file or folder of the Files tree.
 class _FileTreeMenu extends StatelessWidget {
-  const _FileTreeMenu({required this.path, required this.dir, required this.close, required this.onNewFile, required this.onRename, this.onOpen});
+  const _FileTreeMenu({
+    required this.path,
+    required this.dir,
+    required this.close,
+    required this.onNewFile,
+    required this.onNewFolder,
+    required this.onRename,
+    this.onOpen,
+  });
   final String path;
   final bool dir;
   final VoidCallback close;
   final VoidCallback? onOpen;
   final VoidCallback onNewFile;
+  final VoidCallback onNewFolder;
   final VoidCallback onRename;
 
   @override
@@ -988,7 +1014,10 @@ class _FileTreeMenu extends StatelessWidget {
     final n = changed.length;
     final discardLabel = dir && n > 0 ? 'Discard $n ${n == 1 ? 'change' : 'changes'}' : 'Discard changes';
     return KMenuPanel(width: 248, children: [
-      if (dir) KMenuItem(icon: KIcons.fileAdd, label: 'New file…', onTap: () => then(onNewFile)),
+      if (dir) ...[
+        KMenuItem(icon: KIcons.fileAdd, label: 'New file…', onTap: () => then(onNewFile)),
+        KMenuItem(icon: KIcons.folderAdd, label: 'New folder…', onTap: () => then(onNewFolder)),
+      ],
       if (onOpen != null) KMenuItem(icon: KIcons.file, label: 'Open', onTap: () => then(onOpen!)),
       KMenuItem(icon: KIcons.rename, label: 'Rename…', onTap: () => then(onRename)),
       KMenuItem(
@@ -1154,30 +1183,37 @@ class _WidgetsTab extends StatelessWidget {
     final list = s.widgets;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Expanded(
-        child: ReorderableListView(
-          buildDefaultDragHandles: false,
-          padding: const EdgeInsets.fromLTRB(10, 12, 10, 4),
-          proxyDecorator: (child, index, animation) => Material(type: MaterialType.transparency, child: child),
-          onReorder: s.reorderWidget,
-          children: [
-            for (var i = 0; i < list.length; i++)
-              Padding(
-                key: ValueKey(list[i]),
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _WidgetCard(widgetKind: list[i], index: i, count: list.length),
-              ),
-          ],
-        ),
+        // No widget gets taller than the list showing it: past that its
+        // content scrolls inside the card.
+        child: LayoutBuilder(builder: (context, box) {
+          final tallest = (box.maxHeight - 16 - _resizerHeight).clamp(AppState.minWidgetHeight, AppState.maxWidgetHeight).toDouble();
+          return ReorderableListView(
+            buildDefaultDragHandles: false,
+            padding: const EdgeInsets.fromLTRB(10, 12, 10, 4),
+            proxyDecorator: (child, index, animation) => Material(type: MaterialType.transparency, child: child),
+            onReorder: s.reorderWidget,
+            children: [
+              for (var i = 0; i < list.length; i++) _WidgetCard(key: ValueKey(list[i]), widgetKind: list[i], index: i, count: list.length, tallest: tallest),
+            ],
+          );
+        }),
       ),
       const Padding(padding: EdgeInsets.fromLTRB(10, 0, 10, 10), child: _AddWidgetButton()),
     ]);
   }
 }
 
+/// The gap under each widget, which drags its height.
+const _resizerHeight = 10.0;
+
 /// Frame of one inspector widget: hover grip to drag (reorder), right-click
-/// for Move up / Move down / Remove.
+/// for Move up / Move down / Remove, and the gap under it drags its height.
+/// Content that doesn't fit the height scrolls inside the card.
 class _WidgetCard extends StatefulWidget {
-  const _WidgetCard({required this.widgetKind, required this.index, required this.count});
+  const _WidgetCard({super.key, required this.widgetKind, required this.index, required this.count, required this.tallest});
+
+  /// The most the card may measure here (the list's height).
+  final double tallest;
   final InspectorWidget widgetKind;
   final int index;
   final int count;
@@ -1188,6 +1224,21 @@ class _WidgetCard extends StatefulWidget {
 
 class _WidgetCardState extends State<_WidgetCard> {
   bool _hover = false;
+  final _scroll = ScrollController();
+  final _card = GlobalKey();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// The card's height now and with all of its content showing.
+  (double, double) _heights() {
+    final now = (_card.currentContext?.findRenderObject() as RenderBox?)?.size.height ?? 0;
+    final hidden = _scroll.hasClients && _scroll.position.hasContentDimensions ? _scroll.position.maxScrollExtent : 0.0;
+    return (now, now + hidden);
+  }
 
   void _menu(Offset at) {
     final s = AppScope.read(context);
@@ -1216,6 +1267,16 @@ class _WidgetCardState extends State<_WidgetCard> {
                   s.moveWidget(w, 1);
                 },
         ),
+        if (s.widgetHeight(w) != null)
+          KMenuItem(
+            icon: KIcons.gauge,
+            label: 'Fit height to content',
+            onTap: () {
+              close();
+              s.setWidgetHeight(w, null);
+              s.saveWidgetHeights();
+            },
+          ),
         const KMenuDivider(),
         KMenuItem(
           icon: KIcons.close,
@@ -1233,46 +1294,176 @@ class _WidgetCardState extends State<_WidgetCard> {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        onSecondaryTapDown: (d) => _menu(d.globalPosition),
-        child: Semantics(
-          label: '${widget.widgetKind.label} widget. Right-click for Move up, Move down, Remove',
-          child: Stack(children: [
-            _widgetBody(widget.widgetKind),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: ReorderableDragStartListener(
-                  index: widget.index,
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.grab,
-                    child: Tooltip(
-                      message: 'Drag to reorder · right-click for options',
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 150),
-                        opacity: _hover ? 0.75 : 0,
-                        child: Container(
-                          width: 44,
-                          height: 14,
-                          alignment: Alignment.center,
-                          child: Container(width: 30, height: 4, decoration: BoxDecoration(color: c.text3, borderRadius: BorderRadius.circular(2))),
+    final s = AppScope.of(context);
+    final w = widget.widgetKind;
+    final limit = (s.widgetHeight(w) ?? widget.tallest).clamp(AppState.minWidgetHeight, widget.tallest).toDouble();
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      MouseRegion(
+        key: _card,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          onSecondaryTapDown: (d) => _menu(d.globalPosition),
+          child: Semantics(
+            label: '${w.label} widget. Right-click for Move up, Move down, Remove',
+            child: Stack(children: [
+              SectionViewport(maxHeight: limit, controller: _scroll, child: _widgetBody(w)),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: ReorderableDragStartListener(
+                    index: widget.index,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.grab,
+                      child: Tooltip(
+                        message: 'Drag to reorder · right-click for options',
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 150),
+                          opacity: _hover ? 0.75 : 0,
+                          child: Container(
+                            width: 44,
+                            height: 14,
+                            alignment: Alignment.center,
+                            child: Container(width: 30, height: 4, decoration: BoxDecoration(color: c.text3, borderRadius: BorderRadius.circular(2))),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
+            ]),
+          ),
+        ),
+      ),
+      _WidgetResizer(widgetKind: w, tallest: widget.tallest, heights: _heights),
+    ]);
+  }
+}
+
+/// The 10 px gap under a widget, which drags its height: from
+/// [AppState.minWidgetHeight] up to its content or the panel's height,
+/// whichever is less. A grip shows on hover, focus and while dragging;
+/// double-click goes back to the content's height; with the keyboard, ↑ ↓
+/// change it (⇧ for bigger steps).
+class _WidgetResizer extends StatefulWidget {
+  const _WidgetResizer({required this.widgetKind, required this.tallest, required this.heights});
+  final InspectorWidget widgetKind;
+  final double tallest;
+
+  /// The card's height now and with all of its content showing.
+  final (double, double) Function() heights;
+
+  @override
+  State<_WidgetResizer> createState() => _WidgetResizerState();
+}
+
+class _WidgetResizerState extends State<_WidgetResizer> {
+  bool _hover = false;
+  bool _focus = false;
+  bool _dragging = false;
+  double _startHeight = 0;
+  double _startY = 0;
+  double _most = 0;
+
+  /// The most the card can measure: all of its content, if the panel has
+  /// room for it.
+  double _mostOf(double full) => full.clamp(AppState.minWidgetHeight, widget.tallest).toDouble();
+
+  void _set(AppState s, double height) => s.setWidgetHeight(widget.widgetKind, height.clamp(AppState.minWidgetHeight, _most).toDouble());
+
+  void _by(AppState s, double dy) {
+    final (now, full) = widget.heights();
+    _most = _mostOf(full);
+    // Nothing to give or take on a widget that is already this small.
+    if (full <= AppState.minWidgetHeight) return;
+    _set(s, now + dy);
+    s.saveWidgetHeights();
+  }
+
+  void _reset(AppState s) {
+    s.setWidgetHeight(widget.widgetKind, null);
+    s.saveWidgetHeights();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final c = context.c;
+    final on = _hover || _focus || _dragging;
+    final set = s.widgetHeight(widget.widgetKind);
+    return Semantics(
+      label: 'Resize ${widget.widgetKind.label} widget',
+      value: set == null ? 'Fits its content' : '${set.round()} pixels',
+      increasedValue: set == null ? 'Fits its content' : '${(set + 16).clamp(AppState.minWidgetHeight, widget.tallest).round()} pixels',
+      decreasedValue: set == null ? 'Shorter than its content' : '${(set - 16).clamp(AppState.minWidgetHeight, widget.tallest).round()} pixels',
+      onIncrease: () => _by(s, 16),
+      onDecrease: () => _by(s, -16),
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.resizeRow,
+        onShowHoverHighlight: (v) => setState(() => _hover = v),
+        onShowFocusHighlight: (v) => setState(() => _focus = v),
+        shortcuts: const {
+          SingleActivator(LogicalKeyboardKey.arrowUp): _ResizeWidget(-16),
+          SingleActivator(LogicalKeyboardKey.arrowDown): _ResizeWidget(16),
+          SingleActivator(LogicalKeyboardKey.arrowUp, shift: true): _ResizeWidget(-40),
+          SingleActivator(LogicalKeyboardKey.arrowDown, shift: true): _ResizeWidget(40),
+        },
+        actions: {
+          _ResizeWidget: CallbackAction<_ResizeWidget>(onInvoke: (i) {
+            _by(s, i.dy);
+            return null;
+          }),
+        },
+        child: Tooltip(
+          message: 'Drag to resize · double-click to fit content',
+          waitDuration: const Duration(milliseconds: 600),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            // From where the drag started, so the edge stays under the
+            // pointer even after hitting a limit.
+            onVerticalDragStart: (d) {
+              final (now, full) = widget.heights();
+              setState(() {
+                _dragging = true;
+                _startHeight = now;
+                _startY = d.globalPosition.dy;
+                _most = _mostOf(full);
+              });
+            },
+            onVerticalDragUpdate: (d) => _set(s, _startHeight + d.globalPosition.dy - _startY),
+            onVerticalDragEnd: (_) {
+              setState(() => _dragging = false);
+              s.saveWidgetHeights();
+            },
+            onVerticalDragCancel: () => setState(() => _dragging = false),
+            onDoubleTap: () => _reset(s),
+            child: SizedBox(
+              height: _resizerHeight,
+              child: Center(
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 150),
+                  opacity: on ? 1 : 0,
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: _dragging ? c.acc : c.text3, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+              ),
             ),
-          ]),
+          ),
         ),
       ),
     );
   }
+}
+
+class _ResizeWidget extends Intent {
+  const _ResizeWidget(this.dy);
+  final double dy;
 }
 
 Widget _widgetBody(InspectorWidget w) => switch (w) {
@@ -1962,7 +2153,9 @@ String _contextBadge(AgentContextItem item) {
 }
 
 /// CI runs of the selected worktree's branch, from its repository's host
-/// (GitHub Actions, GitLab CI, Bitbucket Pipelines). Problems — a token
+/// (GitHub Actions, GitLab CI, Bitbucket Pipelines). A commit with several
+/// workflows shows them all: the pull request's checks first, then the
+/// runs that started for something else (a push). Problems — a token
 /// without access, an expired one, an outage — read as plain sentences with
 /// the fix one click away; the provider's own words show small underneath.
 class PipelinesCard extends StatelessWidget {
@@ -1974,10 +2167,11 @@ class PipelinesCard extends StatelessWidget {
     final c = context.c;
     final p = s.pipelines;
     final provider = p.provider;
-    final run = p.latest;
+    final runs = p.runs;
+    final run = runs.firstOrNull;
     final problem = p.problem;
     final stale = problem != null && problem.keepsLastRun;
-    final (pill, pillColor, pillBg) = switch (run?.state) {
+    final (pill, pillColor, pillBg) = switch (_overall(runs)) {
       _ when stale => ('Stale', c.warn, c.warnSoft),
       CiState.running => ('Running', c.acc, c.accSoft),
       CiState.queued => ('Queued', c.text2, c.tile),
@@ -1987,6 +2181,10 @@ class PipelinesCard extends StatelessWidget {
       CiState.skipped => ('Skipped', c.text2, c.tile),
       null => ('', c.text2, c.tile),
     };
+    // Two sections only when the commit has runs of both kinds.
+    final checks = [for (final r in runs) if (r.pullRequest) r];
+    final rest = [for (final r in runs) if (!r.pullRequest) r];
+    final sections = checks.isNotEmpty && rest.isNotEmpty;
     final checked = p.checkedAt == null ? 'not checked yet' : 'checked ${_ago(p.checkedAt!)}';
     void settings() => showSettingsDialog(context, initial: SettingsTab.repos);
 
@@ -2021,7 +2219,8 @@ class PipelinesCard extends StatelessWidget {
           break;
       }
     } else if (run != null && provider != null) {
-      if (run.state.finished && run.hasFailedJobs) action('Re-run failed jobs', busy ? null : p.rerunFailed, primary: true);
+      final failed = runs.where((r) => r.state.finished && r.hasFailedJobs).firstOrNull;
+      if (failed != null) action('Re-run failed jobs', busy ? null : () => p.rerunFailed(failed), primary: true);
       action('Open in ${provider.label}', run.url.isEmpty ? null : () => openUrl(run.url));
     }
 
@@ -2050,21 +2249,14 @@ class PipelinesCard extends StatelessWidget {
           Text('Select a worktree to see its pipelines.', style: sans(12, color: c.text3))
         else if (p.loading && run == null && problem == null)
           Text('Asking ${provider?.label ?? 'the CI'}…', style: sans(12, color: c.text3)),
-        if (run != null) ...[
-          // One line: a long label (`run #8812 · attempt 2`) ellipsizes
-          // instead of overflowing the panel.
-          Text.rich(
-            TextSpan(children: [
-              TextSpan(text: '${run.label} · ${run.shortSha}', style: mono(11.5, color: c.text2)),
-              const WidgetSpan(child: SizedBox(width: 8)),
-              TextSpan(text: _runNote(run), style: sans(11.5, color: c.text3)),
-            ]),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 6),
-          for (final j in run.jobs) _JobRow(job: j, stale: stale),
-        ],
+        if (sections) ...[
+          _RunsHeading(provider == CiProvider.gitlabCi ? 'Merge request' : 'Pull request', count: checks.length),
+          for (final r in checks) _RunBlock(run: r, stale: stale, named: true),
+          const SizedBox(height: 8),
+          _RunsHeading('Other runs', count: rest.length),
+          for (final r in rest) _RunBlock(run: r, stale: stale, named: true),
+        ] else
+          for (final r in runs) _RunBlock(run: r, stale: stale, named: runs.length > 1),
         if (problem != null) ...[
           if (run != null) const SizedBox(height: 6),
           _ProblemBox(problem: problem, provider: provider ?? CiProvider.githubActions, repo: p.repo),
@@ -2085,6 +2277,15 @@ class PipelinesCard extends StatelessWidget {
     );
   }
 
+  /// One state for all the runs: still going, else the worst ending.
+  static CiState? _overall(List<CiRun> runs) {
+    const order = [CiState.running, CiState.queued, CiState.failed, CiState.canceled, CiState.passed, CiState.skipped];
+    for (final state in order) {
+      if (runs.any((r) => r.state == state)) return state;
+    }
+    return null;
+  }
+
   static String _runNote(CiRun run) {
     final total = run.jobs.length;
     final at = run.createdAt == null ? '' : 'started ${_ago(run.createdAt!)}';
@@ -2095,6 +2296,61 @@ class PipelinesCard extends StatelessWidget {
       _ => run.state.name,
     };
     return [if (at.isNotEmpty) at, progress].join(' · ');
+  }
+}
+
+/// "Pull request · 2" over a group of runs.
+class _RunsHeading extends StatelessWidget {
+  const _RunsHeading(this.label, {required this.count});
+  final String label;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(count > 1 ? '$label · $count' : label, style: sans(11, weight: FontWeight.w600, color: c.text3, letterSpacing: 0.2)),
+    );
+  }
+}
+
+/// One run: its line (a click opens it on the provider) and its jobs.
+/// [named] leads with the workflow, where there are several runs.
+class _RunBlock extends StatelessWidget {
+  const _RunBlock({required this.run, required this.stale, required this.named});
+  final CiRun run;
+  final bool stale;
+  final bool named;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final name = named ? run.workflow : '';
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      KPressable(
+        onTap: run.url.isEmpty ? null : () => openUrl(run.url),
+        semanticLabel: '${name.isEmpty ? run.label : name}, ${run.state.name}',
+        // One line: a long label (`run #8812 · attempt 2`) ellipsizes
+        // instead of overflowing the panel.
+        builder: (context, hover, focus) => Text.rich(
+          TextSpan(children: [
+            if (name.isNotEmpty) ...[
+              TextSpan(text: name, style: sans(12, weight: FontWeight.w600, color: hover || focus ? c.acc : c.text)),
+              const WidgetSpan(child: SizedBox(width: 8)),
+            ],
+            TextSpan(text: '${run.label} · ${run.shortSha}', style: mono(11.5, color: c.text2)),
+            const WidgetSpan(child: SizedBox(width: 8)),
+            TextSpan(text: PipelinesCard._runNote(run), style: sans(11.5, color: c.text3)),
+          ]),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      const SizedBox(height: 6),
+      for (final j in run.jobs) _JobRow(job: j, stale: stale),
+      if (named) const SizedBox(height: 6),
+    ]);
   }
 }
 
@@ -2434,7 +2690,7 @@ class _PullRequestCardState extends State<PullRequestCard> {
     if (mounted) setState(() => _busy = false);
   }
 
-  /// `feat/PRC-412-bulk-discounts` → `feat: PRC-412 bulk discounts`.
+  /// `feat/TSK-412-bulk-discounts` → `feat: TSK-412 bulk discounts`.
   static String _titleFor(String branch) {
     final slash = branch.indexOf('/');
     final rest = (slash < 0 ? branch : branch.substring(slash + 1)).replaceAll('-', ' ').replaceAll('_', ' ');

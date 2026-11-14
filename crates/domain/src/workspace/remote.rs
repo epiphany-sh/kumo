@@ -82,14 +82,14 @@ mod tests {
     fn parses_common_remote_forms() {
         let cases = [
             (
-                "git@github.com:pricing/price-admin.git",
+                "git@github.com:platform/repo-a.git",
                 GitHost::GitHub,
-                "pricing/price-admin",
+                "platform/repo-a",
             ),
             (
-                "https://github.com/pricing/price-admin",
+                "https://github.com/platform/repo-a",
                 GitHost::GitHub,
-                "pricing/price-admin",
+                "platform/repo-a",
             ),
             (
                 "https://gitlab.com/group/sub/reader.git",

@@ -123,9 +123,9 @@ DiffLine _a(String t) => DiffLine(DiffKind.added, t);
 DiffLine _d(String t) => DiffLine(DiffKind.deleted, t);
 
 abstract final class MockChanges {
-  /// Files of the PRC-412 worktree, as shown by `git ls-files`.
+  /// Files of the TSK-412 worktree, as shown by `git ls-files`.
   static const tree = [
-    'cmd/price-admin/main.go',
+    'cmd/repo-a/main.go',
     'internal/discount/bulk.go',
     'internal/discount/bulk_test.go',
     'internal/discount/discount.go',
@@ -175,7 +175,7 @@ abstract final class MockChanges {
       _c('\t\treturn nil, err'), _c('\t}'), _c('\treturn pgx.CollectRows(rows, pgx.RowToStructByName[Discount])'), _c('}'),
     ]),
     ChangedFile(path: 'internal/kafka/bulk_consumer.go', kind: 'A', writing: true, lines: _all(DiffKind.added, const [
-      'package kafka', '', 'import (', '\t"context"', '\t"encoding/json"', '', '\t"github.com/segmentio/kafka-go"', '', '\t"price-admin/internal/discount"', ')', '',
+      'package kafka', '', 'import (', '\t"context"', '\t"encoding/json"', '', '\t"github.com/segmentio/kafka-go"', '', '\t"repo-a/internal/discount"', ')', '',
       'const TopicBulkDiscounts = "price.discounts.bulk.v1"', '', 'type BulkConsumer struct {', '\treader *kafka.Reader', '\tsvc    *discount.Service', '}', '',
       'func (c *BulkConsumer) Run(ctx context.Context) error {', '\tfor {', '\t\tmsg, err := c.reader.FetchMessage(ctx)', '\t\tif err != nil {', '\t\t\treturn err', '\t\t}',
       '\t\tvar b discount.BulkDiscount', '\t\tif err := json.Unmarshal(msg.Value, &b); err != nil {', '\t\t\tcontinue // poison message: it lands in the DLQ', '\t\t}',

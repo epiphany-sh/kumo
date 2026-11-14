@@ -161,6 +161,8 @@ pub(super) fn parse_run(pipeline: &Value, steps: &Value, web: &str) -> CiRun {
             })
             .collect(),
         url,
+        workflow: String::new(),
+        pull_request: false,
     }
 }
 

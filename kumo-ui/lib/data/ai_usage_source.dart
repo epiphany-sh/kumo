@@ -192,8 +192,8 @@ class MockAiUsageSource extends AiUsageSource {
       compactCommand: '/compact',
       slices: [ContextSlice(ContextSliceKind.system, 21000), ContextSlice(ContextSliceKind.files, 51000), ContextSlice(ContextSliceKind.conversation, 46000)],
       items: [
-        SessionContextItem(badge: 'JI', label: 'PRC-412 · Bulk discounts by category', tokens: 2400, detail: 'Jira ticket the agent started from'),
-        SessionContextItem(badge: 'CF', label: 'Discount rules v3', tokens: 6100, detail: 'Confluence · Pricing › Engineering › Discounts'),
+        SessionContextItem(badge: 'JI', label: 'TSK-412 · Bulk discounts by category', tokens: 2400, detail: 'Jira ticket the agent started from'),
+        SessionContextItem(badge: 'CF', label: 'Discount rules v3', tokens: 6100, detail: 'Confluence · Platform › Engineering › Discounts'),
         SessionContextItem(badge: '{}', label: 'repository.go:20–26 · your note', tokens: 400, detail: 'Sent with Ask agent'),
         SessionContextItem(badge: '14', label: 'files read · internal/discount/…', tokens: 42100, detail: 'Files the agent opened in this session'),
       ],
@@ -205,7 +205,7 @@ class MockAiUsageSource extends AiUsageSource {
       compactCommand: '/compact',
       slices: [ContextSlice(ContextSliceKind.system, 12000), ContextSlice(ContextSliceKind.files, 38000), ContextSlice(ContextSliceKind.conversation, 22000)],
       items: [
-        SessionContextItem(badge: 'JI', label: 'PRC-412 · Bulk discounts by category', tokens: 2400, detail: 'Jira ticket the agent started from'),
+        SessionContextItem(badge: 'JI', label: 'TSK-412 · Bulk discounts by category', tokens: 2400, detail: 'Jira ticket the agent started from'),
         SessionContextItem(badge: '9', label: 'files read · internal/discount/…', tokens: 35600, detail: 'Files the agent opened in this session'),
       ],
     ),

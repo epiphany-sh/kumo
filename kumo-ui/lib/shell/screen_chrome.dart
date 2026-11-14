@@ -232,5 +232,105 @@ class Section extends StatelessWidget {
   final bool strong;
 
   @override
-  Widget build(BuildContext context) => GlassPanel(padding: padding, fill: strong ? context.c.panelStrong : null, child: child);
+  Widget build(BuildContext context) {
+    final fill = strong ? context.c.panelStrong : null;
+    final view = SectionViewport.maybeOf(context);
+    final max = view?.maxHeight;
+    if (view == null || max == null) return GlassPanel(padding: padding, fill: fill, child: child);
+    return GlassPanel(
+      fill: fill,
+      clip: true,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: max),
+        // The limit is for this panel only, not for panels inside it.
+        child: _SectionScroll(controller: view.controller, padding: padding, child: SectionViewport(maxHeight: null, child: child)),
+      ),
+    );
+  }
+}
+
+/// Height limit for the [Section] below it: the panel is as tall as its
+/// content up to [maxHeight], and past that its content scrolls inside the
+/// frame. With [controller] the owner can read how much content there is.
+class SectionViewport extends InheritedWidget {
+  const SectionViewport({super.key, required this.maxHeight, this.controller, required super.child});
+  final double? maxHeight;
+  final ScrollController? controller;
+
+  static SectionViewport? maybeOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<SectionViewport>();
+
+  @override
+  bool updateShouldNotify(SectionViewport oldWidget) => maxHeight != oldWidget.maxHeight || controller != oldWidget.controller;
+}
+
+/// The scrolling inside a height-limited [Section]. Scrolling past either
+/// end carries on in the list around it, momentum included, so a trackpad
+/// swipe never dies on a panel that has reached its end. (A panel whose
+/// content fits takes no scroll gestures at all; the wheel already falls
+/// through on its own.)
+class _SectionScroll extends StatefulWidget {
+  const _SectionScroll({required this.controller, required this.padding, required this.child});
+  final ScrollController? controller;
+  final EdgeInsetsGeometry padding;
+  final Widget child;
+
+  @override
+  State<_SectionScroll> createState() => _SectionScrollState();
+}
+
+class _SectionScrollState extends State<_SectionScroll> {
+  ScrollController? _own;
+  ScrollController get _controller => widget.controller ?? (_own ??= ScrollController());
+
+  /// Whether the drag in course has been moving the list around.
+  bool _handedOff = false;
+
+  @override
+  void dispose() {
+    _own?.dispose();
+    super.dispose();
+  }
+
+  bool _onScroll(ScrollNotification n) {
+    if (n.depth != 0 || n.metrics.axis != Axis.vertical) return false;
+    final outer = Scrollable.maybeOf(context)?.position;
+    if (outer == null || outer.axis != Axis.vertical) return false;
+    if (n is ScrollStartNotification) {
+      _handedOff = false;
+    } else if (n is OverscrollNotification) {
+      if (n.dragDetails != null) {
+        _handedOff = true;
+        final to = (outer.pixels + n.overscroll).clamp(outer.minScrollExtent, outer.maxScrollExtent).toDouble();
+        if (to != outer.pixels) outer.jumpTo(to);
+      } else if (n.velocity != 0) {
+        _fling(outer, n.velocity);
+      }
+    } else if (n is ScrollEndNotification) {
+      // A drag that ended while pushing past the end: its momentum goes to
+      // the list (pointer velocity is the opposite of scroll velocity).
+      final v = n.dragDetails?.primaryVelocity ?? 0;
+      if (_handedOff && v != 0) _fling(outer, -v);
+      _handedOff = false;
+    }
+    return false;
+  }
+
+  void _fling(ScrollPosition outer, double velocity) {
+    if (outer is ScrollPositionWithSingleContext) outer.goBallistic(velocity);
+  }
+
+  @override
+  Widget build(BuildContext context) => NotificationListener<ScrollNotification>(
+        onNotification: _onScroll,
+        child: Scrollbar(
+          controller: _controller,
+          child: SingleChildScrollView(
+            controller: _controller,
+            primary: false,
+            physics: const ClampingScrollPhysics(),
+            padding: widget.padding,
+            child: widget.child,
+          ),
+        ),
+      );
 }

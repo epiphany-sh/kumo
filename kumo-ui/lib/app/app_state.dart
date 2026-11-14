@@ -16,6 +16,8 @@ import '../data/tests_source.dart';
 import '../data/changes.dart';
 import '../data/workspace_source.dart';
 import '../data/worktree_changes.dart';
+import '../data/worktree_lights.dart';
+import '../data/shell_activity_source.dart';
 import '../data/models.dart';
 import '../editor/file_buffers.dart';
 import '../platform/app_icon.dart';
@@ -86,6 +88,7 @@ class AppState extends ChangeNotifier {
     WorkspaceSource? workspace,
     WorktreeChanges Function(String worktreePath)? changesFor,
     AgentsSource? agents,
+    ShellActivitySource? shells,
     AgentDefsSource? agentDefs,
     AiUsageSource? usage,
     TasksSource? tasks,
@@ -101,6 +104,7 @@ class AppState extends ChangeNotifier {
   })  : prefs = prefs ?? Preferences.memory(),
         workspace = workspace ?? MockWorkspaceSource(),
         agents = agents ?? MockAgentsSource(),
+        shells = shells ?? NoShellActivity(),
         // The design's agents with the design's daemon; a real daemon needs
         // the AgentDefs service first.
         agentDefs = agentDefs ?? (agents == null ? MockAgentDefs() : UnsupportedAgentDefs()),
@@ -120,9 +124,15 @@ class AppState extends ChangeNotifier {
     _bindPipelines();
     _bindTests();
     this.workspace.addListener(_onWorkspaceChanged);
+    // The lights first: the listeners that rebuild read them.
     this.agents
+      ..addListener(_readLights)
       ..addListener(notifyListeners)
       ..addListener(_flushQueued);
+    this.shells
+      ..addListener(_readLights)
+      ..addListener(notifyListeners);
+    _readLights();
     this.usage.addListener(notifyListeners);
     this.updates.addListener(notifyListeners);
     this.profiles.addListener(notifyListeners);
@@ -135,6 +145,11 @@ class AppState extends ChangeNotifier {
     _sidePanelRight = p.get<bool>('sidePanel.right', false);
     _sidePanelOpen = p.get<bool>('sidePanel.onLaunch', true);
     _sidebarWidth = p.get<num>('sidebar.width', defaultSidebarWidth).toDouble().clamp(minSidebarWidth, maxSidebarWidth).toDouble();
+    final heights = p.get<Map<String, Object?>>('widgets.heights', const {});
+    for (final w in InspectorWidget.values) {
+      final h = heights[w.name];
+      if (h is num) _widgetHeights[w] = h.toDouble().clamp(minWidgetHeight, maxWidgetHeight).toDouble();
+    }
     // The workspace this window opens on: the one it was opened for (a new
     // window), else the last one.
     final want = initialProfile ?? p.get<String>('profile.current', '');
@@ -172,6 +187,9 @@ class AppState extends ChangeNotifier {
     demoWallpaper = other.demoWallpaper;
     _sidebarVisible = other._sidebarVisible;
     _sidebarWidth = other._sidebarWidth;
+    _widgetHeights
+      ..clear()
+      ..addAll(other._widgetHeights);
     _sidePanelRight = other._sidePanelRight;
     notifyListeners();
   }
@@ -345,12 +363,13 @@ class AppState extends ChangeNotifier {
 
   /// The selected worktree: its branch (shown) and, with real data, its path
   /// (the identity: `main` exists in every repo). Mocks select by branch.
-  String activeWorktree = 'feat/PRC-412-bulk-discounts';
+  String activeWorktree = 'feat/TSK-412-bulk-discounts';
   String? activeWorktreePath;
   void selectWorktree(String branch, {String? path}) {
     activeWorktree = branch;
     activeWorktreePath = path;
     if (path != null) workspace.acknowledge(path);
+    if (activeWorktreeEntry case final w?) _lights.seen(workspace.absolutePathOf(w));
     _home = false;
     _bindChanges();
     _bindPipelines();
@@ -419,6 +438,8 @@ class AppState extends ChangeNotifier {
   }
 
   void _onWorkspaceChanged() {
+    // An agent's worktree may have just arrived: place it.
+    _readLights();
     if (workspace.error != _lastWorkspaceError) {
       _lastWorkspaceError = workspace.error;
       _workspaceErrorDismissed = false;
@@ -746,12 +767,17 @@ class AppState extends ChangeNotifier {
   ContextTab? get activeContext => _home ? null : _tabs.activeContext;
 
   /// Opens (or goes to) the worktree's [t] tab in the Terminal view.
+  ///
+  /// The Files tab has its own tree: an open side panel showing Files moves
+  /// to Source control instead of repeating it. A hidden panel stays hidden,
+  /// and the saved choice of tab isn't touched.
   void openContext(ContextTab t) {
     _home = false;
     final tabs = _tabs;
     if (!tabs.context.contains(t)) tabs.context.add(t);
     tabs.activeContext = t;
     _view = KumoView.terminal;
+    if (t == ContextTab.files && _sidePanelOpen && _sidePanelTab == SidePanelTab.files) _sidePanelTab = SidePanelTab.git;
     notifyListeners();
   }
 
@@ -904,6 +930,18 @@ class AppState extends ChangeNotifier {
     return changes.error;
   }
 
+  /// A new folder (and its missing parents), kept with an empty `.gitkeep`:
+  /// git doesn't track empty folders. Returns why not, or null.
+  Future<String?> createFolder(String raw) async {
+    final path = cleanPath(raw);
+    if (path.isEmpty) return 'Give the folder a name';
+    if (pathExists(path)) return '$path already exists';
+    final changes = _changes;
+    await changes.write('$path/.gitkeep', '');
+    if (!identical(changes, _changes)) return null;
+    return changes.error;
+  }
+
   /// Renames or moves a file or folder; its tabs and unsaved edits follow.
   /// Returns why not, or null.
   Future<String?> movePath(String from, String raw) async {
@@ -1040,8 +1078,33 @@ class AppState extends ChangeNotifier {
 
   void removeWidget(InspectorWidget w) {
     _widgets = [for (final x in _widgets) if (x != w) x];
+    if (_widgetHeights.remove(w) != null) saveWidgetHeights();
     notifyListeners();
   }
+
+  /// How tall a widget may get before its content scrolls: its bottom edge
+  /// drags between [minWidgetHeight] and [maxWidgetHeight] (the panel also
+  /// stops it at its own height and at the widget's content). Without one
+  /// a widget is as tall as its content, up to the panel's height.
+  static const minWidgetHeight = 120.0;
+  static const maxWidgetHeight = 900.0;
+  final Map<InspectorWidget, double> _widgetHeights = {};
+  double? widgetHeight(InspectorWidget w) => _widgetHeights[w];
+
+  /// null goes back to the content's height.
+  void setWidgetHeight(InspectorWidget w, double? height) {
+    final h = height?.clamp(minWidgetHeight, maxWidgetHeight).toDouble();
+    if (h == _widgetHeights[w]) return;
+    if (h == null) {
+      _widgetHeights.remove(w);
+    } else {
+      _widgetHeights[w] = h;
+    }
+    notifyListeners();
+  }
+
+  /// Keeps the heights for the next launch (once a drag ends, not per frame).
+  void saveWidgetHeights() => prefs.set('widgets.heights', _widgetHeights.isEmpty ? null : {for (final e in _widgetHeights.entries) e.key.name: e.value});
 
   bool _agentPaused = false;
   bool get agentPaused => _agentPaused;
@@ -1324,10 +1387,91 @@ class AppState extends ChangeNotifier {
     if (repo != null) setSetting('tests.command.${repo.id}', command.trim().isEmpty ? null : command.trim());
   }
 
+  /// Each worktree's pull request, when it was asked for, and the ones
+  /// being asked for now (key: path and branch).
+  final _prOf = <String, (PullRequestInfo?, DateTime)>{};
+  final _prAsking = <String>{};
+
+  /// How long a worktree's pull request is trusted before asking again.
+  static const prFreshFor = Duration(minutes: 3);
+
+  /// [w]'s pull request (open, merged or closed) as last read, or null: it
+  /// has none, or it hasn't arrived yet (asking for it notifies when it
+  /// does). The principal checkout and branches never pushed aren't asked.
+  PullRequestInfo? pullRequestOf(Worktree w) {
+    if (w.isMain || !w.everPushed) return null;
+    final path = workspace.absolutePathOf(w);
+    final key = '$path\n${w.branch}';
+    final have = _prOf[key];
+    if ((have == null || DateTime.now().difference(have.$2) > prFreshFor) && _prAsking.add(key)) _askPullRequest(key, path);
+    return have?.$1;
+  }
+
+  Future<void> _askPullRequest(String key, String path) async {
+    PullRequestInfo? pr;
+    try {
+      pr = (await pullRequests.forBranch(path)).pullRequest;
+    } on Object {
+      // No host, no token, no network: no icon, like a branch without one.
+    }
+    _prAsking.remove(key);
+    if (_disposed) return;
+    final before = _prOf[key]?.$1;
+    _prOf[key] = (pr, DateTime.now());
+    if (pr?.state != before?.state || pr?.checksState != before?.checksState || pr?.number != before?.number) notifyListeners();
+  }
+
   // ---- Agents ----
 
   /// Coding agents (optional): connected providers and running sessions.
   final AgentsSource agents;
+
+  /// What the shells in the terminals run (their commands, for the dots).
+  final ShellActivitySource shells;
+
+  final _lights = WorktreeLights();
+
+  /// Wakes the sidebar when a running command becomes a server.
+  Timer? _lightsTick;
+
+  void _readLights() {
+    final entry = activeWorktreeEntry;
+    _lights.update(
+      runs: agents.runs,
+      handTyped: agents.terminalAgents,
+      shells: shells.shells,
+      shellsLoaded: shells.loaded,
+      worktrees: [for (final r in workspace.repos) for (final w in r.worktrees) workspace.absolutePathOf(w)],
+      looking: entry == null || _home ? null : workspace.absolutePathOf(entry),
+    );
+    _tickLights();
+  }
+
+  void _tickLights() {
+    _lightsTick?.cancel();
+    final now = DateTime.now();
+    final next = _lights.nextChange(now);
+    if (next == null || _disposed) return;
+    _lightsTick = Timer(next.difference(now) + const Duration(milliseconds: 50), () {
+      _tickLights();
+      notifyListeners();
+    });
+  }
+
+  /// What [w]'s dot in the sidebar says and why, and whether it pulses:
+  /// an agent is working there, or a command just started. Mock
+  /// worktrees, with nothing running, show their drawn tone, still.
+  ({WorktreeSignal signal, bool pulse}) worktreeLight(Worktree w) {
+    final live = _lights.of(workspace.absolutePathOf(w), DateTime.now());
+    if (live.light != WorktreeLight.idle) return (signal: live, pulse: live.light == WorktreeLight.working);
+    final drawn = switch (w.tone) {
+      WorktreeTone.idle => WorktreeSignal.none,
+      WorktreeTone.running => const WorktreeSignal(WorktreeLight.working, 'An agent is working'),
+      WorktreeTone.warn => const WorktreeSignal(WorktreeLight.asking, 'An agent needs you'),
+      WorktreeTone.ok => const WorktreeSignal(WorktreeLight.done, 'An agent finished'),
+    };
+    return (signal: drawn, pulse: false);
+  }
 
   /// Your agents (Claude Code subagents): their files, runs and test runs.
   /// Views listen to it directly.
@@ -1592,8 +1736,14 @@ class AppState extends ChangeNotifier {
       profiles.dispose();
     }
     agents
+      ..removeListener(_readLights)
       ..removeListener(notifyListeners)
       ..removeListener(_flushQueued)
+      ..dispose();
+    _lightsTick?.cancel();
+    shells
+      ..removeListener(_readLights)
+      ..removeListener(notifyListeners)
       ..dispose();
     agentDefs.dispose();
     agentsRequest.dispose();

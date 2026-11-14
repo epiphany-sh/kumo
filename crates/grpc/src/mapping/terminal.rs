@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
+use kumo_application::terminal::RepoHistory;
 use kumo_domain::terminal::{
-    LaunchSpec, TerminalError, TerminalEvent, TerminalInfo, TerminalSize, TerminalStatus,
+    LaunchSpec, TerminalActivity, TerminalError, TerminalEvent, TerminalInfo, TerminalSize,
+    TerminalStatus,
 };
 use kumo_proto::v1 as pb;
 
@@ -53,6 +55,51 @@ pub fn terminal_info_to(info: TerminalInfo) -> pb::TerminalInfo {
             .unwrap_or_default(),
         exited: exit.is_some(),
         exit_code: exit.unwrap_or_default(),
+    }
+}
+
+/// What the shells are doing.
+pub fn terminals_activity_to(shells: Vec<TerminalActivity>) -> pb::TerminalsActivity {
+    pb::TerminalsActivity {
+        shells: shells
+            .into_iter()
+            .map(|shell| pb::ShellActivity {
+                terminal_id: shell.id.to_string(),
+                cwd: shell
+                    .cwd
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_default(),
+                running: shell.activity.running.map(|r| pb::RunningCommand {
+                    command: r.command,
+                    started_unix_nanos: r.started_at.as_unix_nanos(),
+                }),
+                last: shell.activity.last.map(|l| pb::FinishedCommand {
+                    command: l.command,
+                    exit_code: l.exit,
+                    finished_unix_nanos: l.finished_at.as_unix_nanos(),
+                }),
+            })
+            .collect(),
+    }
+}
+
+/// A repository's remembered commands and the folder the shell is in.
+pub fn history_to(history: RepoHistory, cwd: Option<PathBuf>) -> pb::HistoryResponse {
+    let path = |p: Option<PathBuf>| p.map(|p| p.display().to_string()).unwrap_or_default();
+    pb::HistoryResponse {
+        entries: history
+            .entries
+            .into_iter()
+            .map(|entry| pb::HistoryEntry {
+                command: entry.command,
+                runs: entry.runs,
+                last_run_unix_nanos: entry.last_run.as_unix_nanos(),
+                last_exit: entry.last_exit,
+                last_cwd: path(entry.last_cwd),
+            })
+            .collect(),
+        repo: path(history.repo),
+        cwd: path(cwd),
     }
 }
 

@@ -128,7 +128,7 @@ abstract class PullRequestsSource {
       throw 'Kumo can’t change pull requests from here yet';
 }
 
-/// The design's pull requests: #521 for feat/PRC-412-bulk-discounts (a
+/// The design's pull requests: #521 for feat/TSK-412-bulk-discounts (a
 /// draft of yours waiting on Lucía) and #518, whose review you were asked
 /// for. Other branches have none; creating one adds it.
 class MockPullRequests implements PullRequestsSource {
@@ -171,7 +171,7 @@ class MockPullRequests implements PullRequestsSource {
       title: 'feat: bulk discounts by category',
       author: 'Mauri',
       authorIsYou: true,
-      branch: 'feat/PRC-412-bulk-discounts',
+      branch: 'feat/TSK-412-bulk-discounts',
       base: 'main',
       draft: true,
       review: PrReview.required,
@@ -179,7 +179,7 @@ class MockPullRequests implements PullRequestsSource {
       checksPassed: 2,
       checksTotal: 3,
       checksState: CiState.running,
-      url: 'https://github.com/pricing/price-admin/pull/521',
+      url: 'https://github.com/platform/repo-a/pull/521',
       commentCount: 4,
     ),
     PullRequestInfo(
@@ -187,7 +187,7 @@ class MockPullRequests implements PullRequestsSource {
       label: '#518',
       title: 'fix: rounding on installment prices',
       author: 'Tomás',
-      branch: 'fix/PRC-398-rounding',
+      branch: 'fix/TSK-398-rounding',
       base: 'main',
       review: PrReview.changesRequested,
       reviewRequestedFromYou: true,
@@ -195,7 +195,7 @@ class MockPullRequests implements PullRequestsSource {
       checksPassed: 1,
       checksTotal: 2,
       checksState: CiState.failed,
-      url: 'https://github.com/pricing/price-admin/pull/518',
+      url: 'https://github.com/platform/repo-a/pull/518',
       commentCount: 9,
     ),
   ];
@@ -230,7 +230,7 @@ class MockPullRequests implements PullRequestsSource {
       branch: worktreePath.split('/').last,
       base: base.isEmpty ? 'main' : base,
       draft: draft,
-      url: 'https://github.com/pricing/price-admin/pull/${530 + created.length}',
+      url: 'https://github.com/platform/repo-a/pull/${530 + created.length}',
     );
     return created[worktreePath] = pr;
   }

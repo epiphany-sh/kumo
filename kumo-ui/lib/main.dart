@@ -12,6 +12,7 @@ import 'engine/engine_pipelines_source.dart';
 import 'engine/engine_docs.dart';
 import 'engine/engine_profiles.dart';
 import 'engine/engine_pull_requests.dart';
+import 'engine/engine_shell_activity.dart';
 import 'engine/engine_tasks_source.dart';
 import 'engine/engine_tests_source.dart';
 import 'engine/engine_workspace_source.dart';
@@ -50,6 +51,7 @@ Future<void> main() async {
       workspace: workspace,
       changesFor: (worktree) => EngineWorktreeChanges(engine, worktree),
       agents: agents,
+      shells: EngineShellActivity(engine),
       agentDefs: EngineAgentDefs(engine, agents, workspace),
       usage: EngineAiUsage(engine, agents),
       tasks: EngineTasksSource(engine),

@@ -160,7 +160,7 @@ class MockWorktreeChanges extends WorktreeChanges {
   bool _pushed = false;
 
   @override
-  String get branch => 'feat/PRC-412-bulk-discounts';
+  String get branch => 'feat/TSK-412-bulk-discounts';
   @override
   String get base => 'origin/main';
   @override

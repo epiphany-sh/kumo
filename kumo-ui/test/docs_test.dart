@@ -53,8 +53,8 @@ void main() {
   test('docs come over the wire with their source', () {
     final source = docSourceFrom(pb.DocSource(id: 'ob1', kind: pb.DocKind.DOC_KIND_OBSIDIAN, name: 'work', location: '/notes/work'));
     expect((source.kind, source.name, source.location), (DocKind.obsidian, 'work', '/notes/work'));
-    final doc = docSummaryFrom(pb.DocSummary(id: 'jira1/98311', title: 'Discount rules v3', place: 'Pricing', updatedAt: Int64(1761660191000), author: 'Lucía'));
-    expect((doc.id, doc.place, doc.author), ('jira1/98311', 'Pricing', 'Lucía'));
+    final doc = docSummaryFrom(pb.DocSummary(id: 'jira1/98311', title: 'Discount rules v3', place: 'Platform', updatedAt: Int64(1761660191000), author: 'Lucía'));
+    expect((doc.id, doc.place, doc.author), ('jira1/98311', 'Platform', 'Lucía'));
     expect(doc.updated, DateTime.fromMillisecondsSinceEpoch(1761660191000));
     expect(docSummaryFrom(pb.DocSummary()).updated, isNull, reason: '0 is unknown');
   });
@@ -63,7 +63,7 @@ void main() {
     final docs = _Docs();
     await _pump(tester, const DocsScreen(), docs: docs);
     expect(find.text('workspace-1.atlassian.net'), findsOneWidget);
-    expect(find.text('PRC-412 scratchpad'), findsOneWidget);
+    expect(find.text('TSK-412 scratchpad'), findsOneWidget);
     // The first page opens by itself, rendered from Markdown.
     expect(docs.reads, ['jira1/98311']);
     expect(find.text('Precedence'), findsOneWidget);

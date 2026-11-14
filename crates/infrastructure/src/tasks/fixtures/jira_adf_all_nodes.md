@@ -1,17 +1,17 @@
 ## Contexto
 
-Como parte de [https://acme.atlassian.net/browse/PRC-11300](https://acme.atlassian.net/browse/PRC-11300) movemos **Pricing** a *Graviton*, sin ~~x86~~. @Ana Gómez confirmó la ventana ✅\
+Como parte de [https://acme.atlassian.net/browse/TSK-11300](https://acme.atlassian.net/browse/TSK-11300) movemos **Platform** a *arm64*, sin ~~x86~~. @Ana Gómez confirmó la ventana ✅\
 Fecha: 2026-10-30 · estado **EN CURSO**
 
 ### Pasos
 
-1. Congelar las escrituras del job ([PRC-11356](https://acme.atlassian.net/browse/PRC-11356)).
+1. Congelar las escrituras del job ([TSK-11356](https://acme.atlassian.net/browse/TSK-11356)).
 2. Correr las migraciones en staging:
    - por lotes de 500k filas
    - comparando `price_history`
 
 - [x] Backup de `price_history`
-- [ ] Avisar en #pricing-oncall
+- [ ] Avisar en #platform-oncall
   - [ ] y en el canal de deploys
 
 ```sql
@@ -32,7 +32,7 @@ GROUP BY channel_id;
 
 ---
 
-![graviton-rollout.png](graviton-rollout.png)
+![arm64-rollout.png](arm64-rollout.png)
 
 ![attachment](attachment)
 
@@ -40,4 +40,4 @@ GROUP BY channel_id;
 
 Instancias m7g.
 
-[https://wiki.pricing.local/runbooks/migraciones](https://wiki.pricing.local/runbooks/migraciones)
+[https://wiki.platform.local/runbooks/migraciones](https://wiki.platform.local/runbooks/migraciones)

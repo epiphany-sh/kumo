@@ -5,14 +5,17 @@ use futures::{Stream, StreamExt};
 use kumo_application::terminal::{Attachment, TerminalService, TerminalSession};
 use kumo_domain::terminal::TerminalId;
 use kumo_proto::v1 as pb;
+use tokio_stream::wrappers::WatchStream;
 use tonic::{Request, Response, Status, Streaming};
 
 use crate::mapping::{
-    launch_spec_from, size_from, status_from, terminal_info_to, terminal_output_to,
+    history_to, launch_spec_from, size_from, status_from, terminal_info_to, terminal_output_to,
+    terminals_activity_to,
 };
 use crate::profile::{Profiles, services_of};
 
 type OutputStream = Pin<Box<dyn Stream<Item = Result<pb::TerminalOutput, Status>> + Send>>;
+type ActivityStream = Pin<Box<dyn Stream<Item = Result<pb::TerminalsActivity, Status>> + Send>>;
 
 /// `kumo.v1.Terminals`.
 ///
@@ -45,9 +48,10 @@ impl pb::terminals_server::Terminals for TerminalsGrpc {
         let service = self.service(&request).await?;
         let request = request.into_inner();
         let shell = request.shell_integration;
+        let remember = request.remember_commands;
         let spec = launch_spec_from(request).map_err(status_from)?;
         let id = if shell {
-            service.open_shell(spec)
+            service.open_shell(spec, remember)
         } else {
             service.open(spec)
         }
@@ -106,7 +110,65 @@ impl pb::terminals_server::Terminals for TerminalsGrpc {
             .collect();
         Ok(Response::new(pb::ListResponse { terminals }))
     }
+
+    type WatchStream = ActivityStream;
+
+    /// The changes are every profile's (one registry): a change elsewhere
+    /// sends this profile's shells again, unchanged.
+    async fn watch(
+        &self,
+        request: Request<pb::WatchTerminalsRequest>,
+    ) -> Result<Response<Self::WatchStream>, Status> {
+        let service = self.service(&request).await?;
+        let changes = WatchStream::new(service.activity_changes());
+        let shells = changes.map(move |_| Ok(terminals_activity_to(service.activity())));
+        Ok(Response::new(Box::pin(shells)))
+    }
+
+    async fn history(
+        &self,
+        request: Request<pb::HistoryRequest>,
+    ) -> Result<Response<pb::HistoryResponse>, Status> {
+        let service = self.service(&request).await?;
+        let request = request.into_inner();
+        let id = TerminalId::parse(&request.terminal_id).map_err(status_from)?;
+        let limit = match request.limit {
+            0 => DEFAULT_HISTORY,
+            n => (n as usize).min(MAX_HISTORY),
+        };
+        let (history, cwd) = service.history(&id, limit).await.map_err(status_from)?;
+        Ok(Response::new(history_to(history, cwd)))
+    }
+
+    async fn forget_history(
+        &self,
+        request: Request<pb::ForgetHistoryRequest>,
+    ) -> Result<Response<pb::ForgetHistoryResponse>, Status> {
+        let service = self.service(&request).await?;
+        let request = request.into_inner();
+        let id = if request.terminal_id.is_empty() {
+            if !request.everything {
+                return Err(Status::invalid_argument(
+                    "a terminal, or everything, to forget",
+                ));
+            }
+            None
+        } else {
+            Some(TerminalId::parse(&request.terminal_id).map_err(status_from)?)
+        };
+        let forgotten = service
+            .forget_history(id.as_ref(), request.everything)
+            .await
+            .map_err(status_from)?;
+        Ok(Response::new(pb::ForgetHistoryResponse {
+            forgotten: u32::try_from(forgotten).unwrap_or(u32::MAX),
+        }))
+    }
 }
+
+/// History entries returned when the client doesn't say, and at most.
+const DEFAULT_HISTORY: usize = 1_000;
+const MAX_HISTORY: usize = kumo_domain::terminal::HISTORY_LIMIT;
 
 /// Feeds client input into the session until the client stops sending or
 /// the session goes away.

@@ -147,7 +147,7 @@ void main() {
     });
 
     test('commands: by name where it’s found, inline elsewhere', () {
-      const a = AgentDef(name: 'go-pr-reviewer', scope: AgentScope.project, repo: 'price-admin');
+      const a = AgentDef(name: 'go-pr-reviewer', scope: AgentScope.project, repo: 'repo-a');
       expect(agentCommand(a, contextDir: '~/.kumo/runs/x', prompt: 'Review #521'), 'claude --agents \'{"go-pr-reviewer": …}\' --agent go-pr-reviewer --add-dir ~/.kumo/runs/x -- "Review #521"');
       final inline = jsonDecode(agentInlineJson(a.copyWith(instructions: 'Hi.'))) as Map;
       expect((inline['go-pr-reviewer'] as Map)['prompt'], 'Hi.');
@@ -156,10 +156,10 @@ void main() {
     });
 
     test('links', () {
-      final pr = parseRepoLink('https://github.com/workspace-1/price-admin/pull/521')!;
-      expect((pr.path, pr.number, pr.ref, pr.name), ('workspace-1/price-admin', 521, '#521', 'price-admin'));
-      final mr = parseRepoLink('https://gitlab.example.com/pricing/price-reader-v2/-/merge_requests/231')!;
-      expect((mr.path, mr.ref), ('pricing/price-reader-v2', '!231'));
+      final pr = parseRepoLink('https://github.com/workspace-1/repo-a/pull/521')!;
+      expect((pr.path, pr.number, pr.ref, pr.name), ('workspace-1/repo-a', 521, '#521', 'repo-a'));
+      final mr = parseRepoLink('https://gitlab.example.com/platform/repo-b/-/merge_requests/231')!;
+      expect((mr.path, mr.ref), ('platform/repo-b', '!231'));
       expect(parseRepoLink('https://github.com/segmentio/kafka-go')!.number, isNull);
       expect(parseRepoLink('https://github.com/o/r/tree/feat/x')!.branch, 'feat/x');
       expect(parseRepoLink('hello'), isNull);
@@ -232,7 +232,7 @@ void main() {
       final state = await _pumpAgents(tester);
       expect(find.text('Your agents'), findsWidgets);
       expect(find.text('go-pr-reviewer'), findsWidgets);
-      expect(find.text('PRICE-ADMIN'), findsOneWidget, reason: 'project agents under their repo');
+      expect(find.text('REPO-A'), findsOneWidget, reason: 'project agents under their repo');
       await tester.tap(find.text('go-pr-reviewer').first);
       await tester.pump();
       expect(find.text('1 · Where should it work?'), findsOneWidget);
@@ -298,7 +298,7 @@ void main() {
       expect(find.textContaining('tools: Read, Grep, Glob, Bash'), findsOneWidget, reason: 'the file preview follows');
       await tester.enterText(find.byKey(const ValueKey('field-Name')), 'test-writer');
       await tester.pump();
-      expect(find.text('test-writer is taken in price-admin.'), findsOneWidget, reason: 'under the field');
+      expect(find.text('test-writer is taken in repo-a.'), findsOneWidget, reason: 'under the field');
       await tester.enterText(find.byKey(const ValueKey('field-Name')), 'go-reuse-reviewer');
       await tester.pump();
       await tester.ensureVisible(find.text('Save'));

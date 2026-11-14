@@ -322,7 +322,7 @@ mod tests {
     use super::*;
 
     const NOTE: &str = "# Sprint\n\
-- [ ] Call [[People/Ana|Ana]] about #pricing ⏫ 📅 2026-11-02\n\
+- [ ] Call [[People/Ana|Ana]] about #platform ⏫ 📅 2026-11-02\n\
   * [x] Ship the [banner](https://x.y) ✅ 2026-10-01\n\
 1. [/] Review copy #work\n\
 - [-] Dropped idea 🔽 #someday\n\
@@ -355,7 +355,7 @@ mod tests {
         );
         assert_eq!(boxes[0].priority, Priority::High);
         assert_eq!(boxes[0].due.as_deref(), Some("2026-11-02"));
-        assert_eq!(boxes[0].tags, ["pricing"]);
+        assert_eq!(boxes[0].tags, ["platform"]);
         assert_eq!(boxes[2].tags, ["work"]);
         assert_eq!(boxes[3].tags, ["someday"], "after the metadata too");
         assert_ne!(boxes[4].id, boxes[5].id, "repeated lines get distinct ids");

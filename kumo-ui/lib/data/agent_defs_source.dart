@@ -154,7 +154,7 @@ abstract class AgentDefsSource extends ChangeNotifier {
   List<PlayRun> playRuns(AgentDef agent);
 }
 
-/// The design's agents: three in price-admin, three personal; a review of
+/// The design's agents: three in repo-a, three personal; a review of
 /// PR #521 running, and canned test runs.
 class MockAgentDefs extends AgentDefsSource {
   MockAgentDefs({this.step = const Duration(milliseconds: 450)});
@@ -171,7 +171,7 @@ class MockAgentDefs extends AgentDefsSource {
         'Don’t comment on style, naming or tests. Don’t change any file.',
     knowledge: ['docs/conventions.md'],
     scope: AgentScope.project,
-    repo: 'price-admin',
+    repo: 'repo-a',
   );
 
   List<AgentDef> _agents = [
@@ -201,7 +201,7 @@ class MockAgentDefs extends AgentDefsSource {
     const AgentDef(
       name: 'ticket-writer',
       description: 'Turns a bug report or a Slack thread into a Jira ticket with steps, impact and acceptance criteria. Use it when a report needs a ticket.',
-      instructions: 'You write Jira tickets for the pricing team: summary, steps to reproduce, impact, acceptance criteria.\n\nCreate it only after I confirm it.',
+      instructions: 'You write Jira tickets for the platform team: summary, steps to reproduce, impact, acceptance criteria.\n\nCreate it only after I confirm it.',
       tools: ['Read', 'WebFetch'],
       mcpServers: ['jira'],
       maxTurns: 15,
@@ -224,7 +224,7 @@ class MockAgentDefs extends AgentDefsSource {
       color: 'green',
       knowledge: ['docs/testing.md'],
       scope: AgentScope.project,
-      repo: 'price-admin',
+      repo: 'repo-a',
     ),
     const AgentDef(
       name: 'migration-checker',
@@ -239,21 +239,21 @@ class MockAgentDefs extends AgentDefsSource {
       output: AgentOutput.json,
       outputTemplate: '[{ "file": "", "reversible": true, "locks": "", "fix": "" }]',
       scope: AgentScope.project,
-      repo: 'price-admin',
+      repo: 'repo-a',
     ),
   ];
 
   late final List<AgentRun> _runs = [
     AgentRun(
       id: 'def-r2', providerId: 'claude', providerName: 'Claude Code', short: 'CC', agent: 'go-pr-reviewer',
-      worktreePath: '~/wt/price-admin/PRC-412', terminalId: 'mock:reviewer', title: 'PR #521 · Bulk discounts', status: AgentStatus.running,
+      worktreePath: '~/wt/repo-a/TSK-412', terminalId: 'mock:reviewer', title: 'PR #521 · Bulk discounts', status: AgentStatus.running,
       startedAt: DateTime.now().subtract(const Duration(minutes: 3)),
       prompt: 'Review PR #521 against main. Point out code that already existed and could have been reused.',
-      context: const [AgentContextItem(kind: AgentContextKind.pullRequest, title: '#521 · diff + description'), AgentContextItem(kind: AgentContextKind.task, title: 'PRC-412', detail: 'Jira')],
+      context: const [AgentContextItem(kind: AgentContextKind.pullRequest, title: '#521 · diff + description'), AgentContextItem(kind: AgentContextKind.task, title: 'TSK-412', detail: 'Jira')],
     ),
     AgentRun(
       id: 'def-r1', providerId: 'claude', providerName: 'Claude Code', short: 'CC', agent: 'go-pr-reviewer',
-      worktreePath: '~/wt/price-admin/PRC-398', terminalId: 'mock:reviewer-done', title: 'PR #517 · Rounding fix', status: AgentStatus.done,
+      worktreePath: '~/wt/repo-a/TSK-398', terminalId: 'mock:reviewer-done', title: 'PR #517 · Rounding fix', status: AgentStatus.done,
       startedAt: DateTime.now().subtract(const Duration(hours: 2)), prompt: 'Review PR #517.',
     ),
     AgentRun(

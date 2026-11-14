@@ -212,7 +212,7 @@ mod tests {
         let store = SqliteWorkspaceStore::in_memory().unwrap();
         store.save_repo(&repo("/r/a")).unwrap();
         store.save_repo(&repo("/r/b")).unwrap();
-        let first = namespace("pricing", &["/r/b", "/r/a"]);
+        let first = namespace("platform", &["/r/b", "/r/a"]);
         let second = namespace("identity", &["/r/a"]);
         store.save_namespace(&first, 0).unwrap();
         store.save_namespace(&second, 9).unwrap();

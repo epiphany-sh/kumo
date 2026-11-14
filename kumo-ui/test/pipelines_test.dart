@@ -112,4 +112,57 @@ void main() {
     expect(find.text('build'), findsWidgets);
     expect(find.text('Retry now'), findsOneWidget);
   });
+
+  testWidgets('a commit with several workflows: the pull request’s checks first, then the other runs', (tester) async {
+    tester.view.physicalSize = const Size(1440, 960);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final source = _Several();
+    final state = AppState(demoWallpaper: true, pipelinesFor: ({required Repo repo, required Worktree worktree, required String worktreePath}) => source);
+    await tester.pumpWidget(KumoApp(state: state));
+    await tester.pump();
+
+    expect(find.text('Failed'), findsWidgets, reason: 'nothing is running any more, and a run failed');
+    final top = [for (final t in ['Pull request', 'test', 'Other runs · 2', 'staging', 'pages']) tester.getTopLeft(find.text(t)).dy];
+    expect(top, [...top]..sort(), reason: 'in that order, top to bottom');
+    expect(find.textContaining('run #31'), findsOneWidget);
+    expect(find.textContaining('run #4'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Re-run failed jobs'));
+    await tester.pump();
+    await tester.tap(find.text('Re-run failed jobs'));
+    await tester.pump();
+    expect(source.rerun, ['2'], reason: 'the run that failed, not the one on top');
+    expect(tester.takeException(), isNull);
+  });
+
+  test('one run shows as before: no sections', () {
+    final p = _mock(MockPipelinesScenario.running);
+    expect(p.others, isEmpty);
+    expect(p.runs, [p.latest]);
+  });
+}
+
+/// A pull request's commit with three workflows: its check, and two that
+/// ran for the push.
+class _Several extends MockPipelinesSource {
+  _Several() : super(scenario: MockPipelinesScenario.passed, latency: Duration.zero);
+  final rerun = <String>[];
+
+  static CiRun _of(String id, String workflow, String label, CiState state, String job, {bool pullRequest = false}) => CiRun(
+        id: id,
+        label: label,
+        shortSha: '4e1b2c0',
+        state: state,
+        workflow: workflow,
+        pullRequest: pullRequest,
+        jobs: [CiJob(name: job, state: state, duration: const Duration(seconds: 40))],
+      );
+
+  @override
+  CiRun? get latest => _of('1', 'ci', 'run #31', CiState.passed, 'test', pullRequest: true);
+  @override
+  List<CiRun> get others => [_of('2', 'deploy', 'run #4', CiState.failed, 'staging'), _of('3', 'docs', 'run #9', CiState.passed, 'pages')];
+  @override
+  Future<void> rerunFailed([CiRun? run]) async => rerun.add(run?.id ?? '');
 }

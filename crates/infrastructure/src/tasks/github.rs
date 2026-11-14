@@ -565,7 +565,7 @@ mod tests {
             "authored by the user, assigned to someone else"
         );
         assert_eq!(theirs.assignee.as_ref().unwrap().name, "tomas");
-        assert_eq!(theirs.id.external(), "pricing/zen-engine#7");
+        assert_eq!(theirs.id.external(), "platform/repo-d#7");
     }
 
     #[test]
@@ -588,7 +588,7 @@ mod tests {
         assert!(
             detail
                 .description
-                .starts_with("The pricing client gives up")
+                .starts_with("The platform client gives up")
         );
         assert!(detail.description.contains("\n### Proposal\n- Retry"));
         assert!(!detail.description.contains('\r'));

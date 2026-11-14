@@ -37,7 +37,7 @@ AgentRun _run(String id, String provider, String name, String path, {List<AgentC
       short: name.substring(0, 2).toUpperCase(),
       worktreePath: path,
       terminalId: 't-$id',
-      title: 'PRC-412',
+      title: 'TSK-412',
       status: AgentStatus.running,
       startedAt: DateTime(2026, 10, 30, 13, 54),
       context: context,
@@ -241,7 +241,7 @@ void main() {
     testWidgets('without usage from the daemon it shows what the agent was given and says what it can’t read', (tester) async {
       final agents = _Agents();
       final (_, path) = await _panel(tester, agents: agents, usage: NoAiUsage());
-      const page = AgentContextItem(kind: AgentContextKind.doc, title: 'Discount rules v3', detail: 'Confluence · Pricing');
+      const page = AgentContextItem(kind: AgentContextKind.doc, title: 'Discount rules v3', detail: 'Confluence · Platform');
       agents.set([_run('a1', 'claude', 'Claude Code', path, context: const [page])]);
       await tester.pump();
       expect(find.text('Claude Code · started 13:54'), findsOneWidget);

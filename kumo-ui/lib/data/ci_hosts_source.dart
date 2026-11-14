@@ -62,8 +62,8 @@ class MockCiHostsSource implements CiHostsSource {
   MockCiHostsSource({List<CiHostInfo>? hosts})
       : _hosts = hosts ??
             [
-              const CiHostInfo(host: 'github.com', provider: CiProvider.githubActions, hasToken: true, ghAvailable: true, repos: ['pricing/price-admin']),
-              const CiHostInfo(host: 'gitlab.example.com', provider: CiProvider.gitlabCi, repos: ['pricing/price-reader-v2']),
+              const CiHostInfo(host: 'github.com', provider: CiProvider.githubActions, hasToken: true, ghAvailable: true, repos: ['platform/repo-a']),
+              const CiHostInfo(host: 'gitlab.example.com', provider: CiProvider.gitlabCi, repos: ['platform/repo-b']),
             ];
 
   List<CiHostInfo> _hosts;

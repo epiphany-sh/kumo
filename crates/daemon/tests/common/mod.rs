@@ -187,6 +187,22 @@ impl Attached {
         });
     }
 
+    /// Reads until the accumulated text has `needle` `count` times.
+    pub async fn read_until_count(&mut self, needle: &str, count: usize) {
+        tokio::time::timeout(TIMEOUT, async {
+            while self.received.text().matches(needle).count() < count {
+                assert!(self.next().await, "stream ended before {count} {needle:?}");
+            }
+        })
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "timed out waiting for {count} {needle:?}, got {:?}",
+                self.received.text()
+            )
+        });
+    }
+
     /// Reads until the terminal reports its exit.
     pub async fn read_to_exit(&mut self) -> i32 {
         tokio::time::timeout(TIMEOUT, async {

@@ -33,7 +33,10 @@ pub use tasks::{
     detected_to, source_options_from, source_to, task_detail_to, task_link_to, task_status_from,
     task_to, tasks_update_to,
 };
-pub use terminal::{launch_spec_from, size_from, terminal_info_to, terminal_output_to};
+pub use terminal::{
+    history_to, launch_spec_from, size_from, terminal_info_to, terminal_output_to,
+    terminals_activity_to,
+};
 pub use tests::{test_run_to, tests_snapshot_to, tests_status_from};
 pub use usage::usage_report_to;
 pub use workspace::{candidate_to, snapshot_to, worktree_to};

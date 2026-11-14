@@ -146,19 +146,19 @@ class MockDocsSource implements DocsSource {
 
   /// Pages only Browse reaches (deeper than the recent ones).
   static final _more = [
-    DocSummary(id: 'jira1/98200', title: 'Discount rules v2', place: 'Pricing', author: 'Lucía', updated: DateTime(2026, 3, 2)),
-    DocSummary(id: 'jira1/98400', title: 'Bulk discounts · design', place: 'Pricing', author: 'Mauri', updated: DateTime(2026, 10, 22)),
-    DocSummary(id: 'jira1/98401', title: 'Open questions', place: 'Pricing', author: 'Mauri', updated: DateTime(2026, 10, 23)),
-    DocSummary(id: 'jira1/98103', title: 'price.discounts.v1', place: 'Pricing', author: 'Tomás', updated: DateTime(2026, 9, 30)),
-    DocSummary(id: 'jira1/98104', title: 'price.lists.v2', place: 'Pricing', author: 'Tomás', updated: DateTime(2026, 9, 12)),
-    DocSummary(id: 'jira1/97500', title: 'On-call · Pricing', place: 'Engineering', author: 'Nico', updated: DateTime(2026, 8, 19)),
+    DocSummary(id: 'jira1/98200', title: 'Discount rules v2', place: 'Platform', author: 'Lucía', updated: DateTime(2026, 3, 2)),
+    DocSummary(id: 'jira1/98400', title: 'Bulk discounts · design', place: 'Platform', author: 'Mauri', updated: DateTime(2026, 10, 22)),
+    DocSummary(id: 'jira1/98401', title: 'Open questions', place: 'Platform', author: 'Mauri', updated: DateTime(2026, 10, 23)),
+    DocSummary(id: 'jira1/98103', title: 'price.discounts.v1', place: 'Platform', author: 'Tomás', updated: DateTime(2026, 9, 30)),
+    DocSummary(id: 'jira1/98104', title: 'price.lists.v2', place: 'Platform', author: 'Tomás', updated: DateTime(2026, 9, 12)),
+    DocSummary(id: 'jira1/97500', title: 'On-call · Platform', place: 'Engineering', author: 'Nico', updated: DateTime(2026, 8, 19)),
     DocSummary(id: 'jira1/97600', title: 'Deploy checklist', place: 'Engineering', author: 'Nico', updated: DateTime(2026, 7, 4)),
   ];
 
   /// The sites' trees: (title, page id or null for a space / folder, under it).
   static const _trees = <String, List<_T>>{
     'jira1': [
-      _T('Pricing', null, [
+      _T('Platform', null, [
         _T('Engineering', null, [
           _T('Discounts', null, [
             _T('Discount rules v3', 'jira1/98311'),
@@ -169,12 +169,12 @@ class MockDocsSource implements DocsSource {
         ]),
       ]),
       _T('Engineering', null, [
-        _T('Runbooks', null, [_T('Incident: stale prices', 'jira1/97455'), _T('On-call · Pricing', 'jira1/97500')]),
+        _T('Runbooks', null, [_T('Incident: stale prices', 'jira1/97455'), _T('On-call · Platform', 'jira1/97500')]),
         _T('Deploy checklist', 'jira1/97600'),
       ]),
     ],
     'ob1': [
-      _T('PRC-412 scratchpad', 'ob1/PRC-412 scratchpad.md'),
+      _T('TSK-412 scratchpad', 'ob1/TSK-412 scratchpad.md'),
       _T('eng', null, [_T('pgx CopyFrom notes', 'ob1/eng/pgx CopyFrom notes.md')]),
     ],
   };
@@ -211,18 +211,18 @@ class MockDocsSource implements DocsSource {
 
   static final _groups = [
     DocGroup(source: _confluence, docs: [
-      DocSummary(id: 'jira1/98311', title: 'Discount rules v3', place: 'Pricing', author: 'Lucía', updated: DateTime(2026, 10, 25), url: 'https://workspace-1.atlassian.net/wiki/spaces/PRC/pages/98311'),
-      DocSummary(id: 'jira1/98102', title: 'Kafka topics and owners', place: 'Pricing', author: 'Tomás', updated: DateTime(2026, 10, 20), url: 'https://workspace-1.atlassian.net/wiki/spaces/PRC/pages/98102'),
+      DocSummary(id: 'jira1/98311', title: 'Discount rules v3', place: 'Platform', author: 'Lucía', updated: DateTime(2026, 10, 25), url: 'https://workspace-1.atlassian.net/wiki/spaces/TSK/pages/98311'),
+      DocSummary(id: 'jira1/98102', title: 'Kafka topics and owners', place: 'Platform', author: 'Tomás', updated: DateTime(2026, 10, 20), url: 'https://workspace-1.atlassian.net/wiki/spaces/TSK/pages/98102'),
       DocSummary(id: 'jira1/97455', title: 'Incident: stale prices', place: 'Engineering', author: 'Nico', updated: DateTime(2026, 10, 2), url: 'https://workspace-1.atlassian.net/wiki/spaces/ENG/pages/97455'),
     ]),
     DocGroup(source: _vault, docs: [
-      DocSummary(id: 'ob1/PRC-412 scratchpad.md', title: 'PRC-412 scratchpad', place: 'work', updated: DateTime(2026, 10, 27), url: 'obsidian://open?vault=work&file=PRC-412%20scratchpad'),
+      DocSummary(id: 'ob1/TSK-412 scratchpad.md', title: 'TSK-412 scratchpad', place: 'work', updated: DateTime(2026, 10, 27), url: 'obsidian://open?vault=work&file=TSK-412%20scratchpad'),
       DocSummary(id: 'ob1/eng/pgx CopyFrom notes.md', title: 'pgx CopyFrom notes', place: 'eng', updated: DateTime(2026, 10, 12), url: 'obsidian://open?vault=work&file=eng/pgx%20CopyFrom%20notes'),
     ]),
   ];
 
   static const _pages = {
-    'jira1/98311': '''These rules cover list-price discounts stored by price-admin. Installment and financing prices are derived later by price-reader-v2 and are never stored with a discount applied.
+    'jira1/98311': '''These rules cover list-price discounts stored by repo-a. Installment and financing prices are derived later by repo-b and are never stored with a discount applied.
 
 ## Precedence
 

@@ -69,7 +69,15 @@ class CiRun {
     this.createdAt,
     this.finishedAt,
     this.url = '',
+    this.workflow = '',
+    this.pullRequest = false,
   });
+
+  /// The workflow it is a run of (`ci`); empty where a commit has one run.
+  final String workflow;
+
+  /// It ran for the branch's pull request: one of its checks.
+  final bool pullRequest;
 
   /// Provider id, to re-run or cancel it.
   final String id;
@@ -177,6 +185,13 @@ abstract class PipelinesSource extends ChangeNotifier {
   /// Latest run for the branch; with a [problem] that [CiProblem.keepsLastRun]
   /// it is the last one seen (stale).
   CiRun? get latest;
+
+  /// The other runs of [latest]'s commit, a workflow each: the pull
+  /// request's first, then the ones that ran for something else (a push).
+  List<CiRun> get others => const [];
+
+  /// [latest] and [others], in the order they show.
+  List<CiRun> get runs => [if (latest case final run?) run, ...others];
   CiProblem? get problem;
 
   /// True until the first answer arrives.
@@ -194,9 +209,9 @@ abstract class PipelinesSource extends ChangeNotifier {
   /// Asks the provider now instead of waiting for the next poll.
   Future<void> refresh();
 
-  /// Re-runs the failed jobs of [latest] (the whole run where the provider
-  /// can't re-run single jobs).
-  Future<void> rerunFailed();
+  /// Re-runs the failed jobs of [run], [latest] when omitted (the whole run
+  /// where the provider can't re-run single jobs).
+  Future<void> rerunFailed([CiRun? run]);
 
   /// Called once the branch was pushed (it had no upstream before).
   void branchPushed() => refresh();
@@ -225,7 +240,7 @@ class NoPipelines extends PipelinesSource {
   @override
   Future<void> refresh() async {}
   @override
-  Future<void> rerunFailed() async {}
+  Future<void> rerunFailed([CiRun? run]) async {}
 }
 
 /// Scenarios of the design mocks: the happy ones and every problem.
@@ -239,8 +254,8 @@ class MockPipelinesSource extends PipelinesSource {
   MockPipelinesSource({
     this.scenario = MockPipelinesScenario.running,
     this.provider = CiProvider.githubActions,
-    this.repo = 'pricing/price-admin',
-    this.branch = 'feat/PRC-412-bulk-discounts',
+    this.repo = 'platform/repo-a',
+    this.branch = 'feat/TSK-412-bulk-discounts',
     this.latency = const Duration(milliseconds: 600),
     this.unpushed = 2,
   }) {
@@ -410,7 +425,7 @@ class MockPipelinesSource extends PipelinesSource {
       });
 
   @override
-  Future<void> rerunFailed() => _answer(() {
+  Future<void> rerunFailed([CiRun? run]) => _answer(() {
         final last = _latest;
         if (last == null || !last.hasFailedJobs) return;
         _startRun(_running(DateTime.now(), label: 'run #8812 · attempt 2', sha: last.shortSha));

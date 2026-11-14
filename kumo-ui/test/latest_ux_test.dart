@@ -31,7 +31,7 @@ class _Agents extends MockAgentsSource {
           short: 'CC',
           worktreePath: worktree,
           terminalId: 't1',
-          title: 'PRC-412 bulk discounts',
+          title: 'TSK-412 bulk discounts',
           status: AgentStatus.running,
           startedAt: DateTime(2026, 10, 30, 13, 54),
         ),
@@ -68,15 +68,15 @@ void main() {
       expect(selectedLines(text, const TextSelection(baseOffset: 2, extentOffset: 7)), (2, 3));
       expect(selectedLines(text, const TextSelection(baseOffset: 9, extentOffset: 2)), (2, 3), reason: 'ending at a line start leaves that line out');
       final m = askAgentMessage(
-        repo: 'price-admin',
-        worktree: '/wt/price-admin/PRC-412',
-        branch: 'feat/PRC-412',
+        repo: 'repo-a',
+        worktree: '/wt/repo-a/TSK-412',
+        branch: 'feat/TSK-412',
         path: _repo,
         lines: (20, 26),
         firstLine: '  func (r *Repository) Upsert(',
         note: 'Look for bugs.',
       );
-      expect(m, 'In price-admin, worktree /wt/price-admin/PRC-412, branch feat/PRC-412: look at $_repo, lines 20–26 (starts with `func (r *Repository) Upsert(`). Look for bugs.');
+      expect(m, 'In repo-a, worktree /wt/repo-a/TSK-412, branch feat/TSK-412: look at $_repo, lines 20–26 (starts with `func (r *Repository) Upsert(`). Look for bugs.');
       expect(m.contains('\n'), isFalse, reason: 'one line: it types into the agent’s terminal as one message');
     });
 
@@ -139,7 +139,8 @@ void main() {
     testWidgets('a worktree shows its whole name and path on hover; right-click copies either', (tester) async {
       final state = await _app(tester);
       final w = state.activeWorktreeEntry!;
-      expect(find.byTooltip('${w.branch}\n${state.workspace.absolutePathOf(w)}\nRight-click for actions'), findsOneWidget);
+      // The design draws an agent working there: the tooltip says so too.
+      expect(find.byTooltip('${w.branch}\n${state.workspace.absolutePathOf(w)}\nAn agent is working\nRight-click for actions'), findsOneWidget);
       await tester.tap(find.text(w.branch).first, buttons: kSecondaryButton);
       await tester.pump();
       expect(find.text('Copy full path'), findsOneWidget);
@@ -174,8 +175,8 @@ void main() {
       await docs(tester);
       await tester.tap(find.text('Browse'));
       await _settle(tester);
-      expect(find.text('Pricing'), findsWidgets);
-      await tester.tap(find.byTooltip('Pricing').first);
+      expect(find.text('Platform'), findsWidgets);
+      await tester.tap(find.byTooltip('Platform').first);
       await _settle(tester);
       await tester.tap(find.byTooltip('Engineering').first);
       await _settle(tester);
@@ -201,7 +202,7 @@ void main() {
       await tester.pump();
       expect(find.byTooltip('Unpin from For you'), findsOneWidget);
       expect(find.text('Pin a page from its header to keep it here.'), findsNothing);
-      await tester.tap(find.text('PRC-412 scratchpad').first);
+      await tester.tap(find.text('TSK-412 scratchpad').first);
       await _settle(tester);
       expect(find.text('RECENT'), findsOneWidget);
       expect(tester.takeException(), isNull);

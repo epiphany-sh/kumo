@@ -13,15 +13,15 @@ import 'package:kumo_ui/widgets/controls.dart';
 const _all = {TaskColumn.todo, TaskColumn.doing, TaskColumn.review, TaskColumn.done};
 
 const _task = TaskEntry(
-  id: 'ji/PRC-1',
+  id: 'ji/TSK-1',
   sourceId: 'ji',
   kind: TaskSourceKind.jira,
-  key: 'PRC-1',
+  key: 'TSK-1',
   title: 'Bulk discounts',
   column: TaskColumn.doing,
   sourceStatus: 'In Progress',
-  url: 'https://acme.atlassian.net/browse/PRC-1',
-  suggestedBranch: 'feat/PRC-1-bulk-discounts',
+  url: 'https://acme.atlassian.net/browse/TSK-1',
+  suggestedBranch: 'feat/TSK-1-bulk-discounts',
 );
 
 /// A source whose details are set by the test: answered, stale, failing.
@@ -133,26 +133,26 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
-  final story = MockTasks.id('PRC-11355');
+  final story = MockTasks.id('TSK-11355');
 
   testWidgets('shows a skeleton while the source answers, then the ticket', (tester) async {
     await _pump(tester, MockTasksSource(latency: const Duration(milliseconds: 400)), story);
-    expect(find.text('Loading PRC-11355 from Jira…'), findsOneWidget);
+    expect(find.text('Loading TSK-11355 from Jira…'), findsOneWidget);
     expect(find.text('migraciones'), findsOneWidget, reason: 'the card is shown at once');
     expect(find.text('Move to'), findsOneWidget, reason: 'actions work while loading');
     expect(find.text('Acceptance criteria'), findsNothing);
 
     await tester.pump(const Duration(milliseconds: 450));
-    expect(find.text('Loading PRC-11355 from Jira…'), findsNothing);
+    expect(find.text('Loading TSK-11355 from Jira…'), findsNothing);
     expect(find.text('Acceptance criteria'), findsOneWidget);
     expect(find.text('1 of 4 met'), findsOneWidget);
     expect(find.text('The agent gets these as its definition of done.'), findsOneWidget);
     expect(find.text('Ana Gómez'), findsWidgets, reason: 'the reporter');
-    expect(find.text('Pricing 2026.22'), findsOneWidget);
+    expect(find.text('Platform 2026.22'), findsOneWidget);
     expect(find.text('1 of 4 done · 1 in progress'), findsOneWidget);
     expect(find.text('Is blocked by'), findsOneWidget);
     expect(find.text('Done, so it no longer blocks this one'), findsOneWidget);
-    expect(find.text('graviton-rollout.png'), findsWidgets, reason: 'attachment and image');
+    expect(find.text('arm64-rollout.png'), findsWidgets, reason: 'attachment and image');
     expect(find.text('Logged 1d 4h'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -185,10 +185,10 @@ void main() {
   });
 
   testWidgets('nothing to show: a readable error and retry', (tester) async {
-    await _pump(tester, _Source(fail: 'Unknown task ji/PRC-404'), 'ji/PRC-404');
+    await _pump(tester, _Source(fail: 'Unknown task ji/TSK-404'), 'ji/TSK-404');
     await tester.pump();
-    expect(find.text('Couldn’t open PRC-404'), findsOneWidget);
-    expect(find.text('Unknown task ji/PRC-404'), findsOneWidget);
+    expect(find.text('Couldn’t open TSK-404'), findsOneWidget);
+    expect(find.text('Unknown task ji/TSK-404'), findsOneWidget);
     expect(find.widgetWithText(KButton, 'Retry'), findsOneWidget);
     expect(find.text('Move to'), findsNothing);
   });
@@ -216,24 +216,24 @@ void main() {
     final calls = await _pump(tester, MockTasksSource(), story);
     await tester.pump();
     // The epic chip in the header.
-    await tester.tap(find.byTooltip('Open PRC-11300 · Migración a Graviton (back returns here)').first);
+    await tester.tap(find.byTooltip('Open TSK-11300 · Migración a arm64 (back returns here)').first);
     // A linked issue.
     await _tap(tester, find.text('Limpieza de ofertas de canales'));
     // A sub-task.
     await _tap(tester, find.text('Analisis'));
     // A key in the description.
-    await _tap(tester, find.descendant(of: find.byType(MarkdownView), matching: find.text('PRC-11356')).first);
-    expect(calls.opened, ['mock-JI/PRC-11300', 'mock-JI/PRC-11340', 'mock-JI/PRC-11357', 'mock-JI/PRC-11356']);
+    await _tap(tester, find.descendant(of: find.byType(MarkdownView), matching: find.text('TSK-11356')).first);
+    expect(calls.opened, ['mock-JI/TSK-11300', 'mock-JI/TSK-11340', 'mock-JI/TSK-11357', 'mock-JI/TSK-11356']);
   });
 
   testWidgets('a ref without an id opens by the source and its key', (tester) async {
     final src = _Source(detail: const TaskDetail(task: _task, links: [
-      LinkedTask(kind: LinkKind.relates, relation: 'relates to', task: TaskRef(key: 'PRC-9', title: 'Old pricing', column: TaskColumn.done)),
+      LinkedTask(kind: LinkKind.relates, relation: 'relates to', task: TaskRef(key: 'TSK-9', title: 'Old platform', column: TaskColumn.done)),
     ]));
     final calls = await _pump(tester, src, _task.id);
     await tester.pump();
-    await _tap(tester, find.text('Old pricing'));
-    expect(calls.opened, ['ji/PRC-9']);
+    await _tap(tester, find.text('Old platform'));
+    expect(calls.opened, ['ji/TSK-9']);
   });
 
   testWidgets('the actions stay pinned while the ticket scrolls', (tester) async {
@@ -308,7 +308,7 @@ void main() {
   });
 
   testWidgets('light theme renders', (tester) async {
-    await _pump(tester, MockTasksSource(), MockTasks.id('PRC-10599'), palette: KumoPalette.light);
+    await _pump(tester, MockTasksSource(), MockTasks.id('TSK-10599'), palette: KumoPalette.light);
     await tester.pump();
     expect(find.text('Unassigned'), findsOneWidget);
     expect(find.textContaining('2 days overdue'), findsOneWidget);
@@ -339,13 +339,13 @@ void main() {
     });
 
     test('inline: bold, code, links, mentions and keys', () {
-      final spans = parseInline('See **this**, `code`, [Runbook](https://x.local/r) and @Ana Gómez on PRC-11300 (not UTF-8 nor OPS-1).', mentions: ['Ana Gómez'], keys: true, keyProjects: {'PRC'});
+      final spans = parseInline('See **this**, `code`, [Runbook](https://x.local/r) and @Ana Gómez on TSK-11300 (not UTF-8 nor OPS-1).', mentions: ['Ana Gómez'], keys: true, keyProjects: {'TSK'});
       expect([for (final s in spans) if (s.$1 != MdInline.text) (s.$1, s.$2)], [
         (MdInline.bold, 'this'),
         (MdInline.code, 'code'),
         (MdInline.link, 'Runbook'),
         (MdInline.mention, '@Ana Gómez'),
-        (MdInline.key, 'PRC-11300'),
+        (MdInline.key, 'TSK-11300'),
       ]);
       expect(parseInline('snake_case_name and a@b.com').where((s) => s.$1 != MdInline.text), isEmpty);
       expect(parseInline('UTF-8 and OPS-1', keys: true).where((s) => s.$1 == MdInline.key).map((s) => s.$2), ['OPS-1']);
@@ -376,7 +376,7 @@ void main() {
     test('keeps working with the card only', () {
       final p = AppState.taskPrompt(_task);
       expect(p, contains('Bulk discounts'));
-      expect(p, contains('Task PRC-1 (Jira)'));
+      expect(p, contains('Task TSK-1 (Jira)'));
       expect(p, isNot(contains('## Description')));
     });
 
@@ -393,14 +393,14 @@ void main() {
           ],
         ),
       );
-      expect(p, contains('Task PRC-1 (Jira)'));
+      expect(p, contains('Task TSK-1 (Jira)'));
       expect(p, contains('Status: In Progress.'));
       expect(p, contains('## Description\n\nAdmins set a discount for a whole category.'));
       expect(p, contains('## Acceptance criteria'));
       expect(p, contains('- [ ] One event per SKU'));
       expect(p, contains('Ana Gómez, 2026-10-23:\nRemember the 30% cap.'));
       expect(p, contains('Mauri (the user):\nConsumer done.'));
-      expect(p, contains('https://acme.atlassian.net/browse/PRC-1'));
+      expect(p, contains('https://acme.atlassian.net/browse/TSK-1'));
     });
   });
 }

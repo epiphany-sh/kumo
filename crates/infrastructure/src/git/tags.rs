@@ -202,7 +202,7 @@ mod tests {
         git(d, &["commit", "-q", "-m", "fix: side"], 3);
         git(d, &["tag", "v0.9.0-hotfix"], 3);
         git(d, &["switch", "-q", "main"], 3);
-        git(d, &["switch", "-q", "-c", "feat/PRC-7-thing"], 4);
+        git(d, &["switch", "-q", "-c", "feat/TSK-7-thing"], 4);
         write(d, "b.txt", "b\nb\n");
         git(d, &["commit", "-q", "-m", "feat: thing"], 5);
         git(d, &["switch", "-q", "main"], 5);
@@ -212,9 +212,9 @@ mod tests {
                 "merge",
                 "-q",
                 "--no-ff",
-                "feat/PRC-7-thing",
+                "feat/TSK-7-thing",
                 "-m",
-                "Merge pull request #2 from acme/feat/PRC-7-thing\n\nfeat: the thing",
+                "Merge pull request #2 from acme/feat/TSK-7-thing\n\nfeat: the thing",
             ],
             6,
         );
@@ -275,7 +275,7 @@ mod tests {
             prs,
             [
                 ("#3", "fix: more", None),
-                ("#2", "feat: the thing", Some("PRC-7"))
+                ("#2", "feat: the thing", Some("TSK-7"))
             ]
         );
     }

@@ -86,9 +86,9 @@ pub enum ContextKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentContext {
     pub kind: ContextKind,
-    /// e.g. "PRC-412 · Bulk discounts by category".
+    /// e.g. "TSK-412 · Bulk discounts by category".
     pub title: String,
-    /// Where it lives, e.g. "Jira" or "Confluence · Pricing".
+    /// Where it lives, e.g. "Jira" or "Confluence · Platform".
     pub detail: String,
     pub url: String,
     /// Its id where it comes from (a task's or a page's), if known.

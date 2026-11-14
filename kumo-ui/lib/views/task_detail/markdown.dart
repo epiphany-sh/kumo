@@ -391,7 +391,7 @@ typedef MdSpan = (MdInline kind, String text, String target, String href);
 
 /// Splits a line into styled runs. [mentions] are names that may follow an
 /// @ (so "@Ana Gómez" stays one mention); [keys] finds ticket keys
-/// ("PRC-11300").
+/// ("TSK-11300").
 List<MdSpan> parseInline(String text, {Iterable<String> mentions = const [], bool keys = false, Set<String> keyProjects = const {}}) {
   final names = [for (final m in mentions) if (m.trim().isNotEmpty) RegExp.escape(m.trim())]..sort((a, b) => b.length.compareTo(a.length));
   final mention = names.isEmpty ? r'@[\p{L}\p{N}_][\p{L}\p{N}_.\-]*' : '@(?:${names.join('|')})(?![\\p{L}\\p{N}_])|@[\\p{L}\\p{N}_][\\p{L}\\p{N}_.\\-]*';
@@ -465,7 +465,7 @@ List<MdSpan> parseInline(String text, {Iterable<String> mentions = const [], boo
 /// Abbreviations that look like keys ("UTF-8", "SHA-256").
 const _notKeys = {'UTF', 'ISO', 'SHA', 'RFC', 'CVE', 'MD', 'TLS', 'SSL', 'HTTP', 'AES', 'RSA', 'IPV', 'ES', 'GPT', 'COVID', 'ARM', 'X', 'TCP', 'UDP', 'PEP'};
 
-/// A ticket key of [projects] ("PRC" for "PRC-11300"); any but the usual
+/// A ticket key of [projects] ("TSK" for "TSK-11300"); any but the usual
 /// abbreviations when there are none.
 bool _isKey(String s, Set<String> projects) {
   final project = s.substring(0, s.lastIndexOf('-'));
@@ -484,7 +484,7 @@ class MdStyle {
   /// People's names, so "@Ana Gómez" reads as one mention.
   final List<String> mentions;
 
-  /// The projects whose keys link ("PRC"); empty: any key-like word.
+  /// The projects whose keys link ("TSK"); empty: any key-like word.
   final Set<String> keyProjects;
   final double size;
 

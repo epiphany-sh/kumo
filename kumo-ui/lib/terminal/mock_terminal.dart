@@ -86,9 +86,9 @@ abstract final class MockSessions {
   /// A fresh shell opened with + / ⌘D / ⌘⇧D. [n] = 1 is "zsh", then "zsh 2"…
   static MockTerminalSurface shell(int n) => MockTerminalSurface(
         title: n == 1 ? 'zsh' : 'zsh $n',
-        cwd: '~/wt/price-admin/PRC-412',
+        cwd: '~/wt/repo-a/TSK-412',
         initial: [
-          TermLine.of([('~/wt/price-admin/PRC-412 ', TermRole.cyan), ('on ', TermRole.text3), ('feat/PRC-412-bulk-discounts', TermRole.ok)]),
+          TermLine.of([('~/wt/repo-a/TSK-412 ', TermRole.cyan), ('on ', TermRole.text3), ('feat/TSK-412-bulk-discounts', TermRole.ok)]),
         ],
       );
 
@@ -107,16 +107,16 @@ abstract final class MockSessions {
 
   static MockTerminalSurface agent() => MockTerminalSurface(
         title: 'Claude Code',
-        cwd: '~/wt/price-admin/PRC-412',
+        cwd: '~/wt/repo-a/TSK-412',
         loop: true,
         blocks: _ran,
         initial: [
-          TermLine.of([('❯ ', TermRole.acc), ('kumo agent run ', TermRole.text), ('--ticket ', TermRole.text3), ('PRC-412 ', TermRole.purple), ('--agent ', TermRole.text3), ('claude', TermRole.text)]),
-          TermLine.of([('  worktree ', TermRole.text3), ('~/wt/price-admin/PRC-412', TermRole.cyan), ('  branch ', TermRole.text3), ('feat/PRC-412-bulk-discounts', TermRole.ok)]),
+          TermLine.of([('❯ ', TermRole.acc), ('kumo agent run ', TermRole.text), ('--ticket ', TermRole.text3), ('TSK-412 ', TermRole.purple), ('--agent ', TermRole.text3), ('claude', TermRole.text)]),
+          TermLine.of([('  worktree ', TermRole.text3), ('~/wt/repo-a/TSK-412', TermRole.cyan), ('  branch ', TermRole.text3), ('feat/TSK-412-bulk-discounts', TermRole.ok)]),
           TermLine.empty,
           TermLine.of([('● ', TermRole.acc), ('Read  ', TermRole.text), ('internal/discount/service.go', TermRole.text2)]),
           TermLine.of([('● ', TermRole.acc), ('Read  ', TermRole.text), ('internal/discount/repository.go', TermRole.text2)]),
-          TermLine.of([('● ', TermRole.acc), ('Read  ', TermRole.text), ('Confluence › Pricing › Discount rules v3', TermRole.text2)]),
+          TermLine.of([('● ', TermRole.acc), ('Read  ', TermRole.text), ('Confluence › Platform › Discount rules v3', TermRole.text2)]),
           TermLine.empty,
           TermLine.of([('◆ Plan', TermRole.purple)], bold: true),
           TermLine.of([('  1  ', TermRole.text3), ('BulkDiscount aggregate + validation', TermRole.text)]),
@@ -129,7 +129,7 @@ abstract final class MockSessions {
           TermLine.of([('✓ ', TermRole.ok), ('Edit  ', TermRole.text), ('internal/discount/bulk.go', TermRole.text2), ('  +84', TermRole.ok), (' −0', TermRole.err)]),
           TermLine.of([('✓ ', TermRole.ok), ('Edit  ', TermRole.text), ('internal/discount/repository.go', TermRole.text2), ('  +31', TermRole.ok), (' −6', TermRole.err)]),
           TermLine.of([('✓ ', TermRole.ok), ('Run   ', TermRole.text), ('go test ./internal/discount/...', TermRole.text2)]),
-          TermLine.of([('      ok  ', TermRole.ok), ('price-admin/internal/discount  0.412s', TermRole.text3)]),
+          TermLine.of([('      ok  ', TermRole.ok), ('repo-a/internal/discount  0.412s', TermRole.text3)]),
           TermLine.of([('● ', TermRole.acc), ('Edit  ', TermRole.text), ('internal/kafka/bulk_consumer.go', TermRole.text2), ('  writing…', TermRole.text3)]),
         ],
       );
@@ -139,7 +139,7 @@ abstract final class MockSessions {
         cwd: 'watch',
         blocks: _ran,
         initial: [
-          TermLine.of([('PRC-412 ', TermRole.cyan), ('❯ ', TermRole.acc), ('gotestsum --watch ./...', TermRole.text)]),
+          TermLine.of([('TSK-412 ', TermRole.cyan), ('❯ ', TermRole.acc), ('gotestsum --watch ./...', TermRole.text)]),
           TermLine.of([('✓ ', TermRole.ok), ('internal/discount ', TermRole.text), ('412ms', TermRole.text3)]),
           TermLine.of([('✓ ', TermRole.ok), ('internal/http ', TermRole.text), ('1.21s', TermRole.text3)]),
           TermLine.of([('✓ ', TermRole.ok), ('internal/kafka ', TermRole.text), ('838ms', TermRole.text3)]),
@@ -152,14 +152,14 @@ abstract final class MockSessions {
 
   static MockTerminalSurface logs() => MockTerminalSurface(
         title: 'k8s logs',
-        cwd: 'gke-staging / pricing',
+        cwd: 'gke-staging / platform',
         loop: true,
         interval: const Duration(milliseconds: 900),
         blocks: _ran,
         initial: [
-          TermLine.of([('❯ ', TermRole.acc), ('kubectl logs -f deploy/price-reader-v2', TermRole.text)]),
+          TermLine.of([('❯ ', TermRole.acc), ('kubectl logs -f deploy/repo-b', TermRole.text)]),
           TermLine.of([('14:02:11 ', TermRole.text3), ('INFO ', TermRole.ok), ('cache warm keys=18240 took=912ms', TermRole.text2)]),
-          TermLine.of([('14:02:12 ', TermRole.text3), ('INFO ', TermRole.ok), ('consumer joined group=price-reader', TermRole.text2)]),
+          TermLine.of([('14:02:12 ', TermRole.text3), ('INFO ', TermRole.ok), ('consumer joined group=repo-c', TermRole.text2)]),
           TermLine.of([('14:02:19 ', TermRole.text3), ('WARN ', TermRole.warn), ('slow query table=prices p99=184ms', TermRole.text2)]),
         ],
         script: [
@@ -175,18 +175,18 @@ abstract final class MockSessions {
 abstract final class MockAgentTerminals {
   static TermLine _l(List<(String, TermRole)> parts, {bool bold = false}) => TermLine.of(parts, bold: bold);
 
-  /// Codex in fix/PRC-398, waiting for an approval.
+  /// Codex in fix/TSK-398, waiting for an approval.
   static MockTerminalSurface codex() => MockTerminalSurface(
         title: 'Codex',
-        cwd: '~/wt/price-admin/PRC-398',
+        cwd: '~/wt/repo-a/TSK-398',
         initial: [
           _l([('>_ ', TermRole.acc), ('Codex', TermRole.text), ('  · ask before shell', TermRole.text3)], bold: true),
-          _l([('> ', TermRole.text3), ('Fix PRC-398: installment prices round wrong for 18 cuotas.', TermRole.text2)]),
+          _l([('> ', TermRole.text3), ('Fix TSK-398: installment prices round wrong for 18 cuotas.', TermRole.text2)]),
           TermLine.empty,
           _l([('• ', TermRole.text), ('Found it: Installment() divides before rounding, so 18 cuotas lose a cent each.', TermRole.text)]),
           _l([('• ', TermRole.ok), ('Edited ', TermRole.text), ('internal/price/installments.go', TermRole.text2), (' (+9 −6)', TermRole.text3)]),
           _l([('• ', TermRole.ok), ('Ran ', TermRole.text), ('go test ./internal/price/...', TermRole.text2)]),
-          _l([('  └ ', TermRole.text3), ('ok  price-admin/internal/price  0.41s  (14 tests)', TermRole.text3)]),
+          _l([('  └ ', TermRole.text3), ('ok  repo-a/internal/price  0.41s  (14 tests)', TermRole.text3)]),
           _l([('• ', TermRole.text), ('The integration test needs the new column on staging.', TermRole.text)]),
           TermLine.empty,
           _l([('▌ ', TermRole.warn), ('Allow command?  ', TermRole.warn), ('make migrate-up ENV=staging', TermRole.text)], bold: true),
@@ -230,7 +230,7 @@ abstract final class MockAgentTerminals {
   /// go-pr-reviewer reviewing PR #521.
   static MockTerminalSurface reviewer() => MockTerminalSurface(
         title: 'go-pr-reviewer',
-        cwd: '~/wt/price-admin/PRC-412',
+        cwd: '~/wt/repo-a/TSK-412',
         initial: [
           _l([('✻ ', TermRole.acc), ('Claude Code', TermRole.text), ('  · agent go-pr-reviewer', TermRole.text3)], bold: true),
           _l([('  context ', TermRole.text3), ('~/.kumo/runs/go-pr-reviewer-2 · 3 items', TermRole.text3)]),

@@ -8,6 +8,7 @@ use kumo_domain::time::Timestamp;
 use tokio::sync::{mpsc, oneshot};
 
 use super::hub::OutputHub;
+use super::recorder::Recorder;
 
 pub(super) struct Pump {
     pub(super) id: TerminalId,
@@ -16,6 +17,8 @@ pub(super) struct Pump {
     pub(super) hub: Arc<OutputHub>,
     pub(super) max_batch_bytes: usize,
     pub(super) exit_drain_idle: Duration,
+    /// A shell's: reads the commands it ran out of its output.
+    pub(super) recorder: Option<Recorder>,
 }
 
 impl Pump {
@@ -47,12 +50,25 @@ impl Pump {
             };
             let Some(first) = next else { break };
 
+            if let Some(recorder) = &mut self.recorder {
+                recorder.feed(&first);
+            }
             let mut builder = BatchBuilder::new(first, self.max_batch_bytes);
             while builder.has_room() {
                 match self.chunks.try_recv() {
-                    Ok(chunk) => builder.push(chunk),
+                    Ok(chunk) => {
+                        if let Some(recorder) = &mut self.recorder {
+                            recorder.feed(&chunk);
+                        }
+                        builder.push(chunk);
+                    }
                     Err(_) => break,
                 }
+            }
+            // Before the output that says it's done: whoever sees that and
+            // asks for the history finds the command there.
+            if let Some(recorder) = &mut self.recorder {
+                recorder.flush(&self.id).await;
             }
             seq += 1;
             let batch = builder.build(seq);
@@ -73,6 +89,9 @@ impl Pump {
         };
         tracing::debug!(terminal = %self.id, code = exit.code(), batches = seq, "terminal exited");
         self.hub.finish(exit).await;
+        if let Some(recorder) = &self.recorder {
+            recorder.ended();
+        }
         exit
     }
 }

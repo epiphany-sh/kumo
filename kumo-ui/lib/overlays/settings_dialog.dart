@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
+import '../engine/engine_scope.dart';
+import '../engine/generated/kumo/v1/kumo.pb.dart' show ForgetHistoryRequest;
 import '../platform/app_icon.dart';
 import '../platform/pasteboard.dart';
 import '../platform/os/host_os.dart';
@@ -207,7 +209,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           ]),
           ('Startup', [
             _toggle(s, 'general.login', 'Open Kumo at login', null, false),
-            _select(s, 'general.workspace', 'Default workspace', 'Namespace selected when the app opens.', const ['Last used', 'pricing', 'identity'], 'Last used'),
+            _select(s, 'general.workspace', 'Default workspace', 'Namespace selected when the app opens.', const ['Last used', 'platform', 'identity'], 'Last used'),
             _toggle(s, 'general.reopen', 'Reopen terminals and agents from last session', 'kumod keeps them running while the app is closed.', true),
           ]),
           ('Updates & privacy', [
@@ -266,6 +268,27 @@ class _SettingsDialogState extends State<SettingsDialog> {
             _toggle(s, 'terminal.copyOnSelect', 'Copy on select', null, false),
             _toggle(s, 'terminal.confirmClose', 'Ask before closing a pane with a running process', null, true),
           ]),
+          ('Commands you run', [
+            _toggle(
+              s,
+              YourLines.keyRemember,
+              'Remember them',
+              'Per repository, shared by its worktrees, in this workspace. A command you start with a space isn’t kept. Works in zsh, bash and fish; applies to new terminals.',
+              true,
+            ),
+            _toggle(
+              s,
+              YourLines.keySuggest,
+              'Suggest as you type',
+              'The rest of a command you ran shows in gray: → takes it, ⌥→ its next word. Hidden when another tool (zsh-autosuggestions) already suggests.',
+              true,
+            ),
+            const _Row(
+              label: 'Forget them',
+              desc: 'Every command remembered in this workspace. The history of one repository: ⌘Y in a terminal (Ctrl+Shift+Y on Windows and Linux).',
+              control: _ForgetCommands(),
+            ),
+          ]),
         ]);
       case SettingsTab.shortcuts:
         return _Page('Shortcuts', 'Keyboard shortcuts across Kumo.', sections: [
@@ -276,6 +299,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             _KbdRow('Close pane', ['⌘', 'W']),
             _KbdRow('Previous command you ran', ['⌘', '↑']),
             _KbdRow('Next command you ran', ['⌘', '↓']),
+            _KbdRow('Command history', ['⌘', 'Y']),
             _KbdRow('Show / hide side panel', ['⌥', '⌘', 'B']),
           ]),
           ('Workspace', const [
@@ -945,5 +969,40 @@ class _AppIconTile extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+/// Forgets every remembered command, on a second click.
+class _ForgetCommands extends StatefulWidget {
+  const _ForgetCommands();
+
+  @override
+  State<_ForgetCommands> createState() => _ForgetCommandsState();
+}
+
+class _ForgetCommandsState extends State<_ForgetCommands> {
+  bool _asked = false;
+  String? _done;
+
+  Future<void> _forget() async {
+    if (!_asked) {
+      setState(() => _asked = true);
+      return;
+    }
+    final conn = EngineScope.maybeOf(context)?.current;
+    if (conn == null) return;
+    try {
+      final reply = await conn.terminals.forgetHistory(ForgetHistoryRequest(everything: true));
+      if (mounted) setState(() => _done = 'Forgot ${reply.forgotten}');
+    } on Object catch (e) {
+      if (mounted) setState(() => _done = 'Couldn’t: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final done = _done;
+    if (done != null) return Text(done, style: sans(12, color: context.c.text3));
+    return KButton(label: _asked ? 'Click again to forget' : 'Forget all', height: 30, fontSize: 12, onTap: _forget);
   }
 }

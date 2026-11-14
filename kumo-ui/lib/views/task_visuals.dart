@@ -221,7 +221,7 @@ String relativeTime(DateTime at, {DateTime? now}) {
 
 // ---- Sprints ----
 
-/// The sprint's number after its board ("Pricing 2026.21" → "2026.21").
+/// The sprint's number after its board ("Platform 2026.21" → "2026.21").
 String sprintShortName(TaskSprint s) => s.name.split(' ').last;
 
 /// What the card says about a sprint: only when it closed (carried over) or

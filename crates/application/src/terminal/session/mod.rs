@@ -4,6 +4,7 @@
 mod hub;
 mod io_threads;
 mod pump;
+mod recorder;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -11,8 +12,8 @@ use std::time::Instant;
 
 use bytes::Bytes;
 use kumo_domain::terminal::{
-    LaunchSpec, PtyKiller, PtyMaster, PtyProcess, TerminalError, TerminalId, TerminalInfo,
-    TerminalSize, TerminalStatus, is_answer,
+    LaunchSpec, PtyKiller, PtyMaster, PtyProcess, ShellActivity, TerminalError, TerminalId,
+    TerminalInfo, TerminalSize, TerminalStatus, is_answer,
 };
 use kumo_domain::time::Timestamp;
 use tokio::sync::{mpsc, oneshot};
@@ -22,6 +23,8 @@ pub use hub::Subscription;
 use super::SessionConfig;
 use hub::OutputHub;
 use pump::Pump;
+pub(in crate::terminal) use recorder::Recorder;
+use recorder::{SharedActivity, ShellCwd};
 
 type SharedMaster = Arc<Mutex<Option<Box<dyn PtyMaster>>>>;
 
@@ -42,6 +45,10 @@ pub struct TerminalSession {
     /// When its size last changed, and when someone last answered in it.
     resized_at: Mutex<Option<Instant>>,
     answered_at: Mutex<Option<Instant>>,
+    /// A shell's folder, as it says at each prompt.
+    shell_cwd: Option<ShellCwd>,
+    /// A shell's command running and last one done.
+    shell_activity: Option<SharedActivity>,
 }
 
 impl std::fmt::Debug for TerminalSession {
@@ -62,6 +69,7 @@ impl TerminalSession {
         spec: &LaunchSpec,
         process: PtyProcess,
         config: &SessionConfig,
+        recorder: Option<Recorder>,
     ) -> Arc<Self> {
         let PtyProcess {
             reader,
@@ -83,6 +91,8 @@ impl TerminalSession {
             config.subscriber_queue_capacity,
         ));
         let master: SharedMaster = Arc::new(Mutex::new(Some(master)));
+        let shell_cwd = recorder.as_ref().map(Recorder::cwd);
+        let shell_activity = recorder.as_ref().map(Recorder::activity);
 
         let pump = Pump {
             id: id.clone(),
@@ -91,6 +101,7 @@ impl TerminalSession {
             hub: Arc::clone(&hub),
             max_batch_bytes: config.max_batch_bytes,
             exit_drain_idle: config.exit_drain_idle,
+            recorder,
         };
         let released = Arc::clone(&master);
         tokio::spawn(async move {
@@ -114,6 +125,8 @@ impl TerminalSession {
             hub,
             resized_at: Mutex::new(None),
             answered_at: Mutex::new(None),
+            shell_cwd,
+            shell_activity,
         })
     }
 
@@ -133,6 +146,21 @@ impl TerminalSession {
             status: self.status(),
             opened_at: self.opened_at,
         }
+    }
+
+    /// The folder its shell is in: the one it said last, or the one it
+    /// opened in.
+    pub fn current_dir(&self) -> Option<PathBuf> {
+        self.shell_cwd
+            .as_ref()
+            .and_then(|cwd| lock(cwd).clone())
+            .or_else(|| self.cwd.clone())
+    }
+
+    /// What its shell is doing; None for a program that isn't a shell
+    /// with Kumo's integration.
+    pub fn shell_activity(&self) -> Option<ShellActivity> {
+        self.shell_activity.as_ref().map(|a| lock(a).clone())
     }
 
     /// Subscribes to output. See [`Subscription`] for ordering guarantees.

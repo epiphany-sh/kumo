@@ -58,10 +58,10 @@ void main() {
     final incoming = MockProject.resolveConflict(text, 'incoming');
     final both = MockProject.resolveConflict(text, 'both');
     expect(MockProject.hasConflictMarkers(current), isFalse);
-    expect(current, contains('2026.10.27-prc412'));
+    expect(current, contains('2026.10.27-tsk412'));
     expect(current, isNot(contains('2026.10.24')));
     expect(incoming, contains('2026.10.24'));
-    expect(incoming, isNot(contains('2026.10.27-prc412')));
-    expect(both, allOf(contains('2026.10.24'), contains('2026.10.27-prc412')));
+    expect(incoming, isNot(contains('2026.10.27-tsk412')));
+    expect(both, allOf(contains('2026.10.24'), contains('2026.10.27-tsk412')));
   });
 }

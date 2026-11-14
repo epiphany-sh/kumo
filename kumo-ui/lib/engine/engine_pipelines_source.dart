@@ -26,6 +26,7 @@ class EnginePipelinesSource extends PipelinesSource {
   String _repo = '';
   String _branch;
   CiRun? _latest;
+  List<CiRun> _others = const [];
   CiProblem? _problem;
   bool _loading = true;
   DateTime? _checkedAt;
@@ -40,6 +41,8 @@ class EnginePipelinesSource extends PipelinesSource {
   String get branch => _branch;
   @override
   CiRun? get latest => _latest;
+  @override
+  List<CiRun> get others => _others;
   @override
   CiProblem? get problem => _problem;
   @override
@@ -75,6 +78,7 @@ class EnginePipelinesSource extends PipelinesSource {
     _repo = s.repo;
     if (s.branch.isNotEmpty) _branch = s.branch;
     _latest = s.hasLatest() ? ciRunFrom(s.latest) : null;
+    _others = [for (final r in s.others) ciRunFrom(r)];
     _problem = s.hasProblem() ? ciProblemFrom(s.problem) : null;
     _checkedAt = _time(s.checkedAt);
     notifyListeners();
@@ -100,10 +104,10 @@ class EnginePipelinesSource extends PipelinesSource {
   Future<void> refresh() => _act((c) => c.refresh(pb.WorktreeRequest(worktreePath: worktreePath)));
 
   @override
-  Future<void> rerunFailed() async {
-    final run = _latest;
-    if (run == null) return;
-    await _act((c) => c.rerunFailed(pb.RerunFailedRequest(worktreePath: worktreePath, runId: run.id)));
+  Future<void> rerunFailed([CiRun? run]) async {
+    final target = run ?? _latest;
+    if (target == null) return;
+    await _act((c) => c.rerunFailed(pb.RerunFailedRequest(worktreePath: worktreePath, runId: target.id)));
   }
 
   @override
@@ -187,6 +191,8 @@ CiRun ciRunFrom(pb.CiRun r) => CiRun(
       finishedAt: _time(r.finishedAt),
       url: r.url,
       jobs: [for (final j in r.jobs) ciJobFrom(j)],
+      workflow: r.workflow,
+      pullRequest: r.pullRequest,
     );
 
 CiProblem ciProblemFrom(pb.CiProblem p) => CiProblem(

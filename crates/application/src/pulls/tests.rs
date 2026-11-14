@@ -75,7 +75,7 @@ impl PullRequestClient for Host {
         token: &str,
         _: usize,
     ) -> Result<Vec<PullRequest>, CiProblem> {
-        assert_eq!((target.repo.as_str(), token), ("pricing/app", "ghp"));
+        assert_eq!((target.repo.as_str(), token), ("platform/app", "ghp"));
         self.lists.fetch_add(1, Ordering::SeqCst);
         match self.fail.lock().unwrap().clone() {
             Some(p) => Err(p),
@@ -174,7 +174,7 @@ fn fixture() -> Fixture {
         repos: vec![RepoState {
             repo: Repo::new(
                 PathBuf::from(MAIN),
-                Some(Remote::parse("git@github.com:pricing/app.git")),
+                Some(Remote::parse("git@github.com:platform/app.git")),
             ),
             worktrees: vec![wt(MAIN, true), wt(WT, false)],
             error: None,

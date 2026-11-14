@@ -185,7 +185,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
     final mine = s.agentDefs;
     final toolbar = ScreenToolbar(
       breadcrumb: Row(mainAxisSize: MainAxisSize.min, children: [
-        Flexible(child: Breadcrumb(icon: KIcons.agent, parts: live ? const ['Agents'] : const ['Agents', 'pricing workspace'])),
+        Flexible(child: Breadcrumb(icon: KIcons.agent, parts: live ? const ['Agents'] : const ['Agents', 'platform workspace'])),
         const SizedBox(width: 12),
         ListenableBuilder(
           listenable: mine,
@@ -328,7 +328,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
         else ...[
           const StatusText('3 of 4 agent slots in use'),
           const Spacer(),
-          const StatusText('gke-staging · pricing', icon: KIcons.cluster),
+          const StatusText('gke-staging · platform', icon: KIcons.cluster),
         ],
       ],
     );

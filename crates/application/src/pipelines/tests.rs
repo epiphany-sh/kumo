@@ -26,6 +26,8 @@ struct Script {
     calls: AtomicUsize,
     targets: Mutex<Vec<CiTarget>>,
     reruns: Mutex<Vec<String>>,
+    /// Runs of the same commit, after the latest.
+    others: Mutex<Vec<CiRun>>,
 }
 
 impl Script {
@@ -53,6 +55,14 @@ impl CiClient for Script {
         } else {
             answers.front().cloned().unwrap_or(Ok(None))
         }
+    }
+
+    fn runs(&self, target: &CiTarget, token: &str) -> Result<Vec<CiRun>, CiProblem> {
+        let mut runs: Vec<CiRun> = self.latest_run(target, token)?.into_iter().collect();
+        if !runs.is_empty() {
+            runs.extend(self.others.lock().unwrap().iter().cloned());
+        }
+        Ok(runs)
     }
 
     fn rerun_failed(&self, _: &CiTarget, _: &str, run: &CiRun) -> Result<(), CiProblem> {
@@ -175,6 +185,8 @@ fn run(id: &str, state: CiState) -> CiRun {
             failure: None,
             url: String::new(),
         }],
+        workflow: String::new(),
+        pull_request: false,
     }
 }
 
@@ -256,7 +268,7 @@ async fn next(rx: &mut watch::Receiver<Option<Arc<PipelinesSnapshot>>>) -> Arc<P
 
 #[tokio::test(flavor = "multi_thread")]
 async fn polls_fast_while_a_run_is_active_and_slow_once_it_finished() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     f.script.then(Ok(Some(run("1", CiState::Running))));
     f.script.then(Ok(Some(run("1", CiState::Running))));
     f.script.then(Ok(Some(run("1", CiState::Passed))));
@@ -265,7 +277,7 @@ async fn polls_fast_while_a_run_is_active_and_slow_once_it_finished() {
     assert_eq!(first.provider, Some(CiProvider::GitHubActions));
     assert_eq!(
         (first.repo.as_str(), first.branch.as_str()),
-        ("pricing/app", "feat/x")
+        ("platform/app", "feat/x")
     );
     assert_eq!(first.latest.as_ref().unwrap().state, CiState::Running);
     assert!(first.checked_at.is_some());
@@ -290,7 +302,7 @@ async fn polls_fast_while_a_run_is_active_and_slow_once_it_finished() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn watchers_share_one_poller_that_stops_when_they_leave() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     f.script.then(Ok(Some(run("1", CiState::Running))));
     let mut a = f.service.watch(Path::new(WT)).unwrap();
     let mut b = f.service.watch(Path::new(WT)).unwrap();
@@ -315,7 +327,7 @@ async fn watchers_share_one_poller_that_stops_when_they_leave() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn local_problems_need_no_provider() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     *f.branch.0.lock().unwrap() = LocalBranch {
         name: Some("feat/x".into()),
         upstream: None,
@@ -356,7 +368,7 @@ async fn local_problems_need_no_provider() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn outages_keep_the_last_run_and_back_off() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     f.script.then(Ok(Some(run("7", CiState::Failed))));
     f.script.then(Err(CiProblem::new(
         CiProblemKind::Unreachable,
@@ -388,7 +400,7 @@ async fn outages_keep_the_last_run_and_back_off() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn token_problems_drop_the_run_and_saving_a_token_retries() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     f.script.then(Ok(Some(run("7", CiState::Passed))));
     let mut rx = f.service.watch(Path::new(WT)).unwrap();
     next(&mut rx).await;
@@ -406,7 +418,7 @@ async fn token_problems_drop_the_run_and_saving_a_token_retries() {
         .await
         .unwrap();
     assert!(info.has_token);
-    assert_eq!(info.repos, ["pricing/app"]);
+    assert_eq!(info.repos, ["platform/app"]);
     let s = next(&mut rx).await;
     assert!(
         s.problem.is_none(),
@@ -421,7 +433,7 @@ async fn token_problems_drop_the_run_and_saving_a_token_retries() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn reruns_the_failed_jobs_of_the_latest_run() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     f.script.then(Ok(Some(run("7", CiState::Failed))));
     let mut rx = f.service.watch(Path::new(WT)).unwrap();
     next(&mut rx).await;
@@ -436,8 +448,22 @@ async fn reruns_the_failed_jobs_of_the_latest_run() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn the_other_runs_of_the_commit_come_along_and_can_be_rerun() {
+    let f = fixture("git@github.com:platform/app.git");
+    *f.script.others.lock().unwrap() = vec![run("8", CiState::Running), run("9", CiState::Failed)];
+    f.script.then(Ok(Some(run("7", CiState::Passed))));
+    let mut rx = f.service.watch(Path::new(WT)).unwrap();
+    let s = next(&mut rx).await;
+    assert_eq!(s.latest.as_ref().unwrap().id, "7");
+    let others: Vec<_> = s.others.iter().map(|r| r.id.as_str()).collect();
+    assert_eq!(others, ["8", "9"]);
+    f.service.rerun_failed(Path::new(WT), "9").await.unwrap();
+    assert_eq!(*f.script.reruns.lock().unwrap(), ["9"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn hosts_and_token_tests() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     let hosts = f.service.hosts().await;
     assert_eq!(hosts.len(), 1);
     assert_eq!(
@@ -479,7 +505,7 @@ async fn hosts_and_token_tests() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn signing_in_with_the_cli_opens_its_login_and_retries_once_it_is_done() {
-    let f = fixture("git@github.com:pricing/app.git");
+    let f = fixture("git@github.com:platform/app.git");
     f.tokens.delete("github.com").unwrap();
     f.script.then(Ok(Some(run("7", CiState::Passed))));
     let mut rx = f.service.watch(Path::new(WT)).unwrap();

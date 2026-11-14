@@ -82,8 +82,8 @@ _FakeTasks _board() => _FakeTasks(
         const TaskSourceInfo(id: 'br', kind: TaskSourceKind.bear, name: 'Bear', taskCount: 1, error: 'macOS didn’t let Kumo read Bear’s notes'),
       ],
       tasks: const [
-        TaskEntry(id: 'ji/PRC-1', sourceId: 'ji', kind: TaskSourceKind.jira, key: 'PRC-1', title: 'Bulk discounts', column: TaskColumn.todo, priority: TaskPriority.high, suggestedBranch: 'feat/PRC-1-bulk-discounts'),
-        TaskEntry(id: 'ji/PRC-2', sourceId: 'ji', kind: TaskSourceKind.jira, key: 'PRC-2', title: 'Rounding error', column: TaskColumn.review, labels: ['backend']),
+        TaskEntry(id: 'ji/TSK-1', sourceId: 'ji', kind: TaskSourceKind.jira, key: 'TSK-1', title: 'Bulk discounts', column: TaskColumn.todo, priority: TaskPriority.high, suggestedBranch: 'feat/TSK-1-bulk-discounts'),
+        TaskEntry(id: 'ji/TSK-2', sourceId: 'ji', kind: TaskSourceKind.jira, key: 'TSK-2', title: 'Rounding error', column: TaskColumn.review, labels: ['backend']),
         TaskEntry(id: 'br/n#1', sourceId: 'br', kind: TaskSourceKind.bear, key: 'Groceries', title: 'Buy milk', column: TaskColumn.todo),
       ],
     );
@@ -119,7 +119,7 @@ void main() {
     expect(find.text('migraciones'), findsWidgets);
     await tester.tap(find.text('migraciones').first);
     await tester.pump();
-    expect(tester.widget<TaskDetailPanel>(find.byType(TaskDetailPanel)).taskId, 'mock-JI/PRC-11355');
+    expect(tester.widget<TaskDetailPanel>(find.byType(TaskDetailPanel)).taskId, 'mock-JI/TSK-11355');
     expect(find.text('↑ ↓ switch tickets · Esc closes'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -148,11 +148,11 @@ void main() {
     await tester.tap(find.text('Bulk discounts'));
     await tester.pump();
     expect(find.text('Start in a worktree'), findsOneWidget);
-    expect(find.textContaining('feat/PRC-1-bulk-discounts'), findsOneWidget, reason: 'the branch it will use');
+    expect(find.textContaining('feat/TSK-1-bulk-discounts'), findsOneWidget, reason: 'the branch it will use');
 
     await tester.tap(find.descendant(of: find.byType(KSegmented<TaskColumn>), matching: find.text('Done')));
     await tester.pump();
-    expect(tasks.moved, [('ji/PRC-1', TaskColumn.done)]);
+    expect(tasks.moved, [('ji/TSK-1', TaskColumn.done)]);
 
     // Bear is read only.
     await tester.tap(find.text('Buy milk'));
@@ -168,9 +168,9 @@ void main() {
     final repo = state.workspace.repos.first;
     final error = await state.startTask(task, repo: repo, branch: task.suggestedBranch, agent: false);
     expect(error, isNull);
-    expect(tasks.links.single.branch, 'feat/PRC-1-bulk-discounts');
-    expect(tasks.moved, [('ji/PRC-1', TaskColumn.doing)]);
-    expect(AppState.taskPrompt(task), contains('Task PRC-1 (Jira)'));
+    expect(tasks.links.single.branch, 'feat/TSK-1-bulk-discounts');
+    expect(tasks.moved, [('ji/TSK-1', TaskColumn.doing)]);
+    expect(AppState.taskPrompt(task), contains('Task TSK-1 (Jira)'));
   });
 
   testWidgets('no sources: the board says how to connect one', (tester) async {

@@ -21,13 +21,13 @@ Lenguaje visual existente (respetalo):
 **Tablero** (ver captura adjunta):
 - Header con "Tasks", la fuente y "synced just now", un buscador "Filter tasks" y chips de fuente con conteo (`All 37`, `Jira - workspace-1 37`).
 - Cuatro columnas: To do, In progress, In review, Done.
-- **Card**: badge de fuente, key (`PRC-11355`), prioridad (High/Med/Low) arriba a la derecha, título y el proyecto (`Pricing`). Nada más.
+- **Card**: badge de fuente, key (`TSK-11355`), prioridad (High/Med/Low) arriba a la derecha, título y el proyecto (`Platform`). Nada más.
 
 **Panel de detalle** (columna derecha, unos 380 px):
 - Key, fuente, título.
 - Grilla con Status, Priority, Due e In (proyecto).
 - Segmented "Move to" (To do / Doing / Review / Done).
-- Bloque "Start in a worktree": repositorio, rama base, rama nueva sugerida (`feat/PRC-11355-migraciones`), switch de agente y botón "Create worktree".
+- Bloque "Start in a worktree": repositorio, rama base, rama nueva sugerida (`feat/TSK-11355-migraciones`), switch de agente y botón "Create worktree".
 - Abajo, los worktrees ya vinculados al ticket.
 
 **El problema:**
@@ -115,17 +115,17 @@ Interacciones a anotar:
 
 Usalos; no inventes empresas reales.
 
-- **PRC-11355 · Story · "migraciones"**
-  - Proyecto Pricing, sprint "Pricing 2026.22" (21 oct – 4 nov), 5 pts, prioridad Low, estado Jira "In Progress".
+- **TSK-11355 · Story · "migraciones"**
+  - Proyecto Platform, sprint "Platform 2026.22" (21 oct – 4 nov), 5 pts, prioridad Low, estado Jira "In Progress".
   - Assignee: vos (Mauri). Reporter: Ana Gómez.
-  - Épica: PRC-11300 "Migración a Graviton".
-  - Subtasks 2/4: PRC-11356 "Migrar job de precios" (Done), PRC-11357 "Analisis" (In Progress), PRC-11358 "actualizar planilla" (To Do), PRC-11359 "verificacion en entornos" (To Do).
-  - Linked: is blocked by PRC-11340 "Limpieza de ofertas de canales" (Done); relates to PRC-11321 "Analisis: Migracion a Envoy".
+  - Épica: TSK-11300 "Migración a arm64".
+  - Subtasks 2/4: TSK-11356 "Migrar job de precios" (Done), TSK-11357 "Analisis" (In Progress), TSK-11358 "actualizar planilla" (To Do), TSK-11359 "verificacion en entornos" (To Do).
+  - Linked: is blocked by TSK-11340 "Limpieza de ofertas de canales" (Done); relates to TSK-11321 "Analisis: Migracion a Envoy".
   - 6 comentarios.
   - Descripción con contexto, una lista de pasos, un bloque de código SQL y acceptance criteria en checklist.
-- **PRC-10599 · Bug · "Generación automática de precios para los canales (Hijas)"**: High, vencido hace 2 días, sin asignar.
-- **PRC-11354 · Sub-task · "Migracion a Graviton (Parte 4/4)"**: padre PRC-11300, Low.
-- **Issue de GitHub** `zen-engine#42` "Retry on 502 from pricing API", labels `bug`, `api`, asignado a vos.
+- **TSK-10599 · Bug · "Generación automática de precios para los canales (Hijas)"**: High, vencido hace 2 días, sin asignar.
+- **TSK-11354 · Sub-task · "Migracion a arm64 (Parte 4/4)"**: padre TSK-11300, Low.
+- **Issue de GitHub** `repo-d#42` "Retry on 502 from platform API", labels `bug`, `api`, asignado a vos.
 - **Tarea de Obsidian** "Revisar costos de AWS" de la nota "Weekly.md", con due date.
 
 ## Restricciones
