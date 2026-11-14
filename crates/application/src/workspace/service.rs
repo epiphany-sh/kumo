@@ -125,6 +125,11 @@ impl WorkspaceService {
             .into_iter()
             .flatten()
         {
+            let before = state
+                .repos
+                .get(&read.repo.path)
+                .and_then(|s| s.repo.remote.clone());
+            self.keep_remote(before.as_ref(), &read.repo).await;
             state.repos.insert(read.repo.path.clone(), read);
         }
         self.publish(&mut state);
@@ -417,11 +422,25 @@ impl WorkspaceService {
     async fn reread<'a>(&self, state: &'a mut State, repo: Repo) -> &'a RepoState {
         let git = Arc::clone(&self.ports.git);
         let path = repo.path.clone();
+        let before = repo.remote.clone();
         let read = tokio::task::spawn_blocking(move || read_repo(git.as_ref(), repo))
             .await
             .unwrap_or_else(|e| unreachable_read(&path, &e));
+        self.keep_remote(before.as_ref(), &read.repo).await;
         state.repos.insert(read.repo.path.clone(), read);
         &state.repos[&path]
+    }
+
+    /// Saves a repository whose remote isn't the one known any more.
+    async fn keep_remote(&self, before: Option<&Remote>, repo: &Repo) {
+        if before == repo.remote.as_ref() {
+            return;
+        }
+        let store = Arc::clone(&self.ports.store);
+        let saved = repo.clone();
+        if let Err(error) = blocking(move || store.save_repo(&saved)).await {
+            tracing::warn!(repo = %repo.path.display(), %error, "remote not saved");
+        }
     }
 
     async fn reread_if_changed(&self, state: &mut State, before: RepoState) {
@@ -439,7 +458,16 @@ impl WorkspaceService {
 
 /// Worktrees and their status. Errors are kept in the state, not raised: a
 /// moved repository must not break the whole workspace.
-fn read_repo(git: &dyn Git, repo: Repo) -> RepoState {
+fn read_repo(git: &dyn Git, mut repo: Repo) -> RepoState {
+    // A repository added before it had a remote (or while git couldn't say)
+    // gets it on the next read. One already known stays: `git remote
+    // get-url` applies `insteadOf` rewrites, which aren't where the
+    // repository lives.
+    if repo.remote.is_none()
+        && let Ok(Some(url)) = git.remote_url(&repo.path)
+    {
+        repo.remote = Some(Remote::parse(&url));
+    }
     match git.worktrees(&repo.path) {
         Ok(mut worktrees) => {
             for worktree in &mut worktrees {

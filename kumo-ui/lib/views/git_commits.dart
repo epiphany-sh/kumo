@@ -383,6 +383,20 @@ Future<void> _showCommitSheet(BuildContext context, RepoActivitySource source, L
   );
 }
 
+/// The commit sheet from outside the Git view (the Terminal view's commits
+/// of the branch): what [commits]`[index]` of [repo] changed. Its source
+/// lives while the sheet is open, and follows no worktree's pipelines.
+Future<void> showRepoCommit(BuildContext context, Repo repo, List<RepoCommit> commits, int index) async {
+  final s = AppScope.read(context);
+  final engine = EngineScope.maybeOf(context);
+  final RepoActivitySource source = engine == null ? MockRepoActivity(repo, s.worktreesOf(repo)) : EngineRepoActivity(engine, s.workspace, repo, const []);
+  try {
+    await _showCommitSheet(context, source, commits, index);
+  } finally {
+    source.dispose();
+  }
+}
+
 /// The sheet's content (public for tests).
 class CommitSheet extends StatefulWidget {
   const CommitSheet({super.key, required this.source, required this.commits, required this.index});
