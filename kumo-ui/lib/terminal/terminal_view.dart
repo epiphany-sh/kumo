@@ -774,7 +774,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
           if (widget.surface.interactive) KMenuItem(icon: KIcons.paste, label: 'Paste', shortcut: '${mod}V', onTap: () => then(_paste)),
           KMenuItem(icon: KIcons.selectAll, label: 'Select all', shortcut: _mac ? '⌘A' : null, onTap: () => then(_selectAll)),
           if (canClear) KMenuItem(icon: KIcons.trash, label: 'Clear scrollback', onTap: () => then(_clearScrollback)),
-          if (_history != null) KMenuItem(icon: KIcons.clock, label: 'Command history…', onTap: () => then(_openHistory)),
+          if (_history != null) KMenuItem(icon: KIcons.clock, label: 'Command history…', shortcut: '${mod}Y', onTap: () => then(_openHistory)),
         ]);
       },
     );
@@ -926,6 +926,11 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
       }
       if (key == LogicalKeyboardKey.keyA && _mac) {
         _selectAll();
+        return KeyEventResult.handled;
+      }
+      // As a browser's history (Ctrl+Y is the shell's yank elsewhere).
+      if (key == LogicalKeyboardKey.keyY && _history != null) {
+        _openHistory();
         return KeyEventResult.handled;
       }
     }

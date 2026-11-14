@@ -40,7 +40,7 @@ void main() {
     test('is nothing while a command runs, or without the shell saying where you type', () {
       expect(screen('$a\$ ${b}make\r\n${c}building').snapshot().input, isNull);
       expect(screen('$a\$ make').snapshot().input, isNull);
-      expect(screen('$a\$ ${b}make\r\n$c${d(0)}$a\$ ${b}').snapshot().input!.text, '');
+      expect(screen('$a\$ ${b}make\r\n$c${d(0)}$a\$ $b').snapshot().input!.text, '');
     });
 
     test('knows when something is drawn at the cursor', () {
@@ -129,6 +129,25 @@ void main() {
       expect(shell.sent.map(utf8.decode), ['\x1b[C']);
     });
  
+    testWidgets('⌘Y opens the history (Ctrl+Shift+Y elsewhere), ⌃Y goes to the shell', (tester) async {
+      final shell = await pump(tester);
+      final mac = defaultTargetPlatform == TargetPlatform.macOS;
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      if (!mac) await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      if (mac) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.keyY);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        expect(shell.sent.map(utf8.decode), ['\x19'], reason: '⌃Y is the shell\'s');
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      }
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyY);
+      await tester.sendKeyUpEvent(mac ? LogicalKeyboardKey.metaLeft : LogicalKeyboardKey.controlLeft);
+      if (!mac) await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pumpAndSettle();
+      expect(find.text('Command history'), findsOneWidget);
+      expect(find.text('git status --short'), findsOneWidget);
+    }, variant: const TargetPlatformVariant({TargetPlatform.macOS, TargetPlatform.linux}));
+
     testWidgets('the history panel finds a command and puts it at the prompt', (tester) async {
       final shell = _Shell('');
       shell._history.value = const CommandHistory([HistoryItem('git status --short', runs: 3), HistoryItem('make test', lastExit: 2)], repo: '/w/app');

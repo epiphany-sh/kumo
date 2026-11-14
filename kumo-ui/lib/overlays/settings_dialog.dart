@@ -285,7 +285,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             ),
             const _Row(
               label: 'Forget them',
-              desc: 'Every command remembered in this workspace. The history of one repository: right-click a terminal → Command history.',
+              desc: 'Every command remembered in this workspace. The history of one repository: ⌘Y in a terminal (Ctrl+Shift+Y on Windows and Linux).',
               control: _ForgetCommands(),
             ),
           ]),
@@ -299,6 +299,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             _KbdRow('Close pane', ['⌘', 'W']),
             _KbdRow('Previous command you ran', ['⌘', '↑']),
             _KbdRow('Next command you ran', ['⌘', '↓']),
+            _KbdRow('Command history', ['⌘', 'Y']),
             _KbdRow('Show / hide side panel', ['⌥', '⌘', 'B']),
           ]),
           ('Workspace', const [
