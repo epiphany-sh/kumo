@@ -164,7 +164,7 @@ impl ProfileOpener {
                 git: Arc::new(git.clone()),
                 store: Arc::new(SqliteWorkspaceStore::open(&db)?),
                 finder: Arc::new(FsRepoFinder::new(home)),
-                watcher: Arc::new(NotifyWatcher),
+                watcher: Arc::new(NotifyWatcher::for_git()),
                 location: WorktreeLocation::new(home),
             })
             .await?,
@@ -197,7 +197,7 @@ impl ProfileOpener {
                 store: task_store,
                 secrets: Arc::clone(&secrets),
                 connectors,
-                watcher: Arc::new(NotifyWatcher),
+                watcher: Arc::new(NotifyWatcher::default()),
             },
             TaskTiming::default(),
         )
@@ -338,7 +338,7 @@ impl ProfileOpener {
             ChangesPorts {
                 git: Arc::new(git.clone()),
                 files: Arc::new(LocalFileStore),
-                watcher: Arc::new(NotifyWatcher),
+                watcher: Arc::new(NotifyWatcher::for_git()),
             },
             Arc::clone(&workspace),
         ));
