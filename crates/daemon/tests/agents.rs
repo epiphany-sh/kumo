@@ -1,5 +1,6 @@
 //! `Agents` service end to end with fake agent CLIs (shell scripts on a
 //! PATH of their own), real PTYs and real worktrees.
+// Unix only: the fake CLIs are POSIX sh scripts made runnable with a mode bit.
 #![cfg(unix)]
 
 mod common;

@@ -23,6 +23,10 @@ pub struct PtyProcess {
     pub master: Box<dyn PtyMaster>,
     pub child: Box<dyn PtyChild>,
     pub killer: Box<dyn PtyKiller>,
+    /// The PTY asks the terminal where its cursor is (`ESC[6n`) and holds
+    /// the program until it's told (ConPTY): the session answers while no
+    /// client is attached.
+    pub holds_for_cursor: bool,
 }
 
 impl fmt::Debug for PtyProcess {

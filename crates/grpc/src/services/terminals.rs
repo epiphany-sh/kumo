@@ -80,7 +80,12 @@ impl pb::terminals_server::Terminals for TerminalsGrpc {
             .attach(&id, target.replay_scrollback)
             .map_err(status_from)?;
 
-        tokio::spawn(forward_input(session, inbound));
+        // A client that can answer the terminal, while it's attached.
+        let client = session.client();
+        tokio::spawn(async move {
+            forward_input(session, inbound).await;
+            drop(client);
+        });
         let outbound = output
             .into_stream()
             .map(|event| Ok(terminal_output_to(event)));

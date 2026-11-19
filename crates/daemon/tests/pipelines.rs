@@ -1,6 +1,5 @@
 //! `Pipelines` end to end, over real gRPC and a real repository. Never
 //! reaches a CI provider: the branch is unpushed or there's no token.
-#![cfg(unix)]
 
 mod common;
 

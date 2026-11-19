@@ -15,7 +15,7 @@ use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
 use super::{
     AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PlainPaths, PrivateFiles,
     ProcessTrees, Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals,
-    StatusLineHook, TerminalShells, process_tree, windows_processes,
+    StatusLineHook, TerminalShell, TerminalShells, process_tree, windows_processes,
 };
 
 /// The child gets a console nobody sees.
@@ -258,10 +258,11 @@ impl AppFolders for Windows {
 }
 
 impl TerminalShells for Windows {
-    /// cmd.exe and PowerShell aren't covered, and a Git Bash would be
-    /// handed Windows paths to its scripts.
-    fn shell_integration() -> bool {
-        false
+    /// PowerShell only. cmd.exe has no hook before a command runs, nor
+    /// its status in `PROMPT`, so it can't mark one; and a Git Bash would
+    /// be handed Windows paths to its scripts.
+    fn integrated_shells() -> &'static [TerminalShell] {
+        &[TerminalShell::PowerShell]
     }
 }
 

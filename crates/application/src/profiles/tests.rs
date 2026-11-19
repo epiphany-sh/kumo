@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -14,6 +14,12 @@ use super::{OpenProfile, ProfileBundle, ProfileService};
 struct MemoryStore {
     saved: Mutex<Option<Vec<Profile>>>,
     removed: Mutex<Vec<ProfileId>>,
+    /// How many removals fail before one works, as a file still open
+    /// fails them on Windows.
+    busy_removals: AtomicU32,
+    failing_saves: AtomicBool,
+    /// Folders marked as being deleted (and not removed yet).
+    marked: Mutex<Vec<ProfileId>>,
 }
 
 impl ProfileStore for MemoryStore {
@@ -21,10 +27,40 @@ impl ProfileStore for MemoryStore {
         Ok(self.saved.lock().unwrap().clone())
     }
     fn save(&self, profiles: &[Profile]) -> Result<(), ProfileError> {
+        if self.failing_saves.load(Ordering::SeqCst) {
+            return Err(ProfileError::Storage("profiles.json: disk full".into()));
+        }
         *self.saved.lock().unwrap() = Some(profiles.to_vec());
         Ok(())
     }
+    fn mark_deleted(&self, id: &ProfileId) -> Result<(), ProfileError> {
+        self.marked.lock().unwrap().push(id.clone());
+        Ok(())
+    }
+    fn unmark_deleted(&self, id: &ProfileId) -> Result<(), ProfileError> {
+        self.marked.lock().unwrap().retain(|m| m != id);
+        Ok(())
+    }
+    fn sweep_deleted(&self, listed: &[ProfileId]) -> Vec<ProfileId> {
+        let marked = std::mem::take(&mut *self.marked.lock().unwrap());
+        let mut left = Vec::new();
+        for id in marked {
+            if listed.contains(&id) {
+                self.marked.lock().unwrap().push(id);
+            } else if self.remove_data(&id).is_err() {
+                self.marked.lock().unwrap().push(id.clone());
+                left.push(id);
+            }
+        }
+        left
+    }
     fn remove_data(&self, id: &ProfileId) -> Result<(), ProfileError> {
+        let busy = self.busy_removals.load(Ordering::SeqCst);
+        if busy > 0 {
+            self.busy_removals.store(busy - 1, Ordering::SeqCst);
+            return Err(ProfileError::Storage("kumo.db: in use".into()));
+        }
+        self.marked.lock().unwrap().retain(|m| m != id);
         self.removed.lock().unwrap().push(id.clone());
         Ok(())
     }
@@ -36,6 +72,8 @@ struct FakeBundle {
     id: String,
     running: AtomicU32,
     closed: AtomicU32,
+    /// How long closing it takes.
+    close_takes: Duration,
     worktrees_dir: Mutex<String>,
     agents: Mutex<Vec<String>>,
 }
@@ -52,7 +90,8 @@ impl ProfileBundle for FakeBundle {
     }
     fn close(&self) -> BoxFuture<'_, ()> {
         self.closed.fetch_add(1, Ordering::SeqCst);
-        Box::pin(async {})
+        let takes = self.close_takes;
+        Box::pin(async move { tokio::time::sleep(takes).await })
     }
     fn copy_agents_from<'a>(&'a self, source: &'a Self) -> BoxFuture<'a, Result<(), ProfileError>> {
         let copied = source.agents.lock().unwrap().clone();
@@ -65,6 +104,10 @@ impl ProfileBundle for FakeBundle {
 struct FakeOpener {
     opened: AtomicU32,
     forgotten: Mutex<Vec<String>>,
+    /// How long closing the bundles it opens takes.
+    close_takes: Mutex<Duration>,
+    /// How many times a profile other than the default was read closed.
+    stats_read: AtomicU32,
 }
 
 impl OpenProfile<FakeBundle> for FakeOpener {
@@ -73,6 +116,7 @@ impl OpenProfile<FakeBundle> for FakeOpener {
         let bundle = FakeBundle {
             id: profile.id.to_string(),
             agents: Mutex::new(vec![format!("agent of {}", profile.id)]),
+            close_takes: *self.close_takes.lock().unwrap(),
             ..FakeBundle::default()
         };
         Box::pin(async move {
@@ -80,7 +124,10 @@ impl OpenProfile<FakeBundle> for FakeOpener {
             Ok(bundle)
         })
     }
-    fn stats(&self, _profile: &Profile) -> ProfileActivity {
+    fn stats(&self, profile: &Profile) -> ProfileActivity {
+        if !profile.is_default() {
+            self.stats_read.fetch_add(1, Ordering::SeqCst);
+        }
         ProfileActivity {
             namespaces: 7,
             ..ProfileActivity::default()
@@ -282,6 +329,86 @@ async fn delete_closes_the_open_bundle_and_forgets_it() {
         s.service.resolve(Some("workspace-1")).await.err(),
         Some(ProfileError::NotFound("workspace-1".into()))
     );
+}
+
+/// What the closed profile ran lets go of its files a moment later.
+#[tokio::test]
+async fn delete_waits_for_the_profile_s_files_to_be_let_go() {
+    let s = setup();
+    s.service.create("Workspace 1", "", None).await.unwrap();
+    s.store.busy_removals.store(3, Ordering::SeqCst);
+    s.service.delete("workspace-1").await.unwrap();
+    assert_eq!(s.service.profiles().len(), 1);
+    assert_eq!(s.store.removed.lock().unwrap().len(), 1);
+}
+
+/// A list that can't be saved keeps the profile, and its data.
+#[tokio::test]
+async fn delete_keeps_the_data_when_the_list_cannot_be_saved() {
+    let s = setup();
+    s.service.create("Workspace 1", "", None).await.unwrap();
+    s.store.failing_saves.store(true, Ordering::SeqCst);
+    assert!(matches!(
+        s.service.delete("workspace-1").await,
+        Err(ProfileError::Storage(_))
+    ));
+    assert_eq!(s.service.profiles().len(), 2);
+    assert!(s.store.removed.lock().unwrap().is_empty());
+    assert!(s.opener.forgotten.lock().unwrap().is_empty());
+    // Not marked either: a later sweep would take a profile still kept.
+    assert!(s.store.marked.lock().unwrap().is_empty());
+
+    s.store.failing_saves.store(false, Ordering::SeqCst);
+    s.service.delete("workspace-1").await.unwrap();
+    assert_eq!(s.service.profiles().len(), 1);
+}
+
+/// A folder that can't go is left marked, and swept on the next load; a
+/// new profile of that name doesn't get it meanwhile.
+#[tokio::test]
+async fn a_folder_that_cannot_go_is_swept_later() {
+    let s = setup();
+    s.service.create("Workspace 1", "", None).await.unwrap();
+    s.store.busy_removals.store(u32::MAX, Ordering::SeqCst);
+    s.service.delete("workspace-1").await.unwrap();
+    assert_eq!(s.service.profiles().len(), 1);
+    let workspace_1 = ProfileId::parse("workspace-1").unwrap();
+    assert_eq!(
+        *s.store.marked.lock().unwrap(),
+        std::slice::from_ref(&workspace_1)
+    );
+    assert!(s.store.removed.lock().unwrap().is_empty());
+
+    let again = s.service.create("Workspace 1", "", None).await.unwrap();
+    assert_ne!(again.id, workspace_1);
+
+    s.store.busy_removals.store(0, Ordering::SeqCst);
+    ProfileService::load(s.store.clone(), Arc::new(FakeOpener::default())).unwrap();
+    assert_eq!(*s.store.removed.lock().unwrap(), [workspace_1]);
+}
+
+/// Nothing opens the profile while it's being deleted: not a request for
+/// it, not the activity of the list.
+#[tokio::test]
+async fn nothing_reopens_a_profile_being_deleted() {
+    let s = setup();
+    s.service.create("Workspace 1", "", None).await.unwrap();
+    s.service.resolve(Some("workspace-1")).await.unwrap();
+    *s.opener.close_takes.lock().unwrap() = Duration::from_millis(300);
+    let deleting = {
+        let service = Arc::clone(&s.service);
+        tokio::spawn(async move { service.delete("workspace-1").await })
+    };
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(s.service.resolve(Some("workspace-1")).await.is_err());
+    let views = s.service.list().await;
+    let deleted = views
+        .iter()
+        .find(|v| v.profile.id.as_str() == "workspace-1");
+    assert!(deleted.is_none_or(|v| v.activity.namespaces == 0));
+    deleting.await.unwrap().unwrap();
+    assert_eq!(s.opener.opened.load(Ordering::SeqCst), 1);
+    assert_eq!(s.opener.stats_read.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]

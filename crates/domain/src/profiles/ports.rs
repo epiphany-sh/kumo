@@ -8,6 +8,14 @@ pub trait ProfileStore: Send + Sync + 'static {
     /// Deletes a profile's data folder. Never the default profile's, which
     /// is Kumo's data folder itself.
     fn remove_data(&self, id: &ProfileId) -> Result<(), ProfileError>;
+    /// Marks a profile's data folder as being deleted, before the profile
+    /// is unlisted: a folder that outlives it is then known to be garbage.
+    fn mark_deleted(&self, id: &ProfileId) -> Result<(), ProfileError>;
+    /// Takes the mark back: the profile stays.
+    fn unmark_deleted(&self, id: &ProfileId) -> Result<(), ProfileError>;
+    /// Removes the marked folders of profiles not in `listed` (never an
+    /// unmarked one) and returns those still there (in use).
+    fn sweep_deleted(&self, listed: &[ProfileId]) -> Vec<ProfileId>;
 }
 
 /// An SSH key in `~/.ssh`. Kumo knows where it is, never what it holds.

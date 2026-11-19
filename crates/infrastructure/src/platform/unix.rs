@@ -8,7 +8,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
+use super::TerminalShell;
 use crate::process::run_with_timeout;
+
+/// zsh, bash and fish mark the commands run.
+pub(super) const INTEGRATED_SHELLS: &[TerminalShell] =
+    &[TerminalShell::Zsh, TerminalShell::Bash, TerminalShell::Fish];
 
 const MARK: &str = "__KUMO_PATH__";
 const SHELL_TIMEOUT: Duration = Duration::from_secs(5);

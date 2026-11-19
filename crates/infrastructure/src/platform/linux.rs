@@ -13,7 +13,7 @@ use keyring_core::{CredentialStore, Error as KeyringError};
 use super::{
     AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PlainPaths, PrivateFiles,
     ProcessTrees, Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals,
-    StatusLineHook, TerminalShells, unix,
+    StatusLineHook, TerminalShell, TerminalShells, unix,
 };
 
 pub struct Linux;
@@ -101,8 +101,8 @@ impl AppFolders for Linux {
 }
 
 impl TerminalShells for Linux {
-    fn shell_integration() -> bool {
-        true
+    fn integrated_shells() -> &'static [TerminalShell] {
+        unix::INTEGRATED_SHELLS
     }
 }
 

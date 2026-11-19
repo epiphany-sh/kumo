@@ -135,11 +135,22 @@ pub trait AgentHooks {
     fn status_line_hook() -> StatusLineHook;
 }
 
+/// A shell Kumo's integration covers (see `pty::shell_integration`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerminalShell {
+    Zsh,
+    Bash,
+    Fish,
+    /// `pwsh` and Windows PowerShell (`powershell`).
+    PowerShell,
+}
+
 /// The shells a terminal opens in.
 pub trait TerminalShells {
-    /// Whether the user's shell gets Kumo's integration (see
-    /// `pty::shell_integration`): zsh, bash and fish mark the commands run.
-    fn shell_integration() -> bool;
+    /// The shells that get Kumo's integration here (see
+    /// `pty::shell_integration`), so they mark the commands run; any other
+    /// starts as it is.
+    fn integrated_shells() -> &'static [TerminalShell];
 }
 
 /// Sign-ins other programs keep in the OS's own secret store (Claude
@@ -258,9 +269,9 @@ pub fn status_line_hook() -> StatusLineHook {
     Current::status_line_hook()
 }
 
-/// See [`TerminalShells::shell_integration`].
-pub fn shell_integration() -> bool {
-    Current::shell_integration()
+/// See [`TerminalShells::integrated_shells`].
+pub fn integrated_shells() -> &'static [TerminalShell] {
+    Current::integrated_shells()
 }
 
 /// See [`SavedSignIns::saved_secret`].

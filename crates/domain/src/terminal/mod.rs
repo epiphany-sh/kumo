@@ -3,6 +3,7 @@
 //! subscribers.
 
 mod batch_builder;
+mod cursor;
 mod error;
 mod event;
 mod exit_status;
@@ -20,6 +21,7 @@ mod status;
 mod text;
 
 pub use batch_builder::BatchBuilder;
+pub use cursor::{CURSOR_REQUEST, CursorRequests, Stripped};
 pub use error::TerminalError;
 pub use event::TerminalEvent;
 pub use exit_status::ExitStatus;

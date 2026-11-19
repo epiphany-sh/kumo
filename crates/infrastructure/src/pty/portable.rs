@@ -35,6 +35,9 @@ impl PtySystem for PortablePtySystem {
             }),
             child: Box::new(PortableChild(child)),
             killer: Box::new(PortableKiller { killer, pid }),
+            // portable-pty starts ConPTY inheriting the cursor, so it asks
+            // where the cursor is first and holds the program until told.
+            holds_for_cursor: cfg!(windows),
         })
     }
 }
@@ -121,10 +124,21 @@ struct PortableKiller {
 }
 
 impl PtyKiller for PortableKiller {
+    #[cfg(unix)]
     fn kill(&mut self) -> Result<(), TerminalError> {
         self.killer
             .kill()
             .map_err(|e| TerminalError::Io(e.to_string()))
+    }
+
+    /// portable-pty 0.9 turns `TerminateProcess`'s answer around on
+    /// Windows: its error (a stale last error) is the kill having worked,
+    /// and its Ok a kill that failed, mostly as the program had exited.
+    /// Neither is worth failing the close over.
+    #[cfg(not(unix))]
+    fn kill(&mut self) -> Result<(), TerminalError> {
+        let _ = self.killer.kill();
+        Ok(())
     }
 
     fn kill_tree(&mut self) -> Result<(), TerminalError> {
@@ -164,6 +178,7 @@ mod tests {
             master,
             mut child,
             mut killer,
+            ..
         } = PortablePtySystem.spawn(&spec).unwrap();
         // ConPTY asks where the cursor is, and holds the program until the
         // terminal answers.
@@ -191,6 +206,33 @@ mod tests {
         assert!(dir.path().join("marker").exists());
     }
 
+    /// Closing a terminal kills its program and says it went fine.
+    #[test]
+    fn killing_a_running_program_succeeds() {
+        let spec = LaunchSpec::new("ping")
+            .unwrap()
+            .with_args(["-n", "30", "127.0.0.1"]);
+        let PtyProcess {
+            mut reader,
+            writer: _writer,
+            master: _master,
+            mut child,
+            mut killer,
+            ..
+        } = PortablePtySystem.spawn(&spec).unwrap();
+        std::thread::spawn(move || {
+            let mut buffer = [0; 1024];
+            while let Ok(1..) = reader.read(&mut buffer) {}
+        });
+        assert_eq!(killer.kill(), Ok(()));
+        let (done, finished) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done.send(child.wait());
+        });
+        let status = finished.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert!(status.is_ok());
+    }
+
     /// What a shell in the terminal runs is its foreground, as a process
     /// group would tell on Unix; the shell itself while it waits.
     #[test]
@@ -206,6 +248,7 @@ mod tests {
             master,
             child: _child,
             mut killer,
+            ..
         } = PortablePtySystem.spawn(&spec).unwrap();
         let (typed, type_it) = mpsc::channel::<Vec<u8>>();
         std::thread::spawn(move || {

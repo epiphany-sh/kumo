@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
@@ -12,6 +12,9 @@ use tokio::sync::{OnceCell, watch};
 
 /// How often activity (agents, terminals) is re-read for watchers.
 const ACTIVITY_EVERY: Duration = Duration::from_secs(1);
+/// How long a deleted profile's folder is waited for: 2 s in all.
+const REMOVE_TRIES: u32 = 40;
+const REMOVE_RETRY: Duration = Duration::from_millis(50);
 
 /// What one profile runs: its stores and services. Isolation comes from
 /// here: a bundle only reaches its own profile's data.
@@ -58,6 +61,8 @@ pub struct ProfileService<B> {
     bundles: Mutex<HashMap<ProfileId, Slot<B>>>,
     /// Counts of closed profiles, read once (nothing changes them).
     stats: Mutex<HashMap<ProfileId, ProfileActivity>>,
+    /// Profiles being deleted: nothing opens them or reads their data.
+    deleting: Mutex<HashSet<ProfileId>>,
     windows: Arc<Windows>,
     /// Serializes registry changes.
     writes: tokio::sync::Mutex<()>,
@@ -89,12 +94,15 @@ impl<B: ProfileBundle> ProfileService<B> {
         };
         let mut profiles = profiles;
         profiles.sort_by_key(|p| p.position);
+        // Folders of profiles deleted while still in use.
+        sweep(store.as_ref(), &profiles);
         Ok(Self {
             store,
             opener,
             profiles: Mutex::new(profiles),
             bundles: Mutex::default(),
             stats: Mutex::default(),
+            deleting: Mutex::default(),
             windows: Arc::new(Windows::default()),
             writes: tokio::sync::Mutex::new(()),
             activity_every: ACTIVITY_EVERY,
@@ -114,10 +122,17 @@ impl<B: ProfileBundle> ProfileService<B> {
 
     /// The bundle of the profile a request names (`None` or empty: the
     /// default one, for clients from before profiles). Opens it the first
-    /// time.
+    /// time. A profile being deleted is gone already.
     pub async fn resolve(&self, id: Option<&str>) -> Result<Arc<B>, ProfileError> {
         let profile = self.find(id)?;
-        let slot = Arc::clone(lock(&self.bundles).entry(profile.id.clone()).or_default());
+        let gone = || ProfileError::NotFound(profile.id.to_string());
+        let slot = {
+            let mut bundles = lock(&self.bundles);
+            if self.is_deleting(&profile.id) {
+                return Err(gone());
+            }
+            Arc::clone(bundles.entry(profile.id.clone()).or_default())
+        };
         let bundle = slot
             .get_or_try_init(|| async {
                 let bundle = self.opener.open(&profile).await?;
@@ -125,7 +140,16 @@ impl<B: ProfileBundle> ProfileService<B> {
                 Ok::<_, ProfileError>(Arc::new(bundle))
             })
             .await?;
+        // Its deletion started while it opened: what it started goes too.
+        if self.is_deleting(&profile.id) || self.find(Some(profile.id.as_str())).is_err() {
+            bundle.close().await;
+            return Err(gone());
+        }
         Ok(Arc::clone(bundle))
+    }
+
+    fn is_deleting(&self, id: &ProfileId) -> bool {
+        lock(&self.deleting).contains(id)
     }
 
     /// Every profile with its activity, in switcher order.
@@ -186,7 +210,11 @@ impl<B: ProfileBundle> ProfileService<B> {
         let profile = {
             let _write = self.writes.lock().await;
             let mut profiles = self.profiles();
-            let id = ProfileId::from_name(name, |id| profiles.iter().any(|p| &p.id == id));
+            // A deleted profile's folder still there isn't a new one's.
+            let leftovers = sweep(self.store.as_ref(), &profiles);
+            let id = ProfileId::from_name(name, |id| {
+                profiles.iter().any(|p| &p.id == id) || leftovers.contains(id)
+            });
             let position = u32::try_from(profiles.len()).unwrap_or(u32::MAX);
             let profile = Profile::new(id, name, color, position, Timestamp::now())?;
             profiles.push(profile.clone());
@@ -243,19 +271,54 @@ impl<B: ProfileBundle> ProfileService<B> {
         if self.windows.count(&profile.id) > 0 {
             return Err(ProfileError::InUse(profile.id.to_string()));
         }
+        // From here nothing opens it again (see `resolve`, `activity`).
+        let _deleting = Deleting::start(&self.deleting, &profile.id);
         if let Some(bundle) = self.open_bundle(&profile.id) {
             bundle.close().await;
         }
         lock(&self.bundles).remove(&profile.id);
         lock(&self.stats).remove(&profile.id);
+        // Marked before it's unlisted: a folder that outlives the profile
+        // is known to be garbage, and swept later.
+        self.store.mark_deleted(&profile.id)?;
+        // Unlisted next: a list that can't be saved keeps the profile, and
+        // its data, unmarked (a later sweep would take it otherwise).
         profiles.retain(|p| p.id != profile.id);
-        self.commit(profiles)?;
-        // Leftover tokens are harmless under a name no profile uses; the
-        // folder goes anyway.
+        if let Err(error) = self.commit(profiles) {
+            if let Err(unmark) = self.store.unmark_deleted(&profile.id) {
+                tracing::warn!(profile = %profile.id, error = %unmark, "deletion mark left behind");
+            }
+            return Err(error);
+        }
+        // Leftover tokens are harmless under a name no profile uses.
         if let Err(error) = self.opener.forget(&profile) {
             tracing::warn!(profile = %profile.id, %error, "keychain tokens left behind");
         }
-        self.store.remove_data(&profile.id)
+        if let Err(error) = self.remove_data_once_released(&profile.id).await {
+            tracing::warn!(
+                profile = %profile.id,
+                %error,
+                "deleted profile's folder left behind, removed on a later start"
+            );
+        }
+        Ok(())
+    }
+
+    /// Removes the profile's folder. What the closed bundle ran lets go
+    /// of its database a moment later (its tasks end on their own), and
+    /// Windows can't delete a file still open: tries again for a while.
+    async fn remove_data_once_released(&self, id: &ProfileId) -> Result<(), ProfileError> {
+        let mut tries = 0;
+        loop {
+            match self.store.remove_data(id) {
+                Err(ProfileError::Storage(error)) if tries < REMOVE_TRIES => {
+                    tracing::debug!(profile = %id, %error, "profile folder busy, trying again");
+                    tries += 1;
+                    tokio::time::sleep(REMOVE_RETRY).await;
+                }
+                result => return result,
+            }
+        }
     }
 
     /// The profile `id` names (None or empty: the default one).
@@ -286,11 +349,17 @@ impl<B: ProfileBundle> ProfileService<B> {
         if let Some(stats) = lock(&self.stats).get(&profile.id) {
             return *stats;
         }
+        // Its data is going: never opened to count it.
+        if self.is_deleting(&profile.id) {
+            return ProfileActivity::default();
+        }
         let (opener, closed) = (Arc::clone(&self.opener), profile.clone());
         let stats = tokio::task::spawn_blocking(move || opener.stats(&closed))
             .await
             .unwrap_or_default();
-        lock(&self.stats).insert(profile.id.clone(), stats);
+        if !self.is_deleting(&profile.id) {
+            lock(&self.stats).insert(profile.id.clone(), stats);
+        }
         stats
     }
 
@@ -355,4 +424,33 @@ impl Drop for Window {
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Removes the folders of deleted profiles that outlived them (see
+/// [`ProfileStore::mark_deleted`]); the ids of those still in use.
+fn sweep(store: &dyn ProfileStore, listed: &[Profile]) -> HashSet<ProfileId> {
+    let listed: Vec<ProfileId> = listed.iter().map(|p| p.id.clone()).collect();
+    store.sweep_deleted(&listed).into_iter().collect()
+}
+
+/// A profile being deleted, until dropped.
+struct Deleting<'a> {
+    deleting: &'a Mutex<HashSet<ProfileId>>,
+    id: ProfileId,
+}
+
+impl<'a> Deleting<'a> {
+    fn start(deleting: &'a Mutex<HashSet<ProfileId>>, id: &ProfileId) -> Self {
+        lock(deleting).insert(id.clone());
+        Self {
+            deleting,
+            id: id.clone(),
+        }
+    }
+}
+
+impl Drop for Deleting<'_> {
+    fn drop(&mut self) {
+        lock(self.deleting).remove(&self.id);
+    }
 }
