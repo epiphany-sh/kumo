@@ -4,6 +4,7 @@ import 'dart:io' show File, Platform, Process, ProcessException, ProcessStartMod
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/widgets.dart' show SingleActivator;
 
+import '../updates.dart';
 import 'key_combo.dart';
 import 'linux.dart';
 import 'macos.dart';
@@ -139,6 +140,11 @@ abstract class HostOs {
   /// else (Sparkle on macOS) or the helper couldn't start. [start] and
   /// [exit] stand in for `dart:io` in tests.
   Future<bool> relaunchAfterExit({int? pid, String? exe, ProcessStarter start = Process.start, void Function(int code) exit = io.exit}) async => false;
+
+  /// New versions of Kumo here: none by default. [stopDaemon] runs before
+  /// Kumo quits to install or relaunch; [autoUpdate] is Settings ›
+  /// General › "Download updates automatically", for an updater that reads it.
+  AppUpdates updates({Future<void> Function()? stopDaemon, bool Function()? autoUpdate}) => AppUpdates();
 
   // Window.
 

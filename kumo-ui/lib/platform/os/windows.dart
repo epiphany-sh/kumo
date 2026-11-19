@@ -4,6 +4,8 @@ import 'dart:io' show Platform, Process, ProcessException, ProcessStartMode;
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 
 import '../channel.dart';
+import '../updates.dart';
+import '../updates_windows.dart';
 import 'host_os.dart';
 
 /// Windows.
@@ -160,6 +162,12 @@ class WindowsOs extends HostOs {
     exit(0);
     return true;
   }
+
+  /// Kumo's own updater ([WindowsUpdates]): GitHub releases, signed zips
+  /// and the zip's `install.ps1`.
+  @override
+  AppUpdates updates({Future<void> Function()? stopDaemon, bool Function()? autoUpdate}) =>
+      WindowsUpdates(config: UpdateConfig.fromEnvironment(env), stopDaemon: stopDaemon, autoUpdate: autoUpdate);
 
   /// Windows 11: Mica. Windows 10: Acrylic (known drag lag on Win10).
   @override

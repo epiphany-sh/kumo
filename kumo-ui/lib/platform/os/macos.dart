@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart' show SingleActivator;
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 
 import '../channel.dart';
+import '../updates.dart';
 import 'host_os.dart';
 import 'key_combo.dart';
 
@@ -90,6 +91,11 @@ class MacOs extends HostOs {
       return 'macOS couldn’t open another Kumo window: ${e.message}';
     }
   }
+
+  /// Sparkle, in the macOS runner: it checks and downloads by itself, so
+  /// [autoUpdate] isn't read here.
+  @override
+  AppUpdates updates({Future<void> Function()? stopDaemon, bool Function()? autoUpdate}) => SparkleUpdates(stopDaemon: stopDaemon);
 
   /// NSVisualEffectView via flutter_acrylic/macos_window_utils, full-size
   /// content view with a transparent unified toolbar so the traffic lights

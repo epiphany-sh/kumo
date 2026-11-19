@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/app/kumo_app.dart';
 import 'package:kumo_ui/platform/os/host_os.dart';
+import 'package:kumo_ui/platform/os/key_combo.dart';
 import 'package:kumo_ui/platform/os/windows.dart';
 import 'package:kumo_ui/platform/updates.dart';
 
@@ -24,6 +25,22 @@ class _Updates extends AppUpdates {
 
   @override
   Future<void> installAndRelaunch() async => installs++;
+}
+
+/// An updater Settings can ask to check (Windows).
+class _CheckingUpdates extends AppUpdates {
+  var checks = 0;
+
+  @override
+  bool get canCheck => true;
+
+  @override
+  Future<void> check() async {
+    checks++;
+    setStatus(const UpdateChecking());
+  }
+
+  void finish(UpdateStatus status) => setStatus(status);
 }
 
 void main() {
@@ -69,6 +86,40 @@ void main() {
     updates.download('0.2.1');
     await tester.pumpAndSettle();
     expect(find.text('Kumo 0.2.1 is ready'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  Future<void> openSettings(WidgetTester tester, AppUpdates updates) async {
+    tester.view.physicalSize = const Size(1440, 960);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(KumoApp(state: AppState(demoWallpaper: true, updates: updates)));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Settings (${AppKeys.settings.label})'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  testWidgets('Settings › General checks for updates by hand where Kumo can, and says how it went', (tester) async {
+    final updates = _CheckingUpdates();
+    await openSettings(tester, updates);
+    expect(find.text('Check for Updates…'), findsOneWidget);
+    expect(find.text(describeUpdateStatus(const UpdateIdle())), findsOneWidget);
+
+    await tester.tap(find.text('Check for Updates…'));
+    await tester.pump();
+    expect(updates.checks, 1);
+    expect(find.text('Checking…'), findsOneWidget);
+
+    updates.finish(const UpdateReady('0.9.0'));
+    await tester.pump();
+    expect(find.text('Kumo 0.9.0 is ready: restart to install it.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Settings › General has no update check where the OS updater checks by itself', (tester) async {
+    await openSettings(tester, _Updates());
+    expect(find.text('Check for Updates…'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

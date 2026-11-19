@@ -9,6 +9,8 @@ import 'package:kumo_ui/platform/os/host_os.dart';
 import 'package:kumo_ui/platform/os/linux.dart';
 import 'package:kumo_ui/platform/os/macos.dart';
 import 'package:kumo_ui/platform/os/windows.dart';
+import 'package:kumo_ui/platform/updates.dart';
+import 'package:kumo_ui/platform/updates_windows.dart';
 
 /// The url opener as (program, args) with the args as a plain list, so
 /// `expect` compares them by value.
@@ -340,6 +342,35 @@ void main() {
       expect(DaemonDiscovery.defaultPath(), r'C:\L\kumo\daemon.json');
       debugHostOs = MacOs(const {});
       expect(Preferences.defaultFile(), isNull);
+    });
+  });
+
+  group('updates', () {
+    test('Sparkle on macOS, Kumo’s own on Windows, none on Linux', () {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final mac = MacOs(const {}).updates();
+      final windows = WindowsOs(const {}).updates();
+      final linux = LinuxOs(const {}).updates();
+      addTearDown(() {
+        mac.dispose();
+        windows.dispose();
+        linux.dispose();
+      });
+      expect(mac, isA<SparkleUpdates>());
+      expect(mac.canCheck, isFalse, reason: 'Sparkle checks by itself');
+      expect(windows, isA<WindowsUpdates>());
+      expect(windows.canCheck, isFalse, reason: 'a debug build never updates itself');
+      expect(linux.runtimeType, AppUpdates);
+      expect(linux.canCheck, isFalse);
+    });
+
+    test('Windows reads "Download updates automatically" each time it would check', () {
+      var auto = true;
+      final updates = WindowsOs(const {}).updates(autoUpdate: () => auto) as WindowsUpdates;
+      addTearDown(updates.dispose);
+      expect(updates.autoUpdate(), isTrue);
+      auto = false;
+      expect(updates.autoUpdate(), isFalse);
     });
   });
 }

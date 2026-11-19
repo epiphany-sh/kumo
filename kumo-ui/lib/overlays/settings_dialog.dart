@@ -11,6 +11,7 @@ import '../platform/app_icon.dart';
 import '../platform/pasteboard.dart';
 import '../platform/os/host_os.dart';
 import '../platform/os/key_combo.dart';
+import '../platform/updates.dart';
 import '../terminal/command_marks.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
@@ -214,6 +215,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             _toggle(s, 'general.reopen', 'Reopen terminals and agents from last session', 'kumod keeps them running while the app is closed.', true),
           ]),
           ('Updates & privacy', [
+            if (s.updates.canCheck) _UpdateCheckRow(updates: s.updates),
             _seg(s, 'general.channel', 'Update channel', null, const ['Stable', 'Beta'], 'Stable'),
             _toggle(s, 'general.autoUpdate', 'Download updates automatically', null, true),
             _toggle(s, 'general.crash', 'Send anonymous crash reports', 'No code, prompts or file contents ever leave your machine this way.', true),
@@ -637,6 +639,26 @@ class _Row extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// "Check for Updates…", with where checking is under it; only where Kumo
+/// checks by itself ([AppUpdates.canCheck]).
+class _UpdateCheckRow extends StatelessWidget {
+  const _UpdateCheckRow({required this.updates});
+  final AppUpdates updates;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<UpdateStatus>(
+        valueListenable: updates.status,
+        builder: (context, status, _) {
+          final busy = status is UpdateChecking || status is UpdateDownloading;
+          return _Row(
+            label: 'Updates',
+            desc: describeUpdateStatus(status),
+            control: KButton(label: 'Check for Updates…', height: 30, fontSize: 12.5, onTap: busy ? null : () => updates.check().ignore()),
+          );
+        },
+      );
 }
 
 class _ToggleRow extends StatelessWidget {
