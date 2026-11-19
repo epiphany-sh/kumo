@@ -25,9 +25,13 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
   /// [adopt] may hand over a terminal the daemon already runs instead.
   ///
   /// With [rememberCommands], the daemon remembers what it runs (Settings →
-  /// Terminal).
-  GrpcTerminalSurface.shell(this._engine, {String? directory, this.onExit, Future<TerminalInfo?> Function()? adopt, this.rememberCommands = true})
-      : title = _shellName,
+  /// Terminal). [shell] is the one chosen there (see [HostOs.resolveShell]).
+  GrpcTerminalSurface.shell(KumoEngine engine, {String? directory, String? shell, void Function(int exitCode)? onExit, Future<TerminalInfo?> Function()? adopt, bool rememberCommands = true})
+      : this._shell(engine, hostOs.resolveShell(shell), directory: directory, onExit: onExit, adopt: adopt, rememberCommands: rememberCommands);
+
+  GrpcTerminalSurface._shell(this._engine, String program, {String? directory, this.onExit, Future<TerminalInfo?> Function()? adopt, this.rememberCommands = true})
+      : title = _nameOf(program),
+        _program = program,
         cwd = _shorten(directory),
         _directory = directory,
         _existingId = null,
@@ -51,6 +55,7 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
         cwd = _shorten(directory),
         _directory = directory,
         _existingId = terminalId,
+        _program = program,
         rememberCommands = false,
         _adopt = null {
     _run();
@@ -59,6 +64,9 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
   final KumoEngine _engine;
   final String? _existingId;
   final String? _directory;
+
+  /// The shell a new terminal starts (unused when re-attaching).
+  final String _program;
 
   /// Whether closing the pane kills the process (shells) or only detaches.
   final bool killOnClose;
@@ -185,9 +193,11 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
     _render();
   }
 
-  static String get _shellPath => hostOs.shell;
-
-  static String get _shellName => _shellPath.split(Platform.pathSeparator).last;
+  /// `/bin/zsh` → zsh, `pwsh.exe` → pwsh: the pane header's name.
+  static String _nameOf(String program) {
+    final name = program.split(RegExp(r'[\\/]')).last;
+    return name.toLowerCase().endsWith('.exe') ? name.substring(0, name.length - 4) : name;
+  }
 
   static String get _home => hostOs.home ?? '';
 
@@ -240,8 +250,8 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
     final env = Platform.environment;
     final directory = _directory;
     return OpenRequest(
-      program: _shellPath,
-      args: hostOs.shellArgs,
+      program: _program,
+      args: hostOs.shellArgsFor(_program),
       cwd: directory == null || directory.isEmpty ? _home : directory,
       env: {
         'TERM_PROGRAM': 'kumo',

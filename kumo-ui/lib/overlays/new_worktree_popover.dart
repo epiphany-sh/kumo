@@ -6,6 +6,7 @@ import '../data/mock_data.dart';
 import '../data/models.dart';
 import '../data/tasks_source.dart';
 import '../data/workspace_source.dart';
+import '../platform/os/key_combo.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/floating_panel.dart';
@@ -376,7 +377,7 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
         Expanded(child: Text('Opens a terminal tab in the new path', style: sans(11, color: p.text3))),
         KButton(label: 'Cancel', onTap: widget.onClose),
         const SizedBox(width: 8),
-        KButton.primary(label: 'Create', onTap: _create, trailing: Kbd('⌘↩', color: p.accText, background: const Color(0x26000000))),
+        KButton.primary(label: 'Create', onTap: _create, trailing: Kbd(AppKeys.submitOnButton.label, color: p.accText, background: const Color(0x26000000))),
       ]),
     ];
   }

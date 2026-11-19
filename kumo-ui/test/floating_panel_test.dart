@@ -2,10 +2,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/app/kumo_app.dart';
+import 'package:kumo_ui/platform/os/host_os.dart';
+import 'package:kumo_ui/platform/os/macos.dart';
 import 'package:kumo_ui/widgets/glass.dart';
 
 void main() {
   testWidgets('New worktree opens centered, drags by its header and stays in the window', (tester) async {
+    // The footer as on macOS: the test font is wider than a real one.
+    debugHostOs = MacOs();
+    addTearDown(() => debugHostOs = null);
     const window = Size(1440, 900);
     tester.view.physicalSize = window;
     tester.view.devicePixelRatio = 1;

@@ -13,6 +13,7 @@ import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
+import '../platform/os/host_os.dart';
 import 'task_detail/markdown.dart';
 import 'task_labels.dart';
 import 'task_visuals.dart';

@@ -15,6 +15,7 @@ import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
+import '../platform/os/host_os.dart';
 import 'agent_files.dart';
 import 'pr_description_dialog.dart' show AgentPickChip, prAgentHome, prAgentTarget;
 
@@ -168,7 +169,7 @@ class _ResolveCommentsDialogState extends State<ResolveCommentsDialog> {
     });
     if (!s.agents.live) return _makeUp(chosen);
     final home = prAgentHome(s, widget.source.repo, pr);
-    if (home == null) return _fail('${widget.source.repo.name} has no checkout on this Mac.');
+    if (home == null) return _fail('${widget.source.repo.name} has no checkout on ${hostOs.machineName}.');
     final files = _files = AgentFileWatch.fresh('${widget.source.repo.name}-${pr.id}-threads', 'json');
     final run = await s.agents.start(
       providerId: _provider ?? s.agents.connected.firstOrNull?.id,
@@ -461,7 +462,7 @@ class _ResolveCommentsDialogState extends State<ResolveCommentsDialog> {
       _Phase.loading || _Phase.setup => !s.agents.live
           ? 'Without Kumo’s engine the agent’s work is made up, to show the flow.'
           : home == null
-              ? '${widget.source.repo.name} has no checkout on this Mac.'
+              ? '${widget.source.repo.name} has no checkout on ${hostOs.machineName}.'
               : 'It works in ${home.$2 ? 'the PR’s worktree' : 'the main checkout (it switches to ${pr.branch})'}: it commits but doesn’t push, and nothing is posted until you say so.',
       _Phase.working => 'Read-only on $_host until you approve.',
       _Phase.done => '${commits.isEmpty ? 'No commits' : '${commits.length} ${commits.length == 1 ? 'commit' : 'commits'} on ${pr.branch}, not pushed'}. Questions only get a reply.'

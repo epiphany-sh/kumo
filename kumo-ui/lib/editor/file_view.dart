@@ -7,6 +7,7 @@ import '../app/app_state.dart';
 import '../data/changes.dart';
 import '../data/mock_project.dart' show GitStatus;
 import '../data/worktree_changes.dart';
+import '../platform/os/key_combo.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/change_scrollbar.dart';
 import '../widgets/controls.dart';
@@ -307,7 +308,7 @@ class _FileViewState extends State<FileView> {
                 ],
                 const Spacer(),
                 if (dirty) ...[
-                  Tooltip(message: 'Save (⌘S)', child: KButton(label: 'Save', height: 24, fontSize: 11.5, onTap: _save)),
+                  Tooltip(message: 'Save (${AppKeys.save.label})', child: KButton(label: 'Save', height: 24, fontSize: 11.5, onTap: _save)),
                   const SizedBox(width: 8),
                 ],
                 if (file != null || (_markdown && !deleted)) ...[

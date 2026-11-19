@@ -21,6 +21,7 @@ import '../data/shell_activity_source.dart';
 import '../data/models.dart';
 import '../editor/file_buffers.dart';
 import '../platform/app_icon.dart';
+import '../platform/os/key_combo.dart';
 import '../platform/updates.dart';
 import '../terminal/command_marks.dart';
 import '../theme/palette.dart';
@@ -28,18 +29,21 @@ import '../widgets/usage_meter.dart';
 import 'preferences.dart';
 
 enum KumoView {
-  terminal('Terminal', '⌘1'),
+  terminal('Terminal'),
   // The full editor: opened from a file (no side-nav entry; files of the
   // current worktree live in its Files tab).
-  files('Files', '', inNav: false),
-  agents('Agents', '⌘2'),
-  tasks('Tasks', '⌘3'),
-  git('Git', '⌘4'),
-  docs('Docs', '⌘5');
+  files('Files', inNav: false),
+  agents('Agents'),
+  tasks('Tasks'),
+  git('Git'),
+  docs('Docs');
 
-  const KumoView(this.label, this.shortcut, {this.inNav = true});
+  const KumoView(this.label, {this.inNav = true});
   final String label;
-  final String shortcut;
+
+  /// Its key in the side-nav (⌘1…⌘5 on macOS, Ctrl+1…5 elsewhere); ''
+  /// when it has none.
+  String get shortcut => inNav ? AppKeys.view(nav.indexOf(this)).label : '';
 
   /// Listed in the side-nav (and reachable with ⌘1…⌘5).
   final bool inNav;

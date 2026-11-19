@@ -478,7 +478,7 @@ class _CommitSheetState extends State<CommitSheet> {
     if (s.agents.connected.isEmpty) return _say('Connect an agent in Settings › AI agents first.');
     final main = s.worktreesOf(widget.source.repo).where((w) => w.isMain).firstOrNull;
     final dir = main == null ? widget.source.repo.path : s.workspace.absolutePathOf(main);
-    if (dir == null) return _say('${widget.source.repo.name} has no checkout on this Mac.');
+    if (dir == null) return _say('${widget.source.repo.name} has no checkout on ${hostOs.machineName}.');
     final run = await s.agents.start(
       worktreePath: dir,
       prompt: commitExplainPrompt(repoName: widget.source.repo.name, sha: k.sha, subject: k.subject),

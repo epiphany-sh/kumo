@@ -9,6 +9,9 @@ import 'package:kumo_ui/app/kumo_app.dart';
 import 'package:kumo_ui/app/preferences.dart';
 import 'package:kumo_ui/overlays/settings_dialog.dart';
 import 'package:kumo_ui/overlays/your_lines_settings.dart';
+import 'package:kumo_ui/platform/os/host_os.dart';
+import 'package:kumo_ui/platform/os/key_combo.dart';
+import 'package:kumo_ui/platform/os/macos.dart';
 import 'package:kumo_ui/terminal/ansi_screen.dart';
 import 'package:kumo_ui/terminal/command_marks.dart';
 import 'package:kumo_ui/terminal/terminal_surface.dart';
@@ -209,7 +212,7 @@ void main() {
     final state = AppState(mode: KumoThemeMode.dark, demoWallpaper: true);
     await tester.pumpWidget(KumoApp(state: state));
     await tester.pump();
-    await tester.tap(find.byTooltip('Settings (⌘,)'));
+    await tester.tap(find.byTooltip('Settings (${AppKeys.settings.label})'));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(SettingsDialog), findsOneWidget);
     await tester.tap(find.text('Appearance'));
@@ -257,6 +260,8 @@ void main() {
   });
 
   testWidgets('⌘↑ / ⌘↓ go from command to command, and paint without errors', (tester) async {
+    debugHostOs = MacOs();
+    addTearDown(() => debugHostOs = null);
     final shell = _Shell();
     await tester.pumpWidget(KumoTheme(
       mode: KumoThemeMode.dark,

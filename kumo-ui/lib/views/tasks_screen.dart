@@ -12,6 +12,8 @@ import '../shell/screen_chrome.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/kicons.dart';
+import '../platform/os/host_os.dart';
+import '../platform/os/key_combo.dart';
 import 'task_detail.dart';
 import 'task_labels.dart';
 import 'task_visuals.dart';
@@ -247,9 +249,9 @@ class _TasksScreenState extends State<TasksScreen> {
     final mineCount = all.where((t) => t.mine).length;
     final inWorktrees = all.where((t) => linked.contains(t.id)).length;
     final subtitle = sources.isEmpty
-        ? 'Connect where your tasks live: Obsidian, Bear, GitHub, Jira, Todoist'
+        ? 'Connect where your tasks live: ${TaskSourceKind.offeredNames}'
         : '${sources.map((x) => x.name).join(', ')} · ${_syncNote(sources)}';
-    final keysHint = _selected == null ? '⌘K finds a ticket by key or title' : '↑ ↓ switch tickets · Esc ${_expanded ? 'back to the panel' : 'closes'}';
+    final keysHint = _selected == null ? '${AppKeys.search.label} finds a ticket by key or title' : '↑ ↓ switch tickets · Esc ${_expanded ? 'back to the panel' : 'closes'}';
 
     final board = Section(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
@@ -488,7 +490,7 @@ class _SearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     return Tooltip(
-      message: 'Filters this board. ⌘K searches every ticket.',
+      message: 'Filters this board. ${AppKeys.search.label} searches every ticket.',
       waitDuration: const Duration(milliseconds: 800),
       child: Container(
         height: 30,
@@ -587,12 +589,12 @@ class _Empty extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Wrap(spacing: 6, children: [for (final k in TaskSourceKind.values) SourceTile(k.badge, size: 30, tooltip: k.label)]),
+          Wrap(spacing: 6, children: [for (final k in TaskSourceKind.offered) SourceTile(k.badge, size: 30, tooltip: k.label)]),
           const SizedBox(height: 14),
           Text('Bring your tasks in', style: sans(16, weight: FontWeight.w600, color: c.text)),
           const SizedBox(height: 6),
           Text(
-            'Checkboxes from an Obsidian vault or Bear, GitHub issues, Jira or Todoist. Kumo keeps them on this Mac, so the board opens instantly, and can start a worktree with an agent from any of them.',
+            'Checkboxes from an Obsidian vault${hostOs.hasBear ? ' or Bear' : ''}, GitHub issues, Jira or Todoist. Kumo keeps them on ${hostOs.machineName}, so the board opens instantly, and can start a worktree with an agent from any of them.',
             textAlign: TextAlign.center,
             style: sans(12.5, color: c.text2, height: 1.5),
           ),

@@ -7,6 +7,7 @@ import '../app/app_state.dart';
 import '../data/agents_source.dart';
 import '../data/models.dart' show AgentStatus;
 import '../overlays/new_agent_dialog.dart';
+import '../platform/os/key_combo.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
@@ -345,7 +346,7 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
                   maxLines: 6,
                   style: sans(12.5, color: c.text, height: 1.45),
                   cursorColor: c.acc,
-                  decoration: InputDecoration.collapsed(hintText: 'What should the agent do with this? (⌘↩ sends)', hintStyle: sans(12.5, color: c.text3, height: 1.45)),
+                  decoration: InputDecoration.collapsed(hintText: 'What should the agent do with this? (${AppKeys.submit.label} sends)', hintStyle: sans(12.5, color: c.text3, height: 1.45)),
                 ),
               ),
               const SizedBox(height: 8),
@@ -454,10 +455,10 @@ class _AskAgentLayerState extends State<AskAgentLayer> {
                     label: _sending
                         ? 'Sending…'
                         : (target == null
-                            ? 'Start agent ⌘↩'
+                            ? 'Start agent ${AppKeys.submit.label}'
                             : (target.run != null && target.state == AgentStatus.needsYou
-                                ? 'Queue for ${target.name} ⌘↩'
-                                : (target.terminal != null && !_enter ? 'Type it in ${target.terminal!.terminalTitle} ⌘↩' : 'Send to ${target.name} ⌘↩'))),
+                                ? 'Queue for ${target.name} ${AppKeys.submit.label}'
+                                : (target.terminal != null && !_enter ? 'Type it in ${target.terminal!.terminalTitle} ${AppKeys.submit.label}' : 'Send to ${target.name} ${AppKeys.submit.label}'))),
                     height: 30,
                     fontSize: 12.5,
                     onTap: canSend ? () => _send(s, targets) : null,
@@ -483,7 +484,7 @@ class _Pill extends StatelessWidget {
     return KPressable(
       onTap: onTap,
       semanticLabel: 'Ask an agent about the selection',
-      tooltip: 'Ask an agent about the selection (⌘L)',
+      tooltip: 'Ask an agent about the selection (${AppKeys.askAgent.label})',
       builder: (context, hover, focus) => Container(
         height: 28,
         padding: const EdgeInsets.only(left: 8, right: 10),
@@ -493,7 +494,7 @@ class _Pill extends StatelessWidget {
           const SizedBox(width: 6),
           Text('Ask agent', style: sans(12, weight: FontWeight.w600, color: c.text)),
           const SizedBox(width: 6),
-          Text('⌘L', style: sans(11.5, color: c.text3)),
+          Text(AppKeys.askAgent.label, style: sans(11.5, color: c.text3)),
         ]),
       ),
     );

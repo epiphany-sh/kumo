@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
 import '../data/models.dart';
+import '../platform/os/key_combo.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
@@ -242,7 +243,7 @@ class _NamespaceDialogState extends State<NamespaceDialog> {
         KButton.primary(
           label: _isNew ? 'Create namespace' : 'Save namespace',
           onTap: _save,
-          trailing: Kbd('⌘↩', color: p.accText, background: const Color(0x33FFFFFF)),
+          trailing: Kbd(AppKeys.submitOnButton.label, color: p.accText, background: const Color(0x33FFFFFF)),
         ),
       ]),
     ];

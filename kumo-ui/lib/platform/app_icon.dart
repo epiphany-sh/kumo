@@ -46,7 +46,7 @@ class AppIcons {
 
   /// Whether you can make one from an image: the runner opens a file
   /// dialog and makes it (macOS).
-  static bool get canMakeOwn => supported && Pasteboard.canChoose;
+  static bool get canMakeOwn => supported && Pasteboard.runnerChooses;
 
   /// Whether Settings has a choice to offer.
   static bool get choosable => canMakeOwn || (supported && AppIcon.values.where((i) => i.preview != null).length > 1);

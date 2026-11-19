@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../platform/os/key_combo.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
@@ -200,7 +200,7 @@ class _HistoryPanelState extends State<HistoryPanel> {
                   Row(children: [
                     Expanded(
                       child: Text(
-                        _note ?? '↵ puts it at the prompt · ${_mac ? '⌘' : 'Ctrl+'}↵ runs it',
+                        _note ?? '↵ puts it at the prompt · ${AppKeys.runFromHistory.label} runs it',
                         style: sans(11.5, color: c.text3),
                       ),
                     ),
@@ -214,8 +214,6 @@ class _HistoryPanelState extends State<HistoryPanel> {
       },
     );
   }
-
-  static bool get _mac => defaultTargetPlatform == TargetPlatform.macOS;
 
   Widget _row(HistoryItem item, bool picked) {
     final c = context.c;

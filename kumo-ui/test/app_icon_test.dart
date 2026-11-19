@@ -5,6 +5,7 @@ import 'package:kumo_ui/app/kumo_app.dart';
 import 'package:kumo_ui/app/preferences.dart';
 import 'package:kumo_ui/overlays/settings_dialog.dart';
 import 'package:kumo_ui/platform/app_icon.dart';
+import 'package:kumo_ui/platform/os/key_combo.dart';
 import 'package:kumo_ui/platform/os/host_os.dart';
 import 'package:kumo_ui/platform/os/linux.dart';
 import 'package:kumo_ui/platform/os/macos.dart';
@@ -67,7 +68,7 @@ void main() {
       final state = AppState(mode: KumoThemeMode.dark, demoWallpaper: true);
       await tester.pumpWidget(KumoApp(state: state));
       await tester.pump();
-      await tester.tap(find.byTooltip('Settings (⌘,)'));
+      await tester.tap(find.byTooltip('Settings (${AppKeys.settings.label})'));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.byType(SettingsDialog), findsOneWidget);
       await tester.tap(find.text('Appearance'));

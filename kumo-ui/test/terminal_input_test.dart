@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kumo_ui/platform/os/host_os.dart';
+import 'package:kumo_ui/platform/os/macos.dart';
+import 'package:kumo_ui/platform/os/windows.dart';
 import 'package:kumo_ui/terminal/ansi_screen.dart';
 import 'package:kumo_ui/terminal/terminal_keys.dart';
 import 'package:kumo_ui/terminal/terminal_surface.dart';
@@ -163,6 +166,31 @@ void main() {
     expect(shell.sent, isEmpty);
   });
 
+  testWidgets('off macOS the pane keys (Ctrl+Shift+T / W / D / E) are left to the app; Ctrl+T is the shell’s', (tester) async {
+    debugHostOs = WindowsOs(const {});
+    addTearDown(() => debugHostOs = null);
+    final shell = _FakeShell();
+    await tester.pumpWidget(KumoTheme(
+      mode: KumoThemeMode.dark,
+      palette: KumoPalette.dark,
+      terminalPalette: KumoPalette.dark,
+      child: MaterialApp(home: Scaffold(body: TerminalCanvas(surface: shell, active: true))),
+    ));
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    for (final key in [LogicalKeyboardKey.keyT, LogicalKeyboardKey.keyW, LogicalKeyboardKey.keyD, LogicalKeyboardKey.keyE]) {
+      await tester.sendKeyEvent(key);
+    }
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    expect(shell.sent, isEmpty);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    expect(shell.sent, [
+      [0x14],
+    ]);
+  });
+
   Future<void> holding(WidgetTester tester, List<LogicalKeyboardKey> modifiers, LogicalKeyboardKey key) async {
     for (final m in modifiers) {
       await tester.sendKeyDownEvent(m);
@@ -280,6 +308,8 @@ void main() {
     });
 
     testWidgets('⌘V pastes copied files or a screenshot as paths, and text otherwise', (tester) async {
+      debugHostOs = MacOs();
+      addTearDown(() => debugHostOs = null);
       final shell = await _pumpShell(tester);
       shell.feed('\x1b[?2004h');
       onClipboard = ['/Users/me/Desktop/Screen Shot.png'];

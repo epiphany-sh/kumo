@@ -1,13 +1,15 @@
 import 'dart:io' show Platform, Process, ProcessException;
 
+import 'package:flutter/widgets.dart' show SingleActivator;
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 
 import '../channel.dart';
 import 'host_os.dart';
+import 'key_combo.dart';
 
 /// macOS.
 class MacOs extends HostOs {
-  MacOs([super.env]);
+  MacOs([super.env, super.exists]);
 
   @override
   String? get home => env['HOME'] ?? env['USERPROFILE'];
@@ -33,16 +35,46 @@ class MacOs extends HostOs {
   String get shell => env['SHELL'] ?? '/bin/zsh';
 
   @override
-  List<String> get shellArgs => const ['-l'];
+  List<String> shellArgsFor(String program) => const ['-l'];
+
+  /// The usual ones that are installed, and `$SHELL` when it's another.
+  /// Looked up once.
+  @override
+  late final List<ShellChoice> shellChoices = [
+    for (final path in {'/bin/zsh', '/bin/bash', '/opt/homebrew/bin/fish', shell})
+      if (path == shell || programExists(path)) (value: path, label: path),
+  ];
 
   @override
-  List<String> get shellChoices => const ['/bin/zsh', '/bin/bash', '/opt/homebrew/bin/fish'];
+  bool get commandKey => true;
 
   @override
-  String get defaultShellChoice => '/bin/zsh';
+  String get altKeyName => '⌥';
+
+  @override
+  SingleActivator keyActivator(KeyCombo combo) => commandKeyActivator(combo);
+
+  /// Glyphs in Apple's order (⌃ ⌥ ⇧ ⌘), then the key.
+  @override
+  List<String> keyCaps(KeyCombo combo) => [if (combo.control) '⌃', if (combo.alt) '⌥', if (combo.shift) '⇧', if (combo.primary) '⌘', combo.keyName ?? combo.macKey ?? macKeyGlyphs[combo.key] ?? plainKeyName(combo.key)];
+
+  @override
+  String keyLabel(KeyCombo combo) => keyCaps(combo).join();
 
   @override
   (String, List<String>) openUrlCommand(String url) => ('open', [url]);
+
+  @override
+  (String, List<String>) revealCommand(String path) => ('open', ['-R', path]);
+
+  @override
+  String get revealLabel => 'Reveal in Finder';
+
+  @override
+  String get machineName => 'this Mac';
+
+  @override
+  bool get hasBear => true;
 
   @override
   Future<String?> openWorkspaceWindow(String id) async {

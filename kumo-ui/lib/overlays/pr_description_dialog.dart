@@ -18,6 +18,7 @@ import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
+import '../platform/os/host_os.dart';
 
 /// Where an agent works on [pr]: its branch's worktree (true), else the
 /// repository's main checkout (false), as an absolute path. Null when the
@@ -191,7 +192,7 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
     });
     if (!s.agents.live) return _makeUp();
     final home = prAgentHome(s, widget.source.repo, pr);
-    if (home == null) return _fail('${widget.source.repo.name} has no checkout on this Mac for an agent to read.');
+    if (home == null) return _fail('${widget.source.repo.name} has no checkout on ${hostOs.machineName} for an agent to read.');
     final dir = Directory('${Directory.systemTemp.path}/kumo-pr');
     try {
       dir.createSync(recursive: true);
@@ -569,7 +570,7 @@ class _PrDescriptionDialogState extends State<PrDescriptionDialog> {
             !live
                 ? 'Without Kumo’s engine this draft is made up, to show the flow.'
                 : home == null
-                    ? '${widget.source.repo.name} has no checkout on this Mac.'
+                    ? '${widget.source.repo.name} has no checkout on ${hostOs.machineName}.'
                     : '$providerName reads ${home.$2 ? 'the PR’s worktree' : 'the branch from the main checkout'} in a new session. Nothing changes on $_host until you update the PR.',
             style: sans(11, color: c.text3, height: 1.4),
           ),
