@@ -1111,6 +1111,7 @@ dependencies = [
  "tracing",
  "ureq",
  "windows-native-keyring-store",
+ "windows-sys",
  "winreg",
 ]
 

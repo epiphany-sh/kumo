@@ -130,8 +130,13 @@ pub(super) fn owner_only_dir(dir: &Path) -> std::io::Result<()> {
 }
 
 /// Claude Code runs status lines with `sh`.
-pub(super) fn sh_status_line() -> bool {
-    true
+pub(super) fn status_line_hook() -> super::StatusLineHook {
+    super::StatusLineHook::Sh
+}
+
+/// The PTY's foreground process group tells (see `pty::portable`).
+pub(super) fn foreground(_root: u32) -> Option<u32> {
+    None
 }
 
 /// Ctrl-C or SIGTERM.

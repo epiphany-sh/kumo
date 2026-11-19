@@ -29,7 +29,7 @@ pub use info::{TerminalActivity, TerminalInfo};
 pub use launch_spec::LaunchSpec;
 pub use marks::{CommandMarks, CommandRun, FinishedCommand, RunningCommand, ShellActivity};
 pub use output::{OutputBatch, OutputChunk};
-pub use ports::{PtyChild, PtyKiller, PtyMaster, PtyProcess, PtySystem};
+pub use ports::{ForegroundProbe, PtyChild, PtyKiller, PtyMaster, PtyProcess, PtySystem};
 pub use replay_buffer::ReplayBuffer;
 pub use shell_integration::{NoShellIntegration, ShellIntegration};
 pub use size::TerminalSize;

@@ -199,10 +199,12 @@ impl TerminalSession {
     }
 
     /// The process in its foreground (what was typed in its shell, or the
-    /// shell); None once it exited or where the OS can't tell.
+    /// shell); None once it exited or where the OS can't tell. May block
+    /// (see [`kumo_domain::terminal::ForegroundProbe`]): call it off the
+    /// async runtime. The PTY isn't held meanwhile.
     pub fn foreground(&self) -> Option<u32> {
-        let master = self.master.lock().unwrap_or_else(PoisonError::into_inner);
-        master.as_ref().and_then(|m| m.foreground())
+        let probe = lock(&self.master).as_ref().map(|m| m.foreground())?;
+        probe()
     }
 
     /// Kills the process and what it started. For agents, whose tools are
@@ -224,5 +226,101 @@ impl TerminalSession {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .kill()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Read, Write};
+    use std::sync::mpsc as std_mpsc;
+    use std::time::Duration;
+
+    use kumo_domain::terminal::{ExitStatus, ForegroundProbe, PtyChild};
+
+    use super::*;
+
+    /// Blocks until dropped: a PTY that stays open.
+    struct Open(std_mpsc::Receiver<()>);
+
+    impl Read for Open {
+        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+            let _ = self.0.recv();
+            Ok(0)
+        }
+    }
+
+    impl PtyChild for Open {
+        fn wait(&mut self) -> Result<ExitStatus, TerminalError> {
+            let _ = self.0.recv();
+            Ok(ExitStatus::UNKNOWN)
+        }
+    }
+
+    struct Sink;
+
+    impl Write for Sink {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct NoKill;
+
+    impl PtyKiller for NoKill {
+        fn kill(&mut self) -> Result<(), TerminalError> {
+            Ok(())
+        }
+        fn kill_tree(&mut self) -> Result<(), TerminalError> {
+            Ok(())
+        }
+    }
+
+    /// Its foreground waits for a resize to go through first.
+    struct SlowMaster(Arc<Mutex<Option<std_mpsc::Receiver<()>>>>);
+
+    impl PtyMaster for SlowMaster {
+        fn resize(&self, _: TerminalSize) -> Result<(), TerminalError> {
+            Ok(())
+        }
+        fn foreground(&self) -> ForegroundProbe {
+            let resized = lock(&self.0).take();
+            Box::new(move || {
+                resized?.recv_timeout(Duration::from_secs(5)).ok()?;
+                Some(42)
+            })
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn reading_the_foreground_does_not_hold_the_pty() {
+        let (_keep_reader, reader) = std_mpsc::channel();
+        let (_keep_child, child) = std_mpsc::channel();
+        let (resized, on_resize) = std_mpsc::channel();
+        let process = PtyProcess {
+            reader: Box::new(Open(reader)),
+            writer: Box::new(Sink),
+            master: Box::new(SlowMaster(Arc::new(Mutex::new(Some(on_resize))))),
+            child: Box::new(Open(child)),
+            killer: Box::new(NoKill),
+        };
+        let spec = LaunchSpec::new("sh").unwrap();
+        let session = TerminalSession::start(
+            TerminalId::generate(),
+            &spec,
+            process,
+            &SessionConfig::default(),
+            None,
+        );
+        let reading = {
+            let session = Arc::clone(&session);
+            std::thread::spawn(move || session.foreground())
+        };
+        std::thread::sleep(Duration::from_millis(100));
+        session.resize(TerminalSize::new(80, 24).unwrap()).unwrap();
+        resized.send(()).unwrap();
+        assert_eq!(reading.join().unwrap(), Some(42));
     }
 }

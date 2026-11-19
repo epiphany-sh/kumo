@@ -1,8 +1,8 @@
 use portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 
 use kumo_domain::terminal::{
-    ExitStatus, LaunchSpec, PtyChild, PtyKiller, PtyMaster, PtyProcess, PtySystem, TerminalError,
-    TerminalSize,
+    ExitStatus, ForegroundProbe, LaunchSpec, PtyChild, PtyKiller, PtyMaster, PtyProcess, PtySystem,
+    TerminalError, TerminalSize,
 };
 
 /// [`PtySystem`] backed by the platform's native PTY (`openpty` on Unix,
@@ -29,7 +29,10 @@ impl PtySystem for PortablePtySystem {
         Ok(PtyProcess {
             reader,
             writer,
-            master: Box::new(PortableMaster(pair.master)),
+            master: Box::new(PortableMaster {
+                master: pair.master,
+                pid,
+            }),
             child: Box::new(PortableChild(child)),
             killer: Box::new(PortableKiller { killer, pid }),
         })
@@ -64,20 +67,37 @@ fn spawn_error(error: impl std::fmt::Display) -> TerminalError {
     TerminalError::Spawn(error.to_string())
 }
 
-struct PortableMaster(Box<dyn MasterPty + Send>);
+struct PortableMaster {
+    master: Box<dyn MasterPty + Send>,
+    /// The program the PTY started, for [`PtyMaster::foreground`] where
+    /// the PTY has no process groups.
+    #[cfg_attr(unix, allow(dead_code))]
+    pid: Option<u32>,
+}
 
 impl PtyMaster for PortableMaster {
     fn resize(&self, size: TerminalSize) -> Result<(), TerminalError> {
-        self.0
+        self.master
             .resize(pty_size(size))
             .map_err(|e| TerminalError::Io(e.to_string()))
     }
 
+    /// The foreground process group's leader, read right away (cheap).
     #[cfg(unix)]
-    fn foreground(&self) -> Option<u32> {
-        self.0
+    fn foreground(&self) -> ForegroundProbe {
+        let pid = self
+            .master
             .process_group_leader()
-            .and_then(|pid| u32::try_from(pid).ok())
+            .and_then(|pid| u32::try_from(pid).ok());
+        Box::new(move || pid)
+    }
+
+    /// ConPTY has no process groups: worked out from the processes, by
+    /// the probe.
+    #[cfg(not(unix))]
+    fn foreground(&self) -> ForegroundProbe {
+        let root = self.pid;
+        Box::new(move || crate::platform::terminal_foreground(root?))
     }
 }
 
@@ -169,5 +189,70 @@ mod tests {
         }
         drop(master);
         assert!(dir.path().join("marker").exists());
+    }
+
+    /// What a shell in the terminal runs is its foreground, as a process
+    /// group would tell on Unix; the shell itself while it waits.
+    #[test]
+    fn the_foreground_is_what_the_shell_runs() {
+        let dir = tempfile::tempdir().unwrap();
+        let spec = LaunchSpec::new("cmd.exe")
+            .unwrap()
+            .with_args(["/d", "/q"])
+            .with_cwd(Some(dir.path().to_path_buf()));
+        let PtyProcess {
+            mut reader,
+            mut writer,
+            master,
+            child: _child,
+            mut killer,
+        } = PortablePtySystem.spawn(&spec).unwrap();
+        let (typed, type_it) = mpsc::channel::<Vec<u8>>();
+        std::thread::spawn(move || {
+            let mut buffer = [0; 1024];
+            let mut seen = Vec::new();
+            while let Ok(read @ 1..) = reader.read(&mut buffer) {
+                seen.extend_from_slice(&buffer[..read]);
+                if seen.windows(4).any(|w| w == b"\x1b[6n") {
+                    seen.clear();
+                    let _ = writer.write_all(b"\x1b[1;1R");
+                }
+                while let Ok(text) = type_it.try_recv() {
+                    let _ = writer.write_all(&text);
+                }
+                let _ = writer.flush();
+            }
+        });
+        let wait_for = |what: &dyn Fn(Option<u32>) -> bool| {
+            let deadline = std::time::Instant::now() + Duration::from_secs(20);
+            loop {
+                let foreground = master.foreground()();
+                if what(foreground) || std::time::Instant::now() > deadline {
+                    return foreground;
+                }
+                // Typed text goes in when the reader wakes up: prod it.
+                let _ = typed.send(Vec::new());
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        };
+        let name = |pid: Option<u32>| {
+            pid.and_then(crate::platform::process).and_then(|p| {
+                p.exe
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_lowercase())
+            })
+        };
+
+        let shell = wait_for(&|pid| name(pid).as_deref() == Some("cmd.exe"));
+        assert_eq!(name(shell).as_deref(), Some("cmd.exe"));
+        typed.send(b"ping -n 60 127.0.0.1 >nul\r".to_vec()).unwrap();
+        let ping = wait_for(&|pid| name(pid).as_deref() == Some("ping.exe"));
+        let details = crate::platform::process(ping.unwrap()).unwrap();
+        assert_eq!(details.args[1..], ["-n", "60", "127.0.0.1"]);
+        assert_eq!(
+            crate::platform::canonical(&details.cwd),
+            crate::platform::canonical(dir.path())
+        );
+        let _ = killer.kill_tree();
     }
 }

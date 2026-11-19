@@ -20,6 +20,10 @@ use keyring_core::{CredentialStore, Error as KeyringError};
 #[cfg(unix)]
 mod unix;
 
+// Read by `windows.rs` only; tested on every OS.
+#[cfg_attr(not(windows), allow(dead_code))]
+mod process_tree;
+
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
@@ -32,6 +36,9 @@ use linux::Linux as Current;
 
 #[cfg(windows)]
 mod windows;
+#[cfg(windows)]
+#[allow(unsafe_code)]
+mod windows_processes;
 #[cfg(windows)]
 use windows::Windows as Current;
 
@@ -112,11 +119,20 @@ pub trait AppFolders {
     fn obsidian_settings(home: &Path) -> PathBuf;
 }
 
+/// The kind of status line command Kumo's usage hook for Claude Code is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatusLineHook {
+    /// POSIX `sh`, which Claude Code runs status lines with.
+    Sh,
+    /// A `powershell.exe` command that runs the same in every shell
+    /// Claude Code may run it with (Git Bash, PowerShell, cmd).
+    PowerShell,
+}
+
 /// What the agents' CLIs can run for Kumo.
 pub trait AgentHooks {
-    /// Whether Claude Code runs a POSIX `sh` status line command (Kumo's
-    /// usage hook is one).
-    fn sh_status_line() -> bool;
+    /// How Kumo's usage hook is written for Claude Code's status line.
+    fn status_line_hook() -> StatusLineHook;
 }
 
 /// The shells a terminal opens in.
@@ -148,6 +164,10 @@ pub struct RunningProcess {
 pub trait Processes {
     /// What `pid` runs and where; None when the OS can't tell.
     fn process(pid: u32) -> Option<RunningProcess>;
+    /// What a terminal that started `root` runs in its foreground, when
+    /// the terminal itself can't tell (no process groups); None when it
+    /// can, or `root` is gone.
+    fn foreground(root: u32) -> Option<u32>;
 }
 
 /// How the OS asks the daemon to stop.
@@ -233,9 +253,9 @@ pub fn obsidian_settings(home: &Path) -> PathBuf {
     Current::obsidian_settings(home)
 }
 
-/// See [`AgentHooks::sh_status_line`].
-pub fn sh_status_line() -> bool {
-    Current::sh_status_line()
+/// See [`AgentHooks::status_line_hook`].
+pub fn status_line_hook() -> StatusLineHook {
+    Current::status_line_hook()
 }
 
 /// See [`TerminalShells::shell_integration`].
@@ -266,6 +286,11 @@ pub fn kill_process_group(pid: u32) {
 /// See [`Processes::process`].
 pub fn process(pid: u32) -> Option<RunningProcess> {
     Current::process(pid)
+}
+
+/// See [`Processes::foreground`].
+pub fn terminal_foreground(root: u32) -> Option<u32> {
+    Current::foreground(root)
 }
 
 /// See [`Signals::shutdown`].

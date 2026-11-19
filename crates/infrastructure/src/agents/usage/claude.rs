@@ -25,6 +25,7 @@ use kumo_domain::time::Timestamp;
 use serde_json::{Map, Value, json};
 
 use super::claude_transcript::ClaudeTranscripts;
+use crate::platform::StatusLineHook;
 
 const SETTINGS: &str = "settings.json";
 const STATUS: &str = "status.json";
@@ -70,14 +71,18 @@ impl UsageSource for ClaudeStatusLine {
     }
 
     fn launch_args(&self, target: &UsageTarget) -> Result<Vec<String>, AgentError> {
-        // The hook is POSIX sh (see [`crate::platform::AgentHooks`]).
-        if !crate::platform::sh_status_line() {
-            return Ok(Vec::new());
-        }
         let dir = self.dir(&target.session_id);
-        std::fs::create_dir_all(&dir).map_err(io_error)?;
         let theirs = user_status_line(&self.config_dir);
-        let settings = settings_for(&dir, theirs);
+        // See [`crate::platform::AgentHooks`].
+        let settings = match crate::platform::status_line_hook() {
+            StatusLineHook::Sh => settings_for(&dir, theirs),
+            // Theirs can't be wrapped: it stays theirs, and no usage is read.
+            StatusLineHook::PowerShell => match powershell_settings_for(&dir, theirs) {
+                Some(settings) => settings,
+                None => return Ok(Vec::new()),
+            },
+        };
+        std::fs::create_dir_all(&dir).map_err(io_error)?;
         let path = dir.join(SETTINGS);
         std::fs::write(&path, settings.to_string()).map_err(io_error)?;
         Ok(vec!["--settings".into(), path.display().to_string()])
@@ -157,17 +162,28 @@ pub fn user_status_line(config_dir: &Path) -> Option<Map<String, Value>> {
 /// doesn't know: they tell when it's asking something while its prompt
 /// blinks.
 pub fn settings_for(dir: &Path, theirs: Option<Map<String, Value>>) -> Value {
+    settings_with(theirs, |command| Some(hook_command(dir, command))).unwrap_or_else(|| json!({}))
+}
+
+/// [`settings_for`] with the [PowerShell hook](powershell_hook_command);
+/// None when the user's status line can't be wrapped by it.
+pub fn powershell_settings_for(dir: &Path, theirs: Option<Map<String, Value>>) -> Option<Value> {
+    settings_with(theirs, |command| powershell_hook_command(dir, command))
+}
+
+fn settings_with(
+    theirs: Option<Map<String, Value>>,
+    hook: impl FnOnce(Option<&str>) -> Option<String>,
+) -> Option<Value> {
     let mut line = theirs.unwrap_or_default();
     let command = line
         .get("command")
         .and_then(Value::as_str)
         .map(str::to_owned);
+    let hook = hook(command.as_deref())?;
     line.insert("type".into(), json!("command"));
-    line.insert(
-        "command".into(),
-        json!(hook_command(dir, command.as_deref())),
-    );
-    json!({ "statusLine": line, "preferredNotifChannel": "iterm2" })
+    line.insert("command".into(), json!(hook));
+    Some(json!({ "statusLine": line, "preferredNotifChannel": "iterm2" }))
 }
 
 /// Saves stdin to `<dir>/status.json` (write, then rename, so a reader
@@ -195,6 +211,112 @@ const DEFAULT_LINE: &str = concat!(
     r#"sed -n -e 's/.*"display_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*"remaining_percentage"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1 · \2% context left/p' "#,
     r#"-e t -e 's/.*"display_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'"#,
 );
+
+/// [`hook_command`] for Windows, where Claude Code runs a status line
+/// with Git Bash or PowerShell, whichever it finds: `powershell.exe` with
+/// the script as `-EncodedCommand` (base64, which no shell reads, and no
+/// execution policy stops), the same in either, and in cmd. Theirs is
+/// piped the JSON with the shell's own `|`; None when it isn't
+/// [one command](one_command), which a pipe can't take whole: it stays
+/// as it is, and that session's usage isn't read.
+pub fn powershell_hook_command(dir: &Path, theirs: Option<&str>) -> Option<String> {
+    use base64::Engine;
+
+    if theirs.is_some_and(|command| !one_command(command)) {
+        return None;
+    }
+    let tmp = ps_quote(&dir.join(format!("{STATUS}.tmp")).display().to_string());
+    let status = ps_quote(&dir.join(STATUS).display().to_string());
+    let print = if theirs.is_some() {
+        PS_PASS_ON
+    } else {
+        PS_DEFAULT_LINE
+    };
+    let script = PS_SAVE.replace("@TMP@", &tmp).replace("@STATUS@", &status) + print;
+    let utf16: Vec<u8> = script.encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let encoded = base64::engine::general_purpose::STANDARD.encode(utf16);
+    let hook =
+        format!("powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand {encoded}");
+    Some(match theirs {
+        Some(command) => format!("{hook} | {command}"),
+        None => hook,
+    })
+}
+
+/// Whether `x | command` feeds all of `command` in Git Bash, PowerShell
+/// and cmd alike. `a; b`, `a && b`, `a || b` and `a & b` feed `a` alone,
+/// and no grouping does in all three (`( … )` is bash's and cmd's, but
+/// PowerShell takes no expression after a `|`). So: no line breaks, and
+/// no `;` outside quotes, nor `&` or `||` outside double quotes (cmd's
+/// only quotes). An escaped quote (`\"`, `` ` ``) or cmd's `^` could hide
+/// a separator in one shell and not in another: none either.
+fn one_command(command: &str) -> bool {
+    if command.contains(['\n', '\r', '`', '^']) || command.contains("\\\"") {
+        return false;
+    }
+    let (mut double, mut single) = (false, false);
+    let mut chars = command.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' if !single => double = !double,
+            '\'' if !double => single = !single,
+            ';' if !double && !single => return false,
+            '&' if !double => return false,
+            '|' if !double && chars.peek() == Some(&'|') => return false,
+            _ => {}
+        }
+    }
+    true
+}
+
+/// Reads stdin whole, as bytes, and saves it (write, then replace);
+/// errors ignored. Windows PowerShell 5.1 too: no `File.Move` overwrite,
+/// and a `$null` string is `""` (not a path) without `[NullString]`.
+const PS_SAVE: &str = "$ErrorActionPreference = 'SilentlyContinue'
+$ProgressPreference = 'SilentlyContinue'
+$m = New-Object System.IO.MemoryStream
+[Console]::OpenStandardInput().CopyTo($m)
+$b = $m.ToArray()
+try {
+  [IO.File]::WriteAllBytes(@TMP@, $b)
+  if ([IO.File]::Exists(@STATUS@)) { [IO.File]::Replace(@TMP@, @STATUS@, [NullString]::Value) }
+  else { [IO.File]::Move(@TMP@, @STATUS@) }
+} catch {}
+$o = [Console]::OpenStandardOutput()
+";
+
+/// The JSON, as read, for the user's status line.
+const PS_PASS_ON: &str = "$o.Write($b, 0, $b.Length)
+$o.Flush()
+";
+
+/// [`DEFAULT_LINE`]'s, as UTF-8 bytes (the console's code page would
+/// mangle the `·`).
+const PS_DEFAULT_LINE: &str = "$l = ''
+try {
+  $j = [Text.Encoding]::UTF8.GetString($b) | ConvertFrom-Json
+  $l = [string]$j.model.display_name
+  $r = $j.context_window.remaining_percentage
+  if ($l -and $null -ne $r) { $l = $l + ' · ' + [math]::Floor([double]$r) + '% context left' }
+} catch {}
+if ($l) { $t = [Text.Encoding]::UTF8.GetBytes($l + \"`n\"); $o.Write($t, 0, $t.Length) }
+$o.Flush()
+";
+
+/// Quotes for PowerShell: `'…'`, with each single quote (curly ones are
+/// quotes too) doubled.
+fn ps_quote(raw: &str) -> String {
+    let mut quoted = String::with_capacity(raw.len() + 2);
+    quoted.push('\'');
+    for c in raw.chars() {
+        if matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}') {
+            quoted.push(c);
+        }
+        quoted.push(c);
+    }
+    quoted.push('\'');
+    quoted
+}
 
 /// Quotes for POSIX sh: `'…'`, with `'` as `'\''`.
 pub fn sh_quote(raw: &str) -> String {
@@ -503,6 +625,188 @@ mod tests {
         );
     }
 
+    /// The script a PowerShell hook runs.
+    fn encoded_script(hook: &str) -> String {
+        use base64::Engine;
+        let encoded = hook
+            .split_whitespace()
+            .skip_while(|w| *w != "-EncodedCommand")
+            .nth(1)
+            .unwrap();
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .unwrap();
+        let units: Vec<u16> = bytes
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|p| u16::from_le_bytes(*p))
+            .collect();
+        String::from_utf16(&units).unwrap()
+    }
+
+    #[test]
+    fn the_powershell_hook_is_one_command_every_shell_runs_alike() {
+        let dir = Path::new(r"C:\Users\O'Brien ’x’\AppData\Roaming\kumo\agents\s1");
+        let hook = powershell_hook_command(dir, None).unwrap();
+        // Nothing a shell reads: a program, flags and base64.
+        assert!(
+            hook.starts_with("powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "),
+            "{hook}"
+        );
+        assert!(
+            hook.chars()
+                .all(|c| c.is_ascii_alphanumeric() || " .-+/=".contains(c)),
+            "{hook}"
+        );
+        // Paths in single quotes, every kind of single quote doubled.
+        let script = encoded_script(&hook);
+        let status = dir.join(STATUS).display().to_string();
+        let quoted = status.replace('\'', "''").replace('’', "’’");
+        assert!(script.contains(&format!("'{quoted}'")), "{script}");
+        assert!(script.contains("context left"), "Kumo's own line");
+
+        // Theirs gets the JSON through a pipe, the shell's own.
+        let theirs = powershell_hook_command(dir, Some("node C:/x/line.js # mine")).unwrap();
+        assert!(theirs.ends_with(" | node C:/x/line.js # mine"), "{theirs}");
+        assert!(!encoded_script(&theirs).contains("context left"));
+        // One on several lines can't be piped into as a whole.
+        assert_eq!(powershell_hook_command(dir, Some("a\nb")), None);
+        assert_eq!(powershell_hook_command(dir, Some("a\r\nb")), None);
+        // Nor one of several commands: `x | a; b` feeds `a` alone, and no
+        // grouping works in all of Git Bash, PowerShell and cmd.
+        for compound in [
+            "a; b",
+            "a && b",
+            "a || b",
+            "a & b",
+            "echo 'x' & b",
+            r#"a "x" ; b"#,
+            r#"a \"; b"#,
+            "a `; b",
+            "a ^& b",
+        ] {
+            assert_eq!(
+                powershell_hook_command(dir, Some(compound)),
+                None,
+                "{compound}"
+            );
+        }
+        // Separators quoted, or a pipe of theirs, are one command still.
+        for single in [
+            r#"node -e "a; b && c || d & e""#,
+            "bash -c 'a; b'",
+            "jq -r .model.display_name | head -c 20",
+            r"powershell -File C:\x\line.ps1",
+        ] {
+            let hook = powershell_hook_command(dir, Some(single)).unwrap();
+            assert!(hook.ends_with(&format!(" | {single}")), "{hook}");
+        }
+
+        let settings = powershell_settings_for(dir, None).unwrap();
+        assert_eq!(settings["statusLine"]["type"], "command");
+        assert_eq!(settings["preferredNotifChannel"], "iterm2");
+        let mut line = Map::new();
+        line.insert("command".into(), json!("a\nb"));
+        line.insert("padding".into(), json!(2));
+        assert_eq!(powershell_settings_for(dir, Some(line)), None);
+    }
+
+    /// Runs `command` as Claude Code may on Windows: through PowerShell,
+    /// cmd or Git Bash, with `input` on stdin.
+    #[cfg(windows)]
+    fn run_windows(shell: &str, command: &str, input: &str) -> Option<String> {
+        use std::io::Write;
+        use std::os::windows::process::CommandExt;
+        use std::process::{Command, Stdio};
+
+        let mut child = match shell {
+            "cmd" => {
+                let mut c = Command::new("cmd.exe");
+                c.raw_arg(format!("/d /s /c \"{command}\""));
+                c
+            }
+            "bash" => {
+                let bash = Path::new(r"C:\Program Files\Git\bin\bash.exe");
+                if !bash.exists() {
+                    return None;
+                }
+                let mut c = Command::new(bash);
+                c.args(["-c", command]);
+                c
+            }
+            _ => {
+                let mut c = Command::new("powershell.exe");
+                c.args(["-NoProfile", "-NonInteractive", "-Command", command]);
+                c
+            }
+        };
+        let mut child = child
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.as_bytes())
+            .unwrap();
+        let out = child.wait_with_output().unwrap();
+        assert!(
+            out.stderr.is_empty(),
+            "{shell}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        Some(String::from_utf8(out.stdout).unwrap())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_powershell_hook_saves_the_json_and_prints_a_line_in_every_shell() {
+        let base = tempfile::tempdir().unwrap();
+        let dir = base.path().join("it's a dir ’x’ & 100%");
+        std::fs::create_dir_all(&dir).unwrap();
+        let compact = r#"{"model":{"display_name":"Opus"},"context_window":{"remaining_percentage":59,"used_percentage":41},"rate_limits":{"five_hour":{"used_percentage":12}}}"#;
+        let own = powershell_hook_command(&dir, None).unwrap();
+        for shell in ["powershell", "cmd", "bash"] {
+            let _ = std::fs::remove_file(dir.join(STATUS));
+            let Some(printed) = run_windows(shell, &own, compact) else {
+                continue;
+            };
+            assert_eq!(printed, "Opus · 59% context left\n", "{shell}");
+            let saved = std::fs::read_to_string(dir.join(STATUS)).unwrap();
+            assert_eq!(saved.trim_end(), compact, "{shell}");
+            assert!(!dir.join("status.json.tmp").exists());
+            // Again, over the saved one.
+            let early = r#"{"model":{"display_name":"Opus"}}"#;
+            assert_eq!(
+                run_windows(shell, &own, early).unwrap(),
+                "Opus\n",
+                "{shell}"
+            );
+            assert_eq!(
+                std::fs::read_to_string(dir.join(STATUS))
+                    .unwrap()
+                    .trim_end(),
+                early
+            );
+        }
+
+        // Theirs reads the same JSON; its output is the line.
+        let theirs = powershell_hook_command(&dir, Some("findstr /c:display_name")).unwrap();
+        let printed = run_windows("cmd", &theirs, compact).unwrap();
+        assert_eq!(printed.trim_end(), compact);
+
+        // Saving fails (the folder is gone): the line still shows.
+        let gone = powershell_hook_command(&base.path().join("gone"), None).unwrap();
+        assert_eq!(
+            run_windows("powershell", &gone, compact).unwrap(),
+            "Opus · 59% context left\n"
+        );
+    }
+
     #[test]
     fn keeps_the_user_s_own_status_line_and_ignores_the_project_s() {
         let home = tempfile::tempdir().unwrap();
@@ -637,5 +941,48 @@ mod tests {
 
         source.forget(&target);
         assert!(!data.path().join("agents/s1").exists());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_windows_session_is_read_through_its_powershell_hook() {
+        let data = tempfile::tempdir().unwrap();
+        let home = tempfile::tempdir().unwrap();
+        let source = ClaudeStatusLine::new(&data.path().join("agents"), home.path());
+        let target = UsageTarget {
+            session_id: AgentSessionId::parse("s1").unwrap(),
+            worktree: home.path().to_owned(),
+            started_at: Timestamp::now(),
+            pid: None,
+        };
+        let args = source.launch_args(&target).unwrap();
+        assert_eq!(args[0], "--settings");
+        let settings: Value =
+            serde_json::from_str(&std::fs::read_to_string(&args[1]).unwrap()).unwrap();
+        let hook = settings["statusLine"]["command"].as_str().unwrap();
+        assert!(hook.starts_with("powershell.exe "), "{hook}");
+        assert_eq!(source.read(&target), None, "nothing reported yet");
+
+        run_windows("bash", hook, DOCS_EXAMPLE)
+            .or_else(|| run_windows("powershell", hook, DOCS_EXAMPLE))
+            .unwrap();
+        assert_eq!(source.read(&target).unwrap().model.as_deref(), Some("Opus"));
+        assert_eq!(source.read(&target), None, "unchanged since");
+
+        // Theirs on several lines stays as it is: no hook, no usage.
+        std::fs::create_dir_all(home.path()).unwrap();
+        std::fs::write(
+            home.path().join("settings.json"),
+            r#"{"statusLine":{"type":"command","command":"a\nb"}}"#,
+        )
+        .unwrap();
+        assert_eq!(source.launch_args(&target).unwrap(), Vec::<String>::new());
+        // So does one of several commands.
+        std::fs::write(
+            home.path().join("settings.json"),
+            r#"{"statusLine":{"type":"command","command":"a && b"}}"#,
+        )
+        .unwrap();
+        assert_eq!(source.launch_args(&target).unwrap(), Vec::<String>::new());
     }
 }

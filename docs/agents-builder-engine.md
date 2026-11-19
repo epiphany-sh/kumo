@@ -230,8 +230,9 @@ message AskResponse { string text = 1; }
 ## 6. CLIs started by hand (`terminalAgents`, `sendToTerminal`)
 
 The daemon runs every terminal's PTY, so it can see what's in the foreground:
-- `tcgetpgrp(master)` gives the process group; read the leader's executable with `proc_pidpath` on macOS or `/proc/<pid>/exe` on Linux. Skip Windows for now.
-- Match it against the known providers' programs. Claude Code runs as `node …/claude`, so also look at argv[1]'s basename.
+- `tcgetpgrp(master)` gives the process group; read the leader's executable with `proc_pidpath` on macOS or `/proc/<pid>/exe` on Linux.
+- Windows (ConPTY) has no process groups. One Toolhelp32 snapshot per check (run off the async runtime, without holding the PTY) gives who started whom, and start times are read only for the terminal's own tree; the foreground is the newest program the terminal's shell started, going through shells it started (`cmd /c claude.cmd`), never that program's own children (an agent's tools). See `platform/process_tree.rs`. The executable, command line (`NtQueryInformationProcess`) and current directory (read from the process parameters) come from `platform/windows_processes.rs`, the crate's only unsafe code.
+- Match it against the known providers' programs. Claude Code runs as `node …/claude`, so also look at argv[1]'s basename. On Windows (an executable path with `\`) names are compared without `.exe`/`.cmd`/`.bat`/`.ps1` and ignoring case. npm's shims run `node` on the package's own script (`…\node_modules\@anthropic-ai\claude-code\cli.js`), so a script inside a known CLI's own npm package (`AgentPreset::packages`, by full name) matches it too, on every OS; other packages (`claude-code-router`, `claude-flow`) never do.
 - For a match, report a `TerminalAgent`:
   ```proto
   message TerminalAgent { string terminal_id = 1; string provider_id = 2; string program = 3; string cwd = 4; AgentState state = 5; bool busy = 6; }

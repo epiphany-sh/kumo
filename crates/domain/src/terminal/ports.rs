@@ -31,13 +31,19 @@ impl fmt::Debug for PtyProcess {
     }
 }
 
+/// Reads which process is in a terminal's foreground: the leader of its
+/// foreground process group, or None where the OS can't tell. It may
+/// block (on Windows it lists every process), so it runs apart from the
+/// PTY, off the async runtime.
+pub type ForegroundProbe = Box<dyn FnOnce() -> Option<u32> + Send>;
+
 /// Master side of the PTY. Dropping it releases the pseudo-terminal.
 pub trait PtyMaster: Send {
     fn resize(&self, size: TerminalSize) -> Result<(), TerminalError>;
-    /// The process in the foreground (the leader of the terminal's
-    /// foreground process group); None where the OS can't tell.
-    fn foreground(&self) -> Option<u32> {
-        None
+    /// How to read the process in the foreground. Cheap itself, as it's
+    /// asked holding the PTY: the [probe](ForegroundProbe) does the work.
+    fn foreground(&self) -> ForegroundProbe {
+        Box::new(|| None)
     }
 }
 
