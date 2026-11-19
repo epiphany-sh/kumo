@@ -6,7 +6,8 @@
 # The zip holds a Kumo folder: Kumo.exe (the UI), kumod.exe next to it (where
 # the UI looks for it) and the VC++ runtime both need, which a fresh Windows
 # may not have, and install.ps1 to update it. RELEASE_REPO (owner/name)
-# goes into install.ps1.
+# goes into install.ps1 and, with the version and Sparkle's public key (the
+# one macOS embeds), into the app, which checks its updates' .sig with it.
 set -euo pipefail
 
 version=${1:?usage: packaging/windows-zip.sh X.Y.Z}
@@ -14,9 +15,11 @@ version=${1:?usage: packaging/windows-zip.sh X.Y.Z}
 build=${BUILD:-$(git rev-list --count HEAD)}
 repo=${RELEASE_REPO:-epiphany-sh/kumo}
 app=kumo-ui/build/windows/x64/runner/Release
+update_key=$(cat packaging/sparkle-public-key)
 
 KUMO_VERSION=$version cargo build --release -p kumod
-(cd kumo-ui && flutter pub get && flutter build windows --release --build-name="$version" --build-number="$build")
+(cd kumo-ui && flutter pub get && flutter build windows --release --build-name="$version" --build-number="$build" \
+	--dart-define=KUMO_VERSION="$version" --dart-define=KUMO_RELEASE_REPO="$repo" --dart-define=KUMO_UPDATE_KEY="$update_key")
 
 cp target/release/kumod.exe "$app/"
 system32="$(cygpath -u "$SYSTEMROOT")/System32"

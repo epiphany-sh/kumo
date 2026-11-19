@@ -6,7 +6,7 @@ un comando y se actualiza con un click:
 - **Primera instalación**: `install.sh` (lo que baja `curl` no queda en
   cuarentena, así que Gatekeeper no frena) o el cask de Homebrew (que le saca
   la cuarentena en `postflight`).
-- **Updates**: Sparkle, adentro de la app. Revisa cada 6 h, descarga solo y
+- **Updates**: Sparkle, adentro de la app. Revisa cada hora, descarga solo y
   avisa en la barra de arriba ("Restart to update"). Sin el click, instala al
   cerrar la app. Verifica cada update con una firma EdDSA propia.
 - **El daemon**: el `kumod` que estaba corriendo sigue con el programa viejo;
@@ -18,13 +18,19 @@ un comando y se actualiza con un click:
 Los builds locales (`make app`, `make run`, `make dev`) no tienen feed: nunca
 se reemplazan solos por la versión publicada.
 
-**Windows** sale en el mismo release, sin firmar y sin auto-update:
+**Windows** sale en el mismo release. Los `.exe` no llevan firma de código
+(Authenticode), pero el zip sí lleva una firma ed25519 hecha con la misma
+clave de Sparkle (`Kumo-X.Y.Z-windows-x64.zip.sig`):
 
-- **Instalación y updates**: `install.ps1` baja el zip de Windows del release
+- **Instalación**: `install.ps1` baja el zip de Windows del release
   más nuevo que lo tenga (no de "Latest", ver abajo), lo copia a
   `%LOCALAPPDATA%\Programs\Kumo`, le saca la marca de "bajado de
   internet" (así SmartScreen no frena) y crea el acceso en el menú Inicio.
-  Para actualizar se vuelve a correr.
+  Solo compara el zip con su `.sha256`, no verifica la firma.
+- **Updates**: la app consulta los releases de GitHub, baja el zip más nuevo,
+  verifica el `.sig` contra la clave pública de Sparkle que trae adentro
+  (`--dart-define=KUMO_UPDATE_KEY`) y recién ahí lo instala con su
+  `install.ps1`. Correr `install.ps1` a mano también actualiza.
 - **El daemon**: un `kumod.exe` corriendo (y las DLL que cargó) no se puede
   pisar ni borrar, pero sí renombrar. `install.ps1` renombra todo lo que hay
   en la carpeta a `<nombre>.<id>.old` y copia lo nuevo; si algo falla, borra
@@ -150,8 +156,8 @@ aparte:
 - **Dependencias**: el job `audit` de `ci` corre `cargo audit` en cada PR. No es
   obligatorio. Dependabot no puede abrir PRs acá porque `branch-policy` rechaza
   sus ramas, así que solo se usan sus alertas.
-- **Si se filtra la clave de Sparkle**: las versiones publicadas no aceptan otra
-  clave, así que rotarla requiere publicar primero una versión firmada con la
+- **Si se filtra la clave de Sparkle**: las versiones publicadas (de macOS y de
+  Windows) no aceptan otra clave, así que rotarla requiere publicar primero una versión firmada con la
   vieja que incluya la pública nueva.
 
 El número de build (`CFBundleVersion`, lo que compara Sparkle) es la cantidad
