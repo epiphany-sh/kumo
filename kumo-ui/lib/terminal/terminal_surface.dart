@@ -173,6 +173,13 @@ abstract interface class TerminalSurface {
   void dispose();
 }
 
+/// A surface that knows the program it runs (a shell's path, or an
+/// agent's): pasted and dropped paths are quoted for it
+/// (`HostOs.shellPaths`).
+abstract interface class ShellProgram implements TerminalSurface {
+  String get program;
+}
+
 /// A surface whose program sets terminal modes (a real PTY): how keys,
 /// paste and the mouse reach it.
 abstract interface class TerminalModes implements TerminalSurface {

@@ -87,6 +87,32 @@ class WindowsOs extends HostOs {
     return name == _pwsh || name == _powershell ? const ['-NoLogo'] : const [];
   }
 
+  /// Quoted only when a path has more than letters, digits and `_-.:\/`:
+  /// in single quotes for PowerShell (a quote inside doubled, typographic
+  /// ones too, which PowerShell also reads as quotes); in double quotes for
+  /// cmd.exe and anything else, as Windows Terminal drops files (a Windows
+  /// path can't hold `"`). A path with `"` or a control character is left
+  /// out: no file has one, so it's forged, and a quote or line break would
+  /// end the quoting or run a command.
+  @override
+  String shellPaths(List<String> paths, {String? shell}) {
+    final name = shell == null ? '' : _fileName(shell).replaceFirst(RegExp(r'\.exe$'), '');
+    final powerShell = name == 'pwsh' || name == 'powershell';
+    return [
+      for (final p in paths.where((p) => !_notAPath.hasMatch(p)))
+        if (!_needsQuotes.hasMatch(p))
+          p
+        else if (powerShell)
+          "'${p.replaceAllMapped(_powerShellQuote, (m) => '${m[0]}${m[0]}')}'"
+        else
+          '"$p"',
+    ].join(' ');
+  }
+
+  static final _notAPath = RegExp('["\\x00-\\x1f\\x7f-\\x9f]');
+  static final _needsQuotes =RegExp(r'[^A-Za-z0-9_\-.:\\/]');
+  static final _powerShellQuote = RegExp('[\'‘’‚‛]');
+
   /// Looked up once.
   @override
   late final List<ShellChoice> shellChoices = [

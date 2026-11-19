@@ -52,6 +52,9 @@ bool FlutterWindow::OnCreate() {
             flutter::EncodableValue(name != nullptr && SetAppIcon(*name)));
       });
 
+  pasteboard_ = std::make_unique<Pasteboard>(
+      flutter_controller_->engine()->messenger(), GetHandle());
+
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     ShowWindow(GetHandle(), show_command_);
   });
@@ -66,6 +69,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   app_icon_channel_ = nullptr;
+  pasteboard_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -125,6 +129,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                                                       lparam);
     if (result) {
       return *result;
+    }
+  }
+
+  if (pasteboard_) {
+    if (auto handled = pasteboard_->HandleMessage(message, wparam, lparam)) {
+      return *handled;
     }
   }
 

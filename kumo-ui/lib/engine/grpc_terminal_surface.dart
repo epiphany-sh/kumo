@@ -17,7 +17,7 @@ import 'kumo_engine.dart';
 ///
 /// Output is parsed as it arrives but published at most once per frame
 /// (kumo.md §5.6). Keystrokes typed before the stream is up are queued.
-class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
+class GrpcTerminalSurface implements TerminalModes, ShellProgram, CommandHistorySource {
   /// Opens the user's login shell in [directory] (their home directory by
   /// default). The PTY is opened at the pane's real size, once it is first
   /// laid out.
@@ -67,6 +67,10 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
 
   /// The shell a new terminal starts (unused when re-attaching).
   final String _program;
+
+  /// What runs: the shell, or the program re-attached to.
+  @override
+  String get program => _program;
 
   /// Whether closing the pane kills the process (shells) or only detaches.
   final bool killOnClose;
