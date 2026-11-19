@@ -13,7 +13,8 @@ import 'terminal_surface.dart';
 /// Supported: UTF-8, C0 controls, cursor movement, erase (with background
 /// color, like xterm), insert/delete, scroll regions, alternate screen, SGR
 /// (16 colors as themed roles, 256 and truecolor exact, bold, dim, italic,
-/// underline, inverse), wide glyphs, cursor visibility and DSR/DA replies,
+/// underline, inverse), wide glyphs, REP, autowrap (DECAWM), cursor
+/// visibility and DSR/DA replies,
 /// and the shell's command marks (OSC 133, see [TermBuffer.blocks]).
 class AnsiScreen {
   AnsiScreen({int cols = 80, int rows = 24, this.maxScrollback = 5000, this.onReply, int Function()? clock})
@@ -67,6 +68,10 @@ class AnsiScreen {
   int _cx = 0;
   int _cy = 0;
   bool _wrapPending = false;
+  /// DECAWM: text reaching the right edge goes on in the next row.
+  bool _autowrap = true;
+  /// The last graphic character printed, for REP.
+  int? _lastPrinted;
   final _pen = _Pen();
   bool _cursorVisible = true;
   bool _appCursorKeys = false;
@@ -85,6 +90,8 @@ class AnsiScreen {
   _State _state = _State.ground;
   final _params = StringBuffer();
   String _private = '';
+  /// The CSI had an intermediate byte (`CSI 2 SP q`): none we handle.
+  bool _intermediate = false;
   final _osc = StringBuffer();
 
   /// DECCKM: arrows send `ESC O x` instead of `ESC [ x` (vim, less…).
@@ -368,8 +375,9 @@ class AnsiScreen {
           _control(r);
         } else if (r == 0x1b) {
           _state = _State.escape;
+        } else if (r <= 0x2f) {
+          _intermediate = true;
         }
-      // Intermediates (0x20–0x2f) are ignored.
       case _State.osc:
         if (r == 0x07) {
           _state = _State.ground;
@@ -403,6 +411,7 @@ class AnsiScreen {
       case 0x5b: // [
         _params.clear();
         _private = '';
+        _intermediate = false;
         _state = _State.csi;
       case 0x5d: // ]
         _osc.clear();
@@ -482,11 +491,15 @@ class AnsiScreen {
   void _print(int rune) {
     final width = termCellWidth(rune);
     if (width == 0) return; // Combining marks / joiners: not composed (M1).
-    if (_wrapPending || (width == 2 && _cx == _cols - 1 && _cols > 1)) {
+    _lastPrinted = rune;
+    final noRoom = width == 2 && _cx == _cols - 1 && _cols > 1;
+    if (_autowrap && (_wrapPending || noRoom)) {
       _grid[_cy].wrapped = true;
       _cx = 0;
       _lineFeed();
       _wrapPending = false;
+    } else if (noRoom) {
+      _cx--; // Autowrap off: it takes the last two cells.
     }
     final row = _grid[_cy];
     row.set(_cx, rune, _pen);
@@ -494,7 +507,7 @@ class AnsiScreen {
     final next = _cx + width;
     if (next >= _cols) {
       _cx = _cols - 1;
-      _wrapPending = true;
+      _wrapPending = _autowrap;
     } else {
       _cx = next;
     }
@@ -512,9 +525,19 @@ class AnsiScreen {
       if (finalByte == 0x68 || finalByte == 0x6c) _privateMode(a, finalByte == 0x68);
       return;
     }
-    if (_private.isNotEmpty) return; // e.g. CSI > c
-    _wrapPending = false;
-    switch (String.fromCharCode(finalByte)) {
+    if (_private.isNotEmpty || _intermediate) return; // e.g. CSI > c, CSI 2 SP q
+    final command = String.fromCharCode(finalByte);
+    // Moving the cursor or editing cancels a pending wrap; SGR, REP and
+    // reports don't (xterm): colored text that fills a row still wraps.
+    if (_cancelsWrap.contains(command)) _wrapPending = false;
+    switch (command) {
+      case 'b':
+        final rune = _lastPrinted;
+        if (rune != null) {
+          for (var i = math.min(arg(0), _cols * _rows); i > 0; i--) {
+            _print(rune);
+          }
+        }
       case 'A':
         _cy = math.max(_cy <= _scrollBottom && _cy >= _top ? _top : 0, _cy - arg(0));
       case 'B' || 'e':
@@ -577,11 +600,17 @@ class AnsiScreen {
     }
   }
 
+  /// CSI finals that move the cursor or edit the screen.
+  static const _cancelsWrap = 'ABCDEFGHJKLMPSTXadefru@`';
+
   void _privateMode(List<int> modes, bool on) {
     for (final mode in modes) {
       switch (mode) {
         case 1:
           _appCursorKeys = on;
+        case 7:
+          _autowrap = on;
+          if (!on) _wrapPending = false;
         case 25:
           _cursorVisible = on;
         case 2004:
@@ -735,6 +764,9 @@ class AnsiScreen {
     _top = 0;
     _bottom = 0x7fffffff;
     _cursorVisible = true;
+    _autowrap = true;
+    _wrapPending = false;
+    _lastPrinted = null;
     _appCursorKeys = false;
     _bracketedPaste = false;
     _mouseMode = 0;
@@ -966,7 +998,18 @@ class _Row {
 
   _Row._cells(this._runes, this._fg, this._bg, this._attrs);
 
+  /// A cut between cells `x - 1` and `x` that splits a wide glyph blanks
+  /// both its halves, as in xterm: neither shows on its own.
+  void _unsplit(int x) {
+    if (x <= 0 || x >= _runes.length || _runes[x] != continuation) return;
+    _runes[x - 1] = 0x20;
+    _runes[x] = 0x20;
+    _line = null;
+  }
+
   void set(int x, int rune, _Pen pen) {
+    if (rune != continuation) _unsplit(x);
+    _unsplit(x + 1);
     _runes[x] = rune;
     _fg[x] = pen.fg;
     _bg[x] = pen.bg;
@@ -977,6 +1020,8 @@ class _Row {
   /// Erased cells keep the current background color (xterm BCE).
   void clear(int from, int to, int bg) {
     if (from >= to) return;
+    _unsplit(from);
+    _unsplit(to);
     if (to >= _runes.length) wrapped = false;
     _runes.fillRange(from, to, 0x20);
     _fg.fillRange(from, to, _Color.none);
@@ -988,6 +1033,8 @@ class _Row {
   void delete(int x, int n, int bg) {
     final cols = _runes.length;
     n = math.min(n, cols - x);
+    _unsplit(x);
+    _unsplit(x + n);
     _runes.setRange(x, cols - n, _runes, x + n);
     _fg.setRange(x, cols - n, _fg, x + n);
     _bg.setRange(x, cols - n, _bg, x + n);
@@ -998,6 +1045,9 @@ class _Row {
   void insert(int x, int n, int bg) {
     final cols = _runes.length;
     n = math.min(n, cols - x);
+    _unsplit(x);
+    // What's pushed past the right edge goes; a glyph it cuts goes whole.
+    _unsplit(cols - n);
     _runes.setRange(x + n, cols, Uint32List.fromList(_runes.sublist(x, cols - n)));
     _fg.setRange(x + n, cols, Uint32List.fromList(_fg.sublist(x, cols - n)));
     _bg.setRange(x + n, cols, Uint32List.fromList(_bg.sublist(x, cols - n)));

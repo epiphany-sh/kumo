@@ -226,7 +226,11 @@ class GrpcTerminalSurface implements TerminalModes, ShellProgram, CommandHistory
       }
       final input = _input = StreamController<TerminalInput>()
         ..add(TerminalInput(attach: AttachTo(terminalId: id, replayScrollback: true)));
-      if (existing != null) input.add(TerminalInput(resize: Resize(cols: _screen.cols, rows: _screen.rows)));
+      // A resize while it was opening went nowhere (no stream yet), and a
+      // terminal re-attached to has the size it had: send the pane's.
+      if (existing != null || (_screen.cols, _screen.rows) != (cols, rows)) {
+        input.add(TerminalInput(resize: Resize(cols: _screen.cols, rows: _screen.rows)));
+      }
       for (final bytes in _pending) {
         input.add(TerminalInput(data: bytes));
       }
