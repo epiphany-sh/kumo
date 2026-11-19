@@ -1,3 +1,4 @@
+import 'dart:io' as io show exit, pid;
 import 'dart:io' show Platform, Process, ProcessException, ProcessStartMode;
 
 import 'package:flutter_acrylic/flutter_acrylic.dart';
@@ -129,6 +130,35 @@ class WindowsOs extends HostOs {
     } on ProcessException catch (e) {
       return 'Windows couldn’t open another Kumo window: ${e.message}';
     }
+  }
+
+  /// A hidden Windows PowerShell waits for Kumo to exit, then starts it
+  /// again: the files it was running can be swapped by then (an update).
+  /// The pid and the path go in its environment, so a path with quotes or
+  /// spaces stays data, never PowerShell code.
+  (String, List<String>, Map<String, String>) relaunchCommand(int pid, String exe) => (
+        _powershellAt ?? _powershell,
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-WindowStyle',
+          'Hidden',
+          '-Command',
+          r'Wait-Process -Id $env:KUMO_RELAUNCH_PID -Timeout 60 -ErrorAction SilentlyContinue; Start-Process -FilePath $env:KUMO_RELAUNCH_EXE',
+        ],
+        {'KUMO_RELAUNCH_PID': '$pid', 'KUMO_RELAUNCH_EXE': exe},
+      );
+
+  @override
+  Future<bool> relaunchAfterExit({int? pid, String? exe, ProcessStarter start = Process.start, void Function(int code) exit = io.exit}) async {
+    final (program, args, extra) = relaunchCommand(pid ?? io.pid, exe ?? Platform.resolvedExecutable);
+    try {
+      await start(program, args, environment: extra, mode: ProcessStartMode.detached);
+    } on ProcessException {
+      return false;
+    }
+    exit(0);
+    return true;
   }
 
   /// Windows 11: Mica. Windows 10: Acrylic (known drag lag on Win10).

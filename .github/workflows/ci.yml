@@ -135,6 +135,9 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0 # the build number counts commits
+      - name: install.ps1 swaps and rolls back
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File packaging/tests/install-swap.ps1
       - run: rustup show active-toolchain
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2

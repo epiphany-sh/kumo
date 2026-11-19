@@ -4,67 +4,185 @@
 #
 # Kumo isn't signed: the files are unblocked so SmartScreen doesn't stop it.
 # It goes to %LOCALAPPDATA%\Programs\Kumo, with a Start menu shortcut.
+#
+# Kumo's own updater runs the copy inside the new zip (Kumo\install.ps1):
+#
+#   install.ps1 -From <the zip's Kumo folder> -WaitPid <Kumo's pid>
+#
+#   -From        install this folder, already downloaded and checked
+#   -WaitPid     wait for that process (the Kumo asking) to exit first
+#   -NoRelaunch  don't open Kumo afterwards
+#   -Log         where it writes what it did (%LOCALAPPDATA%\Kumo\updates\update.log)
+#   -Dest        where Kumo goes; any other than the default gets no shortcut
+#   -LockTimeout seconds to wait for another install into -Dest to finish
+param(
+    [string]$From,
+    [int]$WaitPid = 0,
+    [switch]$NoRelaunch,
+    [string]$Log = (Join-Path $env:LOCALAPPDATA 'Kumo\updates\update.log'),
+    [string]$Dest = (Join-Path $env:LOCALAPPDATA 'Programs\Kumo'),
+    [int]$LockTimeout = 120
+)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue' # Invoke-WebRequest is much slower with the bar
 
 $repo = '@RELEASE_REPO@'
-$dest = Join-Path $env:LOCALAPPDATA 'Programs\Kumo'
+$defaultDest = Join-Path $env:LOCALAPPDATA 'Programs\Kumo'
 
-if (-not [Environment]::Is64BitOperatingSystem) {
-    throw 'Kumo runs on 64-bit Windows.'
+# Says it, and keeps it in the log; a log that can't be written isn't an error.
+function Write-KumoLog([string]$Message) {
+    Write-Host $Message
+    try {
+        New-Item -ItemType Directory -Path (Split-Path $Log) -Force | Out-Null
+        Add-Content -LiteralPath $Log -Value ('{0:yyyy-MM-dd HH:mm:ss} {1}' -f (Get-Date), $Message)
+    } catch {}
 }
 
-$tmp = Join-Path ([IO.Path]::GetTempPath()) ("kumo-" + [Guid]::NewGuid())
-New-Item -ItemType Directory -Path $tmp | Out-Null
+# Kumo's updater closed Kumo to run this: whatever fails, Kumo opens again.
+$updating = $From -or $WaitPid -gt 0
+$relaunch = $updating -and -not $NoRelaunch
+$lock = $null
+$locked = $false
 try {
-    # Not "latest": that's the newest release with the macOS build, and
-    # Windows publishes without waiting for it (docs/releasing.md).
-    $releases = Invoke-RestMethod "https://api.github.com/repos/$repo/releases?per_page=20"
-    $asset = $releases |
-        Where-Object { -not $_.draft -and -not $_.prerelease } |
-        ForEach-Object { $_.assets } |
-        Where-Object { $_.name -like 'Kumo-*-windows-x64.zip' } |
-        Select-Object -First 1
-    if (-not $asset) { throw "No Windows build in $repo's releases yet." }
-
-    Write-Host "Downloading $($asset.name)..."
-    $zip = Join-Path $tmp 'Kumo.zip'
-    Invoke-WebRequest $asset.browser_download_url -OutFile $zip -UseBasicParsing
-    $expected = (Invoke-RestMethod "$($asset.browser_download_url).sha256").Trim()
-    if ((Get-FileHash $zip -Algorithm SHA256).Hash -ine $expected) {
-        throw "The download doesn't match its checksum: nothing was installed."
-    }
-    Expand-Archive $zip -DestinationPath $tmp
-
-    $ui = Get-Process -Name Kumo -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$dest\*" }
-    if ($ui) {
-        Write-Host 'Closing Kumo to replace it (your terminals keep running)...'
-        $ui | ForEach-Object { [void]$_.CloseMainWindow() }
-        $ui | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue
-        $ui | Stop-Process -Force -ErrorAction SilentlyContinue
+    if (-not [Environment]::Is64BitOperatingSystem) {
+        throw 'Kumo runs on 64-bit Windows.'
     }
 
-    New-Item -ItemType Directory -Path $dest -Force | Out-Null
-    # A running kumod.exe can't be overwritten, but it can be renamed: it
-    # keeps running from the old file, and Kumo restarts it on the new one
-    # once no terminals are open. Old ones go when they're no longer running.
-    Get-ChildItem $dest -Filter '*.old' | Remove-Item -Force -ErrorAction SilentlyContinue
-    $kumod = Join-Path $dest 'kumod.exe'
-    if (Test-Path $kumod) {
-        Rename-Item $kumod ("kumod.exe." + [Guid]::NewGuid() + ".old")
+    # One install into a folder at a time: another one's cleanup would delete
+    # what this one set aside, and the other way round.
+    $key = [IO.Path]::GetFullPath($Dest).TrimEnd('\').ToUpperInvariant()
+    $sha = [Security.Cryptography.SHA256]::Create()
+    $hash = -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($key)) | ForEach-Object { $_.ToString('x2') })
+    $lock = New-Object System.Threading.Mutex($false, "Local\KumoInstall-$hash")
+    try {
+        $locked = $lock.WaitOne([TimeSpan]::FromSeconds($LockTimeout))
+    } catch [System.Threading.AbandonedMutexException] {
+        $locked = $true # the other one died holding it; this one takes over
     }
-    Get-ChildItem $dest -Exclude '*.old' | Remove-Item -Recurse -Force
-    Copy-Item (Join-Path $tmp 'Kumo\*') $dest -Recurse -Force
-    Get-ChildItem $dest -Recurse -File | Unblock-File
+    if (-not $locked) {
+        throw "Another Kumo install into $Dest is still running: nothing was installed."
+    }
 
-    $programs = [Environment]::GetFolderPath('Programs')
-    $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $programs 'Kumo.lnk'))
-    $shortcut.TargetPath = Join-Path $dest 'Kumo.exe'
-    $shortcut.WorkingDirectory = $dest
-    $shortcut.Save()
+    # What the last update set aside. Some may still be running (kumod.exe and
+    # the DLLs it loaded): they go next time.
+    if (Test-Path -LiteralPath $Dest) {
+        Get-ChildItem -LiteralPath $Dest -Filter '*.old' -Force |
+            ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) ("kumo-" + [Guid]::NewGuid())
+    New-Item -ItemType Directory -Path $tmp | Out-Null
+    try {
+        if ($From) {
+            # The zip's Kumo folder, or the folder it was extracted to.
+            $src = if (Test-Path -LiteralPath (Join-Path $From 'Kumo\Kumo.exe')) { Join-Path $From 'Kumo' } else { $From }
+            if (-not (Test-Path -LiteralPath (Join-Path $src 'Kumo.exe'))) {
+                throw "No Kumo.exe in $From`: nothing was installed."
+            }
+            Write-KumoLog "Installing Kumo from $src"
+        } else {
+            # Not "latest": that's the newest release with the macOS build, and
+            # Windows publishes without waiting for it (docs/releasing.md).
+            $releases = Invoke-RestMethod "https://api.github.com/repos/$repo/releases?per_page=20"
+            $asset = $releases |
+                Where-Object { -not $_.draft -and -not $_.prerelease } |
+                ForEach-Object { $_.assets } |
+                Where-Object { $_.name -like 'Kumo-*-windows-x64.zip' } |
+                Select-Object -First 1
+            if (-not $asset) { throw "No Windows build in $repo's releases yet." }
+
+            Write-KumoLog "Downloading $($asset.name)..."
+            $zip = Join-Path $tmp 'Kumo.zip'
+            Invoke-WebRequest $asset.browser_download_url -OutFile $zip -UseBasicParsing
+            $expected = (Invoke-RestMethod "$($asset.browser_download_url).sha256").Trim()
+            if ((Get-FileHash $zip -Algorithm SHA256).Hash -ine $expected) {
+                throw "The download doesn't match its checksum: nothing was installed."
+            }
+            Expand-Archive $zip -DestinationPath $tmp
+            $src = Join-Path $tmp 'Kumo'
+        }
+
+        if ($WaitPid -gt 0) {
+            Write-KumoLog "Waiting for Kumo ($WaitPid) to quit..."
+            Wait-Process -Id $WaitPid -Timeout 60 -ErrorAction SilentlyContinue
+        }
+        $ui = Get-Process -Name Kumo -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$Dest\*" }
+        if ($ui) {
+            Write-KumoLog 'Closing Kumo to replace it (your terminals keep running)...'
+            $ui | ForEach-Object { [void]$_.CloseMainWindow() }
+            $ui | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue
+            $ui | Stop-Process -Force -ErrorAction SilentlyContinue
+        }
+
+        # A running kumod.exe, and the DLLs it loaded, can't be deleted or
+        # overwritten, but they can be renamed: everything there is set aside as
+        # <name>.<id>.old, and the new files go in their place. kumod keeps
+        # running from the old files; Kumo restarts it on the new ones once no
+        # terminals are open. Anything failing puts the old ones back.
+        New-Item -ItemType Directory -Path $Dest -Force | Out-Null
+        $id = [Guid]::NewGuid()
+        $aside = New-Object System.Collections.Generic.List[string]
+        $copied = New-Object System.Collections.Generic.List[string]
+        try {
+            foreach ($item in @(Get-ChildItem -LiteralPath $Dest -Force | Where-Object { $_.Name -notlike '*.old' })) {
+                Rename-Item -LiteralPath $item.FullName -NewName "$($item.Name).$id.old"
+                $aside.Add($item.Name)
+            }
+            foreach ($item in @(Get-ChildItem -LiteralPath $src -Force)) {
+                $target = Join-Path $Dest $item.Name
+                $copied.Add($target) # before copying, so half a copy goes too
+                Copy-Item -LiteralPath $item.FullName -Destination $target -Recurse -Force
+            }
+            $copied | ForEach-Object { Get-ChildItem -LiteralPath $_ -Recurse -File -Force } | Unblock-File
+        } catch {
+            $failure = $_
+            Write-KumoLog "Couldn't install Kumo, putting the old one back: $failure"
+            foreach ($target in $copied) {
+                Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            foreach ($name in $aside) {
+                try {
+                    Rename-Item -LiteralPath (Join-Path $Dest "$name.$id.old") -NewName $name
+                } catch {
+                    Write-KumoLog "Couldn't put back $name`: $_"
+                }
+            }
+            $relaunch = -not $NoRelaunch # the old one, put back, opens again
+            throw $failure
+        }
+
+        if ($Dest -eq $defaultDest) {
+            try {
+                $programs = [Environment]::GetFolderPath('Programs')
+                $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $programs 'Kumo.lnk'))
+                $shortcut.TargetPath = Join-Path $Dest 'Kumo.exe'
+                $shortcut.WorkingDirectory = $Dest
+                $shortcut.Save()
+            } catch {
+                if (-not $updating) { throw }
+                # Kumo is updated, and the shortcut it had still points at it.
+                Write-KumoLog "Couldn't update the Start menu shortcut (Kumo is updated anyway): $_"
+            }
+        }
+    } finally {
+        Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+} catch {
+    $failure = $_
+    if ($updating) { Write-KumoLog "Kumo wasn't updated: $failure" }
+    # Whichever Kumo is there now: the old one, or the new one if only
+    # something after the swap failed.
+    $exe = Join-Path $Dest 'Kumo.exe'
+    if ($relaunch -and (Test-Path -LiteralPath $exe)) {
+        try { Start-Process -FilePath $exe } catch { Write-KumoLog "Couldn't open Kumo again: $_" }
+    }
+    throw $failure
 } finally {
-    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    if ($locked) { $lock.ReleaseMutex() }
+    if ($lock) { $lock.Dispose() }
 }
 
-Write-Host "Kumo is in $dest (and in the Start menu)"
-Start-Process (Join-Path $dest 'Kumo.exe')
+Write-KumoLog $(if ($Dest -eq $defaultDest) { "Kumo is in $Dest (and in the Start menu)" } else { "Kumo is in $Dest" })
+if (-not $NoRelaunch) {
+    Start-Process (Join-Path $Dest 'Kumo.exe')
+}

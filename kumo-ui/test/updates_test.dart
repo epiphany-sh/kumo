@@ -1,7 +1,12 @@
+import 'dart:io' as io show exit;
+import 'dart:io' show Process;
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/app/kumo_app.dart';
+import 'package:kumo_ui/platform/os/host_os.dart';
+import 'package:kumo_ui/platform/os/windows.dart';
 import 'package:kumo_ui/platform/updates.dart';
 
 /// Sparkle as the runner would drive it.
@@ -83,4 +88,28 @@ void main() {
     await updates.relaunch();
     expect(calls, ['stop kumod', 'install', 'stop kumod', 'relaunch']);
   });
+
+  test('without the macOS runner, relaunch stops the daemon and asks the OS to start Kumo again', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(const MethodChannel('kumo/updates'), null);
+    final calls = <String>[];
+    debugHostOs = _RelaunchingOs(calls);
+    addTearDown(() => debugHostOs = null);
+    final updates = SparkleUpdates(stopDaemon: () async => calls.add('stop kumod'));
+    await updates.relaunch();
+    expect(calls, ['stop kumod', 'relaunch after exit']);
+  });
+}
+
+/// An OS that records being asked to relaunch.
+class _RelaunchingOs extends WindowsOs {
+  _RelaunchingOs(this.calls) : super(const {});
+
+  final List<String> calls;
+
+  @override
+  Future<bool> relaunchAfterExit({int? pid, String? exe, ProcessStarter start = Process.start, void Function(int code) exit = io.exit}) async {
+    calls.add('relaunch after exit');
+    return true;
+  }
 }

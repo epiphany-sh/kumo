@@ -1,3 +1,5 @@
+import 'dart:io' show ProcessException, ProcessStartMode;
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -227,6 +229,52 @@ void main() {
       expect(args, isEmpty);
       expect(env, {'KUMO_WORKSPACE': 'workspace-1'});
     });
+
+    test('relaunch: a hidden PowerShell waits for this Kumo to exit, then starts it again', () async {
+      const powershell = r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe';
+      final os = WindowsOs(const {'SystemRoot': r'C:\Windows'}, null, (path) => path == powershell);
+      // A quote and spaces: the path reaches PowerShell as data, not code.
+      const exe = r"C:\Users\O'Brien Q\AppData\Local\Programs\Kumo\Kumo.exe";
+      final started = <(String, List<String>, Map<String, String>?, ProcessStartMode)>[];
+      final exits = <int>[];
+      final relaunched = await os.relaunchAfterExit(
+        pid: 4242,
+        exe: exe,
+        start: (program, args, {environment, mode = ProcessStartMode.normal}) async => started.add((program, args, environment, mode)),
+        exit: exits.add,
+      );
+      expect(relaunched, isTrue);
+      expect(started, hasLength(1));
+      final (program, args, environment, mode) = started.single;
+      expect(program, powershell);
+      expect(args.sublist(0, args.length - 1), ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command']);
+      expect(args.last, contains(r'Wait-Process -Id $env:KUMO_RELAUNCH_PID'));
+      expect(args.last, contains(r'Start-Process -FilePath $env:KUMO_RELAUNCH_EXE'));
+      expect(args.last, isNot(contains('Brien')), reason: 'the path goes in the environment');
+      expect(environment, {'KUMO_RELAUNCH_PID': '4242', 'KUMO_RELAUNCH_EXE': exe});
+      expect(mode, ProcessStartMode.detached);
+      expect(exits, [0], reason: 'Kumo quits once the helper is waiting for it');
+    });
+
+    test('relaunch: PowerShell from %PATH% when its folder isn’t known', () async {
+      final os = WindowsOs(const {}, (exe) => false);
+      final programs = <String>[];
+      await os.relaunchAfterExit(pid: 1, exe: r'C:\Kumo\Kumo.exe', start: (program, args, {environment, mode = ProcessStartMode.normal}) async => programs.add(program), exit: (_) {});
+      expect(programs, ['powershell.exe']);
+    });
+
+    test('relaunch: Kumo stays open when the helper can’t start', () async {
+      final os = WindowsOs(const {}, (exe) => false);
+      final exits = <int>[];
+      final relaunched = await os.relaunchAfterExit(
+        pid: 1,
+        exe: r'C:\Kumo\Kumo.exe',
+        start: (program, args, {environment, mode = ProcessStartMode.normal}) async => throw const ProcessException('powershell.exe', [], 'not found'),
+        exit: exits.add,
+      );
+      expect(relaunched, isFalse);
+      expect(exits, isEmpty);
+    });
   });
 
   group('Linux', () {
@@ -270,6 +318,17 @@ void main() {
       expect(os.windowButtonsInContent, isFalse);
       expect(await os.openWorkspaceWindow('workspace-1'), contains('macOS'));
     });
+  });
+
+  test('macOS (Sparkle) and Linux start no relaunch helper and don’t quit', () async {
+    for (final os in [MacOs(const {}), LinuxOs(const {})]) {
+      final started = <String>[];
+      final exits = <int>[];
+      final relaunched = await os.relaunchAfterExit(pid: 1, exe: '/k', start: (program, args, {environment, mode = ProcessStartMode.normal}) async => started.add(program), exit: exits.add);
+      expect(relaunched, isFalse, reason: '$os');
+      expect(started, isEmpty);
+      expect(exits, isEmpty);
+    }
   });
 
   group('callers read the chosen OS', () {

@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'os/host_os.dart';
+
 /// New versions of Kumo. This one has none (tests, `flutter run`); the app
 /// uses [SparkleUpdates].
 class AppUpdates extends ChangeNotifier {
@@ -16,7 +18,8 @@ class AppUpdates extends ChangeNotifier {
 
 /// Sparkle, in the macOS runner (`AppDelegate.swift`): release builds check
 /// and download in the background, and an update ready to install shows
-/// here. Nobody clicks? It installs when Kumo quits.
+/// here. Nobody clicks? It installs when Kumo quits. Without the macOS
+/// runner, [relaunch] goes to [HostOs.relaunchAfterExit].
 ///
 /// [stopDaemon] runs before Kumo quits: the daemon outlives the UI, so
 /// without it the relaunched Kumo would find the old `kumod` still running.
@@ -52,7 +55,9 @@ class SparkleUpdates extends AppUpdates {
     try {
       await _channel.invokeMethod<void>(method);
     } on MissingPluginException {
-      // Not the macOS runner.
+      // Not the macOS runner: the OS starts Kumo again once it has quit
+      // (Windows); installing is Sparkle's, so macOS only.
+      if (method == 'relaunch' && !kIsWeb) await hostOs.relaunchAfterExit();
     }
   }
 }

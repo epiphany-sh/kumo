@@ -25,10 +25,14 @@ se reemplazan solos por la versión publicada.
   `%LOCALAPPDATA%\Programs\Kumo`, le saca la marca de "bajado de
   internet" (así SmartScreen no frena) y crea el acceso en el menú Inicio.
   Para actualizar se vuelve a correr.
-- **El daemon**: un `kumod.exe` corriendo no se puede pisar, pero sí
-  renombrar. `install.ps1` lo renombra a `kumod.exe.<id>.old` y pone el nuevo;
-  el viejo sigue corriendo y la UI lo reinicia sobre el nuevo como en macOS.
-  Los `.old` se borran en la próxima instalación, si ya no corren.
+- **El daemon**: un `kumod.exe` corriendo (y las DLL que cargó) no se puede
+  pisar ni borrar, pero sí renombrar. `install.ps1` renombra todo lo que hay
+  en la carpeta a `<nombre>.<id>.old` y copia lo nuevo; si algo falla, borra
+  lo copiado y devuelve los `.old` a su nombre. El viejo sigue corriendo y la
+  UI lo reinicia sobre el nuevo como en macOS. Los `.old` se borran en la
+  próxima instalación, si ya no corren. El zip trae su propio `install.ps1`
+  (`Kumo\install.ps1 -From <carpeta> -WaitPid <pid>`) para que Kumo se
+  actualice solo; `packaging/tests/install-swap.ps1` lo prueba en CI.
 - **El zip** (`packaging/windows-zip.sh`) trae `Kumo.exe`, `kumod.exe` y el
   runtime de VC++ que necesitan los dos.
 

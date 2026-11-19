@@ -5,7 +5,8 @@
 #
 # The zip holds a Kumo folder: Kumo.exe (the UI), kumod.exe next to it (where
 # the UI looks for it) and the VC++ runtime both need, which a fresh Windows
-# may not have. RELEASE_REPO (owner/name) goes into install.ps1.
+# may not have, and install.ps1 to update it. RELEASE_REPO (owner/name)
+# goes into install.ps1.
 set -euo pipefail
 
 version=${1:?usage: packaging/windows-zip.sh X.Y.Z}
@@ -24,12 +25,15 @@ for dll in msvcp140.dll vcruntime140.dll vcruntime140_1.dll; do
 done
 
 mkdir -p dist
+sed -e "s|@RELEASE_REPO@|$repo|g" packaging/install.ps1.in > dist/install.ps1
 staging=$(mktemp -d)
 trap 'rm -rf "$staging"' EXIT
 cp -r "$app" "$staging/Kumo"
+# Kumo updates itself with the install.ps1 of the version it downloaded
+# (install.ps1 -From).
+cp dist/install.ps1 "$staging/Kumo/install.ps1"
 rm -f "dist/Kumo-$version-windows-x64.zip"
 (cd "$staging" && 7z a -tzip -bso0 Kumo.zip Kumo)
 cp "$staging/Kumo.zip" "dist/Kumo-$version-windows-x64.zip"
-sed -e "s|@RELEASE_REPO@|$repo|g" packaging/install.ps1.in > dist/install.ps1
 sha256sum "dist/Kumo-$version-windows-x64.zip" | cut -d' ' -f1 > "dist/Kumo-$version-windows-x64.zip.sha256"
 echo "✓ dist/: Kumo-$version-windows-x64.zip and its .sha256, install.ps1"
