@@ -1,6 +1,7 @@
 //! A live terminal session: owns the PTY handles, its I/O threads and the
 //! pump task, and fans output out to subscribers.
 
+mod cursor;
 mod hub;
 mod io_threads;
 mod pump;
@@ -18,9 +19,11 @@ use kumo_domain::terminal::{
 use kumo_domain::time::Timestamp;
 use tokio::sync::{mpsc, oneshot};
 
+pub use cursor::ClientGuard;
 pub use hub::Subscription;
 
 use super::SessionConfig;
+use cursor::{Clients, CursorAnswers};
 use hub::OutputHub;
 use pump::Pump;
 pub(in crate::terminal) use recorder::Recorder;
@@ -49,6 +52,8 @@ pub struct TerminalSession {
     shell_cwd: Option<ShellCwd>,
     /// A shell's command running and last one done.
     shell_activity: Option<SharedActivity>,
+    /// The clients attached to it (see [`Self::client`]).
+    clients: Clients,
 }
 
 impl std::fmt::Debug for TerminalSession {
@@ -77,6 +82,7 @@ impl TerminalSession {
             master,
             child,
             killer,
+            holds_for_cursor,
         } = process;
 
         let (chunk_tx, chunk_rx) = mpsc::channel(config.chunk_queue_capacity);
@@ -93,6 +99,9 @@ impl TerminalSession {
         let master: SharedMaster = Arc::new(Mutex::new(Some(master)));
         let shell_cwd = recorder.as_ref().map(Recorder::cwd);
         let shell_activity = recorder.as_ref().map(Recorder::activity);
+        let clients = Clients::default();
+        let cursor =
+            holds_for_cursor.then(|| CursorAnswers::new(Arc::clone(&clients), input_tx.clone()));
 
         let pump = Pump {
             id: id.clone(),
@@ -102,6 +111,7 @@ impl TerminalSession {
             max_batch_bytes: config.max_batch_bytes,
             exit_drain_idle: config.exit_drain_idle,
             recorder,
+            cursor,
         };
         let released = Arc::clone(&master);
         tokio::spawn(async move {
@@ -127,7 +137,14 @@ impl TerminalSession {
             answered_at: Mutex::new(None),
             shell_cwd,
             shell_activity,
+            clients,
         })
+    }
+
+    /// A client attached to it, for as long as the guard lives: it
+    /// answers the terminal's questions, so the session doesn't.
+    pub fn client(&self) -> ClientGuard {
+        ClientGuard::new(&self.clients)
     }
 
     pub fn id(&self) -> &TerminalId {
@@ -199,10 +216,12 @@ impl TerminalSession {
     }
 
     /// The process in its foreground (what was typed in its shell, or the
-    /// shell); None once it exited or where the OS can't tell.
+    /// shell); None once it exited or where the OS can't tell. May block
+    /// (see [`kumo_domain::terminal::ForegroundProbe`]): call it off the
+    /// async runtime. The PTY isn't held meanwhile.
     pub fn foreground(&self) -> Option<u32> {
-        let master = self.master.lock().unwrap_or_else(PoisonError::into_inner);
-        master.as_ref().and_then(|m| m.foreground())
+        let probe = lock(&self.master).as_ref().map(|m| m.foreground())?;
+        probe()
     }
 
     /// Kills the process and what it started. For agents, whose tools are
@@ -224,5 +243,250 @@ impl TerminalSession {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .kill()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Read, Write};
+    use std::sync::mpsc as std_mpsc;
+    use std::time::Duration;
+
+    use kumo_domain::terminal::{ExitStatus, ForegroundProbe, PtyChild};
+
+    use super::*;
+
+    /// Blocks until dropped: a PTY that stays open.
+    struct Open(std_mpsc::Receiver<()>);
+
+    impl Read for Open {
+        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+            let _ = self.0.recv();
+            Ok(0)
+        }
+    }
+
+    impl PtyChild for Open {
+        fn wait(&mut self) -> Result<ExitStatus, TerminalError> {
+            let _ = self.0.recv();
+            Ok(ExitStatus::UNKNOWN)
+        }
+    }
+
+    struct Sink;
+
+    impl Write for Sink {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct NoKill;
+
+    impl PtyKiller for NoKill {
+        fn kill(&mut self) -> Result<(), TerminalError> {
+            Ok(())
+        }
+        fn kill_tree(&mut self) -> Result<(), TerminalError> {
+            Ok(())
+        }
+    }
+
+    /// Its foreground waits for a resize to go through first.
+    struct SlowMaster(Arc<Mutex<Option<std_mpsc::Receiver<()>>>>);
+
+    impl PtyMaster for SlowMaster {
+        fn resize(&self, _: TerminalSize) -> Result<(), TerminalError> {
+            Ok(())
+        }
+        fn foreground(&self) -> ForegroundProbe {
+            let resized = lock(&self.0).take();
+            Box::new(move || {
+                resized?.recv_timeout(Duration::from_secs(5)).ok()?;
+                Some(42)
+            })
+        }
+    }
+
+    /// Prints `chunks` once told to go, then stays open until dropped.
+    struct Chunks {
+        go: std_mpsc::Receiver<()>,
+        chunks: Vec<&'static [u8]>,
+    }
+
+    impl Read for Chunks {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            // Blocks for the go, and again (until dropped) once printed.
+            if self.chunks.is_empty() || self.go.recv().is_err() {
+                let _ = self.go.recv();
+                return Ok(0);
+            }
+            let chunk = self.chunks.remove(0);
+            buf[..chunk.len()].copy_from_slice(chunk);
+            Ok(chunk.len())
+        }
+    }
+
+    /// Sends what's written to it.
+    struct Typed(std_mpsc::Sender<Vec<u8>>);
+
+    impl Write for Typed {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            let _ = self.0.send(buf.to_vec());
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// A session on a PTY that prints `chunks`, one per send on the
+    /// returned sender; what the session types into it comes out of the
+    /// receiver.
+    fn printing(
+        chunks: Vec<&'static [u8]>,
+        holds_for_cursor: bool,
+    ) -> (
+        Arc<TerminalSession>,
+        std_mpsc::Sender<()>,
+        std_mpsc::Receiver<Vec<u8>>,
+        std_mpsc::Sender<()>,
+    ) {
+        let (go, go_rx) = std_mpsc::channel();
+        let (keep_child, child) = std_mpsc::channel();
+        let (typed, typed_out) = std_mpsc::channel();
+        let process = PtyProcess {
+            reader: Box::new(Chunks { go: go_rx, chunks }),
+            writer: Box::new(Typed(typed)),
+            master: Box::new(SlowMaster(Arc::new(Mutex::new(None)))),
+            child: Box::new(Open(child)),
+            killer: Box::new(NoKill),
+            holds_for_cursor,
+        };
+        let session = TerminalSession::start(
+            TerminalId::generate(),
+            &LaunchSpec::new("cmd.exe").unwrap(),
+            process,
+            &SessionConfig::default(),
+            None,
+        );
+        (session, go, typed_out, keep_child)
+    }
+
+    /// ConPTY holds the program until the terminal says where its cursor
+    /// is: with no client to say it, the session does, even for a request
+    /// read in two pieces.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn answers_where_the_cursor_is_while_no_client_is_attached() {
+        let (_session, go, typed, _child) = printing(vec![b"hi\x1b[", b"6n"], true);
+        go.send(()).unwrap();
+        go.send(()).unwrap();
+        let answer = typed.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(answer, b"\x1b[1;1R");
+        assert!(typed.recv_timeout(Duration::from_millis(200)).is_err());
+    }
+
+    /// One answer only: the client's.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn leaves_the_answer_to_an_attached_client() {
+        let (session, go, typed, _child) = printing(vec![b"\x1b[6n"], true);
+        let client = session.client();
+        go.send(()).unwrap();
+        assert!(typed.recv_timeout(Duration::from_millis(300)).is_err());
+
+        // Gone: the next request is the session's to answer.
+        drop(client);
+        let (session, go, typed, _child) = printing(vec![b"\x1b[6n"], true);
+        drop(session.client());
+        go.send(()).unwrap();
+        assert_eq!(
+            typed.recv_timeout(Duration::from_secs(5)).unwrap(),
+            b"\x1b[1;1R"
+        );
+    }
+
+    /// All the output it kept for a client attaching now.
+    fn replayed(session: &TerminalSession) -> Vec<u8> {
+        let subscription = session.subscribe(true);
+        subscription
+            .replay()
+            .iter()
+            .flat_map(|batch| batch.data.iter().copied())
+            .collect()
+    }
+
+    /// Waits until `session` kept `bytes` of output.
+    async fn kept(session: &TerminalSession, bytes: usize) -> Vec<u8> {
+        for _ in 0..100 {
+            let replay = replayed(session);
+            if replay.len() >= bytes {
+                return replay;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        replayed(session)
+    }
+
+    /// A request the session answered isn't asked again of a client that
+    /// attaches later (it would answer it too, twice in all).
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_request_the_session_answered_is_not_replayed() {
+        let (session, go, typed, _child) = printing(vec![b"a\x1b[", b"6nb"], true);
+        go.send(()).unwrap();
+        go.send(()).unwrap();
+        typed.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(kept(&session, 2).await, b"ab");
+    }
+
+    /// One a client was there to answer stays, as the program wrote it.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_request_a_client_answered_is_kept() {
+        let (session, go, _typed, _child) = printing(vec![b"a\x1b[6nb"], true);
+        let _client = session.client();
+        go.send(()).unwrap();
+        assert_eq!(kept(&session, 6).await, b"a\x1b[6nb");
+    }
+
+    /// A Unix PTY doesn't wait for the answer: the program asked, and the
+    /// terminal answers.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_pty_that_does_not_hold_the_program_gets_no_answer() {
+        let (_session, go, typed, _child) = printing(vec![b"\x1b[6n"], false);
+        go.send(()).unwrap();
+        assert!(typed.recv_timeout(Duration::from_millis(300)).is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn reading_the_foreground_does_not_hold_the_pty() {
+        let (_keep_reader, reader) = std_mpsc::channel();
+        let (_keep_child, child) = std_mpsc::channel();
+        let (resized, on_resize) = std_mpsc::channel();
+        let process = PtyProcess {
+            reader: Box::new(Open(reader)),
+            writer: Box::new(Sink),
+            master: Box::new(SlowMaster(Arc::new(Mutex::new(Some(on_resize))))),
+            child: Box::new(Open(child)),
+            killer: Box::new(NoKill),
+            holds_for_cursor: false,
+        };
+        let spec = LaunchSpec::new("sh").unwrap();
+        let session = TerminalSession::start(
+            TerminalId::generate(),
+            &spec,
+            process,
+            &SessionConfig::default(),
+            None,
+        );
+        let reading = {
+            let session = Arc::clone(&session);
+            std::thread::spawn(move || session.foreground())
+        };
+        std::thread::sleep(Duration::from_millis(100));
+        session.resize(TerminalSize::new(80, 24).unwrap()).unwrap();
+        resized.send(()).unwrap();
+        assert_eq!(reading.join().unwrap(), Some(42));
     }
 }

@@ -166,7 +166,57 @@ impl ProfileStore for FileProfileStore {
             Err(e) => Err(storage_error(&dir, e)),
         }
     }
+
+    fn mark_deleted(&self, id: &ProfileId) -> Result<(), ProfileError> {
+        if id.is_default() {
+            return Err(ProfileError::DefaultProfile);
+        }
+        let dir = profile_dir(&self.data_dir, id);
+        if !dir.is_dir() {
+            return Ok(());
+        }
+        let mark = dir.join(DELETED_MARK);
+        fs::write(&mark, b"").map_err(|e| storage_error(&mark, e))
+    }
+
+    fn unmark_deleted(&self, id: &ProfileId) -> Result<(), ProfileError> {
+        let mark = profile_dir(&self.data_dir, id).join(DELETED_MARK);
+        match fs::remove_file(&mark) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(storage_error(&mark, e)),
+        }
+    }
+
+    fn sweep_deleted(&self, listed: &[ProfileId]) -> Vec<ProfileId> {
+        let Ok(entries) = fs::read_dir(self.data_dir.join(PROFILES_DIR)) else {
+            return Vec::new();
+        };
+        let mut left = Vec::new();
+        for entry in entries.flatten() {
+            let Some(id) = entry
+                .file_name()
+                .to_str()
+                .and_then(|name| ProfileId::parse(name).ok())
+            else {
+                continue;
+            };
+            if id.is_default() || listed.contains(&id) || !entry.path().join(DELETED_MARK).is_file()
+            {
+                continue;
+            }
+            if let Err(error) = self.remove_data(&id) {
+                tracing::warn!(profile = %id, %error, "deleted profile's folder left behind");
+                left.push(id);
+            }
+        }
+        left
+    }
 }
+
+/// In the folder of a profile being deleted (see
+/// [`ProfileStore::mark_deleted`]).
+const DELETED_MARK: &str = ".kumo-deleted";
 
 fn storage_error(path: &Path, error: impl std::fmt::Display) -> ProfileError {
     ProfileError::Storage(format!("{}: {error}", path.display()))
@@ -229,5 +279,50 @@ mod tests {
             Err(ProfileError::DefaultProfile)
         );
         assert!(data.join("kumo.db").exists());
+    }
+
+    /// A folder whose removal failed after its profile went: marked, it's
+    /// swept later. One without the mark, or still listed, is kept.
+    #[test]
+    fn sweep_removes_only_marked_folders_of_unlisted_profiles() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = dir.path();
+        for p in ["orphan", "unmarked", "listed"] {
+            fs::create_dir_all(data.join("profiles").join(p)).unwrap();
+            fs::write(data.join("profiles").join(p).join("kumo.db"), b"x").unwrap();
+        }
+        let store = FileProfileStore::in_dir(data);
+        store.mark_deleted(&id("orphan")).unwrap();
+        store.mark_deleted(&id("listed")).unwrap();
+        // No folder: nothing to mark.
+        store.mark_deleted(&id("gone")).unwrap();
+        assert!(!data.join("profiles/gone").exists());
+
+        let left = store.sweep_deleted(&[ProfileId::default_profile(), id("listed")]);
+        assert!(left.is_empty());
+        assert!(!data.join("profiles/orphan").exists());
+        assert!(data.join("profiles/unmarked/kumo.db").exists());
+        assert!(data.join("profiles/listed/kumo.db").exists());
+    }
+
+    #[test]
+    fn sweeping_without_a_profiles_folder_finds_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = FileProfileStore::in_dir(dir.path());
+        assert!(store.sweep_deleted(&[]).is_empty());
+    }
+
+    /// A mark taken back: even unlisted (a lost profiles.json), it stays.
+    #[test]
+    fn an_unmarked_folder_is_never_swept() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = dir.path();
+        fs::create_dir_all(data.join("profiles/kept")).unwrap();
+        let store = FileProfileStore::in_dir(data);
+        store.mark_deleted(&id("kept")).unwrap();
+        store.unmark_deleted(&id("kept")).unwrap();
+        store.unmark_deleted(&id("never-marked")).unwrap();
+        assert!(store.sweep_deleted(&[]).is_empty());
+        assert!(data.join("profiles/kept").is_dir());
     }
 }

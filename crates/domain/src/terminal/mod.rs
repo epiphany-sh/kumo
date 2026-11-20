@@ -3,6 +3,7 @@
 //! subscribers.
 
 mod batch_builder;
+mod cursor;
 mod error;
 mod event;
 mod exit_status;
@@ -20,6 +21,7 @@ mod status;
 mod text;
 
 pub use batch_builder::BatchBuilder;
+pub use cursor::{CURSOR_REQUEST, CursorRequests, Stripped};
 pub use error::TerminalError;
 pub use event::TerminalEvent;
 pub use exit_status::ExitStatus;
@@ -29,7 +31,7 @@ pub use info::{TerminalActivity, TerminalInfo};
 pub use launch_spec::LaunchSpec;
 pub use marks::{CommandMarks, CommandRun, FinishedCommand, RunningCommand, ShellActivity};
 pub use output::{OutputBatch, OutputChunk};
-pub use ports::{PtyChild, PtyKiller, PtyMaster, PtyProcess, PtySystem};
+pub use ports::{ForegroundProbe, PtyChild, PtyKiller, PtyMaster, PtyProcess, PtySystem};
 pub use replay_buffer::ReplayBuffer;
 pub use shell_integration::{NoShellIntegration, ShellIntegration};
 pub use size::TerminalSize;

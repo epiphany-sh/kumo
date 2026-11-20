@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use kumo_domain::daemon::DaemonEndpoint;
+use kumo_domain::terminal::CursorRequests;
 use kumo_grpc::client::KumoClient;
 use kumo_proto::v1 as pb;
 use kumod::{Daemon, DaemonConfig, PlanAccounts, SecretsBackend};
@@ -100,6 +101,41 @@ pub async fn open(client: &mut KumoClient, program: &str, args: &[&str]) -> Stri
         .terminal_id
 }
 
+/// A program that runs for 30 seconds unless stopped.
+pub fn sleeper() -> (&'static str, &'static [&'static str]) {
+    if cfg!(windows) {
+        ("ping", &["-n", "30", "127.0.0.1"])
+    } else {
+        ("sleep", &["30"])
+    }
+}
+
+/// The program and arguments that run `unix` through `sh -c`, or
+/// `windows` through `cmd.exe` on Windows (where `!name!` reads a variable
+/// as the line runs, after a `set /p` set it).
+pub fn script(unix: &str, windows: &str) -> (String, Vec<String>) {
+    if cfg!(windows) {
+        let args = ["/d", "/v:on", "/c", windows];
+        ("cmd.exe".into(), args.map(str::to_owned).to_vec())
+    } else {
+        ("sh".into(), vec!["-c".into(), unix.into()])
+    }
+}
+
+/// Opens a terminal running [`script`].
+pub async fn open_script(client: &mut KumoClient, unix: &str, windows: &str) -> String {
+    let (program, args) = script(unix, windows);
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    open(client, &program, &args).await
+}
+
+/// `text` and Enter, as a terminal sends it (`\r` on Windows, where the
+/// console doesn't read `\n` as one).
+pub fn line(text: &str) -> Vec<u8> {
+    let enter = if cfg!(windows) { "\r" } else { "\n" };
+    format!("{text}{enter}").into_bytes()
+}
+
 /// What one attachment has received so far.
 #[derive(Debug, Default)]
 pub struct Received {
@@ -127,6 +163,10 @@ pub struct Attached {
     input: mpsc::Sender<pb::TerminalInput>,
     output: tonic::Streaming<pb::TerminalOutput>,
     pub received: Received,
+    /// Whether it answers the terminal's cursor position request (ConPTY
+    /// sends one at start): only one of several attachments should.
+    pub answers_cursor: bool,
+    cursor_requests: CursorRequests,
 }
 
 impl Attached {
@@ -149,14 +189,15 @@ impl Attached {
             input,
             output,
             received: Received::default(),
+            answers_cursor: true,
+            cursor_requests: CursorRequests::new(),
         }
     }
 
-    pub async fn send(&self, data: &'static [u8]) {
+    pub async fn send(&self, data: impl AsRef<[u8]>) {
+        let data = Bytes::copy_from_slice(data.as_ref());
         self.input
-            .send(input_msg(pb::terminal_input::Kind::Data(
-                Bytes::from_static(data),
-            )))
+            .send(input_msg(pb::terminal_input::Kind::Data(data)))
             .await
             .unwrap();
     }
@@ -169,6 +210,23 @@ impl Attached {
             })))
             .await
             .unwrap();
+    }
+
+    /// Reads until `done` accepts the accumulated text (`what` names it in
+    /// a failure).
+    pub async fn read_until_with(&mut self, what: &str, done: impl Fn(&str) -> bool) {
+        tokio::time::timeout(TIMEOUT, async {
+            while !done(&self.received.text()) {
+                assert!(self.next().await, "stream ended before {what}");
+            }
+        })
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "timed out waiting for {what}, got {:?}",
+                self.received.text()
+            )
+        });
     }
 
     /// Reads until the accumulated text contains `needle`.
@@ -221,7 +279,19 @@ impl Attached {
         match self.output.message().await.unwrap() {
             Some(pb::TerminalOutput {
                 kind: Some(Kind::Output(batch)),
-            }) => self.received.batches.push(batch),
+            }) => {
+                // ConPTY asks where the cursor is, and holds the program
+                // until the terminal answers: the UI does, so this does.
+                // Each one it sees, as the UI does (one split between two
+                // batches too).
+                let asks = self.cursor_requests.strip(&batch.data).requests;
+                if self.answers_cursor {
+                    for _ in 0..asks {
+                        self.send(b"\x1b[1;1R").await;
+                    }
+                }
+                self.received.batches.push(batch);
+            }
             Some(pb::TerminalOutput {
                 kind: Some(Kind::Exited(exited)),
             }) => self.received.exit_code = Some(exited.exit_code),

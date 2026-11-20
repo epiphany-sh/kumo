@@ -5,6 +5,7 @@ use std::time::Duration;
 use crate::terminal::{ExitStatus, TerminalId};
 use crate::time::Timestamp;
 
+use super::AgentPreset;
 use super::usage::AgentModel;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -199,29 +200,85 @@ const RUNTIMES: &[&str] = &[
     "node", "bun", "deno", "python", "python3", "sh", "bash", "zsh",
 ];
 
+/// Extensions a program has on Windows (`claude.exe`, `codex.cmd`,
+/// `node.exe`). Only stripped from Windows names: on macOS and Linux a
+/// name matches as it is.
+const WINDOWS_EXTENSIONS: &[&str] = &[".exe", ".cmd", ".bat", ".ps1"];
+
 fn base_name(path: &str) -> &str {
     path.rsplit(['/', '\\']).next().unwrap_or(path)
 }
 
+/// `path`'s file name; a Windows one lowercase (Windows names ignore
+/// case) and without its [extension](WINDOWS_EXTENSIONS).
+fn program_name(path: &str, windows: bool) -> String {
+    let name = base_name(path);
+    if !windows {
+        return name.to_owned();
+    }
+    let name = name.to_ascii_lowercase();
+    WINDOWS_EXTENSIONS
+        .iter()
+        .find_map(|ext| name.strip_suffix(ext))
+        .map_or_else(|| name.clone(), str::to_owned)
+}
+
+/// The npm package a script is in, by full name
+/// (`…/node_modules/@scope/name/…` → `@scope/name`): npm's shims on
+/// Windows run `node` on the package's script itself
+/// (`…/@anthropic-ai/claude-code/cli.js`), not on a `claude` link.
+fn npm_package(script: &str) -> Option<String> {
+    let parts: Vec<&str> = script.split(['/', '\\']).collect();
+    let at = parts.iter().rposition(|p| *p == "node_modules")?;
+    let mut rest = parts[at + 1..].iter();
+    let first = rest.next()?;
+    let name = if first.starts_with('@') {
+        format!("{first}/{}", rest.next()?)
+    } else {
+        (*first).to_owned()
+    };
+    // A file right in node_modules isn't a package.
+    rest.next()?;
+    Some(name)
+}
+
 /// Which of `programs` (provider id, program) a process is: its
-/// executable or its first argument, or, for a runtime, its script.
+/// executable or its first argument, or, for a runtime, its script (by
+/// name, or by the npm package it's in: only a known CLI's own
+/// [packages](AgentPreset::packages), by full name). A Windows process
+/// (its executable's path has `\`) is matched ignoring case and
+/// `.exe`/`.cmd`/`.bat`/`.ps1`.
 pub fn agent_program<'a>(
     exe: &str,
     args: &[String],
     programs: &'a [(String, String)],
 ) -> Option<&'a (String, String)> {
-    let mut names = vec![base_name(exe)];
+    let windows = exe.contains('\\');
+    let mut names = vec![program_name(exe, windows)];
     if let Some(first) = args.first() {
-        names.push(base_name(first));
+        names.push(program_name(first, windows));
     }
-    if names.iter().any(|n| RUNTIMES.contains(n))
+    let mut package = None;
+    if names.iter().any(|n| RUNTIMES.contains(&n.as_str()))
         && let Some(script) = args.get(1)
     {
-        names.push(base_name(script));
+        names.push(program_name(script, windows));
+        package = npm_package(script);
     }
-    programs.iter().find(|(_, program)| {
-        let program = base_name(program);
-        !program.is_empty() && names.contains(&program)
+    programs.iter().find(|(id, program)| {
+        let program = program_name(program, windows);
+        let in_package = package.as_deref().is_some_and(|package| {
+            AgentPreset::find(id).is_some_and(|preset| {
+                preset.packages.iter().any(|known| {
+                    if windows {
+                        known.eq_ignore_ascii_case(package)
+                    } else {
+                        *known == package
+                    }
+                })
+            })
+        });
+        (!program.is_empty() && names.contains(&program)) || in_package
     })
 }
 
@@ -300,5 +357,162 @@ mod tests {
                 .0,
             "claude"
         );
+    }
+
+    #[test]
+    fn a_cli_is_found_on_windows_as_npm_and_installers_run_it() {
+        let programs = vec![
+            ("claude".to_owned(), "claude".to_owned()),
+            ("codex".to_owned(), "codex".to_owned()),
+            ("gemini".to_owned(), "gemini".to_owned()),
+            ("opencode".to_owned(), "opencode".to_owned()),
+        ];
+        let args = |a: &[&str]| a.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+        let id = |exe: &str, a: &[&str]| agent_program(exe, &args(a), &programs).map(|p| &p.0);
+        let node = r"C:\Program Files\nodejs\node.exe";
+        let npm = r"C:\Users\Jane Doe\AppData\Roaming\npm\node_modules";
+
+        // The native installer's executable, any case.
+        let native = r"C:\Users\me\.local\bin\claude.exe";
+        assert_eq!(id(native, &[native, "--resume"]).unwrap(), "claude");
+        assert_eq!(id(r"C:\x\Claude.EXE", &["Claude.EXE"]).unwrap(), "claude");
+        // npm's shims run node on the package's script, wherever it is.
+        let cli = format!(r"{npm}\@anthropic-ai\claude-code\cli.js");
+        assert_eq!(id(node, &[node, &cli, "-c"]).unwrap(), "claude");
+        let codex = format!(r"{npm}\@openai\codex\bin\codex.js");
+        assert_eq!(id(node, &["node", &codex]).unwrap(), "codex");
+        let gemini = format!(r"{npm}\@google\gemini-cli\dist\index.js");
+        assert_eq!(id(node, &["node.exe", &gemini]).unwrap(), "gemini");
+        let opencode = format!(r"{npm}\opencode-ai\bin\opencode");
+        assert_eq!(id(node, &[node, &opencode]).unwrap(), "opencode");
+        // The `.cmd` shim, run by a shell of its own.
+        let shim = r"C:\Users\me\AppData\Roaming\npm\codex.cmd";
+        assert_eq!(id(shim, &[shim]).unwrap(), "codex");
+
+        // Another package, or an editor opening the CLI's files: no.
+        let other = format!(r"{npm}\claudette\cli.js");
+        assert!(id(node, &[node, &other]).is_none());
+        let server = format!(r"{npm}\typescript\lib\tsserver.js");
+        assert!(id(node, &[node, &server]).is_none());
+        assert!(id(r"C:\x\notepad.exe", &["notepad.exe", &cli]).is_none());
+        assert!(id(r"C:\x\pwsh.exe", &["pwsh.exe", "-NoLogo"]).is_none());
+    }
+
+    fn preset_programs() -> Vec<(String, String)> {
+        super::super::PRESETS
+            .iter()
+            .map(|p| (p.id.to_owned(), p.program.to_owned()))
+            .collect()
+    }
+
+    #[test]
+    fn only_a_cli_s_own_npm_package_is_it() {
+        let programs = preset_programs();
+        let args = |a: &[&str]| a.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+        let id = |exe: &str, a: &[&str]| agent_program(exe, &args(a), &programs).map(|p| &p.0);
+        for (node, modules, sep) in [
+            (
+                r"C:\Program Files\nodejs\node.exe",
+                r"C:\npm\node_modules",
+                "\\",
+            ),
+            ("/usr/local/bin/node", "/usr/local/lib/node_modules", "/"),
+        ] {
+            let script = |package: &str| {
+                let package = package.replace('/', sep);
+                format!("{modules}{sep}{package}{sep}dist{sep}cli.js")
+            };
+            for other in [
+                "claude-code-router",
+                "@musistudio/claude-code-router",
+                "claude-flow",
+                "claude-task-master",
+                "codex-cli",
+                "gemini-mcp-tool",
+                "opencode-mcp",
+                // Same names, someone else's packages.
+                "claude-code",
+                "codex",
+                "gemini-cli",
+            ] {
+                assert!(id(node, &[node, &script(other)]).is_none(), "{other}");
+            }
+            for (package, provider) in [
+                ("@anthropic-ai/claude-code", "claude"),
+                ("@openai/codex", "codex"),
+                ("@google/gemini-cli", "gemini"),
+                ("@github/copilot", "copilot"),
+                ("opencode-ai", "opencode"),
+                ("@qwen-code/qwen-code", "qwen"),
+                ("@sourcegraph/amp", "amp"),
+            ] {
+                let found = id(node, &[node, &script(package)]);
+                assert_eq!(found.map(String::as_str), Some(provider), "{package}");
+            }
+        }
+    }
+
+    #[test]
+    fn unix_names_match_as_they_always_did() {
+        /// `agent_program` before Windows support.
+        fn before<'a>(
+            exe: &str,
+            args: &[String],
+            programs: &'a [(String, String)],
+        ) -> Option<&'a (String, String)> {
+            let mut names = vec![base_name(exe)];
+            if let Some(first) = args.first() {
+                names.push(base_name(first));
+            }
+            if names.iter().any(|n| RUNTIMES.contains(n))
+                && let Some(script) = args.get(1)
+            {
+                names.push(base_name(script));
+            }
+            programs.iter().find(|(_, program)| {
+                let program = base_name(program);
+                !program.is_empty() && names.contains(&program)
+            })
+        }
+        let programs = preset_programs();
+        let cases: &[(&str, &[&str])] = &[
+            ("/opt/homebrew/bin/codex", &["codex"]),
+            (
+                "/usr/local/bin/node",
+                &["node", "/usr/local/bin/claude", "-c"],
+            ),
+            ("/usr/local/bin/node", &["node", "/x/claude.js"]),
+            ("/usr/local/bin/node", &["node", "/x/codex.mjs"]),
+            ("/usr/local/bin/node", &["node", "/x/Claude"]),
+            ("/x/claude.exe", &["claude.exe"]),
+            ("/x/codex.cmd", &["codex.cmd"]),
+            ("/x/Claude", &["Claude"]),
+            ("/x/CODEX", &["CODEX"]),
+            ("/x/gemini.ps1", &["gemini.ps1"]),
+            ("/usr/bin/vim", &["vim", "claude"]),
+            ("/bin/zsh", &["-zsh"]),
+            ("/bin/sh", &["/bin/sh", "-c", "claude"]),
+            ("/bin/sh", &["/bin/sh", "/opt/bin/claude"]),
+            ("/usr/bin/python3", &["python3", "/x/aider"]),
+            ("/usr/bin/python3", &["python3", "/x/aider.py"]),
+            ("/x/cursor-agent", &["cursor-agent"]),
+            ("/x/claude-code-router", &["ccr"]),
+            (
+                "/usr/local/bin/node",
+                &["node", "/n/node_modules/claude-flow/cli.js"],
+            ),
+            (
+                "/usr/local/bin/node",
+                &["node", "/n/node_modules/codex-cli/codex"],
+            ),
+        ];
+        for (exe, a) in cases {
+            let a: Vec<String> = a.iter().map(|s| (*s).to_owned()).collect();
+            assert_eq!(
+                agent_program(exe, &a, &programs),
+                before(exe, &a, &programs),
+                "{exe} {a:?}"
+            );
+        }
     }
 }

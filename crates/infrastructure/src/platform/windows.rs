@@ -15,7 +15,7 @@ use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
 use super::{
     AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PlainPaths, PrivateFiles,
     ProcessTrees, Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals,
-    TerminalShells,
+    StatusLineHook, TerminalShell, TerminalShells, process_tree, windows_processes,
 };
 
 /// The child gets a console nobody sees.
@@ -258,18 +258,20 @@ impl AppFolders for Windows {
 }
 
 impl TerminalShells for Windows {
-    /// cmd.exe and PowerShell aren't covered, and a Git Bash would be
-    /// handed Windows paths to its scripts.
-    fn shell_integration() -> bool {
-        false
+    /// PowerShell only. cmd.exe has no hook before a command runs, nor
+    /// its status in `PROMPT`, so it can't mark one; and a Git Bash would
+    /// be handed Windows paths to its scripts.
+    fn integrated_shells() -> &'static [TerminalShell] {
+        &[TerminalShell::PowerShell]
     }
 }
 
 impl AgentHooks for Windows {
     /// Claude Code runs status lines through Git Bash or PowerShell,
-    /// whichever it finds: no way to know which, so Kumo's isn't used.
-    fn sh_status_line() -> bool {
-        false
+    /// whichever it finds: no way to know which, so Kumo's is a
+    /// `powershell.exe` command that runs the same in both.
+    fn status_line_hook() -> StatusLineHook {
+        StatusLineHook::PowerShell
     }
 }
 
@@ -289,9 +291,31 @@ impl Signals for Windows {
 }
 
 impl Processes for Windows {
-    /// Not read yet: terminals on Windows don't report agent CLIs.
-    fn process(_pid: u32) -> Option<RunningProcess> {
-        None
+    /// Its executable's path, its command line split as the C runtime
+    /// splits it, and its current directory (empty when it can't be read).
+    fn process(pid: u32) -> Option<RunningProcess> {
+        let exe = windows_processes::exe(pid)?;
+        let args = windows_processes::command_line(pid)
+            .map(|line| process_tree::split_command_line(&line))
+            .unwrap_or_default();
+        let cwd = windows_processes::cwd(pid).unwrap_or_default();
+        Some(RunningProcess { exe, args, cwd })
+    }
+
+    /// ConPTY has no process groups: one snapshot of every process, read
+    /// as [`process_tree::foreground`] says. Start times are read only
+    /// for what the walk compares, in the root's tree alone (see
+    /// [`process_tree::start_times_needed`]). Blocks: run it off the async
+    /// runtime.
+    fn foreground(root: u32) -> Option<u32> {
+        let mut rows = windows_processes::snapshot();
+        let needed = process_tree::start_times_needed(&rows, root);
+        for row in &mut rows {
+            if needed.contains(&row.pid) {
+                row.created = windows_processes::created(row.pid);
+            }
+        }
+        process_tree::foreground(&rows, root)
     }
 }
 

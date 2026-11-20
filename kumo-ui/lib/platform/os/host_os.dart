@@ -1,8 +1,10 @@
+import 'dart:io' as io show exit;
 import 'dart:io' show File, Platform, Process, ProcessException, ProcessStartMode;
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/widgets.dart' show SingleActivator;
 
+import '../updates.dart';
 import 'key_combo.dart';
 import 'linux.dart';
 import 'macos.dart';
@@ -132,6 +134,18 @@ abstract class HostOs {
   /// started; otherwise why it couldn't.
   Future<String?> openWorkspaceWindow(String id);
 
+  /// Starts Kumo ([exe], this executable by default) again once this
+  /// process ([pid], this one by default) has exited, then quits with
+  /// [exit]. False, without quitting, when this OS leaves that to someone
+  /// else (Sparkle on macOS) or the helper couldn't start. [start] and
+  /// [exit] stand in for `dart:io` in tests.
+  Future<bool> relaunchAfterExit({int? pid, String? exe, ProcessStarter start = Process.start, void Function(int code) exit = io.exit}) async => false;
+
+  /// New versions of Kumo here: none by default. [stopDaemon] runs before
+  /// Kumo quits to install or relaunch; [autoUpdate] is Settings ›
+  /// General › "Download updates automatically", for an updater that reads it.
+  AppUpdates updates({Future<void> Function()? stopDaemon, bool Function()? autoUpdate}) => AppUpdates();
+
   // Window.
 
   /// Whether the OS can draw a translucent backdrop behind Flutter.
@@ -168,6 +182,9 @@ List<String> ctrlKeyCaps(KeyCombo combo) {
   final a = ctrlKeyActivator(combo);
   return [if (a.control) 'Ctrl', if (a.alt) 'Alt', if (a.shift) 'Shift', k.keyName ?? spelledKeyNames[k.key] ?? plainKeyName(k.key)];
 }
+
+/// Starts a program, as [Process.start] does (injectable for tests).
+typedef ProcessStarter = Future<void> Function(String executable, List<String> arguments, {Map<String, String>? environment, ProcessStartMode mode});
 
 /// A shell Settings › Terminal offers: what runs, and what the menu says.
 typedef ShellChoice = ({String value, String label});

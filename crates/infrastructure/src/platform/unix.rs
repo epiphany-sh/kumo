@@ -8,7 +8,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
+use super::TerminalShell;
 use crate::process::run_with_timeout;
+
+/// zsh, bash and fish mark the commands run.
+pub(super) const INTEGRATED_SHELLS: &[TerminalShell] =
+    &[TerminalShell::Zsh, TerminalShell::Bash, TerminalShell::Fish];
 
 const MARK: &str = "__KUMO_PATH__";
 const SHELL_TIMEOUT: Duration = Duration::from_secs(5);
@@ -130,8 +135,13 @@ pub(super) fn owner_only_dir(dir: &Path) -> std::io::Result<()> {
 }
 
 /// Claude Code runs status lines with `sh`.
-pub(super) fn sh_status_line() -> bool {
-    true
+pub(super) fn status_line_hook() -> super::StatusLineHook {
+    super::StatusLineHook::Sh
+}
+
+/// The PTY's foreground process group tells (see `pty::portable`).
+pub(super) fn foreground(_root: u32) -> Option<u32> {
+    None
 }
 
 /// Ctrl-C or SIGTERM.

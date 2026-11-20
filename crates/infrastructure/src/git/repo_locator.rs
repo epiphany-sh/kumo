@@ -13,7 +13,7 @@ impl RepoLocator for GitDirLocator {
         let checkout = dir.ancestors().find(|d| d.join(".git").exists())?;
         let dot_git = checkout.join(".git");
         if dot_git.is_dir() {
-            return checkout.canonicalize().ok();
+            return resolved(checkout);
         }
         // "gitdir: <path>", relative to the checkout or absolute.
         let text = std::fs::read_to_string(&dot_git).ok()?;
@@ -21,14 +21,20 @@ impl RepoLocator for GitDirLocator {
         let common = match std::fs::read_to_string(git_dir.join("commondir")) {
             Ok(common) => git_dir.join(common.trim()),
             // A submodule: a repository of its own.
-            Err(_) => return checkout.canonicalize().ok(),
+            Err(_) => return resolved(checkout),
         };
-        let common = common.canonicalize().ok()?;
+        let common = resolved(&common)?;
         match common.file_name() {
             Some(name) if name == ".git" => common.parent().map(Path::to_path_buf),
-            _ => checkout.canonicalize().ok(),
+            _ => resolved(checkout),
         }
     }
+}
+
+/// `path` with its links resolved, in its plain form (no `\\?\` on
+/// Windows, so it matches the repositories' paths elsewhere).
+fn resolved(path: &Path) -> Option<PathBuf> {
+    path.canonicalize().ok().map(crate::platform::plain_path)
 }
 
 #[cfg(test)]
@@ -38,7 +44,7 @@ mod tests {
     #[test]
     fn a_folder_in_a_checkout_or_in_one_of_its_worktrees_is_the_repository() {
         let dir = tempfile::tempdir().unwrap();
-        let root = dir.path().canonicalize().unwrap();
+        let root = crate::platform::canonical(dir.path());
         let repo = root.join("app");
         std::fs::create_dir_all(repo.join(".git/worktrees/feat")).unwrap();
         std::fs::create_dir_all(repo.join("src/deep")).unwrap();
@@ -63,7 +69,7 @@ mod tests {
     #[test]
     fn a_submodule_is_a_repository_of_its_own() {
         let dir = tempfile::tempdir().unwrap();
-        let root = dir.path().canonicalize().unwrap();
+        let root = crate::platform::canonical(dir.path());
         std::fs::create_dir_all(root.join(".git/modules/lib")).unwrap();
         std::fs::create_dir_all(root.join("lib")).unwrap();
         std::fs::write(root.join("lib/.git"), "gitdir: ../.git/modules/lib\n").unwrap();

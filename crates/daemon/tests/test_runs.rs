@@ -1,20 +1,34 @@
 //! `Tests` service end to end: the command found from the worktree's
 //! files, run on a real PTY with fake tools on a PATH of their own.
-#![cfg(unix)]
 
 mod common;
 
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use common::{Attached, TIMEOUT, TestDaemon, git_repo, save_namespace};
 use kumo_grpc::client::KumoClient;
 use kumo_proto::v1 as pb;
 
-fn tool(bin: &Path, name: &str, body: &str) {
+/// A fake `name` in `bin/`: `unix` as a POSIX sh script, or `windows` as
+/// a batch file on Windows.
+fn tool(bin: &Path, name: &str, unix: &str, windows: &str) {
+    if cfg!(windows) {
+        let script = format!("@echo off\r\n{}\r\n", windows.replace('\n', "\r\n"));
+        std::fs::write(bin.join(format!("{name}.cmd")), script).unwrap();
+        return;
+    }
     let path = bin.join(name);
-    std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::fs::write(&path, format!("#!/bin/sh\n{unix}\n")).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+}
+
+/// A command as typed: `unix` for `sh`, or `windows` for `cmd.exe`.
+fn typed<'a>(unix: &'a str, windows: &'a str) -> &'a str {
+    if cfg!(windows) { windows } else { unix }
 }
 
 async fn worktree(daemon: &TestDaemon, client: &mut KumoClient) -> PathBuf {
@@ -79,6 +93,9 @@ async fn runs_the_makefile_target_and_reads_its_results() {
         "echo \"make $* in $(pwd)\"\n\
          echo '     Running unittests src/lib.rs (target/debug/deps/app-1a2b)'\n\
          echo 'test result: ok. 41 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.20s'",
+        "echo make %* in %CD%\n\
+         echo      Running unittests src/lib.rs (target/debug/deps/app-1a2b)\n\
+         echo test result: ok. 41 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.20s",
     );
 
     let mut stream = watch(&mut client, &wt).await;
@@ -131,7 +148,10 @@ async fn a_typed_command_fails_and_a_long_one_stops() {
         .tests
         .run(run(
             &wt,
-            "echo '--- FAIL: TestBulk (0.00s)'; echo 'FAIL\tacme/discount\t0.4s'; exit 1",
+            typed(
+                "echo '--- FAIL: TestBulk (0.00s)'; echo 'FAIL\tacme/discount\t0.4s'; exit 1",
+                "echo --- FAIL: TestBulk (0.00s)& echo FAIL\tacme/discount\t0.4s& exit 1",
+            ),
         ))
         .await
         .unwrap();
@@ -148,7 +168,10 @@ async fn a_typed_command_fails_and_a_long_one_stops() {
 
     client
         .tests
-        .run(run(&wt, "echo waiting; read line"))
+        .run(run(
+            &wt,
+            typed("echo waiting; read line", "echo waiting& set /p line="),
+        ))
         .await
         .unwrap();
     snapshot_where(&mut stream, |s| {
@@ -168,7 +191,7 @@ async fn a_typed_command_fails_and_a_long_one_stops() {
 
     let outside = client
         .tests
-        .run(run(Path::new("/tmp"), "true"))
+        .run(run(Path::new("/tmp"), typed("true", "exit 0")))
         .await
         .unwrap_err();
     assert_eq!(outside.code(), tonic::Code::NotFound);

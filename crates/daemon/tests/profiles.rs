@@ -439,15 +439,15 @@ async fn host_tokens_are_per_profile_and_go_with_it() {
     assert!(!host_token(&mut second, "github.com").await);
 }
 
-#[cfg(unix)]
 #[tokio::test(flavor = "multi_thread")]
 async fn terminals_belong_to_the_profile_that_opened_them() {
     let daemon = TestDaemon::start().await;
     let mut first = daemon.client().await;
     create(&mut first, "Workspace 1").await;
     let mut second = first.with_profile(Some("workspace-1"));
-    let mine = common::open(&mut first, "sleep", &["30"]).await;
-    let theirs = common::open(&mut second, "sleep", &["30"]).await;
+    let (program, args) = common::sleeper();
+    let mine = common::open(&mut first, program, args).await;
+    let theirs = common::open(&mut second, program, args).await;
 
     let ids = |list: pb::ListResponse| -> Vec<String> {
         list.terminals.into_iter().map(|t| t.terminal_id).collect()

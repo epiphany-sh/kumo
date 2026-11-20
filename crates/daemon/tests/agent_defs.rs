@@ -1,6 +1,7 @@
 //! `AgentDefs` end to end: your agents' files in a profile's Claude Code
 //! folder and in a repository, runs and test runs of a fake `claude` (a
 //! shell script that writes down how it was called).
+// Unix only: the fake CLIs are POSIX sh scripts made runnable with a mode bit.
 #![cfg(unix)]
 
 mod common;
