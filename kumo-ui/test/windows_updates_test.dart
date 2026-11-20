@@ -14,6 +14,9 @@ const _feedUrl = 'https://api.github.com/repos/$_repo/releases?per_page=20';
 const _localAppData = r'C:\Users\me\AppData\Local';
 const _installedExe = r'C:\Users\me\AppData\Local\Programs\Kumo\Kumo.exe';
 
+/// The updater's files live on the disk running the tests, any OS.
+final _sep = Platform.pathSeparator;
+
 String _zipUrl(String v) => 'https://github.com/$_repo/releases/download/v$v/Kumo-$v-windows-x64.zip';
 
 /// A release as GitHub's API lists it.
@@ -147,6 +150,22 @@ class _World {
 
   String get key => base64.encode(publicKey.bytes);
 
+  /// The download folders an updater holds. Windows locks a file per open
+  /// handle, so a second updater in this process is refused as another
+  /// Kumo would be; POSIX locks are per process and never refuse it.
+  final held = <String>{};
+
+  void Function()? lockFolder(String dir) {
+    if (held.contains(dir)) return null;
+    final release = lockUpdateFolder(dir);
+    if (release == null) return null;
+    held.add(dir);
+    return () {
+      held.remove(dir);
+      release();
+    };
+  }
+
   /// Publishes [releases]; each version's zip is signed (and hashed) unless
   /// told otherwise.
   Future<void> publish(List<Map<String, Object?>> releases, {Map<String, String> headers = const {}}) async {
@@ -185,6 +204,7 @@ class _World {
           return true;
         },
         autoUpdate: () => auto,
+        lockFolder: lockFolder,
         listenForExit: false,
       );
 }
@@ -274,9 +294,9 @@ void main() {
       final kumo = updates.readyDir!;
       final folder = Directory(kumo).parent.path;
       expect(w.folders().single, startsWith('0.9.0.4242.'), reason: 'this Kumo’s own folder');
-      expect(File('$kumo\\install.ps1').existsSync(), isTrue);
-      expect(File('$folder\\Kumo.zip').existsSync(), isTrue);
-      expect(File('$folder\\Kumo.zip.part').existsSync(), isFalse);
+      expect(File('$kumo${_sep}install.ps1').existsSync(), isTrue);
+      expect(File('$folder${_sep}Kumo.zip').existsSync(), isTrue);
+      expect(File('$folder${_sep}Kumo.zip.part').existsSync(), isFalse);
       updates.dispose();
     });
 
@@ -316,7 +336,7 @@ void main() {
       await w.publish([_release('0.9.0')]);
       // Someone's zip where every Kumo used to download, swapped in again
       // while this one downloads.
-      final shared = File('${w.dir.path}\\0.9.0\\Kumo.zip');
+      final shared = File('${w.dir.path}${_sep}0.9.0${_sep}Kumo.zip');
       await shared.create(recursive: true);
       await shared.writeAsString('evil zip 0.9.0');
       File? downloaded;
@@ -433,8 +453,8 @@ void main() {
       final (exe, args) = w.launcher.started.single;
       expect(exe.toLowerCase(), endsWith('powershell.exe'));
       final kumo = updates.readyDir!;
-      expect(kumo, startsWith('${w.dir.path}\\0.9.0.4242.'));
-      expect(args, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', '$kumo\\install.ps1', '-From', kumo, '-WaitPid', '4242']);
+      expect(kumo, startsWith('${w.dir.path}${_sep}0.9.0.4242.'));
+      expect(args, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', '$kumo${_sep}install.ps1', '-From', kumo, '-WaitPid', '4242']);
       updates.dispose();
     });
 
@@ -462,7 +482,7 @@ void main() {
 
     test('an installer gone missing does not quit, says so and downloads again', () async {
       final updates = await readyUpdates();
-      await File('${updates.readyDir}\\install.ps1').delete();
+      await File('${updates.readyDir}${_sep}install.ps1').delete();
       await updates.installAndRelaunch();
       expect(w.calls, ['stop kumod'], reason: 'Kumo keeps running');
       expect(w.launcher.started, isEmpty);
@@ -478,7 +498,7 @@ void main() {
 
     test('quitting with its installer gone missing starts nothing', () async {
       final updates = await readyUpdates();
-      await File('${updates.readyDir}\\install.ps1').delete();
+      await File('${updates.readyDir}${_sep}install.ps1').delete();
       expect(await updates.installOnQuit(), AppExitResponse.exit);
       expect(w.calls, isEmpty);
       updates.dispose();
@@ -527,8 +547,8 @@ void main() {
 
       final updates = w.updates();
       await updates.settled;
-      expect(File('$held\\install.ps1').existsSync(), isTrue, reason: 'still in use');
-      expect(File('$held\\Kumo.exe').existsSync(), isTrue);
+      expect(File('$held${_sep}install.ps1').existsSync(), isTrue, reason: 'still in use');
+      expect(File('$held${_sep}Kumo.exe').existsSync(), isTrue);
       expect(Directory('${w.dir.path}/0.8.2').existsSync(), isFalse, reason: 'no one holds it');
       updates.dispose();
       other.dispose();
