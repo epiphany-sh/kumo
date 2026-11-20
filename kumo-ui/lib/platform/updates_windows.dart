@@ -327,6 +327,24 @@ typedef UpdateExtractor = Future<void> Function(String zip, String into);
 /// The version an executable says it is (`X.Y.Z+build`), or null.
 typedef ExeVersionReader = Future<String?> Function(String exe);
 
+/// Holds the download folder [dir] for this Kumo until the function it
+/// returns runs; null when another Kumo holds it.
+typedef UpdateFolderLock = void Function()? Function(String dir);
+
+/// [UpdateFolderLock] by [dir]'s `.lock`, locked exclusively. Windows
+/// locks per open handle, so another Kumo (or another updater) is refused.
+void Function()? lockUpdateFolder(String dir) {
+  RandomAccessFile? file;
+  try {
+    file = File(WindowsUpdates._join(dir, '.lock')).openSync(mode: FileMode.append);
+    file.lockSync(FileLock.exclusive);
+    return file.closeSync;
+  } on FileSystemException {
+    file?.closeSync();
+    return null;
+  }
+}
+
 /// The `ProductVersion` in a Windows executable's version resource (UTF-16
 /// strings: the key, padding, the value); null when there is none. Kumo's
 /// is `flutter build --build-name` plus `+` and the build number
@@ -409,8 +427,10 @@ class WindowsUpdates extends AppUpdates {
     this.stopDaemon,
     Future<bool> Function()? relaunchApp,
     bool Function()? autoUpdate,
+    UpdateFolderLock? lockFolder,
     bool listenForExit = true,
   })  : config = config ?? UpdateConfig.fromEnvironment(Platform.environment),
+        _lockFolder = lockFolder ?? lockUpdateFolder,
         _launcher = launcher ?? const _IoLauncher(),
         _timer = timer ?? Timer.new,
         _now = now ?? DateTime.now,
@@ -441,6 +461,7 @@ class WindowsUpdates extends AppUpdates {
   final UpdateExtractor? _extract;
   final ExeVersionReader _exeVersion;
   final Future<bool> Function() _relaunchApp;
+  final UpdateFolderLock _lockFolder;
   /// Settings › General › "Download updates automatically", read before
   /// each background check; a manual [check] runs anyway.
   final bool Function() autoUpdate;
@@ -525,7 +546,9 @@ class WindowsUpdates extends AppUpdates {
     }
   }
 
-  static String _join(String dir, String name) => '$dir\\$name';
+  /// [name] in [dir]: `\` on Windows, where this runs; the host's separator
+  /// in tests on other OSes.
+  static String _join(String dir, String name) => '$dir${Platform.pathSeparator}$name';
 
   /// This Kumo's own download folder for [version]: every workspace window
   /// is a Kumo process of its own, and none trusts another's files.
@@ -542,7 +565,7 @@ class WindowsUpdates extends AppUpdates {
     try {
       await dir.create(recursive: true);
       // Held while this Kumo runs: another one starting leaves the folder be.
-      _locks[dir.path] = _lock(dir.path) ?? (throw _UpdateError('Couldn’t download Kumo $version: its folder is in use.'));
+      _locks[dir.path] = _lockFolder(dir.path) ?? (throw _UpdateError('Couldn’t download Kumo $version: its folder is in use.'));
       final part = File(_join(dir.path, 'Kumo.zip.part'));
       try {
         await _net.download(release.zip, part);
@@ -593,26 +616,13 @@ class WindowsUpdates extends AppUpdates {
     }
   }
 
-  /// Each download folder's `.lock`, held exclusively while this Kumo runs.
-  final _locks = <String, RandomAccessFile>{};
-
-  /// [dir]'s `.lock`, held exclusively; null when another Kumo holds it.
-  static RandomAccessFile? _lock(String dir) {
-    RandomAccessFile? file;
-    try {
-      file = File(_join(dir, '.lock')).openSync(mode: FileMode.append);
-      file.lockSync(FileLock.exclusive);
-      return file;
-    } on FileSystemException {
-      file?.closeSync();
-      return null;
-    }
-  }
+  /// Each download folder's release, held while this Kumo runs.
+  final _locks = <String, void Function()>{};
 
   /// Lets go of [dir], one of this Kumo's, and deletes it.
   void _discard(Directory dir) {
     try {
-      _locks.remove(dir.path)?.closeSync();
+      _locks.remove(dir.path)?.call();
     } on FileSystemException {
       // Closed already.
     }
@@ -652,9 +662,9 @@ class WindowsUpdates extends AppUpdates {
         if (entry is! Directory) continue;
         if (File(_join(entry.path, '.lock')).existsSync()) {
           // Another Kumo's, still running: its update may be about to install.
-          final held = _lock(entry.path);
-          if (held == null) continue;
-          held.closeSync();
+          final release = _lockFolder(entry.path);
+          if (release == null) continue;
+          release();
         }
         _deleteQuietly(entry);
       }
