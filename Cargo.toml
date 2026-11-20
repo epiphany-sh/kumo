@@ -60,6 +60,8 @@ hdrhistogram = "7.6.0"
 tempfile = "3.27.0"
 rusqlite = { version = "0.41.0", features = ["bundled"] }
 notify = "8.2.1"
+# .gitignore rules, so the watcher skips what git skips (build output).
+ignore = "0.4.34"
 # Task sources: blocking HTTP on the OS's TLS (Security.framework, SChannel),
 # and API tokens in the OS keychain.
 ureq = { version = "3.5.0", default-features = false, features = ["native-tls-no-default", "json", "gzip"] }

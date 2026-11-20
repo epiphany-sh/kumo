@@ -1,6 +1,7 @@
-//! Benchmark scenarios (kumo.md §10: M0 terminals, M4 tasks).
+//! Benchmark scenarios (kumo.md §10: M0 terminals, M4 tasks; git).
 
 pub mod echo;
+pub mod git;
 pub mod hello;
 pub mod tasks;
 pub mod throughput;

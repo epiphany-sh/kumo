@@ -54,6 +54,8 @@ enum Scenario {
     Throughput,
     /// Listing and filtering 10,000 tasks from the local cache.
     Tasks,
+    /// Git processes the daemon starts for a build and for edits.
+    Git,
     /// All of the above with default parameters.
     All,
 }
@@ -79,11 +81,13 @@ async fn main() -> anyhow::Result<()> {
         } => scenarios::echo::run(&mut client, iterations, warmup, pause_ms).await?,
         Scenario::Throughput => scenarios::throughput::run(&mut client).await?,
         Scenario::Tasks => scenarios::tasks::run(&mut client).await?,
+        Scenario::Git => scenarios::git::run(&mut client, daemon.git_trace()).await?,
         Scenario::All => {
             scenarios::hello::run(&mut client, 10_000, 1_000).await?;
             scenarios::echo::run(&mut client, 1_000, 100, 2).await?;
             scenarios::throughput::run(&mut client).await?;
             scenarios::tasks::run(&mut client).await?;
+            scenarios::git::run(&mut client, daemon.git_trace()).await?;
         }
     }
     Ok(())
