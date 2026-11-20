@@ -4,6 +4,7 @@ import 'dart:io' show File, Platform, Process, ProcessException, ProcessStartMod
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/widgets.dart' show SingleActivator;
 
+import '../../terminal/terminal_keys.dart' show terminalPaths;
 import '../updates.dart';
 import 'key_combo.dart';
 import 'linux.dart';
@@ -72,6 +73,13 @@ abstract class HostOs {
   /// What a new terminal runs for the shell [chosen] in Settings: that one
   /// while it's offered (so installed), else [shell].
   String resolveShell(String? chosen) => (chosen == null ? null : offeredShell(chosen)) ?? shell;
+
+  /// [paths] (pasted or dropped files) as [shell], the program the pane
+  /// runs (null when unknown), takes them on its command line: backslash
+  /// escapes by default ([terminalPaths]). A line break in a path stays,
+  /// escaped (a POSIX file can have one, and `\` before it continues the
+  /// line); Windows leaves such paths out.
+  String shellPaths(List<String> paths, {String? shell}) => terminalPaths(paths);
 
   /// Settings → Terminal → Shell, said for the user.
   String get shellDescription => 'Login shell for new tabs (${paneShortcutLabel(PaneShortcut.newTab)}) and splits.';

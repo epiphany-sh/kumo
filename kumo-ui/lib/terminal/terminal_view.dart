@@ -693,7 +693,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     final surface = widget.surface;
     if (!surface.interactive) return;
     final paths = await Pasteboard.paths();
-    final text = paths != null ? terminalPaths(paths) : (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+    final text = paths != null ? _shellPaths(paths) : (await Clipboard.getData(Clipboard.kTextPlain))?.text;
     if (text == null || text.isEmpty || !mounted || widget.surface != surface) return;
     _pasteText(text);
   }
@@ -711,15 +711,24 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     surface.sendBytes(terminalPaste(text, bracketed: modes?.bracketedPaste ?? false));
   }
 
-  // ---- Files dropped from Finder go in as their paths, on the pane under
+  // ---- Files dropped from Finder or Explorer go in as their paths, on the pane under
   // the pointer.
 
   StreamSubscription<FileDrop>? _drops;
 
   void _onDrop(FileDrop drop) {
     if (!mounted || !widget.surface.interactive || drop.paths.isEmpty || !_shownAt(drop.position)) return;
-    _pasteText(terminalPaths(drop.paths));
+    // Empty when every path was left out (HostOs.shellPaths).
+    final text = _shellPaths(drop.paths);
+    if (text.isEmpty) return;
+    _pasteText(text);
     _focus.requestFocus();
+  }
+
+  /// [paths] quoted for the program this pane runs.
+  String _shellPaths(List<String> paths) {
+    final surface = widget.surface;
+    return hostOs.shellPaths(paths, shell: surface is ShellProgram ? surface.program : null);
   }
 
   /// Whether this pane is what shows at [global]: not offstage (another

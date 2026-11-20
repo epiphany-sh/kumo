@@ -10,9 +10,10 @@ import 'os/macos.dart';
 /// left).
 typedef FileDrop = ({List<String> paths, Offset position});
 
-/// The clipboard and dropped files, through the macOS runner
-/// (`MainFlutterWindow.swift`). Elsewhere there is nothing: ⌘V pastes text.
-/// The open dialog is the runner's on macOS and file_selector's elsewhere.
+/// The clipboard and dropped files, through the runner: macOS
+/// (`MainFlutterWindow.swift`) and Windows (`windows/runner/pasteboard.cpp`).
+/// Elsewhere there is nothing: a paste is text. The open dialog is the
+/// runner's on macOS and file_selector's elsewhere.
 class Pasteboard {
   Pasteboard._();
 

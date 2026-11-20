@@ -184,4 +184,59 @@ void main() {
       expect((flags('\x1b[?1000l'), screen.mouseDrags, screen.mouseHover), (false, false, false));
     });
   });
+
+  group('overwriting half of a wide glyph blanks the other half', () {
+    test('printing over its second cell', () {
+      expect(screenText(fed('漢x\r\x1b[1Ca')).first, ' ax');
+    });
+
+    test('printing over its first cell', () {
+      expect(screenText(fed('漢x\ra')).first, 'a x');
+    });
+
+    test('a wide glyph straddling two others', () {
+      expect(screenText(fed('漢字\r\x1b[1C中')).first, ' 中');
+    });
+
+    test('erasing characters over either half', () {
+      expect(screenText(fed('漢漢\r\x1b[1C\x1b[1X')).first, '  漢');
+      expect(screenText(fed('漢x\r\x1b[X')).first, '  x');
+      expect(screenText(fed('x漢\x1b[1D\x1b[K')).first, 'x');
+    });
+
+    test('deleting and inserting characters inside one', () {
+      expect(screenText(fed('a漢b\r\x1b[2C\x1b[P')).first, 'a b');
+      expect(screenText(fed('a漢b\r\x1b[2C\x1b[@')).first, 'a   b');
+    });
+
+    test('inserting pushes one half off the right edge', () {
+      expect(screenText(fed('ab漢\r\x1b[@', cols: 4)).first, ' ab');
+    });
+  });
+
+  group('REP repeats the last printed character', () {
+    test('n times, once by default', () {
+      expect(screenText(fed('ahora \x1b[2bvamos')).first, 'ahora   vamos');
+      expect(screenText(fed('x\x1b[b')).first, 'xx');
+    });
+
+    test('wrapping at the edge, wide glyphs included', () {
+      expect(screenText(fed('abc\x1b[3b', cols: 4)).take(2), ['abcc', 'cc']);
+      expect(screenText(fed('漢\x1b[b')).first, '漢漢');
+    });
+  });
+
+  test('a pending wrap survives SGR: the next character starts the next line', () {
+    expect(screenText(fed('abcd\x1b[0;31me', cols: 4)).take(2), ['abcd', 'e']);
+  });
+
+  test('autowrap off (DECAWM) keeps overwriting the last column', () {
+    expect(screenText(fed('\x1b[?7labcdef', cols: 4)).take(2), ['abcf', '']);
+    expect(screenText(fed('\x1b[?7l\x1b[?7habcdef', cols: 4)).take(2), ['abcd', 'ef']);
+  });
+
+  test('a CSI with an intermediate byte it does not know is ignored', () {
+    // SL (scroll left) and DECSCUSR (cursor style), not ICH.
+    expect(screenText(fed('abc\r\x1b[1 @\x1b[2 q')).first, 'abc');
+  });
 }

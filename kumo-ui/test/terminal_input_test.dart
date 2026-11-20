@@ -15,8 +15,8 @@ import 'package:kumo_ui/theme/kumo_theme.dart';
 import 'package:kumo_ui/theme/palette.dart';
 
 /// An interactive surface backed by the real parser, recording input.
-class _FakeShell implements TerminalModes {
-  _FakeShell() {
+class _FakeShell implements TerminalModes, ShellProgram {
+  _FakeShell({this.program = 'zsh'}) {
     _screen.feed(utf8.encode('\x1b[1;32m~\x1b[0m ❯ '));
     _buffer.value = _screen.snapshot();
   }
@@ -25,6 +25,9 @@ class _FakeShell implements TerminalModes {
   final _buffer = ValueNotifier(const TermBuffer([]));
   final sent = <List<int>>[];
   (int, int)? size;
+
+  @override
+  final String program;
 
   @override
   String get title => 'zsh';
@@ -63,8 +66,8 @@ class _FakeShell implements TerminalModes {
   bool get sgrMouse => _screen.sgrMouse;
 }
 
-Future<_FakeShell> _pumpShell(WidgetTester tester) async {
-  final shell = _FakeShell();
+Future<_FakeShell> _pumpShell(WidgetTester tester, {String program = 'zsh'}) async {
+  final shell = _FakeShell(program: program);
   await tester.pumpWidget(KumoTheme(
     mode: KumoThemeMode.dark,
     palette: KumoPalette.dark,
@@ -320,6 +323,28 @@ void main() {
       await tester.pump();
       expect(shell.sent.map(utf8.decode).toList(), ['\x1b[200~/Users/me/Desktop/Screen\\ Shot.png\x1b[201~', '\x1b[200~plain text\x1b[201~']);
     }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+    testWidgets('on Windows Ctrl+Shift+V pastes a copied file or screenshot quoted for PowerShell', (tester) async {
+      debugHostOs = WindowsOs(const {});
+      addTearDown(() => debugHostOs = null);
+      final shell = await _pumpShell(tester, program: r'C:\Program Files\PowerShell\7\pwsh.exe');
+      onClipboard = [r'C:\Users\me\AppData\Local\Temp\kumo-paste\image-1.png', r"C:\My Files\it's.png"];
+      await holding(tester, [ctrl, shift], LogicalKeyboardKey.keyV);
+      await tester.pump();
+      onClipboard = null;
+      await holding(tester, [ctrl, shift], LogicalKeyboardKey.keyV);
+      await tester.pump();
+      expect(shell.sent.map(utf8.decode).toList(), [r"C:\Users\me\AppData\Local\Temp\kumo-paste\image-1.png 'C:\My Files\it''s.png'", 'plain text']);
+    });
+
+    testWidgets('on Windows files dropped on a cmd.exe pane go in double-quoted', (tester) async {
+      debugHostOs = WindowsOs(const {});
+      addTearDown(() => debugHostOs = null);
+      final shell = await _pumpShell(tester, program: r'C:\Windows\system32\cmd.exe');
+      await drop([r'C:\My Files\a.png', r'C:\b.txt'], tester.getCenter(find.byType(TerminalCanvas)));
+      await tester.pump();
+      expect(shell.sent.map(utf8.decode).toList(), [r'"C:\My Files\a.png" C:\b.txt']);
+    });
 
     testWidgets('files dropped go to the pane under the pointer, not one offstage', (tester) async {
       final shown = _FakeShell();
