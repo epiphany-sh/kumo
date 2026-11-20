@@ -1,6 +1,5 @@
 //! `PullRequests` end to end, over real gRPC and a real repository. Never
 //! reaches a host: there's no token, or the branch isn't pushed.
-#![cfg(unix)]
 
 mod common;
 

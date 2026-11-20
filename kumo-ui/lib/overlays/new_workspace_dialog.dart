@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../app/app_state.dart';
 import '../data/profiles_source.dart';
 import '../platform/new_window.dart';
+import '../platform/os/key_combo.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
@@ -268,7 +269,7 @@ class _NewWorkspaceDialogState extends State<NewWorkspaceDialog> {
         KButton.primary(
           label: _busy ? 'Creating…' : 'Create workspace',
           onTap: name.isEmpty || _busy || !s.profiles.canManage ? null : _create,
-          trailing: Kbd('⌘↩', color: c.accText, background: const Color(0x33FFFFFF)),
+          trailing: Kbd(AppKeys.submitOnButton.label, color: c.accText, background: const Color(0x33FFFFFF)),
         ),
       ]),
     ];
@@ -295,7 +296,7 @@ class _NewWorkspaceDialogState extends State<NewWorkspaceDialog> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${p.name} is ready', style: sans(13, weight: FontWeight.w600, color: c.ok)),
               Text(
-                'Until you connect its accounts, each view says what’s missing.${n > 0 && n <= 9 ? ' Switch with ⌃⌘$n.' : ''}',
+                'Until you connect its accounts, each view says what’s missing.${n > 0 && n <= 9 ? ' Switch with ${AppKeys.workspace(n).label}.' : ''}',
                 style: sans(12.5, color: c.text2, height: 1.45),
               ),
             ]),

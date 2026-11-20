@@ -13,7 +13,7 @@ use keyring_core::{CredentialStore, Error as KeyringError};
 use super::{
     AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PlainPaths, PrivateFiles,
     ProcessTrees, Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals,
-    TerminalShells, unix,
+    StatusLineHook, TerminalShell, TerminalShells, unix,
 };
 
 pub struct MacOs;
@@ -99,14 +99,14 @@ impl AppFolders for MacOs {
 }
 
 impl TerminalShells for MacOs {
-    fn shell_integration() -> bool {
-        true
+    fn integrated_shells() -> &'static [TerminalShell] {
+        unix::INTEGRATED_SHELLS
     }
 }
 
 impl AgentHooks for MacOs {
-    fn sh_status_line() -> bool {
-        unix::sh_status_line()
+    fn status_line_hook() -> StatusLineHook {
+        unix::status_line_hook()
     }
 }
 
@@ -171,5 +171,9 @@ impl Processes for MacOs {
             args: args.split_whitespace().map(str::to_owned).collect(),
             cwd,
         })
+    }
+
+    fn foreground(root: u32) -> Option<u32> {
+        unix::foreground(root)
     }
 }

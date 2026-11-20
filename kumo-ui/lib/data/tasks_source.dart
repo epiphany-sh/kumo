@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../platform/os/host_os.dart';
 import 'mock_task_details.dart';
 import 'mock_tasks.dart';
 import 'models.dart';
@@ -18,6 +19,12 @@ enum TaskSourceKind {
   final String blurb;
 
   bool get needsSecret => this == jira || this == todoist;
+
+  /// The ones this OS can connect: Bear is a Mac app.
+  static List<TaskSourceKind> get offered => [for (final k in values) if (k != bear || hostOs.hasBear) k];
+
+  /// [offered], said as a list ("Obsidian, Bear, GitHub, Jira, Todoist").
+  static String get offeredNames => offered.map((k) => k.label).join(', ');
 }
 
 enum TaskPriority { none, low, medium, high, urgent }

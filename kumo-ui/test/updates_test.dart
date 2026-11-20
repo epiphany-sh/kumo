@@ -1,7 +1,13 @@
+import 'dart:io' as io show exit;
+import 'dart:io' show Process;
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/app/kumo_app.dart';
+import 'package:kumo_ui/platform/os/host_os.dart';
+import 'package:kumo_ui/platform/os/key_combo.dart';
+import 'package:kumo_ui/platform/os/windows.dart';
 import 'package:kumo_ui/platform/updates.dart';
 
 /// Sparkle as the runner would drive it.
@@ -19,6 +25,22 @@ class _Updates extends AppUpdates {
 
   @override
   Future<void> installAndRelaunch() async => installs++;
+}
+
+/// An updater Settings can ask to check (Windows).
+class _CheckingUpdates extends AppUpdates {
+  var checks = 0;
+
+  @override
+  bool get canCheck => true;
+
+  @override
+  Future<void> check() async {
+    checks++;
+    setStatus(const UpdateChecking());
+  }
+
+  void finish(UpdateStatus status) => setStatus(status);
 }
 
 void main() {
@@ -67,6 +89,40 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  Future<void> openSettings(WidgetTester tester, AppUpdates updates) async {
+    tester.view.physicalSize = const Size(1440, 960);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(KumoApp(state: AppState(demoWallpaper: true, updates: updates)));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Settings (${AppKeys.settings.label})'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  testWidgets('Settings › General checks for updates by hand where Kumo can, and says how it went', (tester) async {
+    final updates = _CheckingUpdates();
+    await openSettings(tester, updates);
+    expect(find.text('Check for Updates…'), findsOneWidget);
+    expect(find.text(describeUpdateStatus(const UpdateIdle())), findsOneWidget);
+
+    await tester.tap(find.text('Check for Updates…'));
+    await tester.pump();
+    expect(updates.checks, 1);
+    expect(find.text('Checking…'), findsOneWidget);
+
+    updates.finish(const UpdateReady('0.9.0'));
+    await tester.pump();
+    expect(find.text('Kumo 0.9.0 is ready: restart to install it.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Settings › General has no update check where the OS updater checks by itself', (tester) async {
+    await openSettings(tester, _Updates());
+    expect(find.text('Check for Updates…'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   test('Sparkle installs only once the daemon has stopped', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
     final calls = <String>[];
@@ -83,4 +139,28 @@ void main() {
     await updates.relaunch();
     expect(calls, ['stop kumod', 'install', 'stop kumod', 'relaunch']);
   });
+
+  test('without the macOS runner, relaunch stops the daemon and asks the OS to start Kumo again', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(const MethodChannel('kumo/updates'), null);
+    final calls = <String>[];
+    debugHostOs = _RelaunchingOs(calls);
+    addTearDown(() => debugHostOs = null);
+    final updates = SparkleUpdates(stopDaemon: () async => calls.add('stop kumod'));
+    await updates.relaunch();
+    expect(calls, ['stop kumod', 'relaunch after exit']);
+  });
+}
+
+/// An OS that records being asked to relaunch.
+class _RelaunchingOs extends WindowsOs {
+  _RelaunchingOs(this.calls) : super(const {});
+
+  final List<String> calls;
+
+  @override
+  Future<bool> relaunchAfterExit({int? pid, String? exe, ProcessStarter start = Process.start, void Function(int code) exit = io.exit}) async {
+    calls.add('relaunch after exit');
+    return true;
+  }
 }

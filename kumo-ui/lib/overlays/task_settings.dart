@@ -5,6 +5,7 @@ import '../data/tasks_source.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/kicons.dart';
+import '../platform/os/host_os.dart';
 
 /// One option of a kind of source, as the form shows it.
 class _Field {
@@ -115,7 +116,7 @@ class _TaskSourceSettingsPanelState extends State<TaskSourceSettingsPanel> {
       ],
       if (_detected.isNotEmpty) ...[
         const SizedBox(height: 16),
-        Text('Found on this Mac', style: sans(12, weight: FontWeight.w600, color: c.text2)),
+        Text('Found on ${hostOs.machineName}', style: sans(12, weight: FontWeight.w600, color: c.text2)),
         for (final d in _detected) ...[
           const SizedBox(height: 8),
           _DetectedRow(found: d, onAdd: () => _addDetected(tasks, d)),
@@ -135,7 +136,7 @@ class _TaskSourceSettingsPanelState extends State<TaskSourceSettingsPanel> {
       else
         Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
           Text('Add', style: sans(12.5, color: c.text2)),
-          for (final kind in TaskSourceKind.values)
+          for (final kind in TaskSourceKind.offered)
             KButton(label: kind.label, height: 30, fontSize: 12.5, onTap: () => setState(() => _adding = kind)),
         ]),
     ]);

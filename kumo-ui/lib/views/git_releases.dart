@@ -480,7 +480,7 @@ class _ReleaseDetail extends StatelessWidget {
     if (!s.agents.live) return s.notify('Agents run once Kumo’s engine is connected');
     if (s.agents.connected.isEmpty) return s.notify('Connect an agent in Settings › AI agents');
     final dir = mainCheckoutOf(s, source);
-    if (dir == null) return s.notify('${source.repo.name} has no checkout on this Mac');
+    if (dir == null) return s.notify('${source.repo.name} has no checkout on ${hostOs.machineName}');
     final r = release;
     final run = await s.agents.start(
       worktreePath: dir,

@@ -17,6 +17,7 @@ dirs.workspace = true
 tracing.workspace = true
 rusqlite.workspace = true
 notify.workspace = true
+ignore.workspace = true
 ureq.workspace = true
 base64.workspace = true
 sha2.workspace = true
@@ -29,6 +30,17 @@ apple-native-keyring-store.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-native-keyring-store.workspace = true
+# The PATH saved in the registry; already in the tree through portable-pty.
+winreg = "0.10.1"
+# Reading other processes (an agent CLI started by hand in a terminal);
+# already in the tree through tokio, notify and portable-pty.
+windows-sys = { workspace = true, features = [
+    "Wdk_System_Threading",
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Threading",
+] }
 
 [dev-dependencies]
 tempfile.workspace = true

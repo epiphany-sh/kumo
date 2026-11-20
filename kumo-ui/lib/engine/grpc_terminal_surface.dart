@@ -17,7 +17,7 @@ import 'kumo_engine.dart';
 ///
 /// Output is parsed as it arrives but published at most once per frame
 /// (kumo.md §5.6). Keystrokes typed before the stream is up are queued.
-class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
+class GrpcTerminalSurface implements TerminalModes, ShellProgram, CommandHistorySource {
   /// Opens the user's login shell in [directory] (their home directory by
   /// default). The PTY is opened at the pane's real size, once it is first
   /// laid out.
@@ -25,9 +25,13 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
   /// [adopt] may hand over a terminal the daemon already runs instead.
   ///
   /// With [rememberCommands], the daemon remembers what it runs (Settings →
-  /// Terminal).
-  GrpcTerminalSurface.shell(this._engine, {String? directory, this.onExit, Future<TerminalInfo?> Function()? adopt, this.rememberCommands = true})
-      : title = _shellName,
+  /// Terminal). [shell] is the one chosen there (see [HostOs.resolveShell]).
+  GrpcTerminalSurface.shell(KumoEngine engine, {String? directory, String? shell, void Function(int exitCode)? onExit, Future<TerminalInfo?> Function()? adopt, bool rememberCommands = true})
+      : this._shell(engine, hostOs.resolveShell(shell), directory: directory, onExit: onExit, adopt: adopt, rememberCommands: rememberCommands);
+
+  GrpcTerminalSurface._shell(this._engine, String program, {String? directory, this.onExit, Future<TerminalInfo?> Function()? adopt, this.rememberCommands = true})
+      : title = _nameOf(program),
+        _program = program,
         cwd = _shorten(directory),
         _directory = directory,
         _existingId = null,
@@ -51,6 +55,7 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
         cwd = _shorten(directory),
         _directory = directory,
         _existingId = terminalId,
+        _program = program,
         rememberCommands = false,
         _adopt = null {
     _run();
@@ -59,6 +64,13 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
   final KumoEngine _engine;
   final String? _existingId;
   final String? _directory;
+
+  /// The shell a new terminal starts (unused when re-attaching).
+  final String _program;
+
+  /// What runs: the shell, or the program re-attached to.
+  @override
+  String get program => _program;
 
   /// Whether closing the pane kills the process (shells) or only detaches.
   final bool killOnClose;
@@ -185,9 +197,11 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
     _render();
   }
 
-  static String get _shellPath => hostOs.shell;
-
-  static String get _shellName => _shellPath.split(Platform.pathSeparator).last;
+  /// `/bin/zsh` → zsh, `pwsh.exe` → pwsh: the pane header's name.
+  static String _nameOf(String program) {
+    final name = program.split(RegExp(r'[\\/]')).last;
+    return name.toLowerCase().endsWith('.exe') ? name.substring(0, name.length - 4) : name;
+  }
 
   static String get _home => hostOs.home ?? '';
 
@@ -212,7 +226,11 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
       }
       final input = _input = StreamController<TerminalInput>()
         ..add(TerminalInput(attach: AttachTo(terminalId: id, replayScrollback: true)));
-      if (existing != null) input.add(TerminalInput(resize: Resize(cols: _screen.cols, rows: _screen.rows)));
+      // A resize while it was opening went nowhere (no stream yet), and a
+      // terminal re-attached to has the size it had: send the pane's.
+      if (existing != null || (_screen.cols, _screen.rows) != (cols, rows)) {
+        input.add(TerminalInput(resize: Resize(cols: _screen.cols, rows: _screen.rows)));
+      }
       for (final bytes in _pending) {
         input.add(TerminalInput(data: bytes));
       }
@@ -240,8 +258,8 @@ class GrpcTerminalSurface implements TerminalModes, CommandHistorySource {
     final env = Platform.environment;
     final directory = _directory;
     return OpenRequest(
-      program: _shellPath,
-      args: hostOs.shellArgs,
+      program: _program,
+      args: hostOs.shellArgsFor(_program),
       cwd: directory == null || directory.isEmpty ? _home : directory,
       env: {
         'TERM_PROGRAM': 'kumo',

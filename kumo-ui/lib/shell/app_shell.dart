@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -6,6 +5,8 @@ import '../app/app_state.dart';
 import '../editor/comment.dart';
 import '../editor/quick_open.dart';
 import '../overlays/settings_dialog.dart';
+import '../platform/os/host_os.dart';
+import '../platform/os/key_combo.dart';
 import '../platform/window_effects.dart';
 import '../theme/kumo_theme.dart';
 import '../views/agents_screen.dart';
@@ -30,76 +31,59 @@ class AppShell extends StatelessWidget {
 
     Map<ShortcutActivator, VoidCallback> bindings() {
       final map = <ShortcutActivator, VoidCallback>{};
-      const keys = [
-        LogicalKeyboardKey.digit1,
-        LogicalKeyboardKey.digit2,
-        LogicalKeyboardKey.digit3,
-        LogicalKeyboardKey.digit4,
-        LogicalKeyboardKey.digit5,
-      ];
+      // App-wide keys answer both ⌘ and Ctrl (KeyCombo.activators).
+      void bind(KeyCombo combo, VoidCallback action) {
+        for (final a in combo.activators) {
+          map[a] = action;
+        }
+      }
+
       final nav = KumoView.nav;
-      for (var i = 0; i < keys.length && i < nav.length; i++) {
+      for (var i = 0; i < 5 && i < nav.length; i++) {
         final v = nav[i];
         // ⌘1 is Terminal in the side-nav: Home.
-        final VoidCallback go = v == KumoView.terminal ? s.showHome : () => s.view = v;
-        map[SingleActivator(keys[i], meta: true)] = go;
-        map[SingleActivator(keys[i], control: true)] = go;
+        bind(AppKeys.view(i), v == KumoView.terminal ? s.showHome : () => s.view = v);
       }
       // ⌃⌘1…9 (⌃⌥ off macOS): the workspaces, in switcher order.
-      const digits = [
-        LogicalKeyboardKey.digit1,
-        LogicalKeyboardKey.digit2,
-        LogicalKeyboardKey.digit3,
-        LogicalKeyboardKey.digit4,
-        LogicalKeyboardKey.digit5,
-        LogicalKeyboardKey.digit6,
-        LogicalKeyboardKey.digit7,
-        LogicalKeyboardKey.digit8,
-        LogicalKeyboardKey.digit9,
-      ];
-      for (var i = 0; i < digits.length; i++) {
-        map[SingleActivator(digits[i], control: true, meta: true)] = () => s.switchToProfileAt(i + 1);
-        map[SingleActivator(digits[i], control: true, alt: true)] = () => s.switchToProfileAt(i + 1);
+      for (var n = 1; n <= 9; n++) {
+        bind(AppKeys.workspace(n), () => s.switchToProfileAt(n));
       }
-      for (final mod in [true, false]) {
-        map[SingleActivator(LogicalKeyboardKey.keyL, meta: mod, control: !mod, shift: true)] = s.cycleTheme;
-        map[SingleActivator(LogicalKeyboardKey.keyN, meta: mod, control: !mod, shift: true)] = s.requestNewWorktree;
-        map[SingleActivator(LogicalKeyboardKey.keyS, meta: mod, control: !mod, alt: true)] = s.toggleSidebar;
-        map[SingleActivator(LogicalKeyboardKey.keyB, meta: mod, control: !mod, alt: true)] = s.toggleSidePanel;
-      }
+      bind(AppKeys.cycleTheme, s.cycleTheme);
+      bind(AppKeys.newWorktree, s.requestNewWorktree);
+      bind(AppKeys.toggleSidebar, s.toggleSidebar);
+      bind(AppKeys.toggleSidePanel, s.toggleSidePanel);
       // Terminal panes, iTerm-style (forwarded only while the Terminal view
-      // is showing): ⌘D split right, ⇧⌘D split down, ⌘W close, ⌘T new. In
+      // is showing): ⌘D split right, ⇧⌘D split down, ⌘W close, ⌘T new
+      // (Ctrl+Shift+D / E / W / T off macOS, see HostOs.paneShortcut). In
       // the full editor ⌘W closes its file instead.
       void close() => s.view == KumoView.files ? s.sendFileCommand(FileCommand.close) : s.sendTerminalCommand(TerminalCommand.closePane);
-      map[const SingleActivator(LogicalKeyboardKey.keyD, meta: true)] = () => s.sendTerminalCommand(TerminalCommand.splitRight);
-      map[const SingleActivator(LogicalKeyboardKey.keyD, meta: true, shift: true)] = () => s.sendTerminalCommand(TerminalCommand.splitDown);
-      map[const SingleActivator(LogicalKeyboardKey.keyW, meta: true)] = close;
-      map[const SingleActivator(LogicalKeyboardKey.keyT, meta: true)] = () => s.sendTerminalCommand(TerminalCommand.newTerminal);
-      map[const SingleActivator(LogicalKeyboardKey.comma, meta: true)] = () => showSettingsDialog(context);
-      map[const SingleActivator(LogicalKeyboardKey.comma, control: true)] = () => showSettingsDialog(context);
+      map[hostOs.paneShortcut(PaneShortcut.splitRight)] = () => s.sendTerminalCommand(TerminalCommand.splitRight);
+      map[hostOs.paneShortcut(PaneShortcut.splitDown)] = () => s.sendTerminalCommand(TerminalCommand.splitDown);
+      map[hostOs.paneShortcut(PaneShortcut.closePane)] = close;
+      map[hostOs.paneShortcut(PaneShortcut.newTab)] = () => s.sendTerminalCommand(TerminalCommand.newTerminal);
+      bind(AppKeys.settings, () => showSettingsDialog(context));
 
-      // The editor's keys: ⌘ on macOS, Ctrl elsewhere. Off macOS they only
-      // exist while a file shows, so a terminal keeps Ctrl+F, Ctrl+P, Ctrl+W
-      // (its shell's).
-      final mac = defaultTargetPlatform == TargetPlatform.macOS;
+      // The editor's keys: ⌘ on macOS, Ctrl elsewhere (AppKeys). Off macOS
+      // they only exist while a file shows, so a terminal keeps Ctrl+F,
+      // Ctrl+P, Ctrl+W (its shell's).
+      final mac = hostOs.commandKey;
       final fileShows = s.view == KumoView.files || (s.view == KumoView.terminal && ((s.activeContext == ContextTab.files && s.contextFile != null) || s.activeFile != null));
-      SingleActivator primary(LogicalKeyboardKey key, {bool shift = false, bool alt = false}) => SingleActivator(key, meta: mac, control: !mac, shift: shift, alt: alt);
       VoidCallback file(FileCommand command) => () => s.sendFileCommand(command);
       if (mac || s.view == KumoView.files || s.activeContext == ContextTab.files) {
         // ⌘P from anywhere: the Files tab (or the full editor) with the file.
-        map[primary(LogicalKeyboardKey.keyP)] = () => goToFile(context, s);
+        map[AppKeys.quickOpen.activator] = () => goToFile(context, s);
       }
       if (fileShows) {
-        if (!mac) map[const SingleActivator(LogicalKeyboardKey.keyW, control: true)] = close;
-        map[primary(LogicalKeyboardKey.keyS)] = file(FileCommand.save);
-        map[primary(LogicalKeyboardKey.keyF)] = file(FileCommand.find);
-        map[mac ? const SingleActivator(LogicalKeyboardKey.keyF, meta: true, alt: true) : const SingleActivator(LogicalKeyboardKey.keyH, control: true)] = file(FileCommand.replace);
-        map[primary(LogicalKeyboardKey.keyG)] = file(FileCommand.findNext);
-        map[primary(LogicalKeyboardKey.keyG, shift: true)] = file(FileCommand.findPrevious);
-        map[primary(LogicalKeyboardKey.keyV, shift: true)] = file(FileCommand.togglePreview);
+        if (!mac) map[AppKeys.closeFile.activator] = close;
+        map[AppKeys.save.activator] = file(FileCommand.save);
+        map[AppKeys.find.activator] = file(FileCommand.find);
+        map[AppKeys.replace.activator] = file(FileCommand.replace);
+        map[AppKeys.findNext.activator] = file(FileCommand.findNext);
+        map[AppKeys.findPrevious.activator] = file(FileCommand.findPrevious);
+        map[AppKeys.togglePreview.activator] = file(FileCommand.togglePreview);
         map[CommentKeyActivator(meta: mac)] = file(FileCommand.toggleComment);
-        map[primary(LogicalKeyboardKey.bracketRight, shift: true)] = file(FileCommand.nextTab);
-        map[primary(LogicalKeyboardKey.bracketLeft, shift: true)] = file(FileCommand.previousTab);
+        map[AppKeys.nextTab.activator] = file(FileCommand.nextTab);
+        map[AppKeys.previousTab.activator] = file(FileCommand.previousTab);
         map[const SingleActivator(LogicalKeyboardKey.tab, control: true)] = file(FileCommand.nextTab);
         map[const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true)] = file(FileCommand.previousTab);
       }

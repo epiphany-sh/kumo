@@ -168,9 +168,9 @@ Dependencias entre crates: `domain ← application ← {infrastructure, grpc} �
   `columna × ancho`, íconos centrados por celda, ancho doble (`cell_width.dart`), y powerline / box drawing /
   bloques dibujados como formas (`drawn_glyphs.dart`). Cada fila se graba en un `Picture` cacheado hasta que
   cambia. `make bench-ui` mide el costo en modo profile.
-- `lib/terminal/terminal_keys.dart`: teclas → bytes (convenciones xterm); ⌘ queda para los atajos de la app.
+- `lib/terminal/terminal_keys.dart`: teclas → bytes (convenciones xterm); ⌘ (Ctrl+Shift+T/W/D/E en Windows y Linux) queda para los atajos de la app.
 - La salida se parsea al llegar y se pinta como mucho una vez por frame (kumo.md §5.6).
 - Fuente de la terminal: GeistMono con fallback a **Symbols Nerd Font Mono** (MIT, v3.5.1,
   `assets/fonts/`), para los íconos de prompts como oh-my-posh o starship.
-- El panel del agente sigue siendo mock hasta M3; las shells (+, ⌘T, ⌘D) son reales.
+- El panel del agente sigue siendo mock hasta M3; las shells (+, ⌘T, ⌘D; Ctrl+Shift+T, Ctrl+Shift+D en Windows y Linux) son reales.
 - macOS: la app corre **sin App Sandbox** (ejecuta shells y lanza `kumod`).

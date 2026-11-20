@@ -10,6 +10,7 @@ import 'package:kumo_ui/shell/app_shell.dart';
 import 'package:kumo_ui/theme/kumo_theme.dart';
 import 'package:kumo_ui/theme/palette.dart';
 import 'package:kumo_ui/views/docs_screen.dart';
+import 'package:kumo_ui/platform/os/key_combo.dart';
 
 const _repo = 'internal/discount/repository.go';
 
@@ -101,7 +102,7 @@ void main() {
       expect(find.text('$_repo:$from-$to'), findsOneWidget, reason: 'what goes with the note');
       await tester.tap(find.text('Find bugs'));
       await tester.pump();
-      await tester.tap(find.text('Send to Claude Code ⌘↩'));
+      await tester.tap(find.text('Send to Claude Code ${AppKeys.submit.label}'));
       await _settle(tester);
       expect(agents.sent.single, contains('$_repo, lines $from–$to'));
       expect(agents.sent.single, endsWith('Look for bugs or edge cases here.'));

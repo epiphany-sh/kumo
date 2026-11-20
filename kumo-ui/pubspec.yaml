@@ -8,6 +8,10 @@ environment:
   flutter: ">=3.24.0"
 
 dependencies:
+  # Pure Dart ed25519 and SHA-256: Windows checks its updates' .sig with it.
+  cryptography: ^2.9.0
+  # The system's open dialog off macOS (the macOS runner has its own).
+  file_selector: ^1.1.0
   fixnum: ^1.1.1
   flutter:
     sdk: flutter
@@ -23,6 +27,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  file_selector_platform_interface: ^2.7.0
+  plugin_platform_interface: ^2.1.8
 
 flutter:
   uses-material-design: true

@@ -20,7 +20,7 @@ import 'engine/engine_worktree_changes.dart';
 import 'engine/kumo_engine.dart';
 import 'platform/app_icon.dart';
 import 'platform/new_window.dart';
-import 'platform/updates.dart';
+import 'platform/os/host_os.dart';
 import 'platform/window_effects.dart';
 
 Future<void> main() async {
@@ -38,7 +38,9 @@ Future<void> main() async {
   // otherwise on the default one, then back to the last one used.
   final launched = launchWorkspace;
   final profiles = EngineProfiles(primary, prefs, initial: launched);
-  final updates = SparkleUpdates(stopDaemon: primary.stopForUpdate);
+  // Sparkle on macOS, Kumo's own on Windows (it reads the setting before
+  // each background check), none elsewhere.
+  final updates = hostOs.updates(stopDaemon: primary.stopForUpdate, autoUpdate: () => prefs.get<bool>('general.autoUpdate', true));
 
   AppState stateFor(KumoEngine engine, {bool owner = false}) {
     final agents = EngineAgentsSource(engine);

@@ -1,6 +1,6 @@
 [package]
 name = "kumo-bench"
-description = "Reproducible benchmarks for the Kumo daemon (kumo.md §4): hello, echo, throughput."
+description = "Reproducible benchmarks for the Kumo daemon (kumo.md §4): hello, echo, throughput, tasks, git."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

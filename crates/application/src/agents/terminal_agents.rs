@@ -215,7 +215,14 @@ async fn follow(
         };
         if checked.elapsed() >= due {
             checked = Instant::now();
-            let pid = session.foreground();
+            // It may list every process (Windows): off the runtime.
+            let pid = {
+                let session = Arc::clone(&session);
+                tokio::task::spawn_blocking(move || session.foreground())
+                    .await
+                    .ok()
+                    .flatten()
+            };
             let new = pid != seen.pid;
             if new || (seen.agent.is_none() && pid.is_some() && seen.since.elapsed() < RECHECK_FOR)
             {

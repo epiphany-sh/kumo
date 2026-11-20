@@ -52,8 +52,6 @@ async fn second_instance_refuses_to_start() {
     );
 }
 
-// Needs a running terminal (`/bin/sh`), like the other terminal tests.
-#[cfg(unix)]
 #[tokio::test(flavor = "multi_thread")]
 async fn shutdown_stops_an_idle_daemon_and_refuses_a_busy_one() {
     let data_dir = tempfile::tempdir().unwrap();
@@ -69,7 +67,8 @@ async fn shutdown_stops_an_idle_daemon_and_refuses_a_busy_one() {
     let discovery = data_dir.path().join("data/daemon.json");
     assert!(discovery.exists());
 
-    let terminal = common::open(&mut client, "/bin/sh", &["-c", "sleep 30"]).await;
+    let (program, args) = common::sleeper();
+    let terminal = common::open(&mut client, program, args).await;
     let busy = client
         .core
         .shutdown(pb::ShutdownRequest { if_idle: true })

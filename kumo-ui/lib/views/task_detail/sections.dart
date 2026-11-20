@@ -363,7 +363,7 @@ class _NotSavedYet extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Not saved on this Mac yet', style: sans(13, weight: FontWeight.w600, color: c.text)),
+          Text('Not saved on ${hostOs.machineName} yet', style: sans(13, weight: FontWeight.w600, color: c.text)),
           const SizedBox(height: 6),
           Text(
             'The description, acceptance criteria, subtasks, links, attachments and comments arrive the first time this ticket opens online. Starting a worktree still works.',

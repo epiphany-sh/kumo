@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 
 import 'os/host_os.dart';
@@ -9,8 +10,10 @@ import 'os/macos.dart';
 /// left).
 typedef FileDrop = ({List<String> paths, Offset position});
 
-/// The clipboard and dropped files, through the macOS runner
-/// (`MainFlutterWindow.swift`). Elsewhere there is nothing: ⌘V pastes text.
+/// The clipboard and dropped files, through the runner: macOS
+/// (`MainFlutterWindow.swift`) and Windows (`windows/runner/pasteboard.cpp`).
+/// Elsewhere there is nothing: a paste is text. The open dialog is the
+/// runner's on macOS and file_selector's elsewhere.
 class Pasteboard {
   Pasteboard._();
 
@@ -30,12 +33,25 @@ class Pasteboard {
 
   static Stream<FileDrop> get drops => _drops.stream;
 
-  /// Whether [chooseFile] opens a dialog here (the macOS runner).
-  static bool get canChoose => hostOs is MacOs;
+  /// Whether [chooseFile] opens a dialog here.
+  static bool get canChoose => true;
+
+  /// Whether the runner opens the dialog (and can work with what it picked,
+  /// see `AppIcons.canMakeOwn`): macOS.
+  static bool get runnerChooses => hostOs is MacOs;
 
   /// A file picked with the system's open panel ([extensions] only), or
   /// null when cancelled or not available.
   static Future<String?> chooseFile({List<String> extensions = const [], String message = ''}) async {
+    if (!runnerChooses) {
+      // file_selector's dialogs have no room for [message].
+      final types = extensions.isEmpty ? const <XTypeGroup>[] : [XTypeGroup(label: 'Files', extensions: extensions)];
+      try {
+        return (await openFile(acceptedTypeGroups: types))?.path;
+      } on MissingPluginException {
+        return null;
+      }
+    }
     try {
       return await _channel.invokeMethod<String>('chooseFile', {'extensions': extensions, 'message': message});
     } on MissingPluginException {

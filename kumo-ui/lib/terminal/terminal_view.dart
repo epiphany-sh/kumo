@@ -12,6 +12,8 @@ import 'package:flutter/services.dart';
 import '../app/app_state.dart';
 import '../engine/grpc_terminal_surface.dart';
 import '../platform/open_url.dart';
+import '../platform/os/host_os.dart';
+import '../platform/os/key_combo.dart';
 import '../platform/pasteboard.dart';
 
 import '../theme/kumo_theme.dart';
@@ -147,7 +149,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   Size _cell = const Size(7, 15);
   Size _size = Size.zero;
 
-  static bool get _mac => defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.iOS;
+  static bool get _mac => hostOs.commandKey;
 
   static const _barWidth = 12.0;
 
@@ -691,7 +693,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     final surface = widget.surface;
     if (!surface.interactive) return;
     final paths = await Pasteboard.paths();
-    final text = paths != null ? terminalPaths(paths) : (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+    final text = paths != null ? _shellPaths(paths) : (await Clipboard.getData(Clipboard.kTextPlain))?.text;
     if (text == null || text.isEmpty || !mounted || widget.surface != surface) return;
     _pasteText(text);
   }
@@ -709,15 +711,24 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     surface.sendBytes(terminalPaste(text, bracketed: modes?.bracketedPaste ?? false));
   }
 
-  // ---- Files dropped from Finder go in as their paths, on the pane under
+  // ---- Files dropped from Finder or Explorer go in as their paths, on the pane under
   // the pointer.
 
   StreamSubscription<FileDrop>? _drops;
 
   void _onDrop(FileDrop drop) {
     if (!mounted || !widget.surface.interactive || drop.paths.isEmpty || !_shownAt(drop.position)) return;
-    _pasteText(terminalPaths(drop.paths));
+    // Empty when every path was left out (HostOs.shellPaths).
+    final text = _shellPaths(drop.paths);
+    if (text.isEmpty) return;
+    _pasteText(text);
     _focus.requestFocus();
+  }
+
+  /// [paths] quoted for the program this pane runs.
+  String _shellPaths(List<String> paths) {
+    final surface = widget.surface;
+    return hostOs.shellPaths(paths, shell: surface is ShellProgram ? surface.program : null);
   }
 
   /// Whether this pane is what shows at [global]: not offstage (another
@@ -758,7 +769,6 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
 
   void _menu(Offset at) {
     final has = _selectedText.isNotEmpty;
-    final mod = _mac ? '⌘' : 'Ctrl+Shift+';
     final canClear = widget.surface is GrpcTerminalSurface;
     showKMenu(
       context,
@@ -770,11 +780,11 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
         }
 
         return KMenuPanel(width: 200, children: [
-          KMenuItem(icon: KIcons.copy, label: 'Copy', shortcut: '${mod}C', onTap: has ? () => then(_copy) : null),
-          if (widget.surface.interactive) KMenuItem(icon: KIcons.paste, label: 'Paste', shortcut: '${mod}V', onTap: () => then(_paste)),
-          KMenuItem(icon: KIcons.selectAll, label: 'Select all', shortcut: _mac ? '⌘A' : null, onTap: () => then(_selectAll)),
+          KMenuItem(icon: KIcons.copy, label: 'Copy', shortcut: AppKeys.terminalCopy.label, onTap: has ? () => then(_copy) : null),
+          if (widget.surface.interactive) KMenuItem(icon: KIcons.paste, label: 'Paste', shortcut: AppKeys.terminalPaste.label, onTap: () => then(_paste)),
+          KMenuItem(icon: KIcons.selectAll, label: 'Select all', shortcut: _mac ? AppKeys.terminalSelectAll.label : null, onTap: () => then(_selectAll)),
           if (canClear) KMenuItem(icon: KIcons.trash, label: 'Clear scrollback', onTap: () => then(_clearScrollback)),
-          if (_history != null) KMenuItem(icon: KIcons.clock, label: 'Command history…', shortcut: '${mod}Y', onTap: () => then(_openHistory)),
+          if (_history != null) KMenuItem(icon: KIcons.clock, label: 'Command history…', shortcut: AppKeys.terminalHistory.label, onTap: () => then(_openHistory)),
         ]);
       },
     );
@@ -842,6 +852,10 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     final keys = HardwareKeyboard.instance;
     final key = event.logicalKey;
     final page = math.max(1, _fit - 1);
+    if (AppKeys.backToPrompt.accepts(event, keys)) {
+      _toBottom();
+      return true;
+    }
     if (keys.isShiftPressed && !keys.isMetaPressed && !keys.isControlPressed) {
       if (key == LogicalKeyboardKey.pageUp) {
         _scrollBy(-page);
@@ -855,29 +869,22 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
         _scrollTo(0);
         return true;
       }
+      // Shift+End on macOS too.
       if (key == LogicalKeyboardKey.end) {
         _toBottom();
         return true;
       }
     }
-    final arrow = key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown;
-    if (arrow && !_mac && keys.isControlPressed && keys.isShiftPressed && !keys.isAltPressed) {
-      return _jumpCommand(up: key == LogicalKeyboardKey.arrowUp);
+    final up = AppKeys.previousCommand.accepts(event, keys);
+    if (up || AppKeys.nextCommand.accepts(event, keys)) {
+      if (!_mac) return _jumpCommand(up: up);
+      // ⌘↑ / ⌘↓ scroll a line when there's no command to jump to.
+      if (!_jumpCommand(up: up)) _scrollBy(up ? -1 : 1);
+      return true;
     }
-    if (_mac && keys.isMetaPressed && !keys.isShiftPressed) {
-      if (arrow) {
-        final up = key == LogicalKeyboardKey.arrowUp;
-        if (!_jumpCommand(up: up)) _scrollBy(up ? -1 : 1);
-        return true;
-      }
-      if (key == LogicalKeyboardKey.home) {
-        _scrollTo(0);
-        return true;
-      }
-      if (key == LogicalKeyboardKey.end) {
-        _toBottom();
-        return true;
-      }
+    if (_mac && keys.isMetaPressed && !keys.isShiftPressed && key == LogicalKeyboardKey.home) {
+      _scrollTo(0);
+      return true;
     }
     return false;
   }
@@ -913,27 +920,25 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     final keys = HardwareKeyboard.instance;
     if (_scrollKey(event)) return KeyEventResult.handled;
     // ⌘C / ⌘V / ⌘A on macOS; Ctrl+Shift+C / V elsewhere (Ctrl+C is ^C).
-    final mod = _mac ? keys.isMetaPressed : keys.isControlPressed && keys.isShiftPressed;
-    if (event is! KeyUpEvent && mod) {
-      final key = event.logicalKey;
-      if (key == LogicalKeyboardKey.keyC && _selectedText.isNotEmpty) {
-        _copy();
-        return KeyEventResult.handled;
-      }
-      if (key == LogicalKeyboardKey.keyV && surface.interactive) {
-        _paste();
-        return KeyEventResult.handled;
-      }
-      if (key == LogicalKeyboardKey.keyA && _mac) {
-        _selectAll();
-        return KeyEventResult.handled;
-      }
-      // As a browser's history (Ctrl+Y is the shell's yank elsewhere).
-      if (key == LogicalKeyboardKey.keyY && _history != null) {
-        _openHistory();
-        return KeyEventResult.handled;
-      }
+    if (AppKeys.terminalCopy.accepts(event, keys) && _selectedText.isNotEmpty) {
+      _copy();
+      return KeyEventResult.handled;
     }
+    if (AppKeys.terminalPaste.accepts(event, keys) && surface.interactive) {
+      _paste();
+      return KeyEventResult.handled;
+    }
+    if (_mac && AppKeys.terminalSelectAll.accepts(event, keys)) {
+      _selectAll();
+      return KeyEventResult.handled;
+    }
+    // As a browser's history (Ctrl+Y is the shell's yank elsewhere).
+    if (AppKeys.terminalHistory.accepts(event, keys) && _history != null) {
+      _openHistory();
+      return KeyEventResult.handled;
+    }
+    // The app's pane keys (⌘T…, Ctrl+Shift+T… off macOS) aren't the shell's.
+    if (event is! KeyUpEvent && PaneShortcut.values.any((p) => hostOs.paneShortcut(p).accepts(event, keys))) return KeyEventResult.ignored;
     if (!surface.interactive) return KeyEventResult.ignored;
     if (_acceptKey(event)) return KeyEventResult.handled;
     if (_selectKey(event, modes)) return KeyEventResult.handled;
@@ -1099,7 +1104,7 @@ class _JumpToBottom extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     return Tooltip(
-      message: _TerminalCanvasState._mac ? 'Back to the prompt (⌘End)' : 'Back to the prompt (Shift+End)',
+      message: 'Back to the prompt (${AppKeys.backToPrompt.label})',
       child: GestureDetector(
         onTap: onTap,
         child: MouseRegion(

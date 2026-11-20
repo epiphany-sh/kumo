@@ -7,6 +7,7 @@
 
 #include "flutter/generated_plugin_registrant.h"
 #include "resource.h"
+#include "window_placement.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -17,6 +18,9 @@ bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
   }
+
+  // Where the user left it, before Flutter sizes its view to the window.
+  show_command_ = RestoreWindowPlacement(GetHandle());
 
   RECT frame = GetClientArea();
 
@@ -48,8 +52,11 @@ bool FlutterWindow::OnCreate() {
             flutter::EncodableValue(name != nullptr && SetAppIcon(*name)));
       });
 
+  pasteboard_ = std::make_unique<Pasteboard>(
+      flutter_controller_->engine()->messenger(), GetHandle());
+
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
-    this->Show();
+    ShowWindow(GetHandle(), show_command_);
   });
 
   // Flutter can complete the first frame before the "show window" callback is
@@ -62,6 +69,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   app_icon_channel_ = nullptr;
+  pasteboard_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -124,9 +132,21 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     }
   }
 
+  if (pasteboard_) {
+    if (auto handled = pasteboard_->HandleMessage(message, wparam, lparam)) {
+      return *handled;
+    }
+  }
+
   switch (message) {
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
+      break;
+    case WM_GETMINMAXINFO:
+      ApplyMinWindowSize(hwnd, reinterpret_cast<MINMAXINFO*>(lparam));
+      return 0;
+    case WM_DESTROY:
+      SaveWindowPlacement(hwnd);
       break;
   }
 

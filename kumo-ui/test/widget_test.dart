@@ -6,10 +6,17 @@ import 'package:kumo_ui/app/kumo_app.dart';
 import 'package:kumo_ui/editor/file_view.dart';
 import 'package:kumo_ui/overlays/namespace_dialog.dart';
 import 'package:kumo_ui/overlays/settings_dialog.dart';
+import 'package:kumo_ui/platform/os/host_os.dart';
+import 'package:kumo_ui/platform/os/macos.dart';
+import 'package:kumo_ui/platform/os/windows.dart';
 import 'package:kumo_ui/shell/side_panel.dart';
 import 'package:kumo_ui/theme/palette.dart';
 
 void main() {
+  // ⌘ keys and their tooltips: macOS (a test may pick another OS).
+  setUp(() => debugHostOs = MacOs());
+  tearDown(() => debugHostOs = null);
+
   Future<AppState> pumpApp(WidgetTester tester, {KumoThemeMode mode = KumoThemeMode.dark}) async {
     tester.view.physicalSize = const Size(1440, 960);
     tester.view.devicePixelRatio = 1;
@@ -76,6 +83,32 @@ void main() {
     await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+    expect(state.view, KumoView.terminal);
+    expect(find.byTooltip('Close tab zsh'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('on Windows Ctrl+Shift+T opens a new terminal tab, and the tooltips say so', (tester) async {
+    debugHostOs = WindowsOs(const {});
+    final state = await pumpApp(tester);
+    expect(find.byTooltip('New tab (Ctrl+Shift+T)'), findsOneWidget);
+    expect(find.byTooltip('Split right (Ctrl+Shift+D)'), findsWidgets);
+    expect(find.byTooltip('Settings (Ctrl+,)'), findsOneWidget);
+    expect(find.byTooltip('Hide sidebar (Ctrl+Alt+S)'), findsOneWidget);
+    expect(find.byTooltip('Terminal in ~, not tied to a repository  Ctrl+1'), findsOneWidget);
+    state.view = KumoView.git;
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+    expect(state.view, KumoView.git, reason: 'the Windows key is the OS’s');
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pump();
     expect(state.view, KumoView.terminal);
     expect(find.byTooltip('Close tab zsh'), findsOneWidget);

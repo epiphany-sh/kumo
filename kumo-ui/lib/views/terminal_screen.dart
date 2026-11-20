@@ -10,6 +10,8 @@ import '../data/repo_activity.dart' show RepoCommit;
 import '../data/worktree_changes.dart' show CommitInfo;
 import '../editor/file_view.dart';
 import '../overlays/new_agent_dialog.dart';
+import '../platform/os/host_os.dart';
+import '../platform/os/key_combo.dart';
 import '../engine/engine_scope.dart';
 import '../engine/generated/kumo/v1/kumo.pb.dart' show TerminalInfo;
 import '../engine/grpc_terminal_surface.dart';
@@ -160,6 +162,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       engine,
       directory: _directoryOf(key),
       adopt: adopt ? () => _adoptRunning(key) : null,
+      shell: _shell,
       onExit: (_) => _closeExited(id),
       rememberCommands: _rememberCommands,
     );
@@ -325,11 +328,14 @@ class _TerminalScreenState extends State<TerminalScreen> {
   /// Settings → Appearance → Your lines in the terminal.
   bool get _rememberCommands => _app?.setting<bool>(YourLines.keyRemember, true) ?? true;
 
+  /// Settings → Terminal → Shell (null: the OS default).
+  String? get _shell => _app?.setting<String>('terminal.shell', hostOs.shell);
+
   String _newShell() {
     final n = ++_shellSeq;
     final id = 'sh-$n';
     final engine = _engine;
-    _surfaces[id] = engine == null ? (_spaceKey == _homeKey ? MockSessions.homeShell(n) : MockSessions.shell(n)) : GrpcTerminalSurface.shell(engine, directory: _directoryOf(_spaceKey), onExit: (_) => _closeExited(id), rememberCommands: _rememberCommands);
+    _surfaces[id] = engine == null ? (_spaceKey == _homeKey ? MockSessions.homeShell(n) : MockSessions.shell(n)) : GrpcTerminalSurface.shell(engine, directory: _directoryOf(_spaceKey), shell: _shell, onExit: (_) => _closeExited(id), rememberCommands: _rememberCommands);
     return id;
   }
 
@@ -568,13 +574,13 @@ class _TerminalScreenState extends State<TerminalScreen> {
                 scrollDirection: Axis.horizontal,
                 child: Row(children: [
                   if (panelToggle && !s.sidePanelRight) ...[
-                    KIconButton(icon: KIcons.sidePanel, label: 'Show side panel (⌥⌘B)', size: 30, iconSize: 16, onTap: s.toggleSidePanel),
+                    KIconButton(icon: KIcons.sidePanel, label: 'Show side panel (${AppKeys.toggleSidePanel.label})', size: 30, iconSize: 16, onTap: s.toggleSidePanel),
                     const SizedBox(width: 4),
                   ],
                   for (final t in _tabs) ...[_tabChip(context, t), const SizedBox(width: 4)],
                   for (final t in s.contextTabs) ...[_contextTab(context, t), const SizedBox(width: 4)],
                   for (final p in s.openFiles) ...[_fileTab(context, p), const SizedBox(width: 4)],
-                  KIconButton(icon: KIcons.add, label: 'New tab (⌘T)', size: 30, iconSize: 15, onTap: _newTab),
+                  KIconButton(icon: KIcons.add, label: 'New tab (${hostOs.paneShortcutLabel(PaneShortcut.newTab)})', size: 30, iconSize: 15, onTap: _newTab),
                 ]),
               ),
             ),
@@ -583,13 +589,13 @@ class _TerminalScreenState extends State<TerminalScreen> {
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(11)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                KIconButton(icon: KIcons.splitRight, label: 'Split right (⌘D)', size: 28, iconSize: 15, onTap: () => _splitRight(_focus)),
-                KIconButton(icon: KIcons.splitDown, label: 'Split down (⇧⌘D)', size: 28, iconSize: 15, onTap: () => _splitDown(_focus)),
+                KIconButton(icon: KIcons.splitRight, label: 'Split right (${hostOs.paneShortcutLabel(PaneShortcut.splitRight)})', size: 28, iconSize: 15, onTap: () => _splitRight(_focus)),
+                KIconButton(icon: KIcons.splitDown, label: 'Split down (${hostOs.paneShortcutLabel(PaneShortcut.splitDown)})', size: 28, iconSize: 15, onTap: () => _splitDown(_focus)),
               ]),
             ),
             if (panelToggle && s.sidePanelRight) ...[
               const SizedBox(width: 4),
-              KIconButton(icon: KIcons.sidePanel, label: 'Show side panel (⌥⌘B)', size: 30, iconSize: 16, onTap: s.toggleSidePanel),
+              KIconButton(icon: KIcons.sidePanel, label: 'Show side panel (${AppKeys.toggleSidePanel.label})', size: 30, iconSize: 16, onTap: s.toggleSidePanel),
             ],
           ]),
         ),
@@ -671,7 +677,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
           ]),
         ),
         const SizedBox(width: 6),
-        KIconButton(icon: KIcons.close, label: 'Close tab $label (⌘W)', size: 18, iconSize: 11, color: c.text3, onTap: () => s.closeContext(t)),
+        KIconButton(icon: KIcons.close, label: 'Close tab $label (${hostOs.paneShortcutLabel(PaneShortcut.closePane)})', size: 18, iconSize: 11, color: c.text3, onTap: () => s.closeContext(t)),
       ]),
     );
   }
@@ -706,7 +712,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
           const SizedBox(width: 6),
           KIconButton(
             icon: KIcons.close,
-            label: s.buffers.isDirty(path) ? 'Close $name, unsaved changes (⌘W)' : 'Close $name (⌘W)',
+            label: s.buffers.isDirty(path) ? 'Close $name, unsaved changes (${AppKeys.closeFile.label})' : 'Close $name (${AppKeys.closeFile.label})',
             size: 18,
             iconSize: 11,
             color: c.text3,
@@ -783,9 +789,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
       builder: (context, box) {
         final compact = box.maxWidth < 340;
         final tools = Row(mainAxisSize: MainAxisSize.min, children: [
-          KIconButton(icon: KIcons.splitRight, label: 'Split right (⌘D)', size: 22, iconSize: 14, color: c.text3, onTap: () => _splitRight(id)),
-          KIconButton(icon: KIcons.splitDown, label: 'Split down (⇧⌘D)', size: 22, iconSize: 14, color: c.text3, onTap: () => _splitDown(id)),
-          KIconButton(icon: KIcons.close, label: 'Close pane (⌘W)', size: 22, iconSize: 13, color: c.text3, onTap: () => _close(id)),
+          KIconButton(icon: KIcons.splitRight, label: 'Split right (${hostOs.paneShortcutLabel(PaneShortcut.splitRight)})', size: 22, iconSize: 14, color: c.text3, onTap: () => _splitRight(id)),
+          KIconButton(icon: KIcons.splitDown, label: 'Split down (${hostOs.paneShortcutLabel(PaneShortcut.splitDown)})', size: 22, iconSize: 14, color: c.text3, onTap: () => _splitDown(id)),
+          KIconButton(icon: KIcons.close, label: 'Close pane (${hostOs.paneShortcutLabel(PaneShortcut.closePane)})', size: 22, iconSize: 13, color: c.text3, onTap: () => _close(id)),
         ]);
         Widget? status;
         if (isMockAgent) {
@@ -1216,7 +1222,7 @@ class _ContextFileTab extends StatelessWidget {
           const SizedBox(width: 6),
           KIconButton(
             icon: KIcons.close,
-            label: s.buffers.isDirty(path) ? 'Close $name, unsaved changes (⌘W)' : 'Close $name (⌘W)',
+            label: s.buffers.isDirty(path) ? 'Close $name, unsaved changes (${AppKeys.closeFile.label})' : 'Close $name (${AppKeys.closeFile.label})',
             size: 18,
             iconSize: 11,
             color: c.text3,

@@ -8,7 +8,6 @@
 //!
 //! The daemon's data is temporary, but the home is yours: that's where the
 //! sign-in is, and the CLI keeps these sessions in its own history.
-#![cfg(unix)]
 
 mod common;
 

@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/app/kumo_app.dart';
+import 'package:kumo_ui/platform/os/host_os.dart';
+import 'package:kumo_ui/platform/os/macos.dart';
 import 'package:kumo_ui/shell/side_panel.dart';
 import 'package:kumo_ui/shell/sidebar.dart';
 import 'package:kumo_ui/views/git_screen.dart';
@@ -18,6 +20,10 @@ Future<AppState> _pump(WidgetTester tester) async {
 }
 
 void main() {
+  // ⌘W: the macOS keys.
+  setUp(() => debugHostOs = MacOs());
+  tearDown(() => debugHostOs = null);
+
   test('Files is not in the side-nav, and ⌘1…⌘5 follow the nav', () {
     expect(KumoView.nav, [KumoView.terminal, KumoView.agents, KumoView.tasks, KumoView.git, KumoView.docs]);
     expect(KumoView.nav.map((v) => v.shortcut), ['⌘1', '⌘2', '⌘3', '⌘4', '⌘5']);

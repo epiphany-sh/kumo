@@ -19,6 +19,7 @@ import '../overlays/settings_dialog.dart';
 import '../platform/git_user.dart';
 import '../platform/new_window.dart';
 import '../platform/os/host_os.dart';
+import '../platform/os/key_combo.dart';
 import '../platform/window_effects.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/anchored_popover.dart';
@@ -91,7 +92,7 @@ class Sidebar extends StatelessWidget {
                   ],
                 ],
                 const Spacer(),
-                KIconButton(icon: KIcons.sidebar, label: 'Hide sidebar (⌥⌘S)', onTap: s.toggleSidebar),
+                KIconButton(icon: KIcons.sidebar, label: 'Hide sidebar (${AppKeys.toggleSidebar.label})', onTap: s.toggleSidebar),
               ]),
             ),
             const SizedBox(height: 12),
@@ -138,7 +139,7 @@ class Sidebar extends StatelessWidget {
               ),
               const SizedBox(width: 9),
               Expanded(child: Text(gitUserName, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, weight: FontWeight.w500, color: c.text))),
-              KIconButton(icon: KIcons.settings, label: 'Settings (⌘,)', onTap: () => showSettingsDialog(context)),
+              KIconButton(icon: KIcons.settings, label: 'Settings (${AppKeys.settings.label})', onTap: () => showSettingsDialog(context)),
             ]),
           ],
         ),
@@ -155,7 +156,7 @@ class Sidebar extends StatelessWidget {
 class _WorkspaceSwitcher extends StatelessWidget {
   const _WorkspaceSwitcher();
 
-  static String _key(int i) => i < 9 ? '⌃⌘${i + 1}' : '';
+  static String _key(int i) => i < 9 ? AppKeys.workspace(i + 1).label : '';
 
   void _menu(BuildContext anchor, AppState s) {
     final width = ((anchor.findRenderObject() as RenderBox?)?.size.width ?? 260.0).clamp(240.0, 320.0);
@@ -230,7 +231,7 @@ class _WorkspaceSwitcher extends StatelessWidget {
     final tip = [
       p.displayName,
       for (final o in waiting) '${o.displayName}: ${o.activity}',
-      if (count > 1) 'Switch with ⌃⌘1…⌃⌘${count.clamp(1, 9)}',
+      if (count > 1) 'Switch with ${AppKeys.workspace(1).label}…${AppKeys.workspace(count.clamp(1, 9)).label}',
     ].join('\n');
     return Builder(
       builder: (anchor) => KPressable(
@@ -771,7 +772,7 @@ class _NamespaceMenuState extends State<_NamespaceMenu> {
     final n = ns.repos.length;
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.backspace, meta: true): () => setState(() => _confirm = true),
+        AppKeys.deleteNamespace.activator: () => setState(() => _confirm = true),
         const SingleActivator(LogicalKeyboardKey.delete): () => setState(() => _confirm = true),
       },
       child: KMenuPanel(children: _confirm
@@ -793,7 +794,7 @@ class _NamespaceMenuState extends State<_NamespaceMenu> {
                 onTap: () => _do(() => s.toggleNamespaceCollapsed(ns.id)),
               ),
               const KMenuDivider(),
-              KMenuItem(icon: KIcons.trash, label: 'Delete namespace…', shortcut: '⌘⌫', danger: true, onTap: () => setState(() => _confirm = true)),
+              KMenuItem(icon: KIcons.trash, label: 'Delete namespace…', shortcut: AppKeys.deleteNamespace.label, danger: true, onTap: () => setState(() => _confirm = true)),
             ]),
     );
   }
@@ -1070,7 +1071,7 @@ class _RepoGroupState extends State<_RepoGroup> {
                 positionKey: NewWorktreePopover,
                 triggerBuilder: (context, toggle, open) => KIconButton(
                   icon: KIcons.add,
-                  label: widget.signal ? 'New worktree in ${r.name} (⇧⌘N)' : 'New worktree in ${r.name}',
+                  label: widget.signal ? 'New worktree in ${r.name} (${AppKeys.newWorktree.label})' : 'New worktree in ${r.name}',
                   onTap: toggle,
                   size: 22,
                   iconSize: 14,
@@ -1143,7 +1144,14 @@ class _WorktreeMenuState extends State<_WorktreeMenu> {
                 s.view = KumoView.terminal;
               }),
             ),
-            KMenuItem(icon: KIcons.reveal, label: 'Reveal in Finder', onTap: () => _do(() {})),
+            KMenuItem(
+              icon: KIcons.reveal,
+              label: hostOs.revealLabel,
+              onTap: () => _do(() async {
+                final error = await hostOs.revealInFileManager(s.workspace.absolutePathOf(w));
+                if (error != null) s.notify(error);
+              }),
+            ),
             KMenuItem(
               icon: KIcons.copy,
               label: 'Copy full path',

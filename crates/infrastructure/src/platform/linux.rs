@@ -13,7 +13,7 @@ use keyring_core::{CredentialStore, Error as KeyringError};
 use super::{
     AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PlainPaths, PrivateFiles,
     ProcessTrees, Processes, ProgramSearch, RunningProcess, SavedSignIns, ScriptShell, Signals,
-    TerminalShells, unix,
+    StatusLineHook, TerminalShell, TerminalShells, unix,
 };
 
 pub struct Linux;
@@ -101,14 +101,14 @@ impl AppFolders for Linux {
 }
 
 impl TerminalShells for Linux {
-    fn shell_integration() -> bool {
-        true
+    fn integrated_shells() -> &'static [TerminalShell] {
+        unix::INTEGRATED_SHELLS
     }
 }
 
 impl AgentHooks for Linux {
-    fn sh_status_line() -> bool {
-        unix::sh_status_line()
+    fn status_line_hook() -> StatusLineHook {
+        unix::status_line_hook()
     }
 }
 
@@ -154,5 +154,9 @@ impl Processes for Linux {
             .unwrap_or_default();
         let cwd = std::fs::read_link(dir.join("cwd")).unwrap_or_default();
         Some(RunningProcess { exe, args, cwd })
+    }
+
+    fn foreground(root: u32) -> Option<u32> {
+        unix::foreground(root)
     }
 }

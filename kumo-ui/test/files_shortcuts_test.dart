@@ -8,6 +8,9 @@ import 'package:kumo_ui/editor/code_editor.dart';
 import 'package:kumo_ui/editor/find.dart';
 import 'package:kumo_ui/editor/markdown_preview.dart';
 import 'package:kumo_ui/editor/quick_open.dart';
+import 'package:kumo_ui/platform/os/host_os.dart';
+import 'package:kumo_ui/platform/os/macos.dart';
+import 'package:kumo_ui/platform/os/windows.dart';
 
 const _repo = 'internal/discount/repository.go';
 const _bulk = 'internal/discount/bulk.go';
@@ -56,6 +59,10 @@ EditableTextState _editor(WidgetTester tester) => tester.state<EditableTextState
 Future<void> _open(WidgetTester tester, String name) => _click(tester, find.text(name).first);
 
 void main() {
+  // ⌘ keys: macOS, as the target platform and as the host.
+  setUp(() => debugHostOs = MacOs());
+  tearDown(() => debugHostOs = null);
+
   group('shortcuts', () {
     testWidgets('⌘W closes the file even after a click outside the editor dropped its focus', (tester) async {
       final state = await _filesTab(tester);
@@ -281,4 +288,52 @@ void main() {
       expect(tester.takeException(), isNull);
     }, variant: _mac);
   });
+
+  group('on Windows', () {
+    setUp(() => debugHostOs = WindowsOs(const {}));
+    final windows = TargetPlatformVariant.only(TargetPlatform.windows);
+
+    testWidgets('Ctrl+P finds a file; Ctrl+S saves it and Ctrl+W closes it; the tooltips say so', (tester) async {
+      final state = await _filesTab(tester);
+      await _ctrl(tester, LogicalKeyboardKey.keyP);
+      expect(find.byType(QuickOpen), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('quick-open')), 'bulk.go');
+      await _pumpAsync(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(state.contextFile, _bulk);
+      expect(find.byTooltip('Close bulk.go (Ctrl+W)'), findsOneWidget);
+
+      await tester.enterText(find.descendant(of: find.byType(CodeEditor), matching: find.byType(TextField)), 'package discount // windows\n');
+      await _pumpAsync(tester);
+      await _ctrl(tester, LogicalKeyboardKey.keyS);
+      expect(await state.changes.read(_bulk), 'package discount // windows\n');
+
+      await _cmd(tester, LogicalKeyboardKey.keyW);
+      expect(state.contextFiles, contains(_bulk), reason: 'the Windows key is the OS’s');
+      await _ctrl(tester, LogicalKeyboardKey.keyW);
+      expect(state.contextFiles, isNot(contains(_bulk)));
+      expect(tester.takeException(), isNull);
+    }, variant: windows);
+
+    testWidgets('Ctrl+F finds and Ctrl+H replaces, as the find bar says', (tester) async {
+      await _filesTab(tester);
+      await _open(tester, 'bulk.go');
+      await _ctrl(tester, LogicalKeyboardKey.keyF);
+      expect(find.byType(FindBar), findsOneWidget);
+      expect(find.byTooltip('Replace (Ctrl+H)'), findsOneWidget);
+      expect(find.byTooltip('Previous match (Shift+↵ · Ctrl+Shift+G)'), findsOneWidget);
+      await _ctrl(tester, LogicalKeyboardKey.keyH);
+      expect(find.byKey(const ValueKey('find-replacement')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }, variant: windows);
+  });
+}
+
+/// Ctrl + [key].
+Future<void> _ctrl(WidgetTester tester, LogicalKeyboardKey key) async {
+  await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+  await tester.sendKeyEvent(key);
+  await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+  await _pumpAsync(tester);
 }

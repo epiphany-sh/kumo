@@ -1,6 +1,5 @@
 //! Git inside a profile end to end: identity, SSH key, signing, and the
 //! HTTPS token through `kumod git-credential`.
-#![cfg(unix)]
 
 mod common;
 
@@ -30,14 +29,22 @@ async fn update(client: &mut KumoClient, request: pb::UpdateProfileRequest) {
     client.profiles.update(request).await.unwrap();
 }
 
-/// What `script` prints in a terminal of the client's profile.
+/// What prints the environment.
+const ENV: &str = if cfg!(windows) { "set" } else { "env" };
+
+/// What `script` prints in a terminal of the client's profile (run by
+/// `sh`, or `cmd.exe` on Windows).
 async fn run(client: &mut KumoClient, cwd: &Path, script: &str) -> String {
+    let (program, args) = common::script(script, script);
     let id = client
         .terminals
         .open(pb::OpenRequest {
-            program: "sh".into(),
-            args: vec!["-c".into(), script.into()],
+            program,
+            args,
             cwd: cwd.display().to_string(),
+            // Wide enough that ConPTY wraps no line.
+            cols: 500,
+            rows: 24,
             ..Default::default()
         })
         .await
@@ -69,7 +76,7 @@ async fn run_until(client: &mut KumoClient, cwd: &Path, script: &str, expected: 
 async fn the_default_profile_with_nothing_set_changes_nothing() {
     let daemon = TestDaemon::start().await;
     let mut client = daemon.client().await;
-    let out = run(&mut client, &daemon.home(), "env").await;
+    let out = run(&mut client, &daemon.home(), ENV).await;
     for var in [
         "GIT_CONFIG_COUNT",
         "GIT_SSH_COMMAND",
@@ -171,8 +178,20 @@ async fn ssh_remotes_go_over_https_with_the_profiles_token() {
     .await;
     assert!(url.contains("https://github.com/team/app.git"), "{url}");
     // ...and git gets the profile's token from kumod git-credential.
-    let fill = "printf 'protocol=https\\nhost=github.com\\n\\n' | GIT_TERMINAL_PROMPT=0 git credential fill";
-    let credential = run(&mut one, &repo, fill).await;
+    let fill = if cfg!(windows) {
+        // cmd's `echo` in a pipe leaves trailing spaces: from a file, in
+        // the folder it runs in (a quoted path wouldn't reach cmd intact).
+        std::fs::write(
+            repo.join("credential-request"),
+            "protocol=https\nhost=github.com\n\n",
+        )
+        .unwrap();
+        "set GIT_TERMINAL_PROMPT=0& git credential fill < credential-request".to_owned()
+    } else {
+        "printf 'protocol=https\\nhost=github.com\\n\\n' | GIT_TERMINAL_PROMPT=0 git credential fill"
+            .to_owned()
+    };
+    let credential = run(&mut one, &repo, &fill).await;
     assert!(
         credential.contains("username=x-access-token"),
         "{credential}"
@@ -255,12 +274,14 @@ async fn an_ssh_key_is_the_only_one_offered_and_signs_commits() {
         },
     )
     .await;
-    let env = run_until(&mut one, &repo, "env", "GIT_SSH_COMMAND=").await;
+    let env = run_until(&mut one, &repo, ENV, "GIT_SSH_COMMAND=").await;
+    // `~/.ssh/…` under a Windows home mixes separators, which ssh takes.
+    let slashes = |text: &str| text.replace('\\', "/");
     assert!(
-        env.contains(&format!(
+        slashes(&env).contains(&slashes(&format!(
             "GIT_SSH_COMMAND=ssh -i '{}' -o IdentitiesOnly=yes",
             key.display()
-        )),
+        ))),
         "{env}"
     );
     // With a key, SSH remotes stay SSH.
@@ -321,6 +342,7 @@ async fn profile_settings_round_trip() {
 
 /// A `gh` in the daemon's `bin/` with two accounts on github.com: `active`
 /// holds the active one, and `auth login` signs in `user-2`.
+#[cfg(unix)]
 fn fake_gh(bin: &Path) {
     use std::os::unix::fs::PermissionsExt;
     let script = format!(
@@ -348,6 +370,8 @@ esac
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
 }
 
+// The fake `gh` is a POSIX sh script.
+#[cfg(unix)]
 #[tokio::test(flavor = "multi_thread")]
 async fn signing_in_with_gh_adds_the_account_and_keeps_the_active_one() {
     let daemon = TestDaemon::start().await;
@@ -395,7 +419,7 @@ async fn signing_in_with_gh_adds_the_account_and_keeps_the_active_one() {
     assert_eq!(active.trim(), "user-1", "gh's active account is back");
 
     // The profile's shells use its account; the default profile's don't.
-    run_until(&mut one, &repo, "env", "GH_TOKEN=token-of-user-2").await;
-    let env = run(&mut first, &repo, "env").await;
+    run_until(&mut one, &repo, ENV, "GH_TOKEN=token-of-user-2").await;
+    let env = run(&mut first, &repo, ENV).await;
     assert!(!env.contains("GH_TOKEN="), "{env}");
 }

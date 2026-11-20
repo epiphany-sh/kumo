@@ -8,6 +8,7 @@ import 'package:kumo_ui/data/profiles_source.dart';
 import 'package:kumo_ui/engine/engine_profiles.dart';
 import 'package:kumo_ui/overlays/new_workspace_dialog.dart';
 import 'package:kumo_ui/overlays/settings_dialog.dart';
+import 'package:kumo_ui/platform/os/key_combo.dart';
 
 Future<AppState> _app(WidgetTester tester, {ProfilesSource? profiles, WorkspaceOpener? open}) async {
   tester.view.physicalSize = const Size(1440, 960);
@@ -66,7 +67,7 @@ void main() {
       expect(find.text('WORKSPACES'), findsOneWidget);
       expect(find.text('Personal'), findsOneWidget);
       expect(find.text('1 agent needs you'), findsWidgets);
-      expect(find.text('⌃⌘3'), findsOneWidget);
+      expect(find.text(AppKeys.workspace(3).label), findsOneWidget);
       expect(find.text('New workspace…'), findsOneWidget);
       await tester.tap(find.text('Personal'));
       await tester.pump();
@@ -140,7 +141,7 @@ void main() {
 
     testWidgets('Settings › Workspaces: what belongs to each; the current and the first can’t be deleted', (tester) async {
       final s = await _app(tester);
-      await tester.tap(find.byTooltip('Settings (⌘,)'));
+      await tester.tap(find.byTooltip('Settings (${AppKeys.settings.label})'));
       await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text('Workspaces').first);
       await tester.pump();

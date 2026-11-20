@@ -10,6 +10,8 @@ import '../engine/generated/kumo/v1/kumo.pb.dart' show ForgetHistoryRequest;
 import '../platform/app_icon.dart';
 import '../platform/pasteboard.dart';
 import '../platform/os/host_os.dart';
+import '../platform/os/key_combo.dart';
+import '../platform/updates.dart';
 import '../terminal/command_marks.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
@@ -199,7 +201,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
               value: s.sidePanelRight ? 'Right' : 'Left',
               onChanged: (v) => s.sidePanelRight = v == 'Right',
             ),
-            _ToggleRow(label: 'Show the side panel when Kumo opens', desc: 'Hide or show it anytime with ⌥⌘B.', value: s.sidePanelOnLaunch, onChanged: (v) => s.sidePanelOnLaunch = v),
+            _ToggleRow(label: 'Show the side panel when Kumo opens', desc: 'Hide or show it anytime with ${AppKeys.toggleSidePanel.label}.', value: s.sidePanelOnLaunch, onChanged: (v) => s.sidePanelOnLaunch = v),
             _ToggleRow(
               label: 'Remember folded repositories',
               desc: 'Repositories you fold in the sidebar stay folded the next time Kumo opens. Off, they all open expanded.',
@@ -213,6 +215,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             _toggle(s, 'general.reopen', 'Reopen terminals and agents from last session', 'kumod keeps them running while the app is closed.', true),
           ]),
           ('Updates & privacy', [
+            if (s.updates.canCheck) _UpdateCheckRow(updates: s.updates),
             _seg(s, 'general.channel', 'Update channel', null, const ['Stable', 'Beta'], 'Stable'),
             _toggle(s, 'general.autoUpdate', 'Download updates automatically', null, true),
             _toggle(s, 'general.crash', 'Send anonymous crash reports', 'No code, prompts or file contents ever leave your machine this way.', true),
@@ -254,7 +257,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       case SettingsTab.terminal:
         return _Page('Terminal', 'Shell, font and keyboard behaviour of every terminal pane.', sections: [
           ('Shell', [
-            _select(s, 'terminal.shell', 'Shell', 'Login shell for new tabs (⌘T) and splits.', hostOs.shellChoices, hostOs.defaultShellChoice),
+            _select(s, 'terminal.shell', 'Shell', hostOs.shellDescription, [for (final c in hostOs.shellChoices) c.value], hostOs.resolveShell(s.setting<String>('terminal.shell', hostOs.shell)), labels: {for (final c in hostOs.shellChoices) c.value: c.label}),
             _text(s, 'terminal.cwd', 'Start in', 'For tabs opened outside a worktree.', '~', mono: true),
             _select(s, 'terminal.scrollback', 'Scrollback', null, const ['5,000 lines', '10,000 lines', '50,000 lines', 'Unlimited'], '10,000 lines'),
           ]),
@@ -264,7 +267,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
             _toggle(s, 'terminal.blink', 'Blinking cursor', null, false),
           ]),
           ('Keyboard & mouse', [
-            _toggle(s, 'terminal.optionMeta', 'Use ⌥ as Meta', 'Needed for word jumps in emacs/readline; off keeps ⌥ for special characters.', true),
+            _toggle(s, 'terminal.optionMeta', 'Use ${hostOs.altKeyName} as Meta', 'Needed for word jumps in emacs/readline; off keeps ${hostOs.altKeyName} for special characters.', true),
             _toggle(s, 'terminal.copyOnSelect', 'Copy on select', null, false),
             _toggle(s, 'terminal.confirmClose', 'Ask before closing a pane with a running process', null, true),
           ]),
@@ -280,44 +283,44 @@ class _SettingsDialogState extends State<SettingsDialog> {
               s,
               YourLines.keySuggest,
               'Suggest as you type',
-              'The rest of a command you ran shows in gray: → takes it, ⌥→ its next word. Hidden when another tool (zsh-autosuggestions) already suggests.',
+              'The rest of a command you ran shows in gray: → takes it, ${AppKeys.nextWord.label} its next word. Hidden when another tool (zsh-autosuggestions) already suggests.',
               true,
             ),
-            const _Row(
+            _Row(
               label: 'Forget them',
-              desc: 'Every command remembered in this workspace. The history of one repository: ⌘Y in a terminal (Ctrl+Shift+Y on Windows and Linux).',
-              control: _ForgetCommands(),
+              desc: 'Every command remembered in this workspace. The history of one repository: ${AppKeys.terminalHistory.label} in a terminal${hostOs.commandKey ? ' (${AppKeys.terminalHistory.labelOffMac} on Windows and Linux)' : ''}.',
+              control: const _ForgetCommands(),
             ),
           ]),
         ]);
       case SettingsTab.shortcuts:
         return _Page('Shortcuts', 'Keyboard shortcuts across Kumo.', sections: [
-          ('Terminal', const [
-            _KbdRow('New tab', ['⌘', 'T']),
-            _KbdRow('Split right', ['⌘', 'D']),
-            _KbdRow('Split down', ['⇧', '⌘', 'D']),
-            _KbdRow('Close pane', ['⌘', 'W']),
-            _KbdRow('Previous command you ran', ['⌘', '↑']),
-            _KbdRow('Next command you ran', ['⌘', '↓']),
-            _KbdRow('Command history', ['⌘', 'Y']),
-            _KbdRow('Show / hide side panel', ['⌥', '⌘', 'B']),
+          ('Terminal', [
+            _KbdRow('New tab', AppKeys.pane(PaneShortcut.newTab).caps),
+            _KbdRow('Split right', AppKeys.pane(PaneShortcut.splitRight).caps),
+            _KbdRow('Split down', AppKeys.pane(PaneShortcut.splitDown).caps),
+            _KbdRow('Close pane', AppKeys.pane(PaneShortcut.closePane).caps),
+            _KbdRow('Previous command you ran', AppKeys.previousCommand.caps),
+            _KbdRow('Next command you ran', AppKeys.nextCommand.caps),
+            _KbdRow('Command history', AppKeys.terminalHistory.caps),
+            _KbdRow('Show / hide side panel', AppKeys.toggleSidePanel.caps),
           ]),
-          ('Workspace', const [
-            _KbdRow('Terminal (Home) · Agents · Tasks · Git · Docs', ['⌘', '1…5']),
-            _KbdRow('Settings', ['⌘', ',']),
-            _KbdRow('New worktree', ['⇧', '⌘', 'N']),
-            _KbdRow('Show / hide sidebar', ['⌥', '⌘', 'S']),
-            _KbdRow('Cycle theme', ['⇧', '⌘', 'L']),
-            _KbdRow('Switch to workspace 1…9', ['⌃', '⌘', '1…9']),
+          ('Workspace', [
+            _KbdRow('Terminal (Home) · Agents · Tasks · Git · Docs', AppKeys.views.caps),
+            _KbdRow('Settings', AppKeys.settings.caps),
+            _KbdRow('New worktree', AppKeys.newWorktree.caps),
+            _KbdRow('Show / hide sidebar', AppKeys.toggleSidebar.caps),
+            _KbdRow('Cycle theme', AppKeys.cycleTheme.caps),
+            _KbdRow('Switch to workspace 1…9', AppKeys.workspaces.caps),
           ]),
-          ('Source control', const [
-            _KbdRow('Commit', ['⌘', '↩']),
+          ('Source control', [
+            _KbdRow('Commit', AppKeys.submit.caps),
           ]),
         ]);
       case SettingsTab.workspaces:
         return _Page(
           'Workspaces',
-          'A workspace keeps one context apart from another: its own Git hosts and tokens, task sources, knowledge bases, agents’ sign-ins, namespaces and worktrees. Switch from the top of the sidebar, or with ⌃⌘1…9; the others keep running.',
+          'A workspace keeps one context apart from another: its own Git hosts and tokens, task sources, knowledge bases, agents’ sign-ins, namespaces and worktrees. Switch from the top of the sidebar, or with ${AppKeys.workspaces.label}; the others keep running.',
           custom: WorkspacesSettingsPanel(
             onOpenTab: (t) => setState(() => _tab = SettingsTab.values.firstWhere((x) => x.name == t, orElse: () => SettingsTab.workspaces)),
           ),
@@ -352,7 +355,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       case SettingsTab.tickets:
         return _Page(
           'Tasks',
-          'Where your tasks come from. Kumo keeps them on this Mac so Tasks opens instantly, re-reads them in the background and writes status changes back. Start a worktree with an agent from any of them.',
+          'Where your tasks come from. Kumo keeps them on ${hostOs.machineName} so Tasks opens instantly, re-reads them in the background and writes status changes back. Start a worktree with an agent from any of them.',
           scopeNote: 'These task sources and their tokens aren’t visible from other workspaces.',
           custom: const TaskSourceSettingsPanel(),
         );
@@ -453,9 +456,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
   Widget _toggle(AppState s, String key, String label, String? desc, bool fallback) =>
       _ToggleRow(label: label, desc: desc, value: s.setting<bool>(key, fallback), onChanged: (v) => s.setSetting(key, v));
 
-  Widget _select(AppState s, String key, String label, String? desc, List<String> options, String fallback) {
+  /// [labels] names an option the menu shows by another text than its value.
+  Widget _select(AppState s, String key, String label, String? desc, List<String> options, String fallback, {Map<String, String> labels = const {}}) {
     final v = s.setting<String>(key, fallback);
-    return _Row(label: label, desc: desc, control: _Dropdown(value: options.contains(v) ? v : fallback, options: options, onChanged: (x) => s.setSetting(key, x)));
+    return _Row(label: label, desc: desc, control: _Dropdown(value: options.contains(v) ? v : fallback, options: options, labels: labels, onChanged: (x) => s.setSetting(key, x)));
   }
 
   Widget _seg(AppState s, String key, String label, String? desc, List<String> options, String fallback) =>
@@ -637,6 +641,26 @@ class _Row extends StatelessWidget {
   }
 }
 
+/// "Check for Updates…", with where checking is under it; only where Kumo
+/// checks by itself ([AppUpdates.canCheck]).
+class _UpdateCheckRow extends StatelessWidget {
+  const _UpdateCheckRow({required this.updates});
+  final AppUpdates updates;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<UpdateStatus>(
+        valueListenable: updates.status,
+        builder: (context, status, _) {
+          final busy = status is UpdateChecking || status is UpdateDownloading;
+          return _Row(
+            label: 'Updates',
+            desc: describeUpdateStatus(status),
+            control: KButton(label: 'Check for Updates…', height: 30, fontSize: 12.5, onTap: busy ? null : () => updates.check().ignore()),
+          );
+        },
+      );
+}
+
 class _ToggleRow extends StatelessWidget {
   const _ToggleRow({required this.label, required this.value, required this.onChanged, this.desc});
   final String label;
@@ -685,9 +709,10 @@ class _KbdRow extends StatelessWidget {
 }
 
 class _Dropdown extends StatelessWidget {
-  const _Dropdown({required this.value, required this.options, required this.onChanged});
+  const _Dropdown({required this.value, required this.options, required this.onChanged, this.labels = const {}});
   final String value;
   final List<String> options;
+  final Map<String, String> labels;
   final ValueChanged<String> onChanged;
 
   @override
@@ -709,7 +734,7 @@ class _Dropdown extends StatelessWidget {
           dropdownColor: Color.alphaBlend(c.pop, c.isDark ? const Color(0xFF181A24) : const Color(0xFFF7F8FB)),
           icon: Icon(Icons.unfold_more_rounded, size: 16, color: c.text3),
           style: style,
-          items: [for (final o in options) DropdownMenuItem<String>(value: o, child: Text(o, style: style, overflow: TextOverflow.ellipsis))],
+          items: [for (final o in options) DropdownMenuItem<String>(value: o, child: Text(labels[o] ?? o, style: style, overflow: TextOverflow.ellipsis))],
           onChanged: (v) {
             if (v != null) onChanged(v);
           },
