@@ -5,12 +5,15 @@ import 'package:flutter/gestures.dart' show kPrimaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kumo_ui/platform/os/key_combo.dart';
 import 'package:kumo_ui/terminal/ansi_screen.dart';
 import 'package:kumo_ui/terminal/term_selection.dart';
 import 'package:kumo_ui/terminal/terminal_surface.dart';
 import 'package:kumo_ui/terminal/terminal_view.dart';
 import 'package:kumo_ui/theme/kumo_theme.dart';
 import 'package:kumo_ui/theme/palette.dart';
+
+import 'support/keys.dart';
 
 final _lines = [
   TermLine.of([('~/dev/kumo ', TermRole.acc), ('❯ git status', TermRole.text)]),
@@ -75,44 +78,43 @@ void main() {
     expect((cells.start.col, cells.end.col), (5, 20), reason: 'wide glyphs before it take two cells');
   });
 
-  testWidgets('drag selects in the terminal; Ctrl+Shift+C copies, typing clears it', (tester) async {
-    String? copied;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
-      if (call.method == 'Clipboard.setData') copied = (call.arguments as Map)['text'] as String?;
-      return null;
+  for (final (name, os) in keyboardOses) {
+    testWidgets('on $name drag selects in the terminal; the copy key copies, typing clears it', (tester) async {
+      useHostOs(os());
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') copied = (call.arguments as Map)['text'] as String?;
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+      final shell = _Shell();
+      await tester.pumpWidget(KumoTheme(
+        mode: KumoThemeMode.dark,
+        palette: KumoPalette.dark,
+        terminalPalette: KumoPalette.dark,
+        child: MaterialApp(home: Scaffold(body: SizedBox(width: 600, height: 200, child: TerminalCanvas(surface: shell, active: true)))),
+      ));
+      await tester.pump();
+      final box = tester.getTopLeft(find.byType(TerminalCanvas));
+      // Padding 14/12; measure a cell from the canvas's own layout.
+      final tp = TextPainter(text: TextSpan(text: 'M', style: mono(12, height: 1.25)), textDirection: TextDirection.ltr)..layout();
+      final cw = tp.width;
+      final lh = tp.height;
+      tp.dispose();
+      Offset at(int line, int col) => box + Offset(14 + col * cw, 12 + line * lh + lh / 2);
+
+      final gesture = await tester.startGesture(at(0, 0), buttons: kPrimaryButton);
+      await gesture.moveTo(at(0, 5));
+      await gesture.up();
+      await tester.pump();
+      await pressCombo(tester, AppKeys.terminalCopy);
+      expect(copied, 'hello');
+      expect(shell.sent, isEmpty, reason: 'copying sends nothing to the shell');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyX);
+      await tester.pump();
+      expect(shell.sent.map(utf8.decode), ['x']);
+      expect(tester.takeException(), isNull);
     });
-    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
-    final shell = _Shell();
-    await tester.pumpWidget(KumoTheme(
-      mode: KumoThemeMode.dark,
-      palette: KumoPalette.dark,
-      terminalPalette: KumoPalette.dark,
-      child: MaterialApp(home: Scaffold(body: SizedBox(width: 600, height: 200, child: TerminalCanvas(surface: shell, active: true)))),
-    ));
-    await tester.pump();
-    final box = tester.getTopLeft(find.byType(TerminalCanvas));
-    // Padding 14/12; measure a cell from the canvas's own layout.
-    final tp = TextPainter(text: TextSpan(text: 'M', style: mono(12, height: 1.25)), textDirection: TextDirection.ltr)..layout();
-    final cw = tp.width;
-    final lh = tp.height;
-    tp.dispose();
-    Offset at(int line, int col) => box + Offset(14 + col * cw, 12 + line * lh + lh / 2);
-
-    final gesture = await tester.startGesture(at(0, 0), buttons: kPrimaryButton);
-    await gesture.moveTo(at(0, 5));
-    await gesture.up();
-    await tester.pump();
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
-    expect(copied, 'hello');
-    expect(shell.sent, isEmpty, reason: 'copying sends nothing to the shell');
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyX);
-    await tester.pump();
-    expect(shell.sent.map(utf8.decode), ['x']);
-    expect(tester.takeException(), isNull);
-  });
+  }
 }
