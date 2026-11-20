@@ -194,9 +194,10 @@ impl Attached {
         }
     }
 
-    pub async fn send(&self, data: impl Into<Bytes>) {
+    pub async fn send(&self, data: impl AsRef<[u8]>) {
+        let data = Bytes::copy_from_slice(data.as_ref());
         self.input
-            .send(input_msg(pb::terminal_input::Kind::Data(data.into())))
+            .send(input_msg(pb::terminal_input::Kind::Data(data)))
             .await
             .unwrap();
     }
@@ -286,7 +287,7 @@ impl Attached {
                 let asks = self.cursor_requests.strip(&batch.data).requests;
                 if self.answers_cursor {
                     for _ in 0..asks {
-                        self.send(&b"\x1b[1;1R"[..]).await;
+                        self.send(b"\x1b[1;1R").await;
                     }
                 }
                 self.received.batches.push(batch);
