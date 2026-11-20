@@ -6,6 +6,7 @@ import 'package:kumo_ui/overlays/settings_dialog.dart';
 import 'package:kumo_ui/theme/kumo_theme.dart';
 import 'package:kumo_ui/theme/palette.dart';
 import 'package:kumo_ui/widgets/kumo_mark.dart';
+import 'package:kumo_ui/platform/os/key_combo.dart';
 
 void main() {
   testWidgets('the mark paints at icon and tiny sizes, and the lockup reads “Kumo”', (tester) async {
@@ -26,7 +27,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(KumoApp(state: AppState(demoWallpaper: true)));
     await tester.pump();
-    await tester.tap(find.byTooltip('Settings (⌘,)'));
+    await tester.tap(find.byTooltip('Settings (${AppKeys.settings.label})'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(SettingsDialog), findsOneWidget);

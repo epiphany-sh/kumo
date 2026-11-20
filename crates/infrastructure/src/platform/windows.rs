@@ -9,6 +9,8 @@ use std::process::Command;
 use std::sync::Arc;
 
 use keyring_core::{CredentialStore, Error as KeyringError};
+use winreg::RegKey;
+use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
 
 use super::{
     AgentHooks, AppFolders, BackgroundPrograms, FileIdentity, Keychain, PlainPaths, PrivateFiles,
@@ -49,13 +51,19 @@ impl ProcessTrees for Windows {
 }
 
 impl ProgramSearch for Windows {
-    /// Programs started from Explorer already get the user's PATH.
+    /// The PATH saved in the registry: Kumo's own is the one it started
+    /// with, so a CLI installed since (npm, WinGet) would be missing.
     fn login_shell_path() -> Option<String> {
-        None
+        registry_path(
+            saved_path(&RegKey::predef(HKEY_LOCAL_MACHINE), MACHINE_ENVIRONMENT),
+            saved_path(&RegKey::predef(HKEY_CURRENT_USER), USER_ENVIRONMENT),
+            &env_var,
+        )
     }
 
+    /// The usual install folders that exist, in case the PATH lacks them.
     fn install_dirs() -> Vec<PathBuf> {
-        Vec::new()
+        existing_install_dirs(&env_var)
     }
 
     /// The runnable extensions first: npm puts a `claude` shell script
@@ -72,6 +80,95 @@ impl ProgramSearch for Windows {
     fn is_executable(meta: &Metadata) -> bool {
         meta.is_file()
     }
+}
+
+/// Where the system's and the user's PATH are saved.
+const MACHINE_ENVIRONMENT: &str = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
+const USER_ENVIRONMENT: &str = "Environment";
+
+/// The `Path` value under `subkey` of `root`, as saved (`%VARS%` unexpanded).
+fn saved_path(root: &RegKey, subkey: &str) -> Option<String> {
+    root.open_subkey(subkey).ok()?.get_value("Path").ok()
+}
+
+/// A process environment variable, None when unset or empty.
+fn env_var(name: &str) -> Option<String> {
+    std::env::var(name).ok().filter(|value| !value.is_empty())
+}
+
+/// `%NAME%` replaced by `lookup(NAME)`; like `ExpandEnvironmentStrings`,
+/// what isn't set stays as written.
+fn expand_vars(text: &str, lookup: &impl Fn(&str) -> Option<String>) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find('%') {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 1..];
+        let Some(end) = after.find('%') else {
+            out.push_str(&rest[start..]);
+            return out;
+        };
+        let name = &after[..end];
+        let value = if name.is_empty() { None } else { lookup(name) };
+        match value {
+            Some(value) => {
+                out.push_str(&value);
+                rest = &after[end + 1..];
+            }
+            // The closing `%` may open the next variable.
+            None => {
+                out.push('%');
+                out.push_str(name);
+                rest = &after[end..];
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The system's PATH, then the user's, expanded: how Windows builds the
+/// PATH of a new process. None when neither has anything.
+fn registry_path(
+    machine: Option<String>,
+    user: Option<String>,
+    lookup: &impl Fn(&str) -> Option<String>,
+) -> Option<String> {
+    let parts: Vec<String> = [machine, user]
+        .into_iter()
+        .flatten()
+        .map(|part| expand_vars(part.trim_matches(';'), lookup))
+        .filter(|part| !part.is_empty())
+        .collect();
+    (!parts.is_empty()).then(|| parts.join(";"))
+}
+
+/// Where npm, Scoop, WinGet, the Store and the curl-style installers put
+/// their programs; those under an unset variable left out.
+fn install_dir_candidates(lookup: &impl Fn(&str) -> Option<String>) -> Vec<PathBuf> {
+    [
+        ("APPDATA", "npm"),
+        ("USERPROFILE", r"scoop\shims"),
+        ("LOCALAPPDATA", r"Microsoft\WinGet\Links"),
+        ("LOCALAPPDATA", r"Microsoft\WindowsApps"),
+        ("USERPROFILE", r".local\bin"),
+        ("USERPROFILE", r".cargo\bin"),
+        ("USERPROFILE", r".bun\bin"),
+    ]
+    .into_iter()
+    .filter_map(|(var, dir)| {
+        let base = lookup(var).filter(|base| !base.is_empty())?;
+        Some(Path::new(&base).join(dir))
+    })
+    .collect()
+}
+
+/// The [candidates](install_dir_candidates) that exist.
+fn existing_install_dirs(lookup: &impl Fn(&str) -> Option<String>) -> Vec<PathBuf> {
+    install_dir_candidates(lookup)
+        .into_iter()
+        .filter(|dir| dir.is_dir())
+        .collect()
 }
 
 impl ScriptShell for Windows {
@@ -210,6 +307,97 @@ mod tests {
             .status()
             .unwrap();
         assert_eq!(status.code(), Some(3));
+    }
+
+    fn env<'a>(vars: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+        move |name| {
+            vars.iter()
+                .find(|(key, _)| key.eq_ignore_ascii_case(name))
+                .map(|(_, value)| (*value).to_owned())
+        }
+    }
+
+    #[test]
+    fn expands_variables_and_keeps_unknown_ones() {
+        let lookup = env(&[
+            ("USERPROFILE", r"C:\Users\me"),
+            ("SystemRoot", r"C:\WINDOWS"),
+        ]);
+        assert_eq!(
+            expand_vars(r"%USERPROFILE%\bin;%systemroot%\system32", &lookup),
+            r"C:\Users\me\bin;C:\WINDOWS\system32"
+        );
+        // Like ExpandEnvironmentStrings: what isn't set stays as written.
+        assert_eq!(expand_vars(r"%NOPE%\bin", &lookup), r"%NOPE%\bin");
+        assert_eq!(expand_vars("100% sure", &lookup), "100% sure");
+        assert_eq!(expand_vars("%%", &lookup), "%%");
+    }
+
+    #[test]
+    fn the_registry_path_is_the_machine_one_then_the_users() {
+        let lookup = env(&[("USERPROFILE", r"C:\Users\me")]);
+        assert_eq!(
+            registry_path(
+                Some(r"C:\WINDOWS;C:\Tools;".to_owned()),
+                Some(r"%USERPROFILE%\AppData\Roaming\npm".to_owned()),
+                &lookup
+            ),
+            Some(r"C:\WINDOWS;C:\Tools;C:\Users\me\AppData\Roaming\npm".to_owned())
+        );
+        assert_eq!(
+            registry_path(None, Some(r"C:\x".to_owned()), &lookup),
+            Some(r"C:\x".to_owned())
+        );
+        assert_eq!(registry_path(Some(String::new()), None, &lookup), None);
+    }
+
+    #[test]
+    fn install_dirs_are_the_usual_ones_that_exist() {
+        let root = tempfile::tempdir().unwrap();
+        let profile = root.path().join("me");
+        let appdata = profile.join(r"AppData\Roaming");
+        let local = profile.join(r"AppData\Local");
+        let profile_text = profile.display().to_string();
+        let appdata_text = appdata.display().to_string();
+        let local_text = local.display().to_string();
+        let vars = [
+            ("USERPROFILE", profile_text.as_str()),
+            ("APPDATA", appdata_text.as_str()),
+            ("LOCALAPPDATA", local_text.as_str()),
+        ];
+        let lookup = env(&vars);
+        assert_eq!(
+            install_dir_candidates(&lookup),
+            [
+                appdata.join("npm"),
+                profile.join(r"scoop\shims"),
+                local.join(r"Microsoft\WinGet\Links"),
+                local.join(r"Microsoft\WindowsApps"),
+                profile.join(r".local\bin"),
+                profile.join(r".cargo\bin"),
+                profile.join(r".bun\bin"),
+            ]
+        );
+        assert_eq!(existing_install_dirs(&lookup), Vec::<PathBuf>::new());
+
+        std::fs::create_dir_all(appdata.join("npm")).unwrap();
+        std::fs::create_dir_all(profile.join(r"scoop\shims")).unwrap();
+        assert_eq!(
+            existing_install_dirs(&lookup),
+            [appdata.join("npm"), profile.join(r"scoop\shims")]
+        );
+    }
+
+    #[test]
+    fn install_dirs_skip_unset_variables() {
+        let lookup = env(&[
+            ("APPDATA", r"C:\Users\me\AppData\Roaming"),
+            ("USERPROFILE", ""),
+        ]);
+        assert_eq!(
+            install_dir_candidates(&lookup),
+            [PathBuf::from(r"C:\Users\me\AppData\Roaming\npm")]
+        );
     }
 
     #[test]

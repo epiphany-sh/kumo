@@ -4,6 +4,8 @@
 /// Rust core and stream highlight ranges, so the UI never parses.
 library;
 
+import '../platform/os/key_combo.dart';
+
 enum Tok { kw, str, num, com, type, fn, key, punct, text, head }
 
 enum Lang { go, rust, toml, dart, ts, python, shell, sql, proto, swift, kotlin, java, c, yaml, json, markdown, makefile, ignore, plain }
@@ -47,7 +49,7 @@ LangInfo langOf(String path) {
   if (known != null) return known;
   if (name.endsWith('.yaml') || name.endsWith('.yml')) return const LangInfo(Lang.yaml, 'YML', 'YAML', 'yaml-ls', 'Spaces: 2');
   if (name.endsWith('.json')) return const LangInfo(Lang.json, '{ }', 'JSON', 'schema: bulk-discount.json', 'Spaces: 2');
-  if (name.endsWith('.md')) return const LangInfo(Lang.markdown, 'MD', 'Markdown', 'preview ⇧⌘V', 'Spaces: 2');
+  if (name.endsWith('.md')) return LangInfo(Lang.markdown, 'MD', 'Markdown', 'preview ${AppKeys.togglePreview.label}', 'Spaces: 2');
   if (name == 'Makefile') return const LangInfo(Lang.makefile, 'MK', 'Makefile', '3 targets', 'Tabs');
   if (name == '.gitignore') return const LangInfo(Lang.ignore, 'GIT', 'Ignore file', '', 'Spaces: 2');
   return const LangInfo(Lang.plain, 'TXT', 'Plain text', '', 'Spaces: 2');

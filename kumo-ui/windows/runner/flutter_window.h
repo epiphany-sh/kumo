@@ -40,6 +40,10 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       app_icon_channel_;
 
+  // How the first frame shows the window: maximized when it closed that way
+  // (window_placement.h).
+  int show_command_ = SW_SHOWNORMAL;
+
   // The icons set with SetAppIcon, destroyed once replaced.
   HICON big_icon_ = nullptr;
   HICON small_icon_ = nullptr;

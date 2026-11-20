@@ -1,9 +1,9 @@
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../platform/os/key_combo.dart';
 import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/kicons.dart';
@@ -338,8 +338,6 @@ class FindBar extends StatelessWidget {
   /// Closes the bar and gives the editor its focus back.
   final VoidCallback onClose;
 
-  static bool get _mac => defaultTargetPlatform == TargetPlatform.macOS;
-
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -354,7 +352,7 @@ class FindBar extends StatelessWidget {
                 ? ''
                 : (n == 0 ? 'No results' : '${f.current + 1} of $n${f.result.capped ? '+' : ''}');
         final statusColor = f.result.error != null || (n == 0 && f.query.text.isNotEmpty) ? c.err : c.text2;
-        final mod = _mac ? '⌘' : 'Ctrl+';
+
         // Glass, like the app's other floating panels: the code under it
         // blurs instead of showing through the text.
         return DecoratedBox(
@@ -381,7 +379,7 @@ class FindBar extends StatelessWidget {
                         ? const SizedBox(width: 6)
                         : KIconButton(
                             icon: f.replacing ? KIcons.chevronDown : KIcons.chevronRight,
-                            label: f.replacing ? 'Hide replace' : 'Replace (${_mac ? '⌥⌘F' : 'Ctrl+H'})',
+                            label: f.replacing ? 'Hide replace' : 'Replace (${AppKeys.replace.label})',
                             size: 22,
                             iconSize: 15,
                             onTap: f.toggleReplace,
@@ -419,8 +417,8 @@ class FindBar extends StatelessWidget {
                             child: Text(status, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(11.5, color: statusColor)),
                           ),
                         ),
-                        KIconButton(icon: KIcons.chevronUp, label: 'Previous match (⇧↵ · ⇧${mod}G)', size: 24, iconSize: 16, onTap: n == 0 ? null : f.clickPrevious),
-                        KIconButton(icon: KIcons.chevronDown, label: 'Next match (↵ · ${mod}G)', size: 24, iconSize: 16, onTap: n == 0 ? null : f.clickNext),
+                        KIconButton(icon: KIcons.chevronUp, label: 'Previous match (${AppKeys.findPreviousByEnter.label} · ${AppKeys.findPrevious.label})', size: 24, iconSize: 16, onTap: n == 0 ? null : f.clickPrevious),
+                        KIconButton(icon: KIcons.chevronDown, label: 'Next match (↵ · ${AppKeys.findNext.label})', size: 24, iconSize: 16, onTap: n == 0 ? null : f.clickNext),
                         KIconButton(icon: KIcons.close, label: 'Close (Esc)', size: 24, iconSize: 13, onTap: onClose),
                       ]),
                       if (f.replacing) ...[
@@ -435,7 +433,7 @@ class FindBar extends StatelessWidget {
                               bindings: {
                                 const SingleActivator(LogicalKeyboardKey.enter): f.replaceOne,
                                 const SingleActivator(LogicalKeyboardKey.numpadEnter): f.replaceOne,
-                                SingleActivator(LogicalKeyboardKey.enter, meta: _mac, control: !_mac): f.replaceAll,
+                                AppKeys.replaceAll.activator: f.replaceAll,
                                 const SingleActivator(LogicalKeyboardKey.escape): onClose,
                               },
                             ),
@@ -444,7 +442,7 @@ class FindBar extends StatelessWidget {
                           KButton(label: 'Replace', kind: KButtonKind.ghost, height: 26, fontSize: 11.5, onTap: n == 0 ? null : f.clickReplace),
                           const SizedBox(width: 4),
                           Tooltip(
-                            message: 'Replace all ($mod↵)',
+                            message: 'Replace all (${AppKeys.replaceAll.label})',
                             child: KButton(label: 'All', kind: KButtonKind.ghost, height: 26, fontSize: 11.5, onTap: n == 0 ? null : f.clickReplaceAll),
                           ),
                         ]),

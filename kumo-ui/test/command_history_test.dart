@@ -4,6 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kumo_ui/platform/os/host_os.dart';
+import 'package:kumo_ui/platform/os/linux.dart';
+import 'package:kumo_ui/platform/os/macos.dart';
+import 'package:kumo_ui/platform/os/windows.dart';
 import 'package:kumo_ui/terminal/ansi_screen.dart';
 import 'package:kumo_ui/terminal/command_history.dart';
 import 'package:kumo_ui/terminal/history_panel.dart';
@@ -130,8 +134,10 @@ void main() {
     });
  
     testWidgets('⌘Y opens the history (Ctrl+Shift+Y elsewhere), ⌃Y goes to the shell', (tester) async {
-      final shell = await pump(tester);
       final mac = defaultTargetPlatform == TargetPlatform.macOS;
+      debugHostOs = switch (defaultTargetPlatform) { TargetPlatform.macOS => MacOs(), TargetPlatform.windows => WindowsOs(const {}), _ => LinuxOs() };
+      addTearDown(() => debugHostOs = null);
+      final shell = await pump(tester);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
       if (!mac) await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
       if (mac) {
@@ -146,7 +152,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Command history'), findsOneWidget);
       expect(find.text('git status --short'), findsOneWidget);
-    }, variant: const TargetPlatformVariant({TargetPlatform.macOS, TargetPlatform.linux}));
+    }, variant: const TargetPlatformVariant({TargetPlatform.macOS, TargetPlatform.linux, TargetPlatform.windows}));
 
     testWidgets('the history panel finds a command and puts it at the prompt', (tester) async {
       final shell = _Shell('');

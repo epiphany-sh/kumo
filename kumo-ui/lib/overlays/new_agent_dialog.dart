@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
 import '../data/agent_defs.dart';
 import '../data/agent_defs_source.dart';
 import '../data/agents_source.dart';
+import '../platform/os/key_combo.dart';
 import '../theme/kumo_theme.dart';
 import '../views/agents_library.dart' show AgentAvatar, riskColors, worktreeContext;
 import '../widgets/controls.dart';
@@ -162,7 +162,7 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
 
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
+        AppKeys.submit.activator: () {
           if (canStart) _start(s, agent, worktree, context0);
         },
       },
@@ -305,7 +305,7 @@ class _NewAgentDialogState extends State<NewAgentDialog> {
               KButton.primary(
                 label: _starting ? 'Starting…' : 'Start',
                 onTap: canStart ? () => _start(s, agent, worktree, context0) : null,
-                trailing: Kbd('⌘↩', color: c.accText, background: const Color(0x26000000)),
+                trailing: Kbd(AppKeys.submitOnButton.label, color: c.accText, background: const Color(0x26000000)),
               ),
             ]),
           ],

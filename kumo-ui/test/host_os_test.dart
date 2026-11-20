@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/app/preferences.dart';
 import 'package:kumo_ui/engine/daemon_endpoint.dart';
@@ -13,9 +15,21 @@ import 'package:kumo_ui/platform/os/windows.dart';
   return (program, args.join(' '));
 }
 
+/// The file manager's command, the same way.
+(String, String) _reveal(HostOs os, String path) {
+  final (program, args) = os.revealCommand(path);
+  return (program, args.join(' '));
+}
+
+/// An activator's key and modifiers (it has no `==`).
+(LogicalKeyboardKey, bool, bool, bool, bool) _keys(SingleActivator a) => (a.trigger, a.control, a.meta, a.shift, a.alt);
+
+/// The shells Settings offers, without their labels.
+List<String> _values(HostOs os) => [for (final c in os.shellChoices) c.value];
+
 void main() {
   group('macOS', () {
-    final os = MacOs(const {'HOME': '/Users/user-1', 'USER': 'user-1'});
+    final os = MacOs(const {'HOME': '/Users/user-1', 'USER': 'user-1'}, (_) => true);
 
     test('files live under ~/Library/Application Support', () {
       expect(os.home, '/Users/user-1');
@@ -34,9 +48,54 @@ void main() {
     test('a login shell: \$SHELL, else zsh', () {
       expect(os.shell, '/bin/zsh');
       expect(MacOs(const {'SHELL': '/bin/bash'}).shell, '/bin/bash');
-      expect(os.shellArgs, ['-l']);
-      expect(os.shellChoices, ['/bin/zsh', '/bin/bash', '/opt/homebrew/bin/fish']);
-      expect(os.defaultShellChoice, '/bin/zsh');
+      expect(os.shellArgsFor(os.shell), ['-l']);
+      expect(_values(os), ['/bin/zsh', '/bin/bash', '/opt/homebrew/bin/fish']);
+      expect([for (final c in os.shellChoices) c.label], _values(os), reason: 'a path is its own label');
+      expect(os.shellDescription, 'Login shell for new tabs (⌘T) and splits.');
+    });
+
+    test('Settings preselects \$SHELL, what a new terminal ran before the setting was read', () {
+      final nu = MacOs(const {'SHELL': '/usr/local/bin/nu'}, (_) => true);
+      expect(nu.shell, '/usr/local/bin/nu');
+      expect(_values(nu), contains('/usr/local/bin/nu'), reason: 'the dropdown can show it');
+      expect(nu.resolveShell(null), '/usr/local/bin/nu');
+      expect(nu.resolveShell('/bin/bash'), '/bin/bash');
+      expect(nu.resolveShell('/gone/sh'), '/usr/local/bin/nu', reason: 'one no longer offered falls back');
+    });
+
+    test('only shells that are installed, and \$SHELL always', () {
+      final checked = <String>[];
+      bool exists(String path) {
+        checked.add(path);
+        return path == '/bin/zsh' || path == '/usr/bin/xonsh';
+      }
+
+      final mac = MacOs(const {'SHELL': '/usr/local/bin/nu', 'PATH': '/usr/local/bin:/usr/bin'}, exists);
+      expect(_values(mac), ['/bin/zsh', '/usr/local/bin/nu'], reason: 'no bash or fish here');
+      expect(checked, isNot(contains('/usr/local/bin/nu')), reason: '\$SHELL is offered unchecked');
+      expect(mac.resolveShell('/opt/homebrew/bin/fish'), '/usr/local/bin/nu', reason: 'a saved fish that isn’t installed keeps \$SHELL -l');
+      expect(mac.resolveShell('/bin/zsh'), '/bin/zsh');
+      expect(mac.programExists('xonsh'), isTrue, reason: 'a bare name is looked up on \$PATH');
+      expect(mac.programExists('fish'), isFalse);
+      expect(mac.programExists('/bin/zsh'), isTrue);
+    });
+
+    test('pane keys use ⌘', () {
+      expect(_keys(os.paneShortcut(PaneShortcut.newTab)), _keys(const SingleActivator(LogicalKeyboardKey.keyT, meta: true)));
+      expect(_keys(os.paneShortcut(PaneShortcut.closePane)), _keys(const SingleActivator(LogicalKeyboardKey.keyW, meta: true)));
+      expect(_keys(os.paneShortcut(PaneShortcut.splitRight)), _keys(const SingleActivator(LogicalKeyboardKey.keyD, meta: true)));
+      expect(_keys(os.paneShortcut(PaneShortcut.splitDown)), _keys(const SingleActivator(LogicalKeyboardKey.keyD, meta: true, shift: true)));
+      expect(os.paneShortcutLabel(PaneShortcut.newTab), '⌘T');
+      expect(os.paneShortcutLabel(PaneShortcut.closePane), '⌘W');
+      expect(os.paneShortcutLabel(PaneShortcut.splitRight), '⌘D');
+      expect(os.paneShortcutLabel(PaneShortcut.splitDown), '⇧⌘D');
+    });
+
+    test('Finder, and this Mac', () {
+      expect(_reveal(os, '/Users/user-1/wt/x'), ('open', '-R /Users/user-1/wt/x'));
+      expect(os.revealLabel, 'Reveal in Finder');
+      expect(os.machineName, 'this Mac');
+      expect(os.hasBear, isTrue);
     });
 
     test('native backdrop with the traffic lights inside the content', () {
@@ -68,18 +127,105 @@ void main() {
       expect(_open(os), ('rundll32', 'url.dll,FileProtocolHandler https://example.com'));
     });
 
-    test('shell: %COMSPEC%, else cmd.exe, with no login flag', () {
-      expect(os.shell, r'C:\Windows\system32\cmd.exe');
-      expect(WindowsOs(const {}).shell, 'cmd.exe');
-      expect(os.shellArgs, isEmpty);
-      expect(os.shellChoices, ['cmd.exe', 'powershell.exe', 'pwsh.exe']);
-      expect(os.shellChoices, contains(os.defaultShellChoice));
+    test('shell: PowerShell 7, else Windows PowerShell, else %COMSPEC%', () {
+      const env = {'COMSPEC': r'C:\Windows\system32\cmd.exe', 'SHELL': '/usr/bin/bash'};
+      final both = WindowsOs(env, (exe) => true);
+      expect(both.shell, 'pwsh.exe', reason: 'a Git Bash \$SHELL doesn’t win');
+      expect([for (final c in both.shellChoices) (c.value, c.label)], [
+        ('pwsh.exe', 'PowerShell 7'),
+        ('powershell.exe', 'Windows PowerShell'),
+        (r'C:\Windows\system32\cmd.exe', 'Command Prompt'),
+      ]);
+      final legacy = WindowsOs(env, (exe) => exe == 'powershell.exe');
+      expect(legacy.shell, 'powershell.exe');
+      expect(_values(legacy), ['powershell.exe', r'C:\Windows\system32\cmd.exe'], reason: 'PowerShell 7 only once installed');
+      expect(WindowsOs(env, (exe) => false).shell, r'C:\Windows\system32\cmd.exe');
+      expect(WindowsOs(const {}, (exe) => false).shell, 'cmd.exe');
+      expect(_values(both), contains(both.shell));
     });
 
-    test('Mica backdrop, native window buttons outside the content', () async {
+    test('shell: the one chosen while it’s offered, with -NoLogo for PowerShell', () {
+      final legacy = WindowsOs(const {'COMSPEC': r'C:\Windows\system32\cmd.exe'}, (exe) => exe == 'powershell.exe');
+      expect(legacy.resolveShell(null), 'powershell.exe');
+      expect(legacy.resolveShell(r'C:\Windows\system32\cmd.exe'), r'C:\Windows\system32\cmd.exe');
+      expect(legacy.resolveShell('pwsh.exe'), 'powershell.exe', reason: 'PowerShell 7 was uninstalled');
+      expect(legacy.shellArgsFor('pwsh.exe'), ['-NoLogo']);
+      expect(legacy.shellArgsFor(r'C:\Program Files\PowerShell\7\PWSH.EXE'), ['-NoLogo']);
+      expect(legacy.shellArgsFor('powershell.exe'), ['-NoLogo']);
+      expect(legacy.shellArgsFor(r'C:\Windows\system32\cmd.exe'), isEmpty);
+      expect(legacy.shellDescription, 'Shell for new tabs (Ctrl+Shift+T) and splits.');
+    });
+
+    test('a shell saved by name before still picks the same one', () {
+      final os = WindowsOs(
+        const {'COMSPEC': r'C:\Windows\system32\cmd.exe', 'ProgramFiles': r'C:\Program Files'},
+        (exe) => exe == 'powershell.exe',
+        (path) => path == r'C:\Program Files\PowerShell\7\pwsh.exe',
+      );
+      expect(os.resolveShell('cmd.exe'), r'C:\Windows\system32\cmd.exe', reason: 'Command Prompt was saved as cmd.exe');
+      expect(os.resolveShell('CMD.EXE'), r'C:\Windows\system32\cmd.exe');
+      expect(os.resolveShell('pwsh.exe'), r'C:\Program Files\PowerShell\7\pwsh.exe');
+      expect(os.resolveShell('PowerShell.exe'), 'powershell.exe');
+      expect(os.resolveShell('bash.exe'), os.shell, reason: 'never offered');
+    });
+
+    test('PowerShell in its install folder first, then %PATH% without network shares', () {
+      final checked = <String>[];
+      bool Function(String) existsAt(Set<String> there) => (path) {
+            checked.add(path);
+            return there.contains(path);
+          };
+      const env = {
+        'ProgramFiles': r'C:\Program Files',
+        'SystemRoot': r'C:\Windows',
+        'PATH': r'\\server\share\bin;C:\tools',
+      };
+      final installed = WindowsOs(env, null, existsAt({r'C:\Program Files\PowerShell\7\pwsh.exe', r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'}));
+      expect(installed.shell, r'C:\Program Files\PowerShell\7\pwsh.exe');
+      expect(_values(installed), [r'C:\Program Files\PowerShell\7\pwsh.exe', r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe', 'cmd.exe']);
+      expect(checked, isNot(contains(startsWith(r'C:\tools'))), reason: 'the install folders answered');
+      checked.clear();
+      final onPath = WindowsOs(env, null, existsAt({r'C:\tools\pwsh.exe'}));
+      expect(onPath.shell, 'pwsh.exe');
+      expect(checked, isNot(contains(startsWith(r'\\'))), reason: 'a UNC entry can hang the UI');
+      expect(checked, contains(r'C:\tools\pwsh.exe'));
+    });
+
+    test('looks for PowerShell on %PATH%', () {
+      bool exists(String path) => path == r'C:\Program Files\PowerShell\7\pwsh.exe';
+      expect(WindowsOs(const {'PATH': r'C:\a;C:\Program Files\PowerShell\7'}, null, exists).shell, 'pwsh.exe');
+      expect(WindowsOs(const {'Path': r'C:\a;C:\Program Files\PowerShell\7\'}, null, exists).shell, 'pwsh.exe');
+      expect(WindowsOs(const {'PATH': r'C:\a', 'COMSPEC': 'cmd'}, null, exists).shell, 'cmd');
+    });
+
+    test('pane keys use Ctrl+Shift, leaving Ctrl+D / T / W to the shell', () {
+      expect(_keys(os.paneShortcut(PaneShortcut.newTab)), _keys(const SingleActivator(LogicalKeyboardKey.keyT, control: true, shift: true)));
+      expect(_keys(os.paneShortcut(PaneShortcut.closePane)), _keys(const SingleActivator(LogicalKeyboardKey.keyW, control: true, shift: true)));
+      expect(_keys(os.paneShortcut(PaneShortcut.splitRight)), _keys(const SingleActivator(LogicalKeyboardKey.keyD, control: true, shift: true)));
+      expect(_keys(os.paneShortcut(PaneShortcut.splitDown)), _keys(const SingleActivator(LogicalKeyboardKey.keyE, control: true, shift: true)));
+      expect(os.paneShortcutLabel(PaneShortcut.newTab), 'Ctrl+Shift+T');
+      expect(os.paneShortcutLabel(PaneShortcut.splitRight), 'Ctrl+Shift+D');
+      expect(os.paneShortcutLabel(PaneShortcut.splitDown), 'Ctrl+Shift+E');
+    });
+
+    test('Explorer, and this PC', () {
+      expect(_reveal(os, r'C:\Users\user-1\wt\x'), ('explorer.exe', r'/select,C:\Users\user-1\wt\x'));
+      expect(_reveal(os, 'C:/Users/user-1/wt/x'), ('explorer.exe', r'/select,C:\Users\user-1\wt\x'), reason: 'git prints worktree paths with /');
+      expect(os.revealLabel, 'Show in Explorer');
+      expect(os.machineName, 'this PC');
+      expect(os.hasBear, isFalse);
+    });
+
+    test('Mica backdrop, native window buttons outside the content', () {
       expect(os.supportsNativeBackdrop, isTrue);
       expect(os.windowButtonsInContent, isFalse);
-      expect(await os.openWorkspaceWindow('workspace-1'), contains('macOS'));
+    });
+
+    test('a new window runs the same executable with KUMO_WORKSPACE', () {
+      final (exe, args, env) = os.workspaceWindowCommand(r'C:\Kumo\kumo_ui.exe', 'workspace-1');
+      expect(exe, r'C:\Kumo\kumo_ui.exe');
+      expect(args, isEmpty);
+      expect(env, {'KUMO_WORKSPACE': 'workspace-1'});
     });
   });
 
@@ -101,8 +247,22 @@ void main() {
 
     test('a login shell', () {
       expect(os.shell, '/bin/zsh');
-      expect(os.shellArgs, ['-l']);
-      expect(os.shellChoices, contains(os.defaultShellChoice));
+      expect(os.shellArgsFor(os.shell), ['-l']);
+      expect(_values(os), contains(os.shell));
+      expect(_values(LinuxOs(const {'SHELL': '/usr/bin/nu'})), contains('/usr/bin/nu'));
+      expect(os.shellDescription, 'Login shell for new tabs (Ctrl+Shift+T) and splits.');
+    });
+
+    test('pane keys use Ctrl+Shift', () {
+      expect(_keys(os.paneShortcut(PaneShortcut.newTab)), _keys(const SingleActivator(LogicalKeyboardKey.keyT, control: true, shift: true)));
+      expect(os.paneShortcutLabel(PaneShortcut.closePane), 'Ctrl+Shift+W');
+    });
+
+    test('the file manager, and this computer', () {
+      expect(_reveal(os, '/home/user-1/wt/x'), ('xdg-open', '/home/user-1/wt'));
+      expect(os.revealLabel, 'Show in File Manager');
+      expect(os.machineName, 'this computer');
+      expect(os.hasBear, isFalse);
     });
 
     test('no native backdrop or new windows', () async {

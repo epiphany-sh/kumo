@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
 import '../platform/os/host_os.dart';
+import '../platform/os/key_combo.dart';
 import '../platform/window_effects.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
@@ -32,12 +33,13 @@ class ScreenFrame extends StatelessWidget {
 
 /// Toolbar: breadcrumb capsule, search, theme cycle, primary action.
 class ScreenToolbar extends StatelessWidget {
-  const ScreenToolbar({super.key, required this.breadcrumb, this.primary, this.searchHint = 'Search commands, tickets, docs…', this.searchKey = '⌘K', this.onSearch});
+  const ScreenToolbar({super.key, required this.breadcrumb, this.primary, this.searchHint = 'Search commands, tickets, docs…', this.searchKey, this.onSearch});
 
   final Widget breadcrumb;
   final Widget? primary;
   final String searchHint;
-  final String searchKey;
+  /// Its key; [AppKeys.search] when not given.
+  final String? searchKey;
 
   /// The search field opens this (a picker of its own) instead of taking
   /// text.
@@ -57,7 +59,7 @@ class ScreenToolbar extends StatelessWidget {
       padding: EdgeInsets.only(left: hiddenSidebarInset, top: 2),
       child: Row(children: [
         if (!s.sidebarVisible) ...[
-          KIconButton(icon: KIcons.sidebar, label: 'Show sidebar (⌥⌘S)', onTap: s.toggleSidebar, size: 36, filled: true),
+          KIconButton(icon: KIcons.sidebar, label: 'Show sidebar (${AppKeys.toggleSidebar.label})', onTap: s.toggleSidebar, size: 36, filled: true),
           const SizedBox(width: 8),
         ],
         // All the free room is the breadcrumb's (it hugs its content, on the
@@ -65,7 +67,7 @@ class ScreenToolbar extends StatelessWidget {
         Expanded(child: Align(alignment: Alignment.centerLeft, child: Capsule(child: breadcrumb))),
         const SizedBox(width: 8),
         // An update waiting takes some of the search field's room.
-        SizedBox(width: s.updates.ready == null ? 300 : 220, child: _SearchField(hint: searchHint, shortcut: searchKey, onTap: onSearch)),
+        SizedBox(width: s.updates.ready == null ? 300 : 220, child: _SearchField(hint: searchHint, shortcut: searchKey ?? AppKeys.search.label, onTap: onSearch)),
         const SizedBox(width: 8),
         if (s.updates.ready case final version?) ...[
           Tooltip(
@@ -74,7 +76,7 @@ class ScreenToolbar extends StatelessWidget {
           ),
           const SizedBox(width: 8),
         ],
-        KIconButton(icon: themeIcon, label: 'Theme: $themeName — click to cycle (⇧⌘L)', onTap: s.cycleTheme, size: 36, filled: true, color: c.text),
+        KIconButton(icon: themeIcon, label: 'Theme: $themeName — click to cycle (${AppKeys.cycleTheme.label})', onTap: s.cycleTheme, size: 36, filled: true, color: c.text),
         if (primary != null) ...[const SizedBox(width: 8), primary!],
       ]),
     );

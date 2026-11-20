@@ -9,6 +9,7 @@ import 'package:kumo_ui/theme/palette.dart';
 import 'package:kumo_ui/views/task_detail.dart';
 import 'package:kumo_ui/views/task_detail/markdown.dart';
 import 'package:kumo_ui/widgets/controls.dart';
+import 'package:kumo_ui/platform/os/host_os.dart';
 
 const _all = {TaskColumn.todo, TaskColumn.doing, TaskColumn.review, TaskColumn.done};
 
@@ -180,7 +181,7 @@ void main() {
     await _pump(tester, _Source(fail: 'Jira didn’t answer'), _task.id);
     await tester.pump();
     expect(find.text('Showing what Kumo saved.'), findsOneWidget);
-    expect(find.text('Not saved on this Mac yet'), findsOneWidget);
+    expect(find.text('Not saved on ${hostOs.machineName} yet'), findsOneWidget);
     expect(find.text('Bulk discounts'), findsOneWidget);
   });
 

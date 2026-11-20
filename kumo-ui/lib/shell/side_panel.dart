@@ -17,6 +17,7 @@ import '../data/tests_source.dart';
 import '../overlays/new_agent_dialog.dart';
 import '../overlays/settings_dialog.dart';
 import '../platform/open_url.dart';
+import '../platform/os/key_combo.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/context_menu.dart';
@@ -71,7 +72,7 @@ class SidePanel extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Expanded(child: Text(tab.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12.5, weight: FontWeight.w600, color: c.text))),
-            KIconButton(icon: KIcons.sidePanel, label: 'Hide side panel (⌥⌘B)', onTap: s.toggleSidePanel),
+            KIconButton(icon: KIcons.sidePanel, label: 'Hide side panel (${AppKeys.toggleSidePanel.label})', onTap: s.toggleSidePanel),
           ]),
         ),
         Expanded(
@@ -336,7 +337,7 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
                 },
                 style: sans(12.5, color: c.text, height: 1.45),
                 cursorColor: c.acc,
-                decoration: InputDecoration.collapsed(hintText: 'Message (⌘↩ to commit)', hintStyle: sans(12.5, color: c.text3, height: 1.45)),
+                decoration: InputDecoration.collapsed(hintText: 'Message (${AppKeys.submit.label} to commit)', hintStyle: sans(12.5, color: c.text3, height: 1.45)),
               ),
             ),
           ),
@@ -494,7 +495,7 @@ class _CommitButton extends StatelessWidget {
               position: belowOf(btn),
               alignRight: true,
               builder: (context, close) => KMenuPanel(width: 220, children: [
-                for (final (label, key, how) in const [('Commit & Push', '⇧⌘↩', 'push'), ('Amend last commit', null, 'amend')])
+                for (final (label, key, how) in [('Commit & Push', AppKeys.commitAndPush.label, 'push'), ('Amend last commit', null, 'amend')])
                   KMenuItem(
                     icon: how == 'amend' ? KIcons.rename : KIcons.upload,
                     label: label,

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -13,6 +12,7 @@ import '../editor/quick_open.dart';
 import '../editor/syntax.dart';
 import '../overlays/new_agent_dialog.dart';
 import '../shell/screen_chrome.dart';
+import '../platform/os/key_combo.dart';
 import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/controls.dart';
@@ -344,7 +344,7 @@ class _FilesScreenState extends State<FilesScreen> {
       toolbar: ScreenToolbar(
         breadcrumb: Breadcrumb(icon: KIcons.branch, parts: [s.activeRepo?.name ?? 'No repository', if (_git.branch.isNotEmpty) _git.branch]),
         searchHint: 'Go to file…',
-        searchKey: defaultTargetPlatform == TargetPlatform.macOS ? '⌘P' : 'Ctrl+P',
+        searchKey: AppKeys.quickOpen.label,
         onSearch: () => goToFile(context, AppScope.read(context)),
         primary: KButton.primary(
           label: 'Ask agent about file',
@@ -533,7 +533,7 @@ class _FilesScreenState extends State<FilesScreen> {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Text('No file open', style: sans(14, weight: FontWeight.w600, color: c.text2)),
                 const SizedBox(height: 6),
-                Text('Pick a file in the explorer or press ⌘P', style: sans(12.5, color: c.text3)),
+                Text('Pick a file in the explorer or press ${AppKeys.quickOpen.label}', style: sans(12.5, color: c.text3)),
               ]),
             ),
           )
@@ -640,7 +640,7 @@ class _FilesScreenState extends State<FilesScreen> {
         const Spacer(),
         if (info.lang == Lang.markdown) ...[
           Tooltip(
-            message: 'Preview or code (⇧⌘V)',
+            message: 'Preview or code (${AppKeys.togglePreview.label})',
             child: KSegmented<bool>(
               label: 'Show',
               height: 24,
@@ -656,7 +656,7 @@ class _FilesScreenState extends State<FilesScreen> {
         Kbd(info.label),
         if (_dirty.contains(path)) ...[
           const SizedBox(width: 8),
-          KButton.primary(label: 'Save', height: 26, fontSize: 11.5, onTap: _save, trailing: Text('⌘S', style: sans(11, color: c.accText.withAlpha(190)))),
+          KButton.primary(label: 'Save', height: 26, fontSize: 11.5, onTap: _save, trailing: Text(AppKeys.save.label, style: sans(11, color: c.accText.withAlpha(190)))),
         ],
       ]),
     );

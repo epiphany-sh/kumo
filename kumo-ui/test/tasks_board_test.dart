@@ -12,6 +12,7 @@ import 'package:kumo_ui/views/task_detail.dart';
 import 'package:kumo_ui/views/task_visuals.dart';
 import 'package:kumo_ui/views/tasks_screen.dart';
 import 'package:kumo_ui/widgets/controls.dart';
+import 'package:kumo_ui/platform/os/key_combo.dart';
 
 Future<AppState> _pump(WidgetTester tester, {TasksSource? tasks, AppState? state, Size size = const Size(1440, 960)}) async {
   tester.view.physicalSize = size;
@@ -65,7 +66,7 @@ void main() {
     expect(find.text('Mine · 4 sources'), findsOneWidget);
     expect(find.text('Jira · Platform, GitHub, Obsidian, Todoist · synced 1 min ago'), findsOneWidget);
     expect(find.text('11 yours of 17 · 3 in worktrees'), findsOneWidget);
-    expect(find.text('⌘K finds a ticket by key or title'), findsOneWidget);
+    expect(find.text('${AppKeys.search.label} finds a ticket by key or title'), findsOneWidget);
     expect(find.text('migraciones'), findsWidgets);
     expect(find.text('Generación automática de precios para los canales (Hijas)'), findsNothing, reason: 'unassigned: not mine');
 

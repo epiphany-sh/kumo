@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
 import '../data/agent_defs.dart';
 import '../platform/pasteboard.dart';
+import '../platform/os/key_combo.dart';
 import '../theme/kumo_theme.dart';
 import '../views/agents_library.dart' show AgentAvatar, CheckLine, riskColors;
 import '../widgets/controls.dart';
@@ -148,7 +148,7 @@ class _CreateAgentDialogState extends State<CreateAgentDialog> {
     final canGo = !_drafting && (!_import || (read?.usable ?? false)) && (_scope == AgentScope.personal || _repo != null);
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
+        AppKeys.submit.activator: () {
           if (canGo) _go(s);
         },
       },
@@ -224,7 +224,7 @@ class _CreateAgentDialogState extends State<CreateAgentDialog> {
               height: 32,
               fontSize: 12.5,
               onTap: canGo ? () => _go(s) : null,
-              trailing: Kbd('⌘↩', color: c.accText, background: const Color(0x26000000)),
+              trailing: Kbd(AppKeys.submitOnButton.label, color: c.accText, background: const Color(0x26000000)),
             ),
           ]),
         ]),

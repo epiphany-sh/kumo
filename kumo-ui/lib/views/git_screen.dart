@@ -27,6 +27,7 @@ import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
 import '../widgets/toolbar_segments.dart';
+import '../platform/os/host_os.dart';
 
 part 'git_commits.dart';
 part 'git_releases.dart';
@@ -1027,7 +1028,7 @@ Future<void> _startPrAgent(BuildContext context, RepoActivitySource source, Repo
   }
   final home = prAgentHome(s, source.repo, pr);
   if (home == null) {
-    s.notify('${source.repo.name} has no checkout on this Mac');
+    s.notify('${source.repo.name} has no checkout on ${hostOs.machineName}');
     return;
   }
   final run = await s.agents.start(

@@ -7,6 +7,7 @@
 
 #include "flutter/generated_plugin_registrant.h"
 #include "resource.h"
+#include "window_placement.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -17,6 +18,9 @@ bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
   }
+
+  // Where the user left it, before Flutter sizes its view to the window.
+  show_command_ = RestoreWindowPlacement(GetHandle());
 
   RECT frame = GetClientArea();
 
@@ -49,7 +53,7 @@ bool FlutterWindow::OnCreate() {
       });
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
-    this->Show();
+    ShowWindow(GetHandle(), show_command_);
   });
 
   // Flutter can complete the first frame before the "show window" callback is
@@ -127,6 +131,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   switch (message) {
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
+      break;
+    case WM_GETMINMAXINFO:
+      ApplyMinWindowSize(hwnd, reinterpret_cast<MINMAXINFO*>(lparam));
+      return 0;
+    case WM_DESTROY:
+      SaveWindowPlacement(hwnd);
       break;
   }
 

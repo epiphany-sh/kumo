@@ -3,7 +3,7 @@ import 'host_os.dart';
 
 /// Linux (and any other desktop OS).
 class LinuxOs extends HostOs {
-  LinuxOs([super.env]);
+  LinuxOs([super.env, super.exists]);
 
   @override
   String? get home => env['HOME'] ?? env['USERPROFILE'];
@@ -32,17 +32,31 @@ class LinuxOs extends HostOs {
   String get shell => env['SHELL'] ?? '/bin/zsh';
 
   @override
-  List<String> get shellArgs => const ['-l'];
+  List<String> shellArgsFor(String program) => const ['-l'];
 
+  /// The usual ones that are installed, and `$SHELL` when it's another.
+  /// Looked up once.
   @override
-  List<String> get shellChoices => const ['/bin/bash', '/bin/zsh', '/usr/bin/fish'];
-
-  /// What [shell] falls back to.
-  @override
-  String get defaultShellChoice => '/bin/zsh';
+  late final List<ShellChoice> shellChoices = [
+    for (final path in {'/bin/bash', '/bin/zsh', '/usr/bin/fish', shell})
+      if (path == shell || programExists(path)) (value: path, label: path),
+  ];
 
   @override
   (String, List<String>) openUrlCommand(String url) => ('xdg-open', [url]);
+
+  /// File managers have no common "select this" flag: its folder opens.
+  @override
+  (String, List<String>) revealCommand(String path) {
+    final cut = path.lastIndexOf('/');
+    return ('xdg-open', [cut > 0 ? path.substring(0, cut) : '/']);
+  }
+
+  @override
+  String get revealLabel => 'Show in File Manager';
+
+  @override
+  String get machineName => 'this computer';
 
   @override
   Future<String?> openWorkspaceWindow(String id) async => 'Opening a workspace in a new window works on macOS for now.';

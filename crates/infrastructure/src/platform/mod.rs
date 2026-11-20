@@ -57,9 +57,10 @@ pub trait ProcessTrees {
 /// Where programs are found: the user's PATH and what counts as a program.
 pub trait ProgramSearch {
     /// The PATH the user's own shell sets up, when it isn't the one Kumo
-    /// was started with (apps opened from the Finder get a minimal one).
+    /// was started with (apps opened from the Finder get a minimal one; on
+    /// Windows, the one saved in the registry, which changes after it).
     fn login_shell_path() -> Option<String>;
-    /// Install folders searched after the PATH, outside the home folder.
+    /// Install folders searched after the PATH.
     fn install_dirs() -> Vec<PathBuf>;
     /// The file names `program` can have, in the order they're tried.
     fn executable_names(program: &str) -> Vec<String>;

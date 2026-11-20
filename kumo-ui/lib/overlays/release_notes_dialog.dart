@@ -16,6 +16,7 @@ import '../theme/kumo_theme.dart';
 import '../widgets/controls.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
+import '../platform/os/host_os.dart';
 import 'agent_files.dart';
 import 'pr_description_dialog.dart' show AgentPickChip, ReadRow;
 
@@ -167,7 +168,7 @@ class _ReleaseNotesDialogState extends State<ReleaseNotesDialog> {
     });
     if (!s.agents.live) return _makeUp();
     final dir = mainCheckoutOf(s, widget.source);
-    if (dir == null) return _fail('${widget.source.repo.name} has no checkout on this Mac for an agent to read.');
+    if (dir == null) return _fail('${widget.source.repo.name} has no checkout on ${hostOs.machineName} for an agent to read.');
     // A tag can have slashes (release/1.2): not in a file name.
     final stem = '${widget.source.repo.name}-${release.tag}-notes'.replaceAll(RegExp(r'[^\w.-]'), '_');
     final files = _files = AgentFileWatch.fresh(stem, 'md', companionExt: _suggestName ? 'name.txt' : null);
@@ -518,7 +519,7 @@ class _ReleaseNotesDialogState extends State<ReleaseNotesDialog> {
         !live
             ? 'Without Kumo’s engine these notes are made up, to show the flow.'
             : dir == null
-                ? '${widget.source.repo.name} has no checkout on this Mac.'
+                ? '${widget.source.repo.name} has no checkout on ${hostOs.machineName}.'
                 : '$providerName reads the history in the main checkout, in a new session. Nothing changes on $_host until you ${_create ? 'create' : 'update'} the release.',
         style: sans(11, color: c.text3, height: 1.4),
       ),

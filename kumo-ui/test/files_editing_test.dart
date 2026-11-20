@@ -6,6 +6,7 @@ import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/app/kumo_app.dart';
 import 'package:kumo_ui/editor/code_editor.dart';
 import 'package:kumo_ui/widgets/change_scrollbar.dart';
+import 'package:kumo_ui/platform/os/key_combo.dart';
 
 const _repo = 'internal/discount/repository.go';
 
@@ -119,7 +120,7 @@ void main() {
     await _pumpAsync(tester);
     await tester.enterText(find.descendant(of: find.byType(CodeEditor), matching: find.byType(TextField)), 'draft');
     await tester.pump();
-    await tester.tap(find.byTooltip('Close repository.go, unsaved changes (⌘W)'));
+    await tester.tap(find.byTooltip('Close repository.go, unsaved changes (${AppKeys.closeFile.label})'));
     await tester.pump();
     expect(find.text('repository.go has unsaved changes. Save them before closing?'), findsOneWidget);
     expect(state.contextFiles, [_repo], reason: 'still open');
