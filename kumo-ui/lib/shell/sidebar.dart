@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -71,7 +70,6 @@ class Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final c = context.c;
-    final nativeLights = !kIsWeb && hostOs.windowButtonsInContent && WindowEffects.nativeBackdrop;
     final signal = _signalTarget(s);
 
     return SizedBox(
@@ -81,11 +79,12 @@ class Sidebar extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Native traffic lights sit on the left of this row (macOS).
+            // Traffic lights sit on the left of this row: the native ones on
+            // macOS, a painted mock on the web or macOS without the backdrop.
             SizedBox(
               height: 32,
               child: Row(children: [
-                if (!nativeLights) ...[
+                if (WindowEffects.paintedTrafficLights) ...[
                   for (final col in const [Color(0xFFFF5F57), Color(0xFFFEBC2E), Color(0xFF28C840)]) ...[
                     Container(width: 12, height: 12, decoration: BoxDecoration(color: col, shape: BoxShape.circle)),
                     const SizedBox(width: 8),

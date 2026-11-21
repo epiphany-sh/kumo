@@ -11,6 +11,7 @@ import 'package:kumo_ui/platform/os/macos.dart';
 import 'package:kumo_ui/platform/os/windows.dart';
 import 'package:kumo_ui/platform/updates.dart';
 import 'package:kumo_ui/platform/updates_windows.dart';
+import 'package:kumo_ui/platform/window_effects.dart';
 
 /// The url opener as (program, args) with the args as a plain list, so
 /// `expect` compares them by value.
@@ -105,6 +106,7 @@ void main() {
     test('native backdrop with the traffic lights inside the content', () {
       expect(os.supportsNativeBackdrop, isTrue);
       expect(os.windowButtonsInContent, isTrue);
+      expect(os.nativeTitleBar, isFalse);
     });
   });
 
@@ -223,6 +225,7 @@ void main() {
     test('Mica backdrop, native window buttons outside the content', () {
       expect(os.supportsNativeBackdrop, isTrue);
       expect(os.windowButtonsInContent, isFalse);
+      expect(os.nativeTitleBar, isTrue);
     });
 
     test('a new window runs the same executable with KUMO_WORKSPACE', () {
@@ -318,6 +321,7 @@ void main() {
     test('no native backdrop or new windows', () async {
       expect(os.supportsNativeBackdrop, isFalse);
       expect(os.windowButtonsInContent, isFalse);
+      expect(os.nativeTitleBar, isTrue);
       expect(await os.openWorkspaceWindow('workspace-1'), contains('macOS'));
     });
   });
@@ -342,6 +346,23 @@ void main() {
       expect(DaemonDiscovery.defaultPath(), r'C:\L\kumo\daemon.json');
       debugHostOs = MacOs(const {});
       expect(Preferences.defaultFile(), isNull);
+    });
+
+    test('painted traffic lights only where the OS draws none', () {
+      addTearDown(() => WindowEffects.nativeBackdrop = false);
+      debugHostOs = MacOs(const {});
+      expect(WindowEffects.paintedTrafficLights, isTrue, reason: 'macOS without the backdrop: a mock');
+      WindowEffects.nativeBackdrop = true;
+      expect(WindowEffects.paintedTrafficLights, isFalse, reason: 'macOS draws its own inside the content');
+      expect(WindowEffects.trafficLightsInset, 40);
+      for (final os in [WindowsOs(const {}), LinuxOs(const {})]) {
+        debugHostOs = os;
+        for (final backdrop in [false, true]) {
+          WindowEffects.nativeBackdrop = backdrop;
+          expect(WindowEffects.paintedTrafficLights, isFalse, reason: '$os draws its own title bar');
+          expect(WindowEffects.trafficLightsInset, 6);
+        }
+      }
     });
   });
 

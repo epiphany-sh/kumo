@@ -131,6 +131,9 @@ class MacOs extends HostOs {
   @override
   bool get windowButtonsInContent => true;
 
+  @override
+  bool get nativeTitleBar => false;
+
   /// `NSApp.applicationIconImage`: a closed app shows its bundle's icon.
   @override
   String? get appIconPlaces => 'In the Dock and the app switcher while Kumo runs.';
