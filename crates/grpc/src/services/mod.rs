@@ -12,6 +12,7 @@ mod releases;
 mod tasks;
 mod terminals;
 mod tests;
+mod todos;
 mod workspace;
 
 pub use self::agent_defs::AgentDefsGrpc;
@@ -26,4 +27,5 @@ pub use self::releases::ReleasesGrpc;
 pub use self::tasks::TasksGrpc;
 pub use self::terminals::TerminalsGrpc;
 pub use self::tests::TestsGrpc;
+pub use self::todos::{AGENT_REPORT, TodosGrpc};
 pub use self::workspace::WorkspaceGrpc;

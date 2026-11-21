@@ -836,6 +836,28 @@ message AgentProvider {
   // shares the Mac's (the first workspace, custom agents, and CLIs whose
   // sign-in can't be kept apart yet).
   bool own_sign_in = 16;
+  // The models it can be started with: what the CLI lists for its account
+  // (Codex), else what it documents (Claude Code's aliases). Only these
+  // are taken.
+  repeated AgentModelChoice models = 17;
+  // Effort levels of its default model (and of models that list none),
+  // lowest first. Empty: it has no such setting.
+  repeated string efforts = 18;
+  // A model with which it takes no effort (Copilot's "auto": it picks both).
+  string no_effort_with = 19;
+  // Kumo can start it with a model and effort (known CLIs it has checked).
+  // Empty model and effort always mean the CLI's own settings.
+  bool tunable = 20;
+}
+
+// A model a CLI can be started with.
+message AgentModelChoice {
+  // As the CLI names it: "opus", "gpt-6-luna".
+  string id = 1;
+  // As it shows it: "GPT-6-Luna".
+  string name = 2;
+  // The effort levels it takes, lowest first; empty: the provider's.
+  repeated string efforts = 3;
 }
 
 message ListProvidersRequest {}
@@ -890,6 +912,13 @@ message StartAgentRequest {
   uint32 rows = 6;
   // What the prompt hands it (a ticket, a page), for the record.
   repeated AgentContext context = 7;
+  // One of the provider's `models`; empty: its own default.
+  string model = 8;
+  // One of the provider's `efforts`; empty: its own default.
+  string effort = 9;
+  // The TODO it works on: it gets `KUMO_TODO` and is told how to report
+  // its progress with `kumod todo`.
+  string todo_id = 10;
 }
 
 enum AgentContextKind {
@@ -1307,6 +1336,26 @@ message AgentDefCapabilities {
   repeated string mcp_servers = 2;
   // False until triggers run; saving them works either way.
   bool triggers_supported = 3;
+  // The skills with what they're for and where they come from: personal
+  // ones, each repository's, then each installed plugin's (named
+  // `<plugin>:<skill>`). Each name once.
+  repeated AgentSkill skill_list = 4;
+}
+
+message AgentSkill {
+  // As the agent file lists it.
+  string name = 1;
+  // From its SKILL.md, on one line; may be empty.
+  string description = 2;
+  AgentSkillFrom from = 3;
+  // The repository's or the plugin's name; empty for personal ones.
+  string from_name = 4;
+}
+
+enum AgentSkillFrom {
+  AGENT_SKILL_FROM_PERSONAL = 0;
+  AGENT_SKILL_FROM_REPO = 1;
+  AGENT_SKILL_FROM_PLUGIN = 2;
 }
 
 // ---------------------------------------------------------------------------
@@ -2286,3 +2335,121 @@ message StopTestsRequest {
 }
 
 message StopTestsResponse {}
+
+// ---------------------------------------------------------------------------
+// TODOs: the user's own, kept on this Mac by the profile and never synced.
+// Any of them can be handed to an agent in a new worktree; from then on it
+// has a status that the agent reports (working, testing, review) and that
+// the user and Kumo move on (pushed, PR, merged).
+
+service Todos {
+  // Every TODO now, then again whenever one changes (last wins).
+  rpc Watch(WatchTodosRequest) returns (stream TodoList);
+  rpc Add(AddTodoRequest) returns (Todo);
+  // Title, notes, repository, done.
+  rpc Update(UpdateTodoRequest) returns (Todo);
+  rpc Delete(DeleteTodoRequest) returns (DeleteTodoResponse);
+  // Records where it runs once its worktree and agent are up.
+  rpc Attach(AttachTodoRequest) returns (Todo);
+  // Moves it to a status. `kumod todo <status>` calls this from the agent.
+  rpc SetStatus(SetTodoStatusRequest) returns (Todo);
+}
+
+enum TodoStatus {
+  // Not handed to an agent yet.
+  TODO_STATUS_OPEN = 0;
+  TODO_STATUS_WORKING = 1;
+  TODO_STATUS_TESTING = 2;
+  // The agent is done and its tests pass: the user tries it and approves.
+  TODO_STATUS_REVIEW = 3;
+  TODO_STATUS_PUSHED = 4;
+  TODO_STATUS_PR = 5;
+  TODO_STATUS_MERGED = 6;
+}
+
+// Where a TODO runs once handed to an agent.
+message TodoRun {
+  string repo_path = 1;
+  string worktree_path = 2;
+  string branch = 3;
+  string base = 4;
+  string provider_id = 5;
+  string agent_name = 6;
+  string model = 7;
+  string effort = 8;
+  // The agent session working on it; empty once it's gone.
+  string session_id = 9;
+  // Its pull request, once there is one.
+  uint64 pr_number = 10;
+  string pr_url = 11;
+}
+
+// When it reached a status, and who moved it there ("Claude Code", "You",
+// "Kumo").
+message TodoStep {
+  TodoStatus status = 1;
+  string by = 2;
+  uint64 at_unix_ms = 3;
+  // What it said with it, e.g. "48 tests pass".
+  string note = 4;
+}
+
+message Todo {
+  string id = 1;
+  string title = 2;
+  string notes = 3;
+  // The repository it's about; empty: any.
+  string repo_path = 4;
+  bool done = 5;
+  uint64 created_unix_ms = 6;
+  TodoStatus status = 7;
+  // Unset until it's handed to an agent.
+  TodoRun run = 8;
+  // Oldest first; the last one is the current status.
+  repeated TodoStep steps = 9;
+}
+
+message TodoList {
+  // Newest first.
+  repeated Todo todos = 1;
+}
+
+message WatchTodosRequest {}
+
+message AddTodoRequest {
+  string title = 1;
+  string notes = 2;
+  string repo_path = 3;
+}
+
+message UpdateTodoRequest {
+  string id = 1;
+  string title = 2;
+  string notes = 3;
+  string repo_path = 4;
+  bool done = 5;
+}
+
+message DeleteTodoRequest {
+  string id = 1;
+}
+
+message DeleteTodoResponse {}
+
+message AttachTodoRequest {
+  string id = 1;
+  TodoRun run = 2;
+}
+
+message SetTodoStatusRequest {
+  string id = 1;
+  TodoStatus status = 2;
+  // Who moved it: an agent's name, "You" or "Kumo".
+  string by = 3;
+  string note = 4;
+  // With TODO_STATUS_PR: the pull request.
+  uint64 pr_number = 5;
+  string pr_url = 6;
+  // With TODO_STATUS_OPEN: forget the run too (cleaned up, or stopped).
+  bool clear_run = 7;
+}

@@ -10,6 +10,7 @@ mod ports;
 mod presets;
 mod provider;
 mod session;
+mod tuning;
 mod usage;
 
 pub use actions::{ActionReader, action_of};
@@ -27,6 +28,7 @@ pub use session::{
     AgentContext, AgentEvent, AgentEventKind, AgentSession, AgentSessionId, AgentState,
     ContextKind, TerminalAgent, agent_program,
 };
+pub use tuning::{EffortArg, ModelCatalog, ModelChoice, NoModelCatalog, Tuning, tuning_for};
 pub use usage::{
     AccountProblem, AccountUsage, AgentModel, ContextReading, ContextSlice, ContextSliceKind,
     PlanReading, PlanUsage, PlanUsageStore, SessionUsage, UsageReading, UsageReport, UsageSource,

@@ -124,6 +124,18 @@ const STEPS: &[&str] = &[
         PRIMARY KEY (repo, command)
     );
     CREATE INDEX command_history_recent ON command_history (repo, last_run DESC);",
+    // 9: the user's own TODOs; `run` and `steps` are JSON
+    "CREATE TABLE todos (
+        id          TEXT PRIMARY KEY,
+        title       TEXT NOT NULL,
+        notes       TEXT NOT NULL DEFAULT '',
+        repo_path   TEXT,
+        done        INTEGER NOT NULL DEFAULT 0,
+        created     INTEGER NOT NULL,
+        run         TEXT,
+        steps       TEXT NOT NULL DEFAULT '[]'
+    );
+    CREATE INDEX todos_newest ON todos (created DESC);",
 ];
 
 #[cfg(test)]

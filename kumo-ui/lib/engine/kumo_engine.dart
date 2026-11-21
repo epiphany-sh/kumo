@@ -28,6 +28,7 @@ class EngineConnection {
         releases = ReleasesClient(channel, options: auth),
         docs = DocsClient(channel, options: auth),
         tests = TestsClient(channel, options: auth),
+        todos = TodosClient(channel, options: auth),
         profiles = ProfilesClient(channel, options: auth);
 
   final ClientChannel channel;
@@ -56,6 +57,7 @@ class EngineConnection {
   final ReleasesClient releases;
   final DocsClient docs;
   final TestsClient tests;
+  final TodosClient todos;
   final ProfilesClient profiles;
 }
 

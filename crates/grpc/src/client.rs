@@ -16,6 +16,7 @@ use kumo_proto::v1::releases_client::ReleasesClient;
 use kumo_proto::v1::tasks_client::TasksClient;
 use kumo_proto::v1::terminals_client::TerminalsClient;
 use kumo_proto::v1::tests_client::TestsClient;
+use kumo_proto::v1::todos_client::TodosClient;
 use kumo_proto::v1::workspace_client::WorkspaceClient;
 use tonic::service::Interceptor;
 use tonic::service::interceptor::InterceptedService;
@@ -56,6 +57,7 @@ pub struct KumoClient {
     pub agent_defs: AgentDefsClient<AuthChannel>,
     pub docs: DocsClient<AuthChannel>,
     pub tests: TestsClient<AuthChannel>,
+    pub todos: TodosClient<AuthChannel>,
     channel: Channel,
     bearer: AttachBearer,
 }
@@ -96,7 +98,8 @@ impl KumoClient {
             releases: ReleasesClient::with_interceptor(channel.clone(), auth.clone()),
             agent_defs: AgentDefsClient::with_interceptor(channel.clone(), auth.clone()),
             docs: DocsClient::with_interceptor(channel.clone(), auth.clone()),
-            tests: TestsClient::with_interceptor(channel.clone(), auth),
+            tests: TestsClient::with_interceptor(channel.clone(), auth.clone()),
+            todos: TodosClient::with_interceptor(channel.clone(), auth),
             channel,
             bearer,
         }

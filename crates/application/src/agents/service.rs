@@ -7,8 +7,8 @@ use bytes::Bytes;
 use kumo_domain::agents::{
     AccountProblem, AccountUsage, AgentContext, AgentError, AgentEventKind, AgentModel,
     AgentPreset, AgentProvider, AgentSession, AgentSessionId, AgentState, AgentStore, CliHomes,
-    PRESETS, PlanUsage, PlanUsageStore, ProgramLocator, StoredProvider, TerminalAgent, UsageReport,
-    UsageSource, UsageTarget, args_for_cmd, runs_through_cmd,
+    ModelCatalog, ModelChoice, PRESETS, PlanUsage, PlanUsageStore, ProgramLocator, StoredProvider,
+    TerminalAgent, UsageReport, UsageSource, UsageTarget, args_for_cmd, runs_through_cmd,
 };
 use kumo_domain::terminal::{
     LaunchSpec, TerminalError, TerminalId, TerminalSize, bracketed_paste, typed_text,
@@ -44,6 +44,8 @@ pub struct AgentPorts {
     pub plans: Arc<dyn PlanUsageStore>,
     /// The CLIs' folders in this profile (their sign-ins and sessions).
     pub homes: Arc<dyn CliHomes>,
+    /// The models each CLI lists for its account (Codex's cache).
+    pub models: Arc<dyn ModelCatalog>,
 }
 
 impl std::fmt::Debug for AgentPorts {
@@ -59,6 +61,8 @@ pub struct ProviderView {
     pub resolved: Option<PathBuf>,
     /// It signs in for this profile only; false: the Mac's sign-in.
     pub own_sign_in: bool,
+    /// The models it can be started with (empty for CLIs Kumo can't tune).
+    pub models: Vec<ModelChoice>,
 }
 
 /// What the user sets for a provider in Settings › AI agents.
@@ -96,6 +100,18 @@ pub struct AgentService {
     /// Sessions Kumo stopped and the code they end with, until their exit
     /// is recorded.
     stopped: Mutex<HashMap<AgentSessionId, i32>>,
+    /// `kumod`: an agent on a TODO reports with `<kumod> todo <status>`.
+    todo_reporter: Option<PathBuf>,
+}
+
+/// What a session is started with besides its prompt: the CLI's model and
+/// effort (empty: its own settings) and the TODO it works on.
+#[derive(Debug, Clone, Default)]
+pub struct AgentTuning {
+    pub model: String,
+    pub effort: String,
+    /// The TODO's id: the agent gets `KUMO_TODO` and is told how to report.
+    pub todo: Option<String>,
 }
 
 /// How [`AgentService::launch`] starts an agent.
@@ -117,6 +133,9 @@ pub struct AgentLaunch {
     pub context_dir: Option<PathBuf>,
     /// Stopped (code 124) when it's up.
     pub time_limit: Option<Duration>,
+    /// Model, effort and TODO; only with the provider's own arguments
+    /// (`args` None).
+    pub tuning: AgentTuning,
 }
 
 impl AgentService {
@@ -135,17 +154,25 @@ impl AgentService {
             usage: Mutex::default(),
             quiet_after: QUIET_AFTER,
             stopped: Mutex::default(),
+            todo_reporter: None,
         }
+    }
+
+    /// Agents started on a TODO are told to report through `program`.
+    pub fn with_todo_reporter(mut self, program: PathBuf) -> Self {
+        self.todo_reporter = Some(program);
+        self
     }
 
     // ---- Providers ----
 
     /// Known CLIs (with the user's settings) followed by custom agents.
     pub async fn providers(&self) -> Result<Vec<ProviderView>, AgentError> {
-        let (store, locator, homes) = (
+        let (store, locator, homes, models) = (
             Arc::clone(&self.ports.store),
             Arc::clone(&self.ports.locator),
             Arc::clone(&self.ports.homes),
+            Arc::clone(&self.ports.models),
         );
         blocking(move || {
             let providers = merge(store.load()?);
@@ -154,10 +181,15 @@ impl AgentService {
                 .map(|provider| {
                     let resolved = locator.locate(&provider.program);
                     let own_sign_in = !provider.custom && homes.own_sign_in(&provider.id);
+                    let models = provider
+                        .tuning()
+                        .map(|t| t.choices(models.listed(&provider.id)))
+                        .unwrap_or_default();
                     ProviderView {
                         provider,
                         resolved,
                         own_sign_in,
+                        models,
                     }
                 })
                 .collect())
@@ -294,33 +326,17 @@ impl AgentService {
 
     // ---- Sessions ----
 
-    /// Starts an agent in a worktree of the workspace, in a new terminal.
-    /// `provider_id` None uses the default agent; `context` is what the
-    /// prompt hands it (a ticket, a page), for the record.
-    pub async fn start(
-        self: &Arc<Self>,
-        provider_id: Option<&str>,
-        worktree: &Path,
-        prompt: &str,
-        title: &str,
-        context: Vec<AgentContext>,
-        size: TerminalSize,
-    ) -> Result<AgentSession, AgentError> {
-        let worktree = self
+    /// Starts an agent in `launch.cwd`, which must be a worktree of the
+    /// workspace, in a new terminal. `provider_id` None uses the default
+    /// agent; `context` is what the prompt hands it (a ticket, a page), for
+    /// the record.
+    pub async fn start(self: &Arc<Self>, launch: AgentLaunch) -> Result<AgentSession, AgentError> {
+        let cwd = self
             .workspace
-            .known_worktree(worktree)
+            .known_worktree(&launch.cwd)
             .await
-            .ok_or_else(|| AgentError::UnknownWorktree(worktree.into()))?;
-        self.launch(AgentLaunch {
-            provider_id: provider_id.map(str::to_owned),
-            cwd: worktree,
-            prompt: prompt.to_owned(),
-            title: title.to_owned(),
-            context,
-            size,
-            ..AgentLaunch::default()
-        })
-        .await
+            .ok_or_else(|| AgentError::UnknownWorktree(launch.cwd.clone()))?;
+        self.launch(AgentLaunch { cwd, ..launch }).await
     }
 
     /// Starts an agent in `launch.cwd` (checked by the caller), in a new
@@ -337,7 +353,19 @@ impl AgentService {
             agent_name,
             context_dir,
             time_limit,
+            tuning,
         } = launch;
+        let todo = tuning
+            .todo
+            .as_deref()
+            .map(str::trim)
+            .filter(|t| !t.is_empty());
+        let prompt = match (todo, &self.todo_reporter) {
+            (Some(_), Some(kumod)) if given_args.is_none() => {
+                format!("{prompt}{}", todo_instructions(kumod))
+            }
+            _ => prompt,
+        };
         let (prompt, title) = (prompt.as_str(), title.as_str());
         let provider = match provider_id.as_deref() {
             Some(id) => self.provider(id).await?,
@@ -351,12 +379,31 @@ impl AgentService {
         }
         let program = self.installed(&provider).await?;
         let through_cmd = runs_through_cmd(&program);
+        let own_args = given_args.is_none();
         let (mut args, prompt_passed) = match given_args {
             Some(args) => (args, true),
             // Through `cmd.exe` the prompt is typed in, whatever the CLI takes.
             None if through_cmd => (provider.launch_args("")?.0, false),
             None => provider.launch_args(prompt)?,
         };
+        if own_args {
+            let chosen = !tuning.model.trim().is_empty() || !tuning.effort.trim().is_empty();
+            let flags = match provider.tuning() {
+                Some(t) => {
+                    let (catalog, id) = (Arc::clone(&self.ports.models), provider.id.clone());
+                    let choices = t.choices(blocking(move || Ok(catalog.listed(&id))).await?);
+                    t.args(&tuning.model, &tuning.effort, &choices)?
+                }
+                None if chosen => {
+                    return Err(AgentError::Invalid(format!(
+                        "Kumo can't pick a model or effort for {}: start it with its own settings",
+                        provider.name
+                    )));
+                }
+                None => Vec::new(),
+            };
+            args = flags.into_iter().chain(args).collect();
+        }
         let mut typed_prompt =
             (!prompt_passed && !prompt.trim().is_empty()).then(|| prompt.to_owned());
         if through_cmd {
@@ -386,7 +433,10 @@ impl AgentService {
         if tells_asking && !settings_given {
             args = notice.iter().map(|a| (*a).to_owned()).chain(args).collect();
         }
-        let env = self.env_for(&provider).await?;
+        let mut env = self.env_for(&provider).await?;
+        if let Some(todo) = todo {
+            env.push(("KUMO_TODO".to_owned(), todo.to_owned()));
+        }
         let spec = LaunchSpec::new(program.display().to_string())
             .map_err(launch_error)?
             .with_args(args)
@@ -890,6 +940,21 @@ async fn blocking<T: Send + 'static>(
     tokio::task::spawn_blocking(f)
         .await
         .map_err(|e| AgentError::Launch(format!("blocking task failed: {e}")))?
+}
+
+/// Added to the prompt of an agent working on a TODO: how to tell Kumo how
+/// it's going. It never pushes: the user reviews first.
+fn todo_instructions(kumod: &Path) -> String {
+    let kumod = kumod.display();
+    format!(
+        "\n\n---\nThis is a TODO the user keeps in Kumo. Report how it goes by running these \
+         commands in your shell (each takes an optional one-line note in quotes):\n\
+         - when you start: \"{kumod}\" todo working\n\
+         - when you run the tests: \"{kumod}\" todo testing \"<what you run>\"\n\
+         - when the change is done and the tests pass: \"{kumod}\" todo review \"<what changed, and the tests' result>\"\n\
+         Don't push or open a pull request: the user tries the change and approves it first. \
+         If they ask for changes, report working again."
+    )
 }
 
 #[cfg(test)]

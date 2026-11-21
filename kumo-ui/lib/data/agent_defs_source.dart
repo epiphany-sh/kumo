@@ -83,7 +83,10 @@ class RepoLink {
 RepoLink? parseRepoLink(String url) {
   final u = Uri.tryParse(url.trim());
   if (u == null || !(u.scheme == 'https' || u.scheme == 'http') || u.host.isEmpty) return null;
-  final parts = [for (final p in u.pathSegments) if (p.isNotEmpty) p];
+  final parts = [
+    for (final p in u.pathSegments)
+      if (p.isNotEmpty) p
+  ];
   final dash = parts.indexOf('-');
   final cut = dash >= 0 ? dash : parts.indexWhere((p) => p == 'pull' || p == 'tree' || p == 'pulls' || p == 'merge_requests');
   final repo = (cut >= 0 ? parts.sublist(0, cut) : parts).join('/').replaceAll(RegExp(r'\.git$'), '');
@@ -121,8 +124,9 @@ abstract class AgentDefsSource extends ChangeNotifier {
 
   Future<void> delete(AgentDef agent);
 
-  /// Skills and MCP servers it can be given.
-  List<String> get skills;
+  /// Skills and MCP servers it can be given: personal skills, then each
+  /// repository's, then each installed plugin's.
+  List<AgentSkill> get skills;
   List<String> get mcpServers;
 
   /// Whether triggers run (the daemon schedules them).
@@ -146,7 +150,8 @@ abstract class AgentDefsSource extends ChangeNotifier {
   /// [worktreePath] (or a throwaway worktree of it when it can change
   /// files). The run fills in as it goes and joins [owner]'s test runs (the
   /// agent as saved: a draft may have another name); see [playRuns].
-  Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude});
+  Future<PlayRun?> play(AgentDef agent,
+      {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude});
 
   Future<void> stopPlay(String id);
 
@@ -178,7 +183,8 @@ class MockAgentDefs extends AgentDefsSource {
     const AgentDef(
       name: 'researcher',
       description: 'Researches a library, API or approach on the web and in the code, and reports the options with sources. Use it before picking a dependency.',
-      instructions: 'You are a researcher.\n\nHow to work:\n1. Look at three to five options: docs, issues, releases, and how the code here would use each.\n2. Compare them in a table.\n\nDon’t change any file. Cite every claim.',
+      instructions:
+          'You are a researcher.\n\nHow to work:\n1. Look at three to five options: docs, issues, releases, and how the code here would use each.\n2. Compare them in a table.\n\nDon’t change any file. Cite every claim.',
       tools: [...readOnlyTools, 'WebFetch', 'WebSearch'],
       model: 'opus',
       maxTurns: 30,
@@ -192,7 +198,8 @@ class MockAgentDefs extends AgentDefsSource {
     const AgentDef(
       name: 'release-notes',
       description: 'Writes release notes from the commits and pull requests since the previous tag. Use it when cutting a release.',
-      instructions: 'You write release notes.\n\nHow to work:\n1. Read git log since the previous tag and the merged pull requests.\n2. Group what changed for people who use it.\n\nDon’t tag, don’t push, don’t edit the release.',
+      instructions:
+          'You write release notes.\n\nHow to work:\n1. Read git log since the previous tag and the merged pull requests.\n2. Group what changed for people who use it.\n\nDon’t tag, don’t push, don’t edit the release.',
       tools: [...readOnlyTools, 'Bash'],
       model: 'haiku',
       maxTurns: 20,
@@ -212,7 +219,8 @@ class MockAgentDefs extends AgentDefsSource {
     const AgentDef(
       name: 'test-writer',
       description: 'Writes table-driven Go tests for what a branch changed and runs them. Use it once a feature works, before asking for review.',
-      instructions: 'You write table-driven Go tests.\n\nHow to work:\n1. Find the functions the branch changed.\n2. Write tests for each, then run go test for those packages.\n\nDon’t change code outside _test.go files. Don’t push.',
+      instructions:
+          'You write table-driven Go tests.\n\nHow to work:\n1. Find the functions the branch changed.\n2. Write tests for each, then run go test for those packages.\n\nDon’t change code outside _test.go files. Don’t push.',
       tools: [...readOnlyTools, 'Edit', 'Write', 'Bash'],
       model: 'sonnet',
       approvals: AgentApprovals.acceptEdits,
@@ -245,20 +253,42 @@ class MockAgentDefs extends AgentDefsSource {
 
   late final List<AgentRun> _runs = [
     AgentRun(
-      id: 'def-r2', providerId: 'claude', providerName: 'Claude Code', short: 'CC', agent: 'go-pr-reviewer',
-      worktreePath: '~/wt/repo-a/TSK-412', terminalId: 'mock:reviewer', title: 'PR #521 · Bulk discounts', status: AgentStatus.running,
+      id: 'def-r2',
+      providerId: 'claude',
+      providerName: 'Claude Code',
+      short: 'CC',
+      agent: 'go-pr-reviewer',
+      worktreePath: '~/wt/repo-a/TSK-412',
+      terminalId: 'mock:reviewer',
+      title: 'PR #521 · Bulk discounts',
+      status: AgentStatus.running,
       startedAt: DateTime.now().subtract(const Duration(minutes: 3)),
       prompt: 'Review PR #521 against main. Point out code that already existed and could have been reused.',
       context: const [AgentContextItem(kind: AgentContextKind.pullRequest, title: '#521 · diff + description'), AgentContextItem(kind: AgentContextKind.task, title: 'TSK-412', detail: 'Jira')],
     ),
     AgentRun(
-      id: 'def-r1', providerId: 'claude', providerName: 'Claude Code', short: 'CC', agent: 'go-pr-reviewer',
-      worktreePath: '~/wt/repo-a/TSK-398', terminalId: 'mock:reviewer-done', title: 'PR #517 · Rounding fix', status: AgentStatus.done,
-      startedAt: DateTime.now().subtract(const Duration(hours: 2)), prompt: 'Review PR #517.',
+      id: 'def-r1',
+      providerId: 'claude',
+      providerName: 'Claude Code',
+      short: 'CC',
+      agent: 'go-pr-reviewer',
+      worktreePath: '~/wt/repo-a/TSK-398',
+      terminalId: 'mock:reviewer-done',
+      title: 'PR #517 · Rounding fix',
+      status: AgentStatus.done,
+      startedAt: DateTime.now().subtract(const Duration(hours: 2)),
+      prompt: 'Review PR #517.',
     ),
     AgentRun(
-      id: 'def-q1', providerId: 'claude', providerName: 'Claude Code', short: 'CC', agent: 'researcher',
-      worktreePath: '~/.kumo/scratch/researcher-2', terminalId: 'mock:researcher', title: 'Kafka clients for Go', status: AgentStatus.done,
+      id: 'def-q1',
+      providerId: 'claude',
+      providerName: 'Claude Code',
+      short: 'CC',
+      agent: 'researcher',
+      worktreePath: '~/.kumo/scratch/researcher-2',
+      terminalId: 'mock:researcher',
+      title: 'Kafka clients for Go',
+      status: AgentStatus.done,
       startedAt: DateTime.now().subtract(const Duration(hours: 2)),
     ),
   ];
@@ -275,7 +305,7 @@ class MockAgentDefs extends AgentDefsSource {
   @override
   bool get triggersSupported => true;
   @override
-  List<String> get skills => const ['go-table-tests', 'go-conventions', 'sql-review'];
+  List<AgentSkill> get skills => mockSkills;
   @override
   List<String> get mcpServers => const ['jira', 'gitlab', 'postgres'];
 
@@ -299,7 +329,10 @@ class MockAgentDefs extends AgentDefsSource {
 
   @override
   Future<void> delete(AgentDef agent) async {
-    _agents = [for (final a in _agents) if (a.key != agent.key) a];
+    _agents = [
+      for (final a in _agents)
+        if (a.key != agent.key) a
+    ];
     notifyListeners();
   }
 
@@ -312,7 +345,8 @@ class MockAgentDefs extends AgentDefsSource {
       description: migrations
           ? 'Checks that SQL migrations are reversible and safe on a live table. Use it on any branch that adds a migration.'
           : '${description.trim().replaceAll(RegExp(r'\.$'), '')}. Use it when ',
-      instructions: 'You are ${migrations ? 'a reviewer of SQL migrations' : 'an agent that ${description.trim()}'}.\n\nHow to work:\n1. Read what you were given first.\n2. ${migrations ? 'Check every migration has a down step and won’t lock a large table.' : 'Do the job, step by step.'}\n3. Say what you did and what you’re unsure of.\n\nDon’t change any file.',
+      instructions:
+          'You are ${migrations ? 'a reviewer of SQL migrations' : 'an agent that ${description.trim()}'}.\n\nHow to work:\n1. Read what you were given first.\n2. ${migrations ? 'Check every migration has a down step and won’t lock a large table.' : 'Do the job, step by step.'}\n3. Say what you did and what you’re unsure of.\n\nDon’t change any file.',
       tools: defaultAgentTools,
       color: migrations ? 'orange' : 'cyan',
       scope: scope,
@@ -334,10 +368,18 @@ class MockAgentDefs extends AgentDefsSource {
   @override
   Future<AgentRun?> run(AgentDef agent, AgentWhere where, {String prompt = '', List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async {
     final r = AgentRun(
-      id: 'def-n${++_seq}', providerId: cli.id, providerName: cli.label, short: switch (cli) { AgentCli.codex => 'CX', AgentCli.copilot => 'GH', AgentCli.claude => 'CC' }, agent: agent.name,
+      id: 'def-n${++_seq}',
+      providerId: cli.id,
+      providerName: cli.label,
+      short: switch (cli) { AgentCli.codex => 'CX', AgentCli.copilot => 'GH', AgentCli.claude => 'CC' },
+      agent: agent.name,
       worktreePath: where.path.isNotEmpty ? where.path : (where.url.isNotEmpty ? where.url : '~/.kumo/scratch/${agent.name}-$_seq'),
-      terminalId: 'mock:new-$_seq', title: prompt.isEmpty ? 'Run ${runsOf(agent).length + 1}' : (prompt.length > 34 ? '${prompt.substring(0, 32)}…' : prompt),
-      status: AgentStatus.running, startedAt: DateTime.now(), prompt: prompt, context: context,
+      terminalId: 'mock:new-$_seq',
+      title: prompt.isEmpty ? 'Run ${runsOf(agent).length + 1}' : (prompt.length > 34 ? '${prompt.substring(0, 32)}…' : prompt),
+      status: AgentStatus.running,
+      startedAt: DateTime.now(),
+      prompt: prompt,
+      context: context,
     );
     _runs.insert(0, r);
     notifyListeners();
@@ -353,15 +395,29 @@ class MockAgentDefs extends AgentDefsSource {
     } else {
       final r = _runs[i];
       _runs[i] = AgentRun(
-        id: r.id, providerId: r.providerId, providerName: r.providerName, short: r.short, agent: r.agent, worktreePath: r.worktreePath,
-        terminalId: r.terminalId, title: r.title, status: AgentStatus.done, startedAt: r.startedAt, prompt: r.prompt, exitCode: 130, context: r.context,
+        id: r.id,
+        providerId: r.providerId,
+        providerName: r.providerName,
+        short: r.short,
+        agent: r.agent,
+        worktreePath: r.worktreePath,
+        terminalId: r.terminalId,
+        title: r.title,
+        status: AgentStatus.done,
+        startedAt: r.startedAt,
+        prompt: r.prompt,
+        exitCode: 130,
+        context: r.context,
       );
     }
     notifyListeners();
   }
 
   @override
-  List<AgentRun> runsOf(AgentDef agent) => [for (final r in _runs) if (r.agent == agent.name) r];
+  List<AgentRun> runsOf(AgentDef agent) => [
+        for (final r in _runs)
+          if (r.agent == agent.name) r
+      ];
 
   @override
   List<PlayRun> playRuns(AgentDef agent) => _plays[agent.key] ??= _history(agent);
@@ -374,8 +430,23 @@ class MockAgentDefs extends AgentDefsSource {
     }
     return [
       run,
-      PlayRun(id: 'play-h3', agent: agent.name, task: _task, draft: false, startedAt: DateTime.now().subtract(const Duration(hours: 1)), state: PlayState.done, meters: const PlayMeters(turns: 18, elapsed: Duration(seconds: 130), costUsd: 0.14)),
-      PlayRun(id: 'play-h2', agent: agent.name, task: _task, draft: false, startedAt: DateTime.now().subtract(const Duration(hours: 1, minutes: 10)), state: PlayState.failed, error: 'It reached its turn limit.', meters: const PlayMeters(turns: 25, elapsed: Duration(seconds: 214), costUsd: 0.21)),
+      PlayRun(
+          id: 'play-h3',
+          agent: agent.name,
+          task: _task,
+          draft: false,
+          startedAt: DateTime.now().subtract(const Duration(hours: 1)),
+          state: PlayState.done,
+          meters: const PlayMeters(turns: 18, elapsed: Duration(seconds: 130), costUsd: 0.14)),
+      PlayRun(
+          id: 'play-h2',
+          agent: agent.name,
+          task: _task,
+          draft: false,
+          startedAt: DateTime.now().subtract(const Duration(hours: 1, minutes: 10)),
+          state: PlayState.failed,
+          error: 'It reached its turn limit.',
+          meters: const PlayMeters(turns: 25, elapsed: Duration(seconds: 214), costUsd: 0.21)),
     ];
   }
 
@@ -384,20 +455,119 @@ class MockAgentDefs extends AgentDefsSource {
   /// A real-looking stream-json run of go-pr-reviewer.
   static final _script = <String>[
     jsonEncode({'type': 'system', 'subtype': 'init', 'model': 'claude-sonnet'}),
-    jsonEncode({'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': 'I’ll read the diff first, then look for existing code for each new function.'}]}}),
-    jsonEncode({'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'id': 't1', 'name': 'Read', 'input': {'file_path': '~/.kumo/runs/play/pr-521.diff'}}]}}),
-    jsonEncode({'type': 'user', 'message': {'content': [{'type': 'tool_result', 'tool_use_id': 't1', 'content': '412 lines · 4 files · new: bulkPercent, roundCents, CategoryRule'}]}}),
-    jsonEncode({'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': 'Three new identifiers. Searching for helpers that already do the same.'}]}}),
-    jsonEncode({'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'id': 't2', 'name': 'Grep', 'input': {'pattern': r'func (\w*Percent|[Rr]ound\w*)', 'path': 'internal/'}}]}}),
-    jsonEncode({'type': 'user', 'message': {'content': [{'type': 'tool_result', 'tool_use_id': 't2', 'content': 'internal/discount/calc.go:48  func applyPercent(p Price, pct int) Price\ninternal/money/round.go:12  func RoundCents(v float64) int64'}]}}),
-    jsonEncode({'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'id': 't3', 'name': 'Glob', 'input': {'pattern': '**/*_test.go'}}]}}),
-    jsonEncode({'type': 'user', 'message': {'content': [{'type': 'tool_result', 'tool_use_id': 't3', 'content': '61 files'}]}}),
-    jsonEncode({'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'id': 't4', 'name': 'Read', 'input': {'file_path': 'internal/money/round.go'}}]}}),
-    jsonEncode({'type': 'user', 'message': {'content': [{'type': 'tool_result', 'tool_use_id': 't4', 'content': 'Read 40 lines'}]}}),
     jsonEncode({
-      'type': 'result', 'subtype': 'success', 'num_turns': 8, 'duration_ms': 41000, 'total_cost_usd': 0.06,
+      'type': 'assistant',
+      'message': {
+        'content': [
+          {'type': 'text', 'text': 'I’ll read the diff first, then look for existing code for each new function.'}
+        ]
+      }
+    }),
+    jsonEncode({
+      'type': 'assistant',
+      'message': {
+        'content': [
+          {
+            'type': 'tool_use',
+            'id': 't1',
+            'name': 'Read',
+            'input': {'file_path': '~/.kumo/runs/play/pr-521.diff'}
+          }
+        ]
+      }
+    }),
+    jsonEncode({
+      'type': 'user',
+      'message': {
+        'content': [
+          {'type': 'tool_result', 'tool_use_id': 't1', 'content': '412 lines · 4 files · new: bulkPercent, roundCents, CategoryRule'}
+        ]
+      }
+    }),
+    jsonEncode({
+      'type': 'assistant',
+      'message': {
+        'content': [
+          {'type': 'text', 'text': 'Three new identifiers. Searching for helpers that already do the same.'}
+        ]
+      }
+    }),
+    jsonEncode({
+      'type': 'assistant',
+      'message': {
+        'content': [
+          {
+            'type': 'tool_use',
+            'id': 't2',
+            'name': 'Grep',
+            'input': {'pattern': r'func (\w*Percent|[Rr]ound\w*)', 'path': 'internal/'}
+          }
+        ]
+      }
+    }),
+    jsonEncode({
+      'type': 'user',
+      'message': {
+        'content': [
+          {
+            'type': 'tool_result',
+            'tool_use_id': 't2',
+            'content': 'internal/discount/calc.go:48  func applyPercent(p Price, pct int) Price\ninternal/money/round.go:12  func RoundCents(v float64) int64'
+          }
+        ]
+      }
+    }),
+    jsonEncode({
+      'type': 'assistant',
+      'message': {
+        'content': [
+          {
+            'type': 'tool_use',
+            'id': 't3',
+            'name': 'Glob',
+            'input': {'pattern': '**/*_test.go'}
+          }
+        ]
+      }
+    }),
+    jsonEncode({
+      'type': 'user',
+      'message': {
+        'content': [
+          {'type': 'tool_result', 'tool_use_id': 't3', 'content': '61 files'}
+        ]
+      }
+    }),
+    jsonEncode({
+      'type': 'assistant',
+      'message': {
+        'content': [
+          {
+            'type': 'tool_use',
+            'id': 't4',
+            'name': 'Read',
+            'input': {'file_path': 'internal/money/round.go'}
+          }
+        ]
+      }
+    }),
+    jsonEncode({
+      'type': 'user',
+      'message': {
+        'content': [
+          {'type': 'tool_result', 'tool_use_id': 't4', 'content': 'Read 40 lines'}
+        ]
+      }
+    }),
+    jsonEncode({
+      'type': 'result',
+      'subtype': 'success',
+      'num_turns': 8,
+      'duration_ms': 41000,
+      'total_cost_usd': 0.06,
       'usage': {'input_tokens': 38200, 'output_tokens': 2100},
-      'result': 'Two reuse opportunities:\n1. bulkPercent (internal/kafka/bulk_consumer.go:91) does what applyPercent (internal/discount/calc.go:48) does, with the cap inlined. Call applyPercent and cap after.\n2. roundCents (bulk_consumer.go:118) repeats money.RoundCents (internal/money/round.go:12). Use that one.\n\nCategoryRule is new: nothing like it exists.',
+      'result':
+          'Two reuse opportunities:\n1. bulkPercent (internal/kafka/bulk_consumer.go:91) does what applyPercent (internal/discount/calc.go:48) does, with the cap inlined. Call applyPercent and cap after.\n2. roundCents (bulk_consumer.go:118) repeats money.RoundCents (internal/money/round.go:12). Use that one.\n\nCategoryRule is new: nothing like it exists.',
     }),
   ];
 
@@ -405,28 +575,100 @@ class MockAgentDefs extends AgentDefsSource {
   static final _codexScript = <String>[
     jsonEncode({'type': 'thread.started', 'thread_id': 'mock'}),
     jsonEncode({'type': 'turn.started'}),
-    jsonEncode({'type': 'item.completed', 'item': {'id': 'item_0', 'type': 'agent_message', 'text': 'I’ll read the diff, then look for existing code for each new function.'}}),
-    jsonEncode({'type': 'item.started', 'item': {'id': 'item_1', 'type': 'command_execution', 'command': "rg -n 'func (\\w*Percent|[Rr]ound\\w*)' internal/", 'aggregated_output': '', 'exit_code': null, 'status': 'in_progress'}}),
-    jsonEncode({'type': 'item.completed', 'item': {'id': 'item_1', 'type': 'command_execution', 'command': "rg -n 'func (\\w*Percent|[Rr]ound\\w*)' internal/", 'aggregated_output': 'internal/discount/calc.go:48:func applyPercent(p Price, pct int) Price\ninternal/money/round.go:12:func RoundCents(v float64) int64', 'exit_code': 0, 'status': 'completed'}}),
-    jsonEncode({'type': 'item.completed', 'item': {'id': 'item_2', 'type': 'agent_message', 'text': 'Two reuse opportunities: bulkPercent repeats applyPercent (internal/discount/calc.go:48), and roundCents repeats money.RoundCents (internal/money/round.go:12). CategoryRule is new.'}}),
-    jsonEncode({'type': 'turn.completed', 'usage': {'input_tokens': 24100, 'cached_input_tokens': 18000, 'output_tokens': 610}}),
+    jsonEncode({
+      'type': 'item.completed',
+      'item': {'id': 'item_0', 'type': 'agent_message', 'text': 'I’ll read the diff, then look for existing code for each new function.'}
+    }),
+    jsonEncode({
+      'type': 'item.started',
+      'item': {'id': 'item_1', 'type': 'command_execution', 'command': "rg -n 'func (\\w*Percent|[Rr]ound\\w*)' internal/", 'aggregated_output': '', 'exit_code': null, 'status': 'in_progress'}
+    }),
+    jsonEncode({
+      'type': 'item.completed',
+      'item': {
+        'id': 'item_1',
+        'type': 'command_execution',
+        'command': "rg -n 'func (\\w*Percent|[Rr]ound\\w*)' internal/",
+        'aggregated_output': 'internal/discount/calc.go:48:func applyPercent(p Price, pct int) Price\ninternal/money/round.go:12:func RoundCents(v float64) int64',
+        'exit_code': 0,
+        'status': 'completed'
+      }
+    }),
+    jsonEncode({
+      'type': 'item.completed',
+      'item': {
+        'id': 'item_2',
+        'type': 'agent_message',
+        'text': 'Two reuse opportunities: bulkPercent repeats applyPercent (internal/discount/calc.go:48), and roundCents repeats money.RoundCents (internal/money/round.go:12). CategoryRule is new.'
+      }
+    }),
+    jsonEncode({
+      'type': 'turn.completed',
+      'usage': {'input_tokens': 24100, 'cached_input_tokens': 18000, 'output_tokens': 610}
+    }),
   ];
 
   /// The same review on Copilot: `copilot -p --output-format json`, as it
   /// prints it (the lines that only stream text left out).
   static final _copilotScript = <String>[
-    jsonEncode({'type': 'assistant.turn_start', 'data': {'turnId': '0'}}),
-    jsonEncode({'type': 'assistant.message', 'data': {'content': 'I’ll read the diff, then look for existing code for each new function.', 'toolRequests': []}}),
-    jsonEncode({'type': 'tool.execution_start', 'data': {'toolCallId': 'c1', 'toolName': 'grep', 'arguments': {'pattern': r'func (\w*Percent|[Rr]ound\w*)', 'path': 'internal/'}}}),
-    jsonEncode({'type': 'tool.execution_complete', 'data': {'toolCallId': 'c1', 'success': true, 'result': {'content': 'internal/discount/calc.go:48:func applyPercent(p Price, pct int) Price\ninternal/money/round.go:12:func RoundCents(v float64) int64'}}}),
-    jsonEncode({'type': 'assistant.turn_start', 'data': {'turnId': '1'}}),
-    jsonEncode({'type': 'assistant.message', 'data': {'content': 'Two reuse opportunities: bulkPercent repeats applyPercent (internal/discount/calc.go:48), and roundCents repeats money.RoundCents (internal/money/round.go:12). CategoryRule is new.', 'toolRequests': []}}),
-    jsonEncode({'type': 'session.usage_checkpoint', 'data': {'accountingSnapshot': {'modelMetrics': {'gpt-6-luna': {'usage': {'inputTokens': 21400, 'outputTokens': 540}}}}}}),
-    jsonEncode({'type': 'result', 'exitCode': 0, 'usage': {'premiumRequests': 1}}),
+    jsonEncode({
+      'type': 'assistant.turn_start',
+      'data': {'turnId': '0'}
+    }),
+    jsonEncode({
+      'type': 'assistant.message',
+      'data': {'content': 'I’ll read the diff, then look for existing code for each new function.', 'toolRequests': []}
+    }),
+    jsonEncode({
+      'type': 'tool.execution_start',
+      'data': {
+        'toolCallId': 'c1',
+        'toolName': 'grep',
+        'arguments': {'pattern': r'func (\w*Percent|[Rr]ound\w*)', 'path': 'internal/'}
+      }
+    }),
+    jsonEncode({
+      'type': 'tool.execution_complete',
+      'data': {
+        'toolCallId': 'c1',
+        'success': true,
+        'result': {'content': 'internal/discount/calc.go:48:func applyPercent(p Price, pct int) Price\ninternal/money/round.go:12:func RoundCents(v float64) int64'}
+      }
+    }),
+    jsonEncode({
+      'type': 'assistant.turn_start',
+      'data': {'turnId': '1'}
+    }),
+    jsonEncode({
+      'type': 'assistant.message',
+      'data': {
+        'content':
+            'Two reuse opportunities: bulkPercent repeats applyPercent (internal/discount/calc.go:48), and roundCents repeats money.RoundCents (internal/money/round.go:12). CategoryRule is new.',
+        'toolRequests': []
+      }
+    }),
+    jsonEncode({
+      'type': 'session.usage_checkpoint',
+      'data': {
+        'accountingSnapshot': {
+          'modelMetrics': {
+            'gpt-6-luna': {
+              'usage': {'inputTokens': 21400, 'outputTokens': 540}
+            }
+          }
+        }
+      }
+    }),
+    jsonEncode({
+      'type': 'result',
+      'exitCode': 0,
+      'usage': {'premiumRequests': 1}
+    }),
   ];
 
   @override
-  Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async {
+  Future<PlayRun?> play(AgentDef agent,
+      {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async {
     final id = 'play-${++_seq}';
     final list = playRuns(owner ?? agent);
     list.insert(0, PlayRun(id: id, agent: agent.name, task: task, draft: draft, startedAt: DateTime.now(), cli: cli.id));
@@ -467,6 +709,59 @@ class MockAgentDefs extends AgentDefsSource {
   }
 }
 
+/// Where a skill comes from.
+enum SkillFrom {
+  personal('Personal'),
+  repo('Repository'),
+  plugin('Plugin');
+
+  const SkillFrom(this.label);
+  final String label;
+}
+
+/// A skill an agent can be given.
+class AgentSkill {
+  const AgentSkill(this.name, {this.description = '', this.from = SkillFrom.personal, this.fromName = ''});
+
+  /// As the agent file lists it: `go-tests`, or `<plugin>:<skill>`.
+  final String name;
+
+  /// From its SKILL.md, on one line; may be empty.
+  final String description;
+  final SkillFrom from;
+
+  /// The repository's or the plugin's name; empty for personal ones.
+  final String fromName;
+}
+
+/// Enough skills, from every place, to need the search.
+const mockSkills = [
+  AgentSkill('go-table-tests', description: 'Writes table-driven Go tests with subtests and golden files.'),
+  AgentSkill('go-conventions', description: 'The team’s Go style: errors, logging, package layout.'),
+  AgentSkill('sql-review', description: 'Reviews SQL migrations for locks, missing indexes and rollbacks.'),
+  AgentSkill('changelog-writer', description: 'Turns commits into user-facing release notes.'),
+  AgentSkill('commit-messages', description: 'Writes commit messages in the repository’s style.'),
+  AgentSkill('incident-notes', description: 'Summarises an incident channel into a timeline and follow-ups.'),
+  AgentSkill('k8s-debug', description: 'Finds why a pod is crash-looping: events, logs, limits.'),
+  AgentSkill('pdf-tools', description: 'Reads, splits and fills PDF files.'),
+  AgentSkill('pr-description', description: 'Drafts a PR description from the diff and the ticket.'),
+  AgentSkill('regex-explain', description: 'Explains a regular expression and writes test cases for it.'),
+  AgentSkill('spreadsheet-clean', description: 'Cleans CSV and spreadsheet data: headers, types, duplicates.'),
+  AgentSkill('terraform-plan-review', description: 'Reads a terraform plan and flags destroys and drift.'),
+  AgentSkill('pricing-rules', description: 'How price rules, channels and discounts fit together.', from: SkillFrom.repo, fromName: 'repo-a'),
+  AgentSkill('bulk-discounts', description: 'Rounding and limits of bulk discounts, with the known edge cases.', from: SkillFrom.repo, fromName: 'repo-a'),
+  AgentSkill('api-contracts', description: 'Keeps the public API contracts and their tests in sync.', from: SkillFrom.repo, fromName: 'repo-b'),
+  AgentSkill('permissions-model', description: 'Roles, scopes and how a permission check is resolved.', from: SkillFrom.repo, fromName: 'repo-c'),
+  AgentSkill('lint-kit:lint-fix', description: 'Runs the linters and fixes what they report.', from: SkillFrom.plugin, fromName: 'lint-kit'),
+  AgentSkill('lint-kit:format', description: 'Formats changed files with the project’s formatter.', from: SkillFrom.plugin, fromName: 'lint-kit'),
+  AgentSkill('test-kit:coverage-gaps', description: 'Finds code no test reaches and suggests where to start.', from: SkillFrom.plugin, fromName: 'test-kit'),
+  AgentSkill('test-kit:flaky-hunt', description: 'Reruns a test until it fails and narrows down why.', from: SkillFrom.plugin, fromName: 'test-kit'),
+  AgentSkill('test-kit:mutation', description: 'Mutation testing: which changes the tests don’t catch.', from: SkillFrom.plugin, fromName: 'test-kit'),
+  AgentSkill('docs-kit:adr', description: 'Writes an architecture decision record from a discussion.', from: SkillFrom.plugin, fromName: 'docs-kit'),
+  AgentSkill('docs-kit:readme', description: 'Updates a README from the code: install, usage, config.', from: SkillFrom.plugin, fromName: 'docs-kit'),
+  AgentSkill('docs-kit:diagrams', description: 'Draws sequence and architecture diagrams as Mermaid.', from: SkillFrom.plugin, fromName: 'docs-kit'),
+];
+
 /// A daemon without the AgentDefs service: nothing to list, nothing saved.
 class UnsupportedAgentDefs extends AgentDefsSource {
   @override
@@ -478,7 +773,7 @@ class UnsupportedAgentDefs extends AgentDefsSource {
   @override
   bool get triggersSupported => false;
   @override
-  List<String> get skills => const [];
+  List<AgentSkill> get skills => const [];
   @override
   List<String> get mcpServers => const [];
   @override
@@ -496,7 +791,9 @@ class UnsupportedAgentDefs extends AgentDefsSource {
   @override
   List<AgentRun> runsOf(AgentDef agent) => const [];
   @override
-  Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async => null;
+  Future<PlayRun?> play(AgentDef agent,
+          {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async =>
+      null;
   @override
   Future<void> stopPlay(String id) async {}
   @override

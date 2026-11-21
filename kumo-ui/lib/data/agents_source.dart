@@ -5,6 +5,21 @@ import 'models.dart';
 
 /// A coding-agent CLI the user can run (known or custom).
 @immutable
+/// A model a CLI can be started with, and the effort levels it takes.
+@immutable
+class AgentModelChoice {
+  const AgentModelChoice({required this.id, required this.name, this.efforts = const []});
+
+  /// As the CLI names it: `opus`, `gpt-6-luna`.
+  final String id;
+
+  /// As it shows it: "GPT-6-Luna".
+  final String name;
+
+  /// Lowest first; empty: the provider's.
+  final List<String> efforts;
+}
+
 class AgentProviderInfo {
   const AgentProviderInfo({
     required this.id,
@@ -20,6 +35,10 @@ class AgentProviderInfo {
     this.installHint = '',
     this.takesPrompt = false,
     this.hasLogin = false,
+    this.tunable = false,
+    this.models = const [],
+    this.efforts = const [],
+    this.noEffortWith = '',
   });
 
   final String id;
@@ -45,6 +64,30 @@ class AgentProviderInfo {
   /// The prompt goes as an argument; otherwise Kumo types it in.
   final bool takesPrompt;
   final bool hasLogin;
+
+  /// Kumo can start it with a model and an effort (known CLIs it checked).
+  final bool tunable;
+
+  /// The models it can be started with: what the CLI lists for its account,
+  /// else what it documents. Only these are taken.
+  final List<AgentModelChoice> models;
+
+  /// Effort levels of its default model (and of models listing none),
+  /// lowest first; empty: none.
+  final List<String> efforts;
+
+  /// The effort levels [model] takes ('': the CLI's default model).
+  List<String> effortsFor(String model) {
+    final own = models.where((m) => m.id == model).firstOrNull?.efforts ?? const <String>[];
+    return own.isNotEmpty ? own : efforts;
+  }
+
+  /// A model with which it takes no effort: it picks both (Copilot's "auto").
+  final String noEffortWith;
+
+  /// Whether [effort] applies with [model] ('' is the CLI's own).
+  bool takesEffortWith(String model) =>
+      effortsFor(model).isNotEmpty && (noEffortWith.isEmpty || (model.isNotEmpty && model != noEffortWith));
 }
 
 enum AgentContextKind {
@@ -275,7 +318,7 @@ abstract class AgentsSource extends ChangeNotifier {
 
   /// Starts an agent ([providerId] null: the default one) in a worktree.
   /// [context] is what the prompt hands it (a ticket, a page).
-  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = '', List<AgentContextItem> context = const []});
+  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = '', List<AgentContextItem> context = const [], String model = '', String effort = '', String todoId = ''});
 
   /// Sends [item] to a running agent: [text] is typed into its terminal and
   /// submitted. False when it couldn't be sent ([error] says why).
@@ -379,7 +422,7 @@ class MockAgentsSource extends AgentsSource {
   }
 
   @override
-  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = '', List<AgentContextItem> context = const []}) async => null;
+  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = '', List<AgentContextItem> context = const [], String model = '', String effort = '', String todoId = ''}) async => null;
 
   @override
   Future<bool> addContext(String id, AgentContextItem item, {String text = ''}) async => false;

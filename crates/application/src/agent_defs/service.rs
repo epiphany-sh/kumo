@@ -5,7 +5,8 @@ use std::time::Duration;
 
 use kumo_domain::agent_defs::{
     AgentCli, AgentDefFile, AgentDefFiles, AgentDefKey, AgentDefScope, AgentDefSettings,
-    AgentDefStore, HeadlessRunner, PageReader, RunGit, agent_cli, agents_dir, check_agent_name,
+    AgentDefStore, FoundSkill, HeadlessRunner, PageReader, RunGit, agent_cli, agents_dir,
+    check_agent_name,
 };
 use kumo_domain::agents::AgentError;
 
@@ -48,10 +49,35 @@ pub struct AgentDefPlaces {
     pub data_dir: PathBuf,
 }
 
+/// Where a skill comes from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SkillFrom {
+    /// `<claude dir>/skills`.
+    Personal,
+    /// A workspace repository's `.claude/skills`: its name.
+    Repo(String),
+    /// An installed Claude Code plugin: its name.
+    Plugin(String),
+}
+
+/// A skill an agent can be given.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillChoice {
+    /// As the agent file lists it: `go-tests`, or `<plugin>:<skill>`.
+    pub name: String,
+    pub description: String,
+    pub from: SkillFrom,
+}
+
 /// Skills and MCP servers an agent can be given.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AgentDefCapabilities {
+    /// Their names, sorted.
     pub skills: Vec<String>,
+    /// Each with what it's for and where it comes from: personal ones,
+    /// then each repository's, then each plugin's. A name is listed once,
+    /// where Claude Code finds it first.
+    pub skill_choices: Vec<SkillChoice>,
     pub mcp_servers: Vec<String>,
     pub triggers_supported: bool,
 }
@@ -235,20 +261,51 @@ impl AgentDefService {
         .await
     }
 
-    /// Skills (personal and each repository's) and MCP servers.
+    /// Skills (personal, each repository's and each installed plugin's)
+    /// and MCP servers.
     pub async fn capabilities(&self) -> Result<AgentDefCapabilities, AgentError> {
-        let repos: Vec<PathBuf> = self.repos().into_iter().map(|(p, _)| p).collect();
+        let named = self.repos();
+        let repos: Vec<PathBuf> = named.iter().map(|(p, _)| p.clone()).collect();
         let files = Arc::clone(&self.ports.files);
         let places = self.places.clone();
         blocking(move || {
-            let mut skills = files.folders(&places.claude_dir.join("skills"));
-            for repo in &repos {
-                skills.extend(files.folders(&repo.join(".claude").join("skills")));
+            let mut choices: Vec<SkillChoice> = Vec::new();
+            let mut add = |found: Vec<FoundSkill>, prefix: &str, from: SkillFrom| {
+                for skill in found {
+                    let name = format!("{prefix}{}", skill.name);
+                    if !choices.iter().any(|c| c.name == name) {
+                        choices.push(SkillChoice {
+                            name,
+                            description: skill.description,
+                            from: from.clone(),
+                        });
+                    }
+                }
+            };
+            add(
+                files.skills(&places.claude_dir.join("skills")),
+                "",
+                SkillFrom::Personal,
+            );
+            for (path, name) in &named {
+                add(
+                    files.skills(&path.join(".claude").join("skills")),
+                    "",
+                    SkillFrom::Repo(name.clone()),
+                );
             }
+            for (plugin, path) in files.plugins(&places.claude_dir) {
+                add(
+                    files.skills(&path.join("skills")),
+                    &format!("{plugin}:"),
+                    SkillFrom::Plugin(plugin.clone()),
+                );
+            }
+            let mut skills: Vec<String> = choices.iter().map(|c| c.name.clone()).collect();
             skills.sort();
-            skills.dedup();
             Ok(AgentDefCapabilities {
                 skills,
+                skill_choices: choices,
                 mcp_servers: files.mcp_servers(&places.claude_config, &repos),
                 triggers_supported: false,
             })

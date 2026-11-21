@@ -6,9 +6,11 @@ mod history_store;
 mod migrations;
 mod task_json;
 mod task_store;
+mod todo_store;
 mod workspace_store;
 
 pub use agent_store::SqliteAgentStore;
 pub use history_store::SqliteHistoryStore;
 pub use task_store::SqliteTaskStore;
+pub use todo_store::SqliteTodoStore;
 pub use workspace_store::SqliteWorkspaceStore;
