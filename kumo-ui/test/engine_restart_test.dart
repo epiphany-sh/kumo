@@ -23,6 +23,34 @@ void _replace(File program) {
   next.renameSync(program.path);
 }
 
+/// Every `kumod` running the copy in [dir], the old program or the new
+/// one: what a test may leave behind (each is started detached, and
+/// outlives the test process).
+List<int> _daemonsIn(Directory dir) {
+  final ps = Process.runSync('ps', ['-Ao', 'pid=,command=']);
+  if (ps.exitCode != 0) return const [];
+  final program = '${dir.path}/kumod';
+  return [
+    for (final line in (ps.stdout as String).split('\n'))
+      if (line.trimLeft().split(' ') case [final pid, ...final command] when command.join(' ') == program || command.join(' ').startsWith('$program '))
+        if (int.tryParse(pid) case final pid?) pid,
+  ];
+}
+
+/// Stops them, for good if they don't go when asked.
+Future<void> _stopDaemonsIn(Directory dir) async {
+  for (final pid in _daemonsIn(dir)) {
+    Process.killPid(pid);
+  }
+  final deadline = DateTime.now().add(const Duration(seconds: 3));
+  while (_daemonsIn(dir).isNotEmpty && DateTime.now().isBefore(deadline)) {
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+  }
+  for (final pid in _daemonsIn(dir)) {
+    Process.killPid(pid, ProcessSignal.sigkill);
+  }
+}
+
 Future<void> _until(bool Function() done, {Duration timeout = const Duration(seconds: 15)}) async {
   final deadline = DateTime.now().add(timeout);
   while (!done()) {
@@ -38,7 +66,31 @@ void main() {
   late Directory dir;
   late File program;
   late DaemonDiscovery discovery;
-  KumoEngine engine() => KumoEngine(discovery: discovery, launcher: _Launcher(program.path, '${dir.path}/data'));
+
+  /// The engines a test made and hasn't quit: quit before their daemons
+  /// stop, so none launches one again.
+  final engines = <KumoEngine>{};
+  KumoEngine engine() {
+    final e = KumoEngine(discovery: discovery, launcher: _Launcher(program.path, '${dir.path}/data'));
+    engines.add(e);
+    return e;
+  }
+
+  void quit(KumoEngine e) {
+    if (engines.remove(e)) e.dispose();
+  }
+
+  // A run cut short (stopped, killed, timed out) never tears down: its
+  // daemons would run on for good. Older than any run still going.
+  setUpAll(() async {
+    final stale = DateTime.now().subtract(const Duration(minutes: 10));
+    for (final left in Directory.systemTemp.listSync().whereType<Directory>()) {
+      if (!left.path.split(Platform.pathSeparator).last.startsWith('kumo-restart-')) continue;
+      if (left.statSync().modified.isAfter(stale)) continue;
+      await _stopDaemonsIn(left);
+      left.deleteSync(recursive: true);
+    }
+  });
 
   setUp(() {
     dir = Directory.systemTemp.createTempSync('kumo-restart-');
@@ -46,9 +98,13 @@ void main() {
     discovery = DaemonDiscovery(file: File('${dir.path}/data/daemon.json'));
   });
 
+  // Every daemon the test started, not just the one daemon.json names
+  // last (a failed update test can leave the old one and the new).
   tearDown(() async {
-    final endpoint = await discovery.read();
-    if (endpoint != null) Process.killPid(endpoint.pid);
+    for (final e in [...engines]) {
+      quit(e);
+    }
+    await _stopDaemonsIn(dir);
     dir.deleteSync(recursive: true);
   });
 
@@ -57,11 +113,10 @@ void main() {
     final before = await first.connection();
     expect(before.outdated, isFalse);
     final terminal = await before.terminals.open(OpenRequest(program: '/bin/sh', args: ['-c', 'sleep 30']));
-    first.dispose(); // the UI quits; kumod and its terminal stay
+    quit(first); // the UI quits; kumod and its terminal stay
 
     _replace(program);
     final second = engine();
-    addTearDown(second.dispose);
     final conn = await second.connection();
     expect(conn.endpoint.pid, before.endpoint.pid, reason: 'the same daemon, now outdated');
     expect(conn.outdated, isTrue);
@@ -78,11 +133,10 @@ void main() {
     final first = engine();
     final before = await first.connection();
     await before.terminals.open(OpenRequest(program: '/bin/sh', args: ['-c', 'sleep 30']));
-    first.dispose();
+    quit(first);
 
     _replace(program);
     final second = engine();
-    addTearDown(second.dispose);
     await second.connection();
     await _until(() => second.runningInOutdated == 1);
 
@@ -102,11 +156,10 @@ void main() {
     expect(await discovery.read(), isNull, reason: 'kumod is gone, its terminal too');
     await expectLater(first.connection(), throwsStateError, reason: 'nothing launches the old program again');
     expect(await discovery.read(), isNull);
-    first.dispose();
+    quit(first);
 
     _replace(program);
     final next = engine();
-    addTearDown(next.dispose);
     final conn = await next.connection();
     expect(conn.endpoint.pid, isNot(before.endpoint.pid));
     expect(conn.outdated, isFalse, reason: 'no restart left to do');
