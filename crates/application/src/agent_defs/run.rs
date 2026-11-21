@@ -127,6 +127,7 @@ impl AgentDefService {
                     .max_minutes
                     .filter(|m| *m > 0)
                     .map(|m| self.minutes(m)),
+                ..AgentLaunch::default()
             })
             .await
     }

@@ -149,7 +149,13 @@ class _AgentEditorState extends State<_AgentEditor> {
         title: 'Description',
         hint: 'when to use it: Claude reads this to decide whether to hand it work',
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          _Area(controller: _desc, minLines: 2, maxLines: 4, label: 'Description', border: descCheck.level == CheckLevel.ok ? null : (descCheck.level == CheckLevel.error ? c.err : c.warn), onChanged: (v) => _set(a.copyWith(description: v))),
+          _Area(
+              controller: _desc,
+              minLines: 2,
+              maxLines: 4,
+              label: 'Description',
+              border: descCheck.level == CheckLevel.ok ? null : (descCheck.level == CheckLevel.error ? c.err : c.warn),
+              onChanged: (v) => _set(a.copyWith(description: v))),
           CheckLine(descCheck),
         ]),
       ),
@@ -232,7 +238,9 @@ class _AgentEditorState extends State<_AgentEditor> {
           // The name's and the description's show under their fields: here,
           // only whether they're fine.
           for (final x in checks.take(2))
-            CheckLine(x.level == CheckLevel.ok ? AgentCheck(CheckLevel.ok, x == checks.first ? 'Name: fine.' : 'Description: says what and when.') : AgentCheck(x.level, x == checks.first ? 'Name: see above.' : 'Description: see above.')),
+            CheckLine(x.level == CheckLevel.ok
+                ? AgentCheck(CheckLevel.ok, x == checks.first ? 'Name: fine.' : 'Description: says what and when.')
+                : AgentCheck(x.level, x == checks.first ? 'Name: see above.' : 'Description: see above.')),
           for (final x in checks.skip(2)) CheckLine(x),
         ]),
       ),
@@ -317,7 +325,13 @@ class _AgentEditorState extends State<_AgentEditor> {
               hint: hint,
               color: riskColors(c, risk).$1,
               tools: [for (final (t, what) in tools) (t, what, a.tools.contains(t))],
-              onToggle: (t) => _set(a.copyWith(tools: a.tools.contains(t) ? [for (final x in a.tools) if (x != t) x] : [...a.tools, t])),
+              onToggle: (t) => _set(a.copyWith(
+                  tools: a.tools.contains(t)
+                      ? [
+                          for (final x in a.tools)
+                            if (x != t) x
+                        ]
+                      : [...a.tools, t])),
             ),
           if (a.mcpServers.isNotEmpty)
             _ToolGroup(
@@ -325,7 +339,10 @@ class _AgentEditorState extends State<_AgentEditor> {
               hint: 'Every tool of the MCP servers in Advanced.',
               color: c.purple,
               tools: [for (final m in a.mcpServers) ('mcp__$m', 'Every tool of $m', true)],
-              onToggle: (t) => _set(a.copyWith(mcpServers: [for (final m in a.mcpServers) if ('mcp__$m' != t) m])),
+              onToggle: (t) => _set(a.copyWith(mcpServers: [
+                for (final m in a.mcpServers)
+                  if ('mcp__$m' != t) m
+              ])),
             ),
         ]),
         // Tools Kumo doesn't offer: kept as the file says, edited in Advanced.
@@ -351,9 +368,23 @@ class _AgentEditorState extends State<_AgentEditor> {
         _Row(
           label: 'Skills',
           hint: 'procedures it loads when it needs them',
-          child: Wrap(spacing: 5, runSpacing: 5, children: [
-            for (final k in a.skills) _Chip(label: k, onRemove: () => _set(a.copyWith(skills: [for (final x in a.skills) if (x != k) x]))),
-            for (final k in defs.skills.where((k) => !a.skills.contains(k))) _AddChip(label: k, onTap: () => _set(a.copyWith(skills: [...a.skills, k]))),
+          // However many there are: picked from a searchable list, shown
+          // here as chips.
+          child: Wrap(spacing: 5, runSpacing: 5, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            for (final k in a.skills)
+              _Chip(
+                label: k,
+                note: defs.skills.any((x) => x.name == k) ? null : 'not found',
+                tooltip: switch (defs.skills.where((x) => x.name == k).firstOrNull?.description) {
+                  final d? when d.isNotEmpty => d,
+                  _ => null,
+                },
+                onRemove: () => _set(a.copyWith(skills: [
+                  for (final x in a.skills)
+                    if (x != k) x
+                ])),
+              ),
+            SkillPicker(selected: a.skills, skills: defs.skills, onChanged: (v) => _set(a.copyWith(skills: v))),
           ]),
         ),
         _Row(
@@ -361,7 +392,14 @@ class _AgentEditorState extends State<_AgentEditor> {
           hint: 'files read before every run',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Wrap(spacing: 5, runSpacing: 5, children: [
-              for (final k in a.knowledge) _Chip(label: k, tag: 'MD', onRemove: () => _set(a.copyWith(knowledge: [for (final x in a.knowledge) if (x != k) x]))),
+              for (final k in a.knowledge)
+                _Chip(
+                    label: k,
+                    tag: 'MD',
+                    onRemove: () => _set(a.copyWith(knowledge: [
+                          for (final x in a.knowledge)
+                            if (x != k) x
+                        ]))),
             ]),
             if (a.knowledge.isNotEmpty) const SizedBox(height: 6),
             _Line(
@@ -383,7 +421,13 @@ class _AgentEditorState extends State<_AgentEditor> {
           hint: 'any other Claude Code tool, by name',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Wrap(spacing: 5, runSpacing: 5, children: [
-              for (final t in agentOtherTools(a.tools)) _Chip(label: t, onRemove: () => _set(a.copyWith(tools: [for (final x in a.tools) if (x != t) x]))),
+              for (final t in agentOtherTools(a.tools))
+                _Chip(
+                    label: t,
+                    onRemove: () => _set(a.copyWith(tools: [
+                          for (final x in a.tools)
+                            if (x != t) x
+                        ]))),
             ]),
             if (agentOtherTools(a.tools).isNotEmpty) const SizedBox(height: 6),
             _Line(
@@ -415,7 +459,13 @@ class _AgentEditorState extends State<_AgentEditor> {
           label: 'Connectors',
           hint: 'MCP servers of this workspace',
           child: Wrap(spacing: 5, runSpacing: 5, children: [
-            for (final m in a.mcpServers) _Chip(label: m, onRemove: () => _set(a.copyWith(mcpServers: [for (final x in a.mcpServers) if (x != m) x]))),
+            for (final m in a.mcpServers)
+              _Chip(
+                  label: m,
+                  onRemove: () => _set(a.copyWith(mcpServers: [
+                        for (final x in a.mcpServers)
+                          if (x != m) x
+                      ]))),
             for (final m in defs.mcpServers.where((m) => !a.mcpServers.contains(m))) _AddChip(label: m, onTap: () => _set(a.copyWith(mcpServers: [...a.mcpServers, m]))),
             if (defs.mcpServers.isEmpty && a.mcpServers.isEmpty) Text('None connected in this workspace.', style: sans(11.5, color: c.text3)),
           ]),
@@ -455,7 +505,8 @@ class _AgentEditorState extends State<_AgentEditor> {
               _LimitField(label: 'Time', unit: 'min', controller: _minutes, onChanged: (v) => _set(a.copyWith(maxMinutes: () => toInt(v)))),
               _LimitField(label: 'Cost', unit: 'USD', controller: _cost, onChanged: (v) => _set(a.copyWith(maxCostUsd: () => double.tryParse(v.trim())))),
             ]),
-            const CheckLine(AgentCheck(CheckLevel.info, 'Optional, and off by default: a task cut short by a guess often costs more than letting it finish. Stop is always at hand. Cost counts in headless runs (playground, triggers), from Claude Code’s own report.')),
+            const CheckLine(AgentCheck(CheckLevel.info,
+                'Optional, and off by default: a task cut short by a guess often costs more than letting it finish. Stop is always at hand. Cost counts in headless runs (playground, triggers), from Claude Code’s own report.')),
           ]),
         ),
         _Row(
@@ -463,8 +514,7 @@ class _AgentEditorState extends State<_AgentEditor> {
           hint: 'what it asks you first',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             for (final p in AgentApprovals.values)
-              if (p != AgentApprovals.bypass || a.approvals == p)
-              _Radio(label: p.label, detail: p.key, hint: p.hint, selected: a.approvals == p, onTap: () => _set(a.copyWith(approvals: p))),
+              if (p != AgentApprovals.bypass || a.approvals == p) _Radio(label: p.label, detail: p.key, hint: p.hint, selected: a.approvals == p, onTap: () => _set(a.copyWith(approvals: p))),
           ]),
         ),
       ]),
@@ -496,9 +546,19 @@ class _AgentEditorState extends State<_AgentEditor> {
                 child: Row(children: [
                   Icon(t == AgentTrigger.schedule ? KIcons.clock : KIcons.pullRequest, size: 13, color: c.text3),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(t == AgentTrigger.pullRequest ? 'When a pull request opens${a.scope == AgentScope.project ? ' in ${a.repo}' : ''}' : 'Weekdays at 9:00', style: sans(12, color: c.text))),
+                  Expanded(
+                      child: Text(t == AgentTrigger.pullRequest ? 'When a pull request opens${a.scope == AgentScope.project ? ' in ${a.repo}' : ''}' : 'Weekdays at 9:00',
+                          style: sans(12, color: c.text))),
                   Text('headless', style: sans(11, color: c.text3)),
-                  KIconButton(icon: KIcons.close, label: 'Remove trigger', size: 26, iconSize: 12, onTap: () => _set(a.copyWith(triggers: [for (final x in a.triggers) if (x != t) x]))),
+                  KIconButton(
+                      icon: KIcons.close,
+                      label: 'Remove trigger',
+                      size: 26,
+                      iconSize: 12,
+                      onTap: () => _set(a.copyWith(triggers: [
+                            for (final x in a.triggers)
+                              if (x != t) x
+                          ]))),
                 ]),
               ),
             if (!defs.triggersSupported)

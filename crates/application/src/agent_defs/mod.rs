@@ -8,5 +8,7 @@ mod sources;
 
 pub use play::PlayStart;
 pub use run::{RunStart, RunWhere};
-pub use service::{AgentDefCapabilities, AgentDefPlaces, AgentDefPorts, AgentDefService};
+pub use service::{
+    AgentDefCapabilities, AgentDefPlaces, AgentDefPorts, AgentDefService, SkillChoice, SkillFrom,
+};
 pub use sources::{PullContext, RunSources, ServiceSources};

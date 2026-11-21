@@ -1,5 +1,6 @@
 import 'dart:io' show Platform, Process, ProcessException;
 
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter/widgets.dart' show SingleActivator;
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 
@@ -99,9 +100,9 @@ class MacOs extends HostOs {
 
   /// NSVisualEffectView via flutter_acrylic/macos_window_utils, full-size
   /// content view with a transparent unified toolbar so the traffic lights
-  /// sit inside our sidebar. Note: this is NSVisualEffectView vibrancy, not
-  /// the macOS 26 NSGlassEffectView "Liquid Glass" material — the plugin
-  /// doesn't expose that yet.
+  /// sit inside our sidebar. On macOS 26 and later the runner swaps that
+  /// vibrancy for the system's Liquid Glass (NSGlassEffectView, `kumo/glass`
+  /// in `MainFlutterWindow.swift`): the plugin doesn't expose it.
   @override
   bool get supportsNativeBackdrop => true;
 
@@ -118,10 +119,20 @@ class MacOs extends HostOs {
   Future<void> applyBackdrop({required bool dark}) async {
     await Window.overrideMacOSBrightness(dark: dark);
     await Window.setEffect(effect: WindowEffect.sidebar, dark: dark);
+    try {
+      await _glass.invokeMethod<bool>('apply');
+    } catch (_) {
+      // An older runner: the vibrancy stays.
+    }
   }
+
+  static const _glass = MethodChannel('kumo/glass');
 
   @override
   bool get windowButtonsInContent => true;
+
+  @override
+  bool get nativeTitleBar => false;
 
   /// `NSApp.applicationIconImage`: a closed app shows its bundle's icon.
   @override

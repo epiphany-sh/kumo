@@ -18,7 +18,7 @@ pub use context::{
 };
 pub use model::{
     AgentDefFile, AgentDefKey, AgentDefScope, AgentDefSettings, AgentDefTrigger, FoundFile,
-    agents_dir, check_agent_name,
+    FoundSkill, agents_dir, check_agent_name,
 };
 pub use play::{PlayEvent, PlayEventKind, PlayRecord};
 pub use ports::{

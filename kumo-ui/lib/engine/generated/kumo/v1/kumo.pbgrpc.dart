@@ -2660,6 +2660,15 @@ class PullRequestsClient extends $grpc.Client {
     return $createUnaryCall(_$answerThread, request, options: options);
   }
 
+  /// The state of pull requests of a repository, by number: one light call
+  /// to the host for all of them, and no git (for TODOs waiting on a merge).
+  $grpc.ResponseFuture<$0.PullRequestStates> states(
+    $0.PullRequestStatesRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$states, request, options: options);
+  }
+
   // method descriptors
 
   static final _$list =
@@ -2687,6 +2696,11 @@ class PullRequestsClient extends $grpc.Client {
           '/kumo.v1.PullRequests/AnswerThread',
           ($0.AnswerThreadRequest value) => value.writeToBuffer(),
           $0.ReviewThread.fromBuffer);
+  static final _$states =
+      $grpc.ClientMethod<$0.PullRequestStatesRequest, $0.PullRequestStates>(
+          '/kumo.v1.PullRequests/States',
+          ($0.PullRequestStatesRequest value) => value.writeToBuffer(),
+          $0.PullRequestStates.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.PullRequests')
@@ -2736,6 +2750,15 @@ abstract class PullRequestsServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.AnswerThreadRequest.fromBuffer(value),
         ($0.ReviewThread value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.PullRequestStatesRequest, $0.PullRequestStates>(
+            'States',
+            states_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.PullRequestStatesRequest.fromBuffer(value),
+            ($0.PullRequestStates value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.PullRequestList> list_Pre($grpc.ServiceCall $call,
@@ -2777,6 +2800,14 @@ abstract class PullRequestsServiceBase extends $grpc.Service {
 
   $async.Future<$0.ReviewThread> answerThread(
       $grpc.ServiceCall call, $0.AnswerThreadRequest request);
+
+  $async.Future<$0.PullRequestStates> states_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.PullRequestStatesRequest> $request) async {
+    return states($call, await $request);
+  }
+
+  $async.Future<$0.PullRequestStates> states(
+      $grpc.ServiceCall call, $0.PullRequestStatesRequest request);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Releases')
@@ -3110,4 +3141,191 @@ abstract class TestsServiceBase extends $grpc.Service {
 
   $async.Future<$0.StopTestsResponse> stop(
       $grpc.ServiceCall call, $0.StopTestsRequest request);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Todos')
+class TodosClient extends $grpc.Client {
+  /// The hostname for this service.
+  static const $core.String defaultHost = '';
+
+  /// OAuth scopes needed for the client.
+  static const $core.List<$core.String> oauthScopes = [
+    '',
+  ];
+
+  TodosClient(super.channel, {super.options, super.interceptors});
+
+  /// Every TODO now, then again whenever one changes (last wins).
+  $grpc.ResponseStream<$0.TodoList> watch(
+    $0.WatchTodosRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createStreamingCall(_$watch, $async.Stream.fromIterable([request]),
+        options: options);
+  }
+
+  $grpc.ResponseFuture<$0.Todo> add(
+    $0.AddTodoRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$add, request, options: options);
+  }
+
+  /// Title, notes, repository, done.
+  $grpc.ResponseFuture<$0.Todo> update(
+    $0.UpdateTodoRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$update, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.DeleteTodoResponse> delete(
+    $0.DeleteTodoRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$delete, request, options: options);
+  }
+
+  /// Records where it runs once its worktree and agent are up.
+  $grpc.ResponseFuture<$0.Todo> attach(
+    $0.AttachTodoRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$attach, request, options: options);
+  }
+
+  /// Moves it to a status. `kumod todo <status>` calls this from the agent.
+  $grpc.ResponseFuture<$0.Todo> setStatus(
+    $0.SetTodoStatusRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$setStatus, request, options: options);
+  }
+
+  // method descriptors
+
+  static final _$watch = $grpc.ClientMethod<$0.WatchTodosRequest, $0.TodoList>(
+      '/kumo.v1.Todos/Watch',
+      ($0.WatchTodosRequest value) => value.writeToBuffer(),
+      $0.TodoList.fromBuffer);
+  static final _$add = $grpc.ClientMethod<$0.AddTodoRequest, $0.Todo>(
+      '/kumo.v1.Todos/Add',
+      ($0.AddTodoRequest value) => value.writeToBuffer(),
+      $0.Todo.fromBuffer);
+  static final _$update = $grpc.ClientMethod<$0.UpdateTodoRequest, $0.Todo>(
+      '/kumo.v1.Todos/Update',
+      ($0.UpdateTodoRequest value) => value.writeToBuffer(),
+      $0.Todo.fromBuffer);
+  static final _$delete =
+      $grpc.ClientMethod<$0.DeleteTodoRequest, $0.DeleteTodoResponse>(
+          '/kumo.v1.Todos/Delete',
+          ($0.DeleteTodoRequest value) => value.writeToBuffer(),
+          $0.DeleteTodoResponse.fromBuffer);
+  static final _$attach = $grpc.ClientMethod<$0.AttachTodoRequest, $0.Todo>(
+      '/kumo.v1.Todos/Attach',
+      ($0.AttachTodoRequest value) => value.writeToBuffer(),
+      $0.Todo.fromBuffer);
+  static final _$setStatus =
+      $grpc.ClientMethod<$0.SetTodoStatusRequest, $0.Todo>(
+          '/kumo.v1.Todos/SetStatus',
+          ($0.SetTodoStatusRequest value) => value.writeToBuffer(),
+          $0.Todo.fromBuffer);
+}
+
+@$pb.GrpcServiceName('kumo.v1.Todos')
+abstract class TodosServiceBase extends $grpc.Service {
+  $core.String get $name => 'kumo.v1.Todos';
+
+  TodosServiceBase() {
+    $addMethod($grpc.ServiceMethod<$0.WatchTodosRequest, $0.TodoList>(
+        'Watch',
+        watch_Pre,
+        false,
+        true,
+        ($core.List<$core.int> value) => $0.WatchTodosRequest.fromBuffer(value),
+        ($0.TodoList value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.AddTodoRequest, $0.Todo>(
+        'Add',
+        add_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.AddTodoRequest.fromBuffer(value),
+        ($0.Todo value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.UpdateTodoRequest, $0.Todo>(
+        'Update',
+        update_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.UpdateTodoRequest.fromBuffer(value),
+        ($0.Todo value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.DeleteTodoRequest, $0.DeleteTodoResponse>(
+        'Delete',
+        delete_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.DeleteTodoRequest.fromBuffer(value),
+        ($0.DeleteTodoResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.AttachTodoRequest, $0.Todo>(
+        'Attach',
+        attach_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.AttachTodoRequest.fromBuffer(value),
+        ($0.Todo value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.SetTodoStatusRequest, $0.Todo>(
+        'SetStatus',
+        setStatus_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.SetTodoStatusRequest.fromBuffer(value),
+        ($0.Todo value) => value.writeToBuffer()));
+  }
+
+  $async.Stream<$0.TodoList> watch_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.WatchTodosRequest> $request) async* {
+    yield* watch($call, await $request);
+  }
+
+  $async.Stream<$0.TodoList> watch(
+      $grpc.ServiceCall call, $0.WatchTodosRequest request);
+
+  $async.Future<$0.Todo> add_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.AddTodoRequest> $request) async {
+    return add($call, await $request);
+  }
+
+  $async.Future<$0.Todo> add($grpc.ServiceCall call, $0.AddTodoRequest request);
+
+  $async.Future<$0.Todo> update_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.UpdateTodoRequest> $request) async {
+    return update($call, await $request);
+  }
+
+  $async.Future<$0.Todo> update(
+      $grpc.ServiceCall call, $0.UpdateTodoRequest request);
+
+  $async.Future<$0.DeleteTodoResponse> delete_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.DeleteTodoRequest> $request) async {
+    return delete($call, await $request);
+  }
+
+  $async.Future<$0.DeleteTodoResponse> delete(
+      $grpc.ServiceCall call, $0.DeleteTodoRequest request);
+
+  $async.Future<$0.Todo> attach_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.AttachTodoRequest> $request) async {
+    return attach($call, await $request);
+  }
+
+  $async.Future<$0.Todo> attach(
+      $grpc.ServiceCall call, $0.AttachTodoRequest request);
+
+  $async.Future<$0.Todo> setStatus_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.SetTodoStatusRequest> $request) async {
+    return setStatus($call, await $request);
+  }
+
+  $async.Future<$0.Todo> setStatus(
+      $grpc.ServiceCall call, $0.SetTodoStatusRequest request);
 }

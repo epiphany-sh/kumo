@@ -17,6 +17,7 @@ use kumo_application::releases::{ReleasePorts, ReleaseService};
 use kumo_application::tasks::{TaskPorts, TaskService, TaskTiming};
 use kumo_application::terminal::{CommandHistory, TerminalService};
 use kumo_application::test_runs::{TestPorts, TestService};
+use kumo_application::todos::TodoService;
 use kumo_application::workspace::{WorkspacePorts, WorkspaceService};
 use kumo_domain::agents::{CliHomes, ProgramLocator, SharedCliHomes};
 use kumo_domain::pipelines::{HostTokens, TokenFallback};
@@ -27,8 +28,8 @@ use kumo_infrastructure::agent_defs::{HttpPageReader, LocalAgentDefFiles, Proces
 
 use crate::config::PlanAccounts;
 use kumo_infrastructure::agents::{
-    ClaudeAccount, ClaudeStatusLine, CodexAccount, CodexRollouts, CopilotAccount, CopilotEvents,
-    OsProcesses, ProfileCliHomes, claude_config_dir, codex_home, copilot_home,
+    ClaudeAccount, ClaudeStatusLine, CliModelCatalog, CodexAccount, CodexRollouts, CopilotAccount,
+    CopilotEvents, OsProcesses, ProfileCliHomes, claude_config_dir, codex_home, copilot_home,
 };
 use kumo_infrastructure::ci::{
     BitbucketPipelines, BitbucketPulls, BitbucketReleases, GhTokenFallback, GitHubActions,
@@ -40,7 +41,7 @@ use kumo_infrastructure::git::{FsRepoFinder, GitCli, GitDirLocator};
 use kumo_infrastructure::profiles::profile_dir;
 use kumo_infrastructure::secrets::{KeychainSecretStore, MemorySecretStore};
 use kumo_infrastructure::storage::{
-    SqliteAgentStore, SqliteHistoryStore, SqliteTaskStore, SqliteWorkspaceStore,
+    SqliteAgentStore, SqliteHistoryStore, SqliteTaskStore, SqliteTodoStore, SqliteWorkspaceStore,
 };
 use kumo_infrastructure::tasks::{
     BearConnector, GitHubConnector, JiraConnector, ObsidianConnector, TodoistConnector,
@@ -87,6 +88,8 @@ pub(crate) struct ProfileOpener {
     pub secrets: Secrets,
     /// `!'<kumod>' --data-dir '<data>' git-credential`, for git config.
     pub helper: String,
+    /// This program: agents on a TODO report with `<kumod> todo <status>`.
+    pub kumod: PathBuf,
     pub terminals: Arc<TerminalService>,
     /// A minute of your agents' time limits.
     pub agent_minute: std::time::Duration,
@@ -203,6 +206,8 @@ impl ProfileOpener {
         )
         .await?;
 
+        let todos = TodoService::load(Arc::new(SqliteTodoStore::open(&db)?)).await?;
+
         // gh's sign-in: one cached token for pipelines and pull requests.
         let gh: Arc<dyn TokenFallback> = Arc::new(GhTokenFallback::new(Arc::clone(locator)));
         let pipelines = Arc::new(PipelinesService::new(
@@ -275,39 +280,43 @@ impl ProfileOpener {
 
         let agent_store = Arc::new(SqliteAgentStore::open(&db)?);
         let agent_store_for_defs = Arc::clone(&agent_store);
-        let agents = Arc::new(AgentService::new(
-            AgentPorts {
-                store: agent_store.clone(),
-                locator: Arc::clone(locator),
-                // Plan limits, context windows, models and efforts, as the CLIs
-                // report them.
-                usage: vec![
-                    Arc::new(ClaudeStatusLine::new(&dir.join("agents"), &claude_dir)),
-                    Arc::new(CodexRollouts::new(&codex_dir)),
-                    Arc::new(CopilotEvents::new(&copilot_home(home))),
-                ],
-                // The same, asked of each account with the CLI's sign-in,
-                // so it shows with no session running.
-                accounts: match self.plan_accounts {
-                    PlanAccounts::Ask => vec![
-                        Arc::new(ClaudeAccount::new(
-                            &claude_dir,
-                            !profile.is_default()
-                                || std::env::var_os("CLAUDE_CONFIG_DIR")
-                                    .is_some_and(|v| !v.is_empty()),
-                            Arc::clone(locator),
-                        )),
-                        Arc::new(CodexAccount::new(&codex_dir)),
-                        Arc::new(CopilotAccount::new(home, Arc::clone(locator))),
+        let agents = Arc::new(
+            AgentService::new(
+                AgentPorts {
+                    store: agent_store.clone(),
+                    locator: Arc::clone(locator),
+                    // Plan limits, context windows, models and efforts, as the CLIs
+                    // report them.
+                    usage: vec![
+                        Arc::new(ClaudeStatusLine::new(&dir.join("agents"), &claude_dir)),
+                        Arc::new(CodexRollouts::new(&codex_dir)),
+                        Arc::new(CopilotEvents::new(&copilot_home(home))),
                     ],
-                    PlanAccounts::Never => Vec::new(),
+                    // The same, asked of each account with the CLI's sign-in,
+                    // so it shows with no session running.
+                    accounts: match self.plan_accounts {
+                        PlanAccounts::Ask => vec![
+                            Arc::new(ClaudeAccount::new(
+                                &claude_dir,
+                                !profile.is_default()
+                                    || std::env::var_os("CLAUDE_CONFIG_DIR")
+                                        .is_some_and(|v| !v.is_empty()),
+                                Arc::clone(locator),
+                            )),
+                            Arc::new(CodexAccount::new(&codex_dir)),
+                            Arc::new(CopilotAccount::new(home, Arc::clone(locator))),
+                        ],
+                        PlanAccounts::Never => Vec::new(),
+                    },
+                    plans: agent_store,
+                    homes,
+                    models: Arc::new(CliModelCatalog::new(&codex_dir)),
                 },
-                plans: agent_store,
-                homes,
-            },
-            Arc::clone(&terminals),
-            Arc::clone(&workspace),
-        ));
+                Arc::clone(&terminals),
+                Arc::clone(&workspace),
+            )
+            .with_todo_reporter(self.kumod.clone()),
+        );
         // Agent CLIs typed by hand in the profile's terminals.
         agents.watch_terminals(Arc::new(OsProcesses));
         let agent_defs = Arc::new(
@@ -357,6 +366,7 @@ impl ProfileOpener {
             agents,
             agent_defs,
             tasks,
+            todos,
             pipelines,
             pulls,
             releases,

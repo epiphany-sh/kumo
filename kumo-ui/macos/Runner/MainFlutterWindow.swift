@@ -7,6 +7,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   private static let frameName = "KumoMainWindow"
 
   private let pasteboard = Pasteboard()
+  private let liquidGlass = LiquidGlass()
 
   // MARK: Dropping files
 
@@ -48,6 +49,9 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     (NSApp.delegate as? AppDelegate)?.appIcon.attach(
       messenger: flutterViewController.engine.binaryMessenger)
     pasteboard.attach(messenger: flutterViewController.engine.binaryMessenger)
+    liquidGlass.attach(
+      window: self, flutterView: flutterViewController.view,
+      messenger: flutterViewController.engine.binaryMessenger)
     // Files dragged from Finder land on the terminal under the pointer.
     self.registerForDraggedTypes([.fileURL])
 
@@ -75,6 +79,77 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       width: width,
       height: height
     )
+  }
+}
+
+/// The window's backdrop on macOS 26 and later: the system's Liquid Glass
+/// (`NSGlassEffectView`) instead of the NSVisualEffectView vibrancy that
+/// macos_window_utils puts at the root, which reads as a milky, nearly opaque
+/// sheet. The plugin's effect view stays (it holds the Flutter view) with an
+/// empty mask, so it no longer draws its material; the glass goes under the
+/// Flutter view. Older systems keep the vibrancy (`lib/platform/os/macos.dart`).
+final class LiquidGlass {
+  private var channel: FlutterMethodChannel?
+  private weak var window: NSWindow?
+  private weak var flutterView: NSView?
+  private var glass: NSView?
+
+  func attach(window: NSWindow, flutterView: NSView, messenger: FlutterBinaryMessenger) {
+    self.window = window
+    self.flutterView = flutterView
+    let channel = FlutterMethodChannel(name: "kumo/glass", binaryMessenger: messenger)
+    channel.setMethodCallHandler { [weak self] call, result in
+      switch call.method {
+      case "apply":
+        // True when the glass is up; false leaves the vibrancy as it is.
+        result(self?.apply() ?? false)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    self.channel = channel
+  }
+
+  private func apply() -> Bool {
+    guard #available(macOS 26.0, *) else { return false }
+    // The plugin's root view is the Flutter view's parent: it moves the view
+    // there in Window.initialize().
+    guard let window = window, let flutter = flutterView,
+      let root = flutter.superview as? NSVisualEffectView
+    else { return false }
+    if glass == nil {
+      let view = PassthroughGlassView(frame: root.bounds)
+      view.autoresizingMask = [.width, .height]
+      view.style = .regular
+      view.cornerRadius = LiquidGlass.cornerRadius(of: window)
+      root.addSubview(view, positioned: .below, relativeTo: flutter)
+      glass = view
+    }
+    // An empty mask: the effect view stops drawing its material, its
+    // subviews (the glass and Flutter) still draw.
+    root.maskImage = NSImage(size: NSSize(width: 1, height: 1))
+    window.isOpaque = false
+    window.backgroundColor = .clear
+    // A clear window lets clicks through where nothing opaque is drawn, and
+    // the glass is drawn by the window server, not by us: every click went
+    // to the app behind. Set explicitly, the whole window takes them.
+    window.ignoresMouseEvents = false
+    window.invalidateShadow()
+    return true
+  }
+
+  /// The glass only draws: a click on it would never reach Flutter.
+  @available(macOS 26.0, *)
+  private final class PassthroughGlassView: NSGlassEffectView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+  }
+
+  /// The window's own corner radius, so the glass doesn't stick out of its
+  /// rounded corners. AppKit has no public getter; 16 pt if it's not there.
+  private static func cornerRadius(of window: NSWindow) -> CGFloat {
+    let key = "_cornerRadius"
+    guard window.responds(to: NSSelectorFromString(key)) else { return 16 }
+    return (window.value(forKey: key) as? CGFloat) ?? 16
   }
 }
 

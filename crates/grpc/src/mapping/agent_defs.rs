@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use kumo_application::agent_defs::AgentDefCapabilities;
+use kumo_application::agent_defs::{AgentDefCapabilities, SkillFrom};
 use kumo_domain::agent_defs::{
     AgentDefFile, AgentDefScope, AgentDefSettings, AgentDefTrigger, PlayEvent, PlayEventKind,
     PlayRecord,
@@ -112,6 +112,23 @@ pub fn play_record_to(record: PlayRecord) -> pb::PlayRecord {
 pub fn capabilities_to(capabilities: AgentDefCapabilities) -> pb::AgentDefCapabilities {
     pb::AgentDefCapabilities {
         skills: capabilities.skills,
+        skill_list: capabilities
+            .skill_choices
+            .into_iter()
+            .map(|c| {
+                let (from, from_name) = match c.from {
+                    SkillFrom::Personal => (pb::AgentSkillFrom::Personal, String::new()),
+                    SkillFrom::Repo(name) => (pb::AgentSkillFrom::Repo, name),
+                    SkillFrom::Plugin(name) => (pb::AgentSkillFrom::Plugin, name),
+                };
+                pb::AgentSkill {
+                    name: c.name,
+                    description: c.description,
+                    from: from.into(),
+                    from_name,
+                }
+            })
+            .collect(),
         mcp_servers: capabilities.mcp_servers,
         triggers_supported: capabilities.triggers_supported,
     }

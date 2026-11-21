@@ -208,6 +208,9 @@ class WindowsOs extends HostOs {
   @override
   bool get windowButtonsInContent => false;
 
+  @override
+  bool get nativeTitleBar => true;
+
   /// `WM_SETICON` on the window (`flutter_window.cpp`); a button pinned to
   /// the taskbar may keep its shortcut's icon.
   @override

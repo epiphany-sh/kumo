@@ -13,6 +13,7 @@
 //! - [`pulls`]: pull requests of the workspace's repositories.
 //! - [`tasks`]: tasks from the user's tools, cached locally.
 //! - [`test_runs`]: a worktree's tests, run and read as they go.
+//! - [`todos`]: the user's own TODOs, handed to agents when they decide.
 //! - [`workspace`]: namespaces, git repositories and their worktrees.
 
 pub mod agent_defs;
@@ -28,4 +29,5 @@ pub mod tasks;
 pub mod terminal;
 pub mod test_runs;
 pub mod time;
+pub mod todos;
 pub mod workspace;

@@ -378,6 +378,7 @@ mod tests {
             },
             resolved: None,
             own_sign_in: false,
+            models: Vec::new(),
         }
     }
 

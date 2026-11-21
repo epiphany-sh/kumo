@@ -27,11 +27,18 @@ import 'kumo_engine.dart';
 ///
 /// An older daemon answers what it has: each feature turns off (the view
 /// keeps its "update kumod" notes) once a call comes back UNIMPLEMENTED.
+///
+/// [history] and [loadPullRequests] false leave those unread (the palette wants
+/// only the releases): no `git log` per branch, no second PR list.
+/// [loadHistory] reads main's history later, when it's needed after all.
 class EngineRepoActivity extends RepoActivitySource {
-  EngineRepoActivity(this._engine, this._workspace, this.repo, List<Worktree> worktrees, {PullRequestsSource? pullRequests})
+  EngineRepoActivity(this._engine, this._workspace, this.repo, List<Worktree> worktrees, {PullRequestsSource? pullRequests, bool history = true, bool loadPullRequests = true})
       : _worktrees = [...worktrees.where((w) => w.isMain), ...worktrees.where((w) => !w.isMain)],
         provider = CiProvider.ofHost(repo.host),
-        _pulls = pullRequests ?? EnginePullRequests(_engine) {
+        _pulls = pullRequests ?? EnginePullRequests(_engine),
+        _readsHistory = history,
+        _loading = history,
+        _prsLoading = loadPullRequests && CiProvider.ofHost(repo.host) != null {
     final provider = this.provider;
     if (provider != null) {
       for (final w in _worktrees) {
@@ -40,8 +47,8 @@ class EngineRepoActivity extends RepoActivitySource {
         _pipelines.add((w, source));
       }
     }
-    _load();
-    if (provider != null) _loadPrs();
+    if (history) _load();
+    if (provider != null && loadPullRequests) _loadPrs();
     _loadReleases();
   }
 
@@ -52,7 +59,7 @@ class EngineRepoActivity extends RepoActivitySource {
   List<RepoPullRequest> _prs = const [];
   CiProblem? _prsProblem;
   CiProblem? _releasesProblem;
-  bool _prsLoading = true;
+  bool _prsLoading;
 
   Future<void> _loadPrs({bool refresh = false}) async {
     PullRequestList answer;
@@ -327,7 +334,7 @@ class EngineRepoActivity extends RepoActivitySource {
   final List<(Worktree, PipelinesSource)> _pipelines = [];
   bool _disposed = false;
 
-  bool _loading = true;
+  bool _loading;
   String? _error;
   List<RepoCommit> _commits = const [];
   RepoBranches? _remote;
@@ -371,6 +378,30 @@ class EngineRepoActivity extends RepoActivitySource {
     _loading = false;
     notifyListeners();
   }
+
+  /// Main's history alone, for a source built with `history: false` (the
+  /// palette, when the worktree has no log to give). Once.
+  @override
+  Future<void> loadHistory() async {
+    if (_readsHistory || _historyAsked) return;
+    _historyAsked = true;
+    _loading = true;
+    notifyListeners();
+    try {
+      final commits = await _log(await _engine.connection(), _mainPath, 30);
+      if (_disposed) return;
+      _commits = commits;
+      _error = null;
+    } on Object catch (e) {
+      if (_disposed) return;
+      _error = _say(e);
+    }
+    _loading = false;
+    notifyListeners();
+  }
+
+  final bool _readsHistory;
+  bool _historyAsked = false;
 
   static Future<List<RepoCommit>> _log(EngineConnection conn, String path, int limit, {bool allBranches = false}) async {
     final log = await conn.git.log(pb.LogRequest(worktreePath: path, limit: limit, allBranches: allBranches));

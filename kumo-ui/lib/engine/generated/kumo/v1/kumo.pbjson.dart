@@ -203,6 +203,21 @@ final $typed_data.Uint8List agentDefTriggerDescriptor = $convert.base64Decode(
     'Cg9BZ2VudERlZlRyaWdnZXISIgoeQUdFTlRfREVGX1RSSUdHRVJfUFVMTF9SRVFVRVNUEAASHg'
     'oaQUdFTlRfREVGX1RSSUdHRVJfU0NIRURVTEUQAQ==');
 
+@$core.Deprecated('Use agentSkillFromDescriptor instead')
+const AgentSkillFrom$json = {
+  '1': 'AgentSkillFrom',
+  '2': [
+    {'1': 'AGENT_SKILL_FROM_PERSONAL', '2': 0},
+    {'1': 'AGENT_SKILL_FROM_REPO', '2': 1},
+    {'1': 'AGENT_SKILL_FROM_PLUGIN', '2': 2},
+  ],
+};
+
+/// Descriptor for `AgentSkillFrom`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List agentSkillFromDescriptor = $convert.base64Decode(
+    'Cg5BZ2VudFNraWxsRnJvbRIdChlBR0VOVF9TS0lMTF9GUk9NX1BFUlNPTkFMEAASGQoVQUdFTl'
+    'RfU0tJTExfRlJPTV9SRVBPEAESGwoXQUdFTlRfU0tJTExfRlJPTV9QTFVHSU4QAg==');
+
 @$core.Deprecated('Use taskSourceKindDescriptor instead')
 const TaskSourceKind$json = {
   '1': 'TaskSourceKind',
@@ -473,6 +488,27 @@ final $typed_data.Uint8List testRunStateDescriptor = $convert.base64Decode(
     'CgxUZXN0UnVuU3RhdGUSGgoWVEVTVF9SVU5fU1RBVEVfUlVOTklORxAAEhkKFVRFU1RfUlVOX1'
     'NUQVRFX1BBU1NFRBABEhkKFVRFU1RfUlVOX1NUQVRFX0ZBSUxFRBACEhoKFlRFU1RfUlVOX1NU'
     'QVRFX1NUT1BQRUQQAw==');
+
+@$core.Deprecated('Use todoStatusDescriptor instead')
+const TodoStatus$json = {
+  '1': 'TodoStatus',
+  '2': [
+    {'1': 'TODO_STATUS_OPEN', '2': 0},
+    {'1': 'TODO_STATUS_WORKING', '2': 1},
+    {'1': 'TODO_STATUS_TESTING', '2': 2},
+    {'1': 'TODO_STATUS_REVIEW', '2': 3},
+    {'1': 'TODO_STATUS_PUSHED', '2': 4},
+    {'1': 'TODO_STATUS_PR', '2': 5},
+    {'1': 'TODO_STATUS_MERGED', '2': 6},
+  ],
+};
+
+/// Descriptor for `TodoStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List todoStatusDescriptor = $convert.base64Decode(
+    'CgpUb2RvU3RhdHVzEhQKEFRPRE9fU1RBVFVTX09QRU4QABIXChNUT0RPX1NUQVRVU19XT1JLSU'
+    '5HEAESFwoTVE9ET19TVEFUVVNfVEVTVElORxACEhYKElRPRE9fU1RBVFVTX1JFVklFVxADEhYK'
+    'ElRPRE9fU1RBVFVTX1BVU0hFRBAEEhIKDlRPRE9fU1RBVFVTX1BSEAUSFgoSVE9ET19TVEFUVV'
+    'NfTUVSR0VEEAY=');
 
 @$core.Deprecated('Use helloRequestDescriptor instead')
 const HelloRequest$json = {
@@ -2246,6 +2282,17 @@ const AgentProvider$json = {
     {'1': 'usage_readable', '3': 14, '4': 1, '5': 8, '10': 'usageReadable'},
     {'1': 'read_usage', '3': 15, '4': 1, '5': 8, '10': 'readUsage'},
     {'1': 'own_sign_in', '3': 16, '4': 1, '5': 8, '10': 'ownSignIn'},
+    {
+      '1': 'models',
+      '3': 17,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.AgentModelChoice',
+      '10': 'models'
+    },
+    {'1': 'efforts', '3': 18, '4': 3, '5': 9, '10': 'efforts'},
+    {'1': 'no_effort_with', '3': 19, '4': 1, '5': 9, '10': 'noEffortWith'},
+    {'1': 'tunable', '3': 20, '4': 1, '5': 8, '10': 'tunable'},
   ],
 };
 
@@ -2259,7 +2306,25 @@ final $typed_data.Uint8List agentProviderDescriptor = $convert.base64Decode(
     'xfaGludBgLIAEoCVILaW5zdGFsbEhpbnQSMgoVdGFrZXNfcHJvbXB0X2FyZ3VtZW50GAwgASgI'
     'UhN0YWtlc1Byb21wdEFyZ3VtZW50EhsKCWhhc19sb2dpbhgNIAEoCFIIaGFzTG9naW4SJQoOdX'
     'NhZ2VfcmVhZGFibGUYDiABKAhSDXVzYWdlUmVhZGFibGUSHQoKcmVhZF91c2FnZRgPIAEoCFIJ'
-    'cmVhZFVzYWdlEh4KC293bl9zaWduX2luGBAgASgIUglvd25TaWduSW4=');
+    'cmVhZFVzYWdlEh4KC293bl9zaWduX2luGBAgASgIUglvd25TaWduSW4SMQoGbW9kZWxzGBEgAy'
+    'gLMhkua3Vtby52MS5BZ2VudE1vZGVsQ2hvaWNlUgZtb2RlbHMSGAoHZWZmb3J0cxgSIAMoCVIH'
+    'ZWZmb3J0cxIkCg5ub19lZmZvcnRfd2l0aBgTIAEoCVIMbm9FZmZvcnRXaXRoEhgKB3R1bmFibG'
+    'UYFCABKAhSB3R1bmFibGU=');
+
+@$core.Deprecated('Use agentModelChoiceDescriptor instead')
+const AgentModelChoice$json = {
+  '1': 'AgentModelChoice',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'efforts', '3': 3, '4': 3, '5': 9, '10': 'efforts'},
+  ],
+};
+
+/// Descriptor for `AgentModelChoice`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List agentModelChoiceDescriptor = $convert.base64Decode(
+    'ChBBZ2VudE1vZGVsQ2hvaWNlEg4KAmlkGAEgASgJUgJpZBISCgRuYW1lGAIgASgJUgRuYW1lEh'
+    'gKB2VmZm9ydHMYAyADKAlSB2VmZm9ydHM=');
 
 @$core.Deprecated('Use listProvidersRequestDescriptor instead')
 const ListProvidersRequest$json = {
@@ -2411,6 +2476,9 @@ const StartAgentRequest$json = {
       '6': '.kumo.v1.AgentContext',
       '10': 'context'
     },
+    {'1': 'model', '3': 8, '4': 1, '5': 9, '10': 'model'},
+    {'1': 'effort', '3': 9, '4': 1, '5': 9, '10': 'effort'},
+    {'1': 'todo_id', '3': 10, '4': 1, '5': 9, '10': 'todoId'},
   ],
 };
 
@@ -2420,7 +2488,8 @@ final $typed_data.Uint8List startAgentRequestDescriptor = $convert.base64Decode(
     '13b3JrdHJlZV9wYXRoGAIgASgJUgx3b3JrdHJlZVBhdGgSFgoGcHJvbXB0GAMgASgJUgZwcm9t'
     'cHQSFAoFdGl0bGUYBCABKAlSBXRpdGxlEhIKBGNvbHMYBSABKA1SBGNvbHMSEgoEcm93cxgGIA'
     'EoDVIEcm93cxIvCgdjb250ZXh0GAcgAygLMhUua3Vtby52MS5BZ2VudENvbnRleHRSB2NvbnRl'
-    'eHQ=');
+    'eHQSFAoFbW9kZWwYCCABKAlSBW1vZGVsEhYKBmVmZm9ydBgJIAEoCVIGZWZmb3J0EhcKB3RvZG'
+    '9faWQYCiABKAlSBnRvZG9JZA==');
 
 @$core.Deprecated('Use agentContextDescriptor instead')
 const AgentContext$json = {
@@ -3317,6 +3386,14 @@ const AgentDefCapabilities$json = {
       '5': 8,
       '10': 'triggersSupported'
     },
+    {
+      '1': 'skill_list',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.AgentSkill',
+      '10': 'skillList'
+    },
   ],
 };
 
@@ -3324,7 +3401,32 @@ const AgentDefCapabilities$json = {
 final $typed_data.Uint8List agentDefCapabilitiesDescriptor = $convert.base64Decode(
     'ChRBZ2VudERlZkNhcGFiaWxpdGllcxIWCgZza2lsbHMYASADKAlSBnNraWxscxIfCgttY3Bfc2'
     'VydmVycxgCIAMoCVIKbWNwU2VydmVycxItChJ0cmlnZ2Vyc19zdXBwb3J0ZWQYAyABKAhSEXRy'
-    'aWdnZXJzU3VwcG9ydGVk');
+    'aWdnZXJzU3VwcG9ydGVkEjIKCnNraWxsX2xpc3QYBCADKAsyEy5rdW1vLnYxLkFnZW50U2tpbG'
+    'xSCXNraWxsTGlzdA==');
+
+@$core.Deprecated('Use agentSkillDescriptor instead')
+const AgentSkill$json = {
+  '1': 'AgentSkill',
+  '2': [
+    {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'description', '3': 2, '4': 1, '5': 9, '10': 'description'},
+    {
+      '1': 'from',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.AgentSkillFrom',
+      '10': 'from'
+    },
+    {'1': 'from_name', '3': 4, '4': 1, '5': 9, '10': 'fromName'},
+  ],
+};
+
+/// Descriptor for `AgentSkill`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List agentSkillDescriptor = $convert.base64Decode(
+    'CgpBZ2VudFNraWxsEhIKBG5hbWUYASABKAlSBG5hbWUSIAoLZGVzY3JpcHRpb24YAiABKAlSC2'
+    'Rlc2NyaXB0aW9uEisKBGZyb20YAyABKA4yFy5rdW1vLnYxLkFnZW50U2tpbGxGcm9tUgRmcm9t'
+    'EhsKCWZyb21fbmFtZRgEIAEoCVIIZnJvbU5hbWU=');
 
 @$core.Deprecated('Use taskSourceDescriptor instead')
 const TaskSource$json = {
@@ -4712,6 +4814,62 @@ final $typed_data.Uint8List createPullRequestRequestDescriptor = $convert.base64
     'RyZWVQYXRoEhQKBXRpdGxlGAIgASgJUgV0aXRsZRISCgRib2R5GAMgASgJUgRib2R5EhIKBGJh'
     'c2UYBCABKAlSBGJhc2USFAoFZHJhZnQYBSABKAhSBWRyYWZ0');
 
+@$core.Deprecated('Use pullRequestStatesRequestDescriptor instead')
+const PullRequestStatesRequest$json = {
+  '1': 'PullRequestStatesRequest',
+  '2': [
+    {'1': 'repo_path', '3': 1, '4': 1, '5': 9, '10': 'repoPath'},
+    {'1': 'numbers', '3': 2, '4': 3, '5': 4, '10': 'numbers'},
+  ],
+};
+
+/// Descriptor for `PullRequestStatesRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pullRequestStatesRequestDescriptor =
+    $convert.base64Decode(
+        'ChhQdWxsUmVxdWVzdFN0YXRlc1JlcXVlc3QSGwoJcmVwb19wYXRoGAEgASgJUghyZXBvUGF0aB'
+        'IYCgdudW1iZXJzGAIgAygEUgdudW1iZXJz');
+
+@$core.Deprecated('Use pullRequestStatesDescriptor instead')
+const PullRequestStates$json = {
+  '1': 'PullRequestStates',
+  '2': [
+    {
+      '1': 'states',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.PullRequestStateOf',
+      '10': 'states'
+    },
+  ],
+};
+
+/// Descriptor for `PullRequestStates`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pullRequestStatesDescriptor = $convert.base64Decode(
+    'ChFQdWxsUmVxdWVzdFN0YXRlcxIzCgZzdGF0ZXMYASADKAsyGy5rdW1vLnYxLlB1bGxSZXF1ZX'
+    'N0U3RhdGVPZlIGc3RhdGVz');
+
+@$core.Deprecated('Use pullRequestStateOfDescriptor instead')
+const PullRequestStateOf$json = {
+  '1': 'PullRequestStateOf',
+  '2': [
+    {'1': 'number', '3': 1, '4': 1, '5': 4, '10': 'number'},
+    {
+      '1': 'state',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.PrState',
+      '10': 'state'
+    },
+  ],
+};
+
+/// Descriptor for `PullRequestStateOf`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pullRequestStateOfDescriptor = $convert.base64Decode(
+    'ChJQdWxsUmVxdWVzdFN0YXRlT2YSFgoGbnVtYmVyGAEgASgEUgZudW1iZXISJgoFc3RhdGUYAi'
+    'ABKA4yEC5rdW1vLnYxLlByU3RhdGVSBXN0YXRl');
+
 @$core.Deprecated('Use pullRequestThreadsRequestDescriptor instead')
 const PullRequestThreadsRequest$json = {
   '1': 'PullRequestThreadsRequest',
@@ -5329,3 +5487,217 @@ const StopTestsResponse$json = {
 /// Descriptor for `StopTestsResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List stopTestsResponseDescriptor =
     $convert.base64Decode('ChFTdG9wVGVzdHNSZXNwb25zZQ==');
+
+@$core.Deprecated('Use todoRunDescriptor instead')
+const TodoRun$json = {
+  '1': 'TodoRun',
+  '2': [
+    {'1': 'repo_path', '3': 1, '4': 1, '5': 9, '10': 'repoPath'},
+    {'1': 'worktree_path', '3': 2, '4': 1, '5': 9, '10': 'worktreePath'},
+    {'1': 'branch', '3': 3, '4': 1, '5': 9, '10': 'branch'},
+    {'1': 'base', '3': 4, '4': 1, '5': 9, '10': 'base'},
+    {'1': 'provider_id', '3': 5, '4': 1, '5': 9, '10': 'providerId'},
+    {'1': 'agent_name', '3': 6, '4': 1, '5': 9, '10': 'agentName'},
+    {'1': 'model', '3': 7, '4': 1, '5': 9, '10': 'model'},
+    {'1': 'effort', '3': 8, '4': 1, '5': 9, '10': 'effort'},
+    {'1': 'session_id', '3': 9, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'pr_number', '3': 10, '4': 1, '5': 4, '10': 'prNumber'},
+    {'1': 'pr_url', '3': 11, '4': 1, '5': 9, '10': 'prUrl'},
+  ],
+};
+
+/// Descriptor for `TodoRun`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List todoRunDescriptor = $convert.base64Decode(
+    'CgdUb2RvUnVuEhsKCXJlcG9fcGF0aBgBIAEoCVIIcmVwb1BhdGgSIwoNd29ya3RyZWVfcGF0aB'
+    'gCIAEoCVIMd29ya3RyZWVQYXRoEhYKBmJyYW5jaBgDIAEoCVIGYnJhbmNoEhIKBGJhc2UYBCAB'
+    'KAlSBGJhc2USHwoLcHJvdmlkZXJfaWQYBSABKAlSCnByb3ZpZGVySWQSHQoKYWdlbnRfbmFtZR'
+    'gGIAEoCVIJYWdlbnROYW1lEhQKBW1vZGVsGAcgASgJUgVtb2RlbBIWCgZlZmZvcnQYCCABKAlS'
+    'BmVmZm9ydBIdCgpzZXNzaW9uX2lkGAkgASgJUglzZXNzaW9uSWQSGwoJcHJfbnVtYmVyGAogAS'
+    'gEUghwck51bWJlchIVCgZwcl91cmwYCyABKAlSBXByVXJs');
+
+@$core.Deprecated('Use todoStepDescriptor instead')
+const TodoStep$json = {
+  '1': 'TodoStep',
+  '2': [
+    {
+      '1': 'status',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.TodoStatus',
+      '10': 'status'
+    },
+    {'1': 'by', '3': 2, '4': 1, '5': 9, '10': 'by'},
+    {'1': 'at_unix_ms', '3': 3, '4': 1, '5': 4, '10': 'atUnixMs'},
+    {'1': 'note', '3': 4, '4': 1, '5': 9, '10': 'note'},
+  ],
+};
+
+/// Descriptor for `TodoStep`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List todoStepDescriptor = $convert.base64Decode(
+    'CghUb2RvU3RlcBIrCgZzdGF0dXMYASABKA4yEy5rdW1vLnYxLlRvZG9TdGF0dXNSBnN0YXR1cx'
+    'IOCgJieRgCIAEoCVICYnkSHAoKYXRfdW5peF9tcxgDIAEoBFIIYXRVbml4TXMSEgoEbm90ZRgE'
+    'IAEoCVIEbm90ZQ==');
+
+@$core.Deprecated('Use todoDescriptor instead')
+const Todo$json = {
+  '1': 'Todo',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'title', '3': 2, '4': 1, '5': 9, '10': 'title'},
+    {'1': 'notes', '3': 3, '4': 1, '5': 9, '10': 'notes'},
+    {'1': 'repo_path', '3': 4, '4': 1, '5': 9, '10': 'repoPath'},
+    {'1': 'done', '3': 5, '4': 1, '5': 8, '10': 'done'},
+    {'1': 'created_unix_ms', '3': 6, '4': 1, '5': 4, '10': 'createdUnixMs'},
+    {
+      '1': 'status',
+      '3': 7,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.TodoStatus',
+      '10': 'status'
+    },
+    {'1': 'run', '3': 8, '4': 1, '5': 11, '6': '.kumo.v1.TodoRun', '10': 'run'},
+    {
+      '1': 'steps',
+      '3': 9,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.TodoStep',
+      '10': 'steps'
+    },
+  ],
+};
+
+/// Descriptor for `Todo`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List todoDescriptor = $convert.base64Decode(
+    'CgRUb2RvEg4KAmlkGAEgASgJUgJpZBIUCgV0aXRsZRgCIAEoCVIFdGl0bGUSFAoFbm90ZXMYAy'
+    'ABKAlSBW5vdGVzEhsKCXJlcG9fcGF0aBgEIAEoCVIIcmVwb1BhdGgSEgoEZG9uZRgFIAEoCFIE'
+    'ZG9uZRImCg9jcmVhdGVkX3VuaXhfbXMYBiABKARSDWNyZWF0ZWRVbml4TXMSKwoGc3RhdHVzGA'
+    'cgASgOMhMua3Vtby52MS5Ub2RvU3RhdHVzUgZzdGF0dXMSIgoDcnVuGAggASgLMhAua3Vtby52'
+    'MS5Ub2RvUnVuUgNydW4SJwoFc3RlcHMYCSADKAsyES5rdW1vLnYxLlRvZG9TdGVwUgVzdGVwcw'
+    '==');
+
+@$core.Deprecated('Use todoListDescriptor instead')
+const TodoList$json = {
+  '1': 'TodoList',
+  '2': [
+    {
+      '1': 'todos',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.Todo',
+      '10': 'todos'
+    },
+  ],
+};
+
+/// Descriptor for `TodoList`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List todoListDescriptor = $convert.base64Decode(
+    'CghUb2RvTGlzdBIjCgV0b2RvcxgBIAMoCzINLmt1bW8udjEuVG9kb1IFdG9kb3M=');
+
+@$core.Deprecated('Use watchTodosRequestDescriptor instead')
+const WatchTodosRequest$json = {
+  '1': 'WatchTodosRequest',
+};
+
+/// Descriptor for `WatchTodosRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List watchTodosRequestDescriptor =
+    $convert.base64Decode('ChFXYXRjaFRvZG9zUmVxdWVzdA==');
+
+@$core.Deprecated('Use addTodoRequestDescriptor instead')
+const AddTodoRequest$json = {
+  '1': 'AddTodoRequest',
+  '2': [
+    {'1': 'title', '3': 1, '4': 1, '5': 9, '10': 'title'},
+    {'1': 'notes', '3': 2, '4': 1, '5': 9, '10': 'notes'},
+    {'1': 'repo_path', '3': 3, '4': 1, '5': 9, '10': 'repoPath'},
+  ],
+};
+
+/// Descriptor for `AddTodoRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List addTodoRequestDescriptor = $convert.base64Decode(
+    'Cg5BZGRUb2RvUmVxdWVzdBIUCgV0aXRsZRgBIAEoCVIFdGl0bGUSFAoFbm90ZXMYAiABKAlSBW'
+    '5vdGVzEhsKCXJlcG9fcGF0aBgDIAEoCVIIcmVwb1BhdGg=');
+
+@$core.Deprecated('Use updateTodoRequestDescriptor instead')
+const UpdateTodoRequest$json = {
+  '1': 'UpdateTodoRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'title', '3': 2, '4': 1, '5': 9, '10': 'title'},
+    {'1': 'notes', '3': 3, '4': 1, '5': 9, '10': 'notes'},
+    {'1': 'repo_path', '3': 4, '4': 1, '5': 9, '10': 'repoPath'},
+    {'1': 'done', '3': 5, '4': 1, '5': 8, '10': 'done'},
+  ],
+};
+
+/// Descriptor for `UpdateTodoRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List updateTodoRequestDescriptor = $convert.base64Decode(
+    'ChFVcGRhdGVUb2RvUmVxdWVzdBIOCgJpZBgBIAEoCVICaWQSFAoFdGl0bGUYAiABKAlSBXRpdG'
+    'xlEhQKBW5vdGVzGAMgASgJUgVub3RlcxIbCglyZXBvX3BhdGgYBCABKAlSCHJlcG9QYXRoEhIK'
+    'BGRvbmUYBSABKAhSBGRvbmU=');
+
+@$core.Deprecated('Use deleteTodoRequestDescriptor instead')
+const DeleteTodoRequest$json = {
+  '1': 'DeleteTodoRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+  ],
+};
+
+/// Descriptor for `DeleteTodoRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteTodoRequestDescriptor =
+    $convert.base64Decode('ChFEZWxldGVUb2RvUmVxdWVzdBIOCgJpZBgBIAEoCVICaWQ=');
+
+@$core.Deprecated('Use deleteTodoResponseDescriptor instead')
+const DeleteTodoResponse$json = {
+  '1': 'DeleteTodoResponse',
+};
+
+/// Descriptor for `DeleteTodoResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List deleteTodoResponseDescriptor =
+    $convert.base64Decode('ChJEZWxldGVUb2RvUmVzcG9uc2U=');
+
+@$core.Deprecated('Use attachTodoRequestDescriptor instead')
+const AttachTodoRequest$json = {
+  '1': 'AttachTodoRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'run', '3': 2, '4': 1, '5': 11, '6': '.kumo.v1.TodoRun', '10': 'run'},
+  ],
+};
+
+/// Descriptor for `AttachTodoRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List attachTodoRequestDescriptor = $convert.base64Decode(
+    'ChFBdHRhY2hUb2RvUmVxdWVzdBIOCgJpZBgBIAEoCVICaWQSIgoDcnVuGAIgASgLMhAua3Vtby'
+    '52MS5Ub2RvUnVuUgNydW4=');
+
+@$core.Deprecated('Use setTodoStatusRequestDescriptor instead')
+const SetTodoStatusRequest$json = {
+  '1': 'SetTodoStatusRequest',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {
+      '1': 'status',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.TodoStatus',
+      '10': 'status'
+    },
+    {'1': 'by', '3': 3, '4': 1, '5': 9, '10': 'by'},
+    {'1': 'note', '3': 4, '4': 1, '5': 9, '10': 'note'},
+    {'1': 'pr_number', '3': 5, '4': 1, '5': 4, '10': 'prNumber'},
+    {'1': 'pr_url', '3': 6, '4': 1, '5': 9, '10': 'prUrl'},
+    {'1': 'clear_run', '3': 7, '4': 1, '5': 8, '10': 'clearRun'},
+  ],
+};
+
+/// Descriptor for `SetTodoStatusRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List setTodoStatusRequestDescriptor = $convert.base64Decode(
+    'ChRTZXRUb2RvU3RhdHVzUmVxdWVzdBIOCgJpZBgBIAEoCVICaWQSKwoGc3RhdHVzGAIgASgOMh'
+    'Mua3Vtby52MS5Ub2RvU3RhdHVzUgZzdGF0dXMSDgoCYnkYAyABKAlSAmJ5EhIKBG5vdGUYBCAB'
+    'KAlSBG5vdGUSGwoJcHJfbnVtYmVyGAUgASgEUghwck51bWJlchIVCgZwcl91cmwYBiABKAlSBX'
+    'ByVXJsEhsKCWNsZWFyX3J1bhgHIAEoCFIIY2xlYXJSdW4=');

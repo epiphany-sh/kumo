@@ -12,6 +12,7 @@ mod releases;
 mod tasks;
 mod terminal;
 mod tests;
+mod todos;
 mod usage;
 mod workspace;
 
@@ -27,7 +28,9 @@ pub use error::{
 };
 pub use pipelines::{ci_problem_to, host_info_to, pipelines_snapshot_to};
 pub use profiles::{gh_account_from, gh_account_to, profile_list_to, profile_to, ssh_key_to};
-pub use pulls::{branch_pull_request_to, pull_request_list_to, pull_request_to, review_thread_to};
+pub use pulls::{
+    branch_pull_request_to, pr_state_to, pull_request_list_to, pull_request_to, review_thread_to,
+};
 pub use releases::{release_list_to, release_range_to, release_to};
 pub use tasks::{
     detected_to, source_options_from, source_to, task_detail_to, task_link_to, task_status_from,
@@ -38,5 +41,8 @@ pub use terminal::{
     terminals_activity_to,
 };
 pub use tests::{test_run_to, tests_snapshot_to, tests_status_from};
+pub use todos::{
+    todo_list_to, todo_run_from, todo_status_from, todo_status_to, todo_to, todos_status_from,
+};
 pub use usage::usage_report_to;
 pub use workspace::{candidate_to, snapshot_to, worktree_to};

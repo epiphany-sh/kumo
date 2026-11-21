@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/editor/code_editor.dart';
@@ -124,6 +126,70 @@ void main() {
       final r = rankFiles('', files, recent: ['cmd/server/main.go', 'gone.txt']);
       expect(r.first.$1, 'cmd/server/main.go');
       expect(r, hasLength(files.length), reason: 'files that are gone are left out');
+    });
+  });
+
+  group('ranking as the query is typed', () {
+    // Paths with shared letters, so short queries match many and longer
+    // ones narrow them.
+    final random = Random(7);
+    const parts = ['src', 'lib', 'internal', 'discount', 'handler', 'repo', 'report', 'go', 'main', 'fileView', 'bulk_api', 'x-y', 'README'];
+    final files = {
+      for (var i = 0; i < 600; i++) [for (var k = 0; k < 1 + random.nextInt(4); k++) parts[random.nextInt(parts.length)]].join('/') + (random.nextBool() ? '.go' : '.dart'),
+    }.toList();
+
+    /// The ranking as it was: every path scored, all of them sorted.
+    List<(String, List<int>)> reference(String q, int limit) {
+      final scored = <(int, String, List<int>)>[];
+      for (final f in files) {
+        final m = fuzzyMatch(q, f);
+        if (m != null) scored.add((m.$1, f, m.$2));
+      }
+      scored.sort((a, b) {
+        final c = b.$1.compareTo(a.$1);
+        if (c != 0) return c;
+        final l = a.$2.length.compareTo(b.$2.length);
+        return l != 0 ? l : a.$2.compareTo(b.$2);
+      });
+      return [for (final s in scored.take(limit)) (s.$2, s.$3)];
+    }
+
+    test('typing, erasing and pasting rank as a full sort does', () {
+      const letters = 'srcdiagohlnmepbtuvRE/ _.';
+      final index = FileIndex(files);
+      var q = '';
+      for (var step = 0; step < 400; step++) {
+        final r = random.nextInt(10);
+        if (r < 6) {
+          q += letters[random.nextInt(letters.length)];
+        } else if (r < 8 && q.isNotEmpty) {
+          q = q.substring(0, q.length - 1);
+        } else if (r < 9) {
+          q = parts[random.nextInt(parts.length)].substring(0, 2);
+        } else {
+          q = '';
+        }
+        final found = index.rank(q, limit: 25);
+        if (q.trim().isEmpty) continue;
+        expect([for (final (f, at) in found.top) '$f $at'], [for (final (f, at) in reference(q, 25)) '$f $at'], reason: 'query "$q"');
+        expect(found.total, reference(q, files.length).length, reason: 'query "$q"');
+      }
+    });
+
+    test('keeps the best few, best first', () {
+      final best = TopK<int>(3, (a, b) => b.compareTo(a));
+      for (final n in [5, 1, 9, 7, 3, 9, 2, 8]) {
+        best.add(n);
+      }
+      expect(best.sorted(), [9, 9, 8]);
+    });
+
+    test('marks runs of matched letters, not each letter', () {
+      const plain = TextStyle(), strong = TextStyle(fontWeight: FontWeight.w700);
+      final spans = markedSpans('repository.go', {0, 1, 2, 11, 12}, plain, strong);
+      expect([for (final s in spans) s.text], ['rep', 'ository.', 'go']);
+      expect([for (final s in spans) s.style], [strong, plain, strong]);
+      expect([for (final s in markedSpans('ab/cd', {3}, plain, strong, offset: 3, from: 0)) s.text], ['a', 'b/cd']);
     });
   });
 }

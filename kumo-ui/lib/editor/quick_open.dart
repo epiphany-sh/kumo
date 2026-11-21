@@ -18,10 +18,21 @@ import '../widgets/kicons.dart';
 /// most, so `repgo` finds `repository.go` before `report/go.mod`. Spaces
 /// in the query are ignored; case too.
 (int, List<int>)? fuzzyMatch(String query, String path) {
-  final q = query.toLowerCase().replaceAll(' ', '');
+  final q = fuzzyQuery(query);
   if (q.isEmpty) return (0, const []);
-  final p = path.toLowerCase();
-  final base = path.lastIndexOf('/') + 1;
+  return _match(q, path, path.toLowerCase(), path.lastIndexOf('/') + 1);
+}
+
+/// [query] as [fuzzyMatch] compares it: lower case, no spaces. Done once
+/// per query, not once per path.
+String fuzzyQuery(String query) => query.toLowerCase().replaceAll(' ', '');
+
+/// [fuzzyMatch] for a query already through [fuzzyQuery] (not empty), on
+/// [path] with its lower case [p] and where its name starts, [base].
+(int, List<int>)? _match(String q, String path, String p, int base) {
+  // Every candidate below needs the letters in order from the start: the
+  // weakest condition, checked first without building anything.
+  if (!_inOrder(p, q)) return null;
   (int, List<int>)? best;
   void consider(List<int>? at) {
     if (at == null) return;
@@ -40,6 +51,21 @@ import '../widgets/kicons.dart';
   return best;
 }
 
+/// Whether [q]'s letters all show in [p], in order.
+bool _inOrder(String p, String q) {
+  var i = 0;
+  final n = p.length;
+  for (var k = 0; k < q.length; k++) {
+    final ch = q.codeUnitAt(k);
+    while (i < n && p.codeUnitAt(i) != ch) {
+      i++;
+    }
+    if (i == n) return false;
+    i++;
+  }
+  return true;
+}
+
 List<int>? _subsequence(String p, String q, int from) {
   final at = <int>[];
   var i = from;
@@ -55,11 +81,26 @@ List<int>? _subsequence(String p, String q, int from) {
 
 bool _boundary(String path, int i) {
   if (i == 0) return true;
-  final prev = path[i - 1];
-  if ('/_-. '.contains(prev)) return true;
+  final prev = path.codeUnitAt(i - 1);
+  // '/', '_', '-', '.', ' '
+  if (prev == 0x2F || prev == 0x5F || prev == 0x2D || prev == 0x2E || prev == 0x20) return true;
   // camelCase: a capital after a small letter.
-  final ch = path[i];
-  return ch.toUpperCase() == ch && ch.toLowerCase() != ch && prev.toLowerCase() == prev && prev.toUpperCase() != prev;
+  return _isUpper(path, i) && _isLower(path, i - 1);
+}
+
+/// ASCII by its code; anything else as the string compares it.
+bool _isUpper(String s, int i) {
+  final c = s.codeUnitAt(i);
+  if (c < 0x80) return c >= 0x41 && c <= 0x5A;
+  final ch = s[i];
+  return ch.toUpperCase() == ch && ch.toLowerCase() != ch;
+}
+
+bool _isLower(String s, int i) {
+  final c = s.codeUnitAt(i);
+  if (c < 0x80) return c >= 0x61 && c <= 0x7A;
+  final ch = s[i];
+  return ch.toLowerCase() == ch && ch.toUpperCase() != ch;
 }
 
 int _score(String path, List<int> at, int base) {
@@ -77,34 +118,170 @@ int _score(String path, List<int> at, int base) {
   return s - path.length ~/ 6 - (at.first ~/ 8);
 }
 
+/// [text] (from [from] up to [to]) as spans: the letters at [hits] (each
+/// less [offset]) in [strong], the rest in [style]; one span per run of
+/// either, not per letter.
+List<TextSpan> markedSpans(String text, Set<int> hits, TextStyle style, TextStyle strong, {int from = 0, int? to, int offset = 0}) {
+  final end = to ?? text.length;
+  final spans = <TextSpan>[];
+  var start = from;
+  while (start < end) {
+    final on = hits.contains(start + offset);
+    var k = start + 1;
+    while (k < end && hits.contains(k + offset) == on) {
+      k++;
+    }
+    spans.add(TextSpan(text: text.substring(start, k), style: on ? strong : style));
+    start = k;
+  }
+  return spans;
+}
+
 /// [files] ranked for [query], best first, at most [limit]; with no query,
 /// [recent] (the files open, latest first) then the rest by path.
-List<(String, List<int>)> rankFiles(String query, List<String> files, {List<String> recent = const [], int limit = 80}) {
-  if (query.trim().isEmpty) {
-    final set = files.toSet();
-    final first = [
-      for (final r in recent)
-        if (set.contains(r)) r
-    ];
-    final firstSet = first.toSet();
-    return [
-      for (final f in first) (f, const <int>[]),
-      for (final f in files)
-        if (!firstSet.contains(f)) (f, const <int>[]),
-    ].take(limit).toList();
+List<(String, List<int>)> rankFiles(String query, List<String> files, {List<String> recent = const [], int limit = 80}) => FileIndex(files).rank(query, recent: recent, limit: limit).top;
+
+/// What [FileIndex.rank] found: the best [top], and how many matched in all.
+typedef FileMatches = ({List<(String, List<int>)> top, int total});
+
+/// [files] made ready to rank as the query is typed: each path's lower case
+/// and name kept, and the paths the last query matched, so a query that
+/// only adds letters looks at those alone (a path that misses `ab` misses
+/// `abc` too). Same order as [fuzzyMatch] and a full sort give.
+class FileIndex {
+  FileIndex(this.files)
+      : _lower = [for (final f in files) f.toLowerCase()],
+        _base = [for (final f in files) f.lastIndexOf('/') + 1];
+
+  final List<String> files;
+  final List<String> _lower;
+  final List<int> _base;
+  Set<String>? _set;
+
+  /// The last query (through [fuzzyQuery]) and the paths it matched.
+  String? _lastQ;
+  List<int> _lastHits = const [];
+  int _lastLimit = -1;
+  FileMatches? _last;
+
+  /// Whether [other] holds the same paths, so this index still serves it.
+  bool serves(List<String> other) {
+    if (identical(other, files)) return true;
+    if (other.length != files.length) return false;
+    for (var i = 0; i < files.length; i++) {
+      final a = other[i], b = files[i];
+      if (!identical(a, b) && a != b) return false;
+    }
+    return true;
   }
-  final scored = <(int, String, List<int>)>[];
-  for (final f in files) {
-    final m = fuzzyMatch(query, f);
-    if (m != null) scored.add((m.$1, f, m.$2));
+
+  FileMatches rank(String query, {List<String> recent = const [], int limit = 80}) {
+    final q = query.trim().isEmpty ? '' : fuzzyQuery(query);
+    if (q.isEmpty) {
+      _lastQ = null;
+      final set = _set ??= files.toSet();
+      final first = <String>[];
+      final firstSet = <String>{};
+      for (final r in recent) {
+        if (set.contains(r) && firstSet.add(r)) first.add(r);
+      }
+      final top = <(String, List<int>)>[for (final f in first.take(limit)) (f, const <int>[])];
+      for (final f in files) {
+        if (top.length >= limit) break;
+        if (!firstSet.contains(f)) top.add((f, const <int>[]));
+      }
+      return (top: top, total: files.length);
+    }
+    if (q == _lastQ && limit == _lastLimit) return _last!;
+
+    final prev = _lastQ;
+    final narrow = prev != null && q.startsWith(prev);
+    final hits = <int>[];
+    final best = TopK<(int, int, List<int>)>(limit, _better);
+    void look(int i) {
+      final m = _match(q, files[i], _lower[i], _base[i]);
+      if (m == null) return;
+      hits.add(i);
+      best.add((m.$1, i, m.$2));
+    }
+
+    if (narrow) {
+      for (final i in _lastHits) {
+        look(i);
+      }
+    } else {
+      for (var i = 0; i < files.length; i++) {
+        look(i);
+      }
+    }
+    _lastQ = q;
+    _lastHits = hits;
+    _lastLimit = limit;
+    return _last = (top: [for (final (_, i, at) in best.sorted()) (files[i], at)], total: hits.length);
   }
-  scored.sort((a, b) {
+
+  /// Higher score first, then the shorter path, then by path.
+  int _better((int, int, List<int>) a, (int, int, List<int>) b) {
     final c = b.$1.compareTo(a.$1);
     if (c != 0) return c;
-    final l = a.$2.length.compareTo(b.$2.length);
-    return l != 0 ? l : a.$2.compareTo(b.$2);
-  });
-  return [for (final s in scored.take(limit)) (s.$2, s.$3)];
+    final pa = files[a.$2], pb = files[b.$2];
+    final l = pa.length.compareTo(pb.length);
+    return l != 0 ? l : pa.compareTo(pb);
+  }
+}
+
+/// The [k] best of what's [add]ed, by [compare] (negative: the first is
+/// better), without sorting all of it: a heap with the worst kept on top.
+class TopK<E> {
+  TopK(this.k, this.compare);
+  final int k;
+  final int Function(E a, E b) compare;
+  final List<E> _heap = [];
+
+  void add(E e) {
+    if (k <= 0) return;
+    if (_heap.length < k) {
+      _heap.add(e);
+      _up(_heap.length - 1);
+    } else if (compare(e, _heap[0]) < 0) {
+      _heap[0] = e;
+      _down(0);
+    }
+  }
+
+  /// Best first.
+  List<E> sorted() => [..._heap]..sort(compare);
+
+  // The root is the worst: a parent is never better than its children.
+  bool _worse(int i, int j) => compare(_heap[i], _heap[j]) > 0;
+
+  void _up(int i) {
+    while (i > 0) {
+      final parent = (i - 1) >> 1;
+      if (!_worse(i, parent)) return;
+      _swap(i, parent);
+      i = parent;
+    }
+  }
+
+  void _down(int i) {
+    final n = _heap.length;
+    while (true) {
+      final l = 2 * i + 1, r = l + 1;
+      var w = i;
+      if (l < n && _worse(l, w)) w = l;
+      if (r < n && _worse(r, w)) w = r;
+      if (w == i) return;
+      _swap(i, w);
+      i = w;
+    }
+  }
+
+  void _swap(int i, int j) {
+    final t = _heap[i];
+    _heap[i] = _heap[j];
+    _heap[j] = t;
+  }
 }
 
 // ---- Palette ----
@@ -112,10 +289,20 @@ List<(String, List<int>)> rankFiles(String query, List<String> files, {List<Stri
 /// ⌘P: picks a file of the worktree; it opens in the full editor when that
 /// is showing, else in the Terminal view's Files tab.
 Future<void> goToFile(BuildContext context, AppState s) async {
+  final path = await showQuickOpen(context, files: s.visibleFiles, recent: recentFiles(s), statusOf: s.changes.statusOf);
+  if (path != null) openWorktreeFile(s, path);
+}
+
+/// The files open in the current worktree, latest first: what an empty
+/// query lists first.
+List<String> recentFiles(AppState s) {
   final current = s.contextFile;
-  final recent = [if (current != null) current, ...s.contextFiles.reversed.where((f) => f != current)];
-  final path = await showQuickOpen(context, files: s.visibleFiles, recent: recent, statusOf: s.changes.statusOf);
-  if (path == null) return;
+  return [if (current != null) current, ...s.contextFiles.reversed.where((f) => f != current)];
+}
+
+/// Opens [path] of the current worktree in the full editor when that is
+/// showing, else in the Terminal view's Files tab.
+void openWorktreeFile(AppState s, String path) {
   if (s.view == KumoView.files) {
     s.editFile(path);
   } else {
@@ -164,7 +351,9 @@ class _QuickOpenState extends State<QuickOpen> {
   static const _rowH = 36.0;
   final _query = TextEditingController();
   final _scroll = ScrollController();
+  late FileIndex _index = FileIndex(widget.files);
   List<(String, List<int>)> _results = const [];
+  int _total = 0;
   int _selected = 0;
 
   @override
@@ -185,7 +374,12 @@ class _QuickOpenState extends State<QuickOpen> {
     super.dispose();
   }
 
-  void _rank() => _results = rankFiles(_query.text, widget.files, recent: widget.recent);
+  void _rank() {
+    if (!_index.serves(widget.files)) _index = FileIndex(widget.files);
+    final found = _index.rank(_query.text, recent: widget.recent);
+    _results = found.top;
+    _total = found.total;
+  }
 
   void _move(int delta) {
     if (_results.isEmpty) return;
@@ -243,7 +437,7 @@ class _QuickOpenState extends State<QuickOpen> {
                   decoration: InputDecoration.collapsed(hintText: 'Go to file…', hintStyle: sans(14.5, color: c.text3)),
                 ),
               ),
-              Text('${_results.length == 80 ? '80+' : _results.length} ${_results.length == 1 ? 'file' : 'files'}', style: sans(11.5, color: c.text3)),
+              Text('$_total ${_total == 1 ? 'file' : 'files'}', style: sans(11.5, color: c.text3)),
             ]),
           ),
           Container(height: 1, color: c.divider, margin: const EdgeInsets.symmetric(horizontal: 6)),
@@ -283,9 +477,7 @@ class _QuickOpenState extends State<QuickOpen> {
     final status = widget.statusOf?.call(path);
     final on = i == _selected;
     final hit = at.toSet();
-    List<TextSpan> marked(String text, int offset, TextStyle style, TextStyle strong) => [
-          for (var k = 0; k < text.length; k++) TextSpan(text: text[k], style: hit.contains(offset + k) ? strong : style),
-        ];
+    List<TextSpan> marked(String text, int offset, TextStyle style, TextStyle strong) => markedSpans(text, hit, style, strong, offset: offset);
     final nameStyle = sans(13, weight: FontWeight.w500, color: c.text);
     final dirStyle = sans(12, color: c.text3);
     return MouseRegion(

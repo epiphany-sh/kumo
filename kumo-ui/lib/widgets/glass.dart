@@ -45,10 +45,10 @@ class GlassPanel extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [top, base, base],
-          stops: const [0.0, 0.08, 1.0],
+          stops: const [0.0, 0.55, 1.0],
         ),
       ),
-      child: content,
+      child: CustomPaint(foregroundPainter: GlassRimPainter(radius: radius, top: c.rimTop, bottom: c.rimBottom), child: content),
     );
   }
 }
@@ -83,8 +83,8 @@ BoxDecoration chipDecoration(KumoPalette c, {double radius = 18, bool selected =
     gradient: LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: [Color.alphaBlend(c.chipSheen, base), base],
-      stops: const [0.0, 0.35],
+      colors: [Color.alphaBlend(c.chipSheen, base), base, base],
+      stops: const [0.0, 0.45, 1.0],
     ),
     boxShadow: c.isDark
         ? const [BoxShadow(color: Color(0x2E000000), blurRadius: 14, offset: Offset(0, 4))]
@@ -118,11 +118,12 @@ class GlassOverlay extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [Color.alphaBlend(c.panelSheen, fill), fill],
-          stops: const [0.0, 0.12],
+          stops: const [0.0, 0.4],
         ),
       ),
       child: child,
     );
+    final rimmed = CustomPaint(foregroundPainter: GlassRimPainter(radius: radius, top: c.rimTop, bottom: c.rimBottom), child: surface);
     return Container(
       width: width,
       decoration: BoxDecoration(
@@ -133,7 +134,60 @@ class GlassOverlay extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: r,
-        child: blur ? BackdropFilter(filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24), child: surface) : surface,
+        child: blur ? BackdropFilter(filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24), child: rimmed) : rimmed,
+      ),
+    );
+  }
+}
+
+/// The specular rim of a glass edge: a 1 px line just inside the border,
+/// bright along the top, gone through the middle and faint along the bottom,
+/// as light catches the edges of a pane. One stroke, no blur.
+class GlassRimPainter extends CustomPainter {
+  const GlassRimPainter({required this.radius, required this.top, required this.bottom});
+
+  final double radius;
+  final Color top;
+  final Color bottom;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(rect.deflate(1.5), Radius.circular((radius - 1.5).clamp(0, radius)));
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [top, top.withAlpha(0), bottom.withAlpha(0), bottom],
+        stops: const [0.0, 0.22, 0.78, 1.0],
+      ).createShader(rect);
+    canvas.drawRRect(rrect, paint);
+  }
+
+  @override
+  bool shouldRepaint(GlassRimPainter old) => old.radius != radius || old.top != top || old.bottom != bottom;
+}
+
+/// The window's own glass: its tint, with light coming in from the top-left.
+class WindowGlass extends StatelessWidget {
+  const WindowGlass({super.key, required this.palette});
+
+  final KumoPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = palette.window;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: const Alignment(-0.6, -1.0),
+          end: const Alignment(0.6, 1.0),
+          colors: [Color.alphaBlend(palette.windowSheen, w), w],
+          stops: const [0.0, 0.4],
+        ),
       ),
     );
   }
@@ -152,16 +206,16 @@ class DemoWallpaper extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(color: palette.wallpaperBase),
       child: Stack(fit: StackFit.expand, children: [
-        _blob(const Alignment(-0.95, -1.0), b[0]),
-        _blob(const Alignment(1.0, -0.85), b[1]),
-        _blob(const Alignment(0.3, 1.1), b[2]),
+        for (var i = 0; i < b.length && i < _at.length; i++) _blob(_at[i], b[i], i == 3 ? 0.6 : 0.95),
       ]),
     );
   }
 
-  Widget _blob(Alignment at, Color color) => DecoratedBox(
+  static const _at = [Alignment(-0.95, -1.0), Alignment(1.0, -0.85), Alignment(0.3, 1.1), Alignment(-0.38, 0.22)];
+
+  Widget _blob(Alignment at, Color color, double radius) => DecoratedBox(
         decoration: BoxDecoration(
-          gradient: RadialGradient(center: at, radius: 0.95, colors: [color, color.withAlpha(0)]),
+          gradient: RadialGradient(center: at, radius: radius, colors: [color, color.withAlpha(0)]),
         ),
       );
 }

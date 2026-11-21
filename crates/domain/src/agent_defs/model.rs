@@ -95,6 +95,15 @@ pub struct FoundFile {
     pub modified_unix_ms: i64,
 }
 
+/// A skill found in a skills folder: its folder's name and what its
+/// `SKILL.md` says it's for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoundSkill {
+    pub name: String,
+    /// One line; empty when its `SKILL.md` has none.
+    pub description: String,
+}
+
 /// Refuses anything Claude Code wouldn't take as a name (and so anything
 /// that could leave the folder: `..`, `/`).
 pub fn check_agent_name(name: &str) -> Result<(), AgentError> {

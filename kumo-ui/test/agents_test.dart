@@ -49,7 +49,7 @@ class _FakeAgents extends AgentsSource {
   @override
   Future<String?> login(String id) async => null;
   @override
-  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = '', List<AgentContextItem> context = const []}) async => null;
+  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = '', List<AgentContextItem> context = const [], String model = '', String effort = '', String todoId = ''}) async => null;
   @override
   Future<bool> addContext(String id, AgentContextItem item, {String text = ''}) async => false;
   @override
