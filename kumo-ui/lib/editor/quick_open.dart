@@ -112,10 +112,20 @@ List<(String, List<int>)> rankFiles(String query, List<String> files, {List<Stri
 /// ⌘P: picks a file of the worktree; it opens in the full editor when that
 /// is showing, else in the Terminal view's Files tab.
 Future<void> goToFile(BuildContext context, AppState s) async {
+  final path = await showQuickOpen(context, files: s.visibleFiles, recent: recentFiles(s), statusOf: s.changes.statusOf);
+  if (path != null) openWorktreeFile(s, path);
+}
+
+/// The files open in the current worktree, latest first: what an empty
+/// query lists first.
+List<String> recentFiles(AppState s) {
   final current = s.contextFile;
-  final recent = [if (current != null) current, ...s.contextFiles.reversed.where((f) => f != current)];
-  final path = await showQuickOpen(context, files: s.visibleFiles, recent: recent, statusOf: s.changes.statusOf);
-  if (path == null) return;
+  return [if (current != null) current, ...s.contextFiles.reversed.where((f) => f != current)];
+}
+
+/// Opens [path] of the current worktree in the full editor when that is
+/// showing, else in the Terminal view's Files tab.
+void openWorktreeFile(AppState s, String path) {
   if (s.view == KumoView.files) {
     s.editFile(path);
   } else {
