@@ -98,6 +98,28 @@ impl PullRequestClient for GitLabPulls {
         Ok(pick.map(|mr| self.complete(target, token, mr, &me)))
     }
 
+    /// One GET per merge request, by its iid: no approvals, no pipeline.
+    fn states(
+        &self,
+        target: &CiTarget,
+        token: &str,
+        numbers: &[u64],
+    ) -> Result<Vec<(u64, PrState)>, CiProblem> {
+        let base = Self::base(target);
+        let mut states = Vec::with_capacity(numbers.len());
+        for &n in numbers {
+            match self
+                .http
+                .get_json(&format!("{base}/merge_requests/{n}"), &Self::headers(token))
+            {
+                Ok(mr) => states.push((n, state_of(mr["state"].as_str()))),
+                Err(p) if p.kind == CiProblemKind::NotFound => {}
+                Err(p) => return Err(p),
+            }
+        }
+        Ok(states)
+    }
+
     fn create(
         &self,
         target: &CiTarget,
@@ -232,6 +254,14 @@ fn person(user: &Value, me: &str) -> Person {
     Person::new(username, name, !me.is_empty() && username == me)
 }
 
+fn state_of(state: Option<&str>) -> PrState {
+    match state {
+        Some("merged") => PrState::Merged,
+        Some("closed") => PrState::Closed,
+        _ => PrState::Open,
+    }
+}
+
 /// [approvals] is `/merge_requests/:iid/approvals`, when read.
 pub(super) fn parse_mr(mr: &Value, approvals: Option<&Value>, me: &str) -> PullRequest {
     let reviewers: Vec<Person> = mr["reviewers"]
@@ -280,11 +310,7 @@ pub(super) fn parse_mr(mr: &Value, approvals: Option<&Value>, me: &str) -> PullR
         branch: mr["source_branch"].as_str().unwrap_or_default().to_owned(),
         base: mr["target_branch"].as_str().unwrap_or_default().to_owned(),
         draft,
-        state: match mr["state"].as_str() {
-            Some("merged") => PrState::Merged,
-            Some("closed") => PrState::Closed,
-            _ => PrState::Open,
-        },
+        state: state_of(mr["state"].as_str()),
         review,
         review_requested_from_you: reviewers.iter().any(|p| p.you),
         reviewers,
@@ -522,5 +548,21 @@ mod tests {
             (refused.kind, refused.missing_scope.as_str()),
             (CiProblemKind::Forbidden, "api")
         );
+    }
+
+    #[test]
+    fn reads_states_by_iid_and_skips_unknown_ones() {
+        let server = TestServer::start(|r| {
+            let p = "/projects/platform%2Frepo-b/merge_requests";
+            match r.path.as_str() {
+                x if x == format!("{p}/231") => (200, r#"{"iid":231,"state":"merged"}"#.into()),
+                x if x == format!("{p}/229") => (200, r#"{"iid":229,"state":"opened"}"#.into()),
+                _ => (404, r#"{"message":"404 Not found"}"#.into()),
+            }
+        });
+        let states = GitLabPulls::default()
+            .states(&target(&server.url, ""), "glpat", &[231, 229, 7])
+            .unwrap();
+        assert_eq!(states, [(231, PrState::Merged), (229, PrState::Open)]);
     }
 }

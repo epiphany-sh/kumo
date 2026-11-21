@@ -184,3 +184,41 @@ async fn loads_what_the_store_kept() {
     let again = TodoService::load(store).await.unwrap();
     assert_eq!(again.todos()[0].title, "Kept");
 }
+
+#[tokio::test]
+async fn changes_at_once_to_one_todo_keep_both() {
+    let (todos, store) = service().await;
+    let todo = todos.add("Retry", "", None).await.unwrap();
+    todos.attach(&todo.id, run()).await.unwrap();
+    // The agent reports while the user edits the notes: each reads the
+    // TODO, saves off the runtime and comes back.
+    let (reported, edited) = tokio::join!(
+        todos.report(&todo.id, "testing", "agent", "48 pass"),
+        todos.update(
+            &todo.id,
+            TodoEdit {
+                notes: Some("Back off on 403".into()),
+                ..TodoEdit::default()
+            }
+        )
+    );
+    reported.unwrap();
+    edited.unwrap();
+    for kept in [
+        todos
+            .todos()
+            .iter()
+            .find(|t| t.id == todo.id)
+            .cloned()
+            .unwrap(),
+        store
+            .todos()
+            .unwrap()
+            .into_iter()
+            .find(|t| t.id == todo.id)
+            .unwrap(),
+    ] {
+        assert_eq!(kept.status(), TodoStatus::Testing);
+        assert_eq!(kept.notes, "Back off on 403");
+    }
+}

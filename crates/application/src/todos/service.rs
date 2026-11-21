@@ -33,6 +33,10 @@ pub struct TodoService {
     store: Arc<dyn TodoStore>,
     todos: Mutex<Vec<Todo>>,
     published: watch::Sender<Arc<Vec<Todo>>>,
+    /// One change at a time, from reading the TODO to publishing it: an
+    /// agent's report and the user's click on the same TODO don't lose one
+    /// another, and the database and the list keep the same order.
+    writes: tokio::sync::Mutex<()>,
 }
 
 impl std::fmt::Debug for TodoService {
@@ -50,6 +54,7 @@ impl TodoService {
             store,
             todos: Mutex::new(todos),
             published,
+            writes: tokio::sync::Mutex::new(()),
         }))
     }
 
@@ -69,10 +74,12 @@ impl TodoService {
         repo_path: Option<PathBuf>,
     ) -> Result<Todo, TodoError> {
         let todo = Todo::new(title, notes, repo_path, Timestamp::now())?;
+        let _turn = self.writes.lock().await;
         self.save(todo, true).await
     }
 
     pub async fn update(&self, id: &TodoId, edit: TodoEdit) -> Result<Todo, TodoError> {
+        let _turn = self.writes.lock().await;
         let mut todo = self.get(id)?;
         if let Some(title) = edit.title {
             todo.title = Todo::checked_title(&title)?;
@@ -90,6 +97,7 @@ impl TodoService {
     }
 
     pub async fn delete(&self, id: &TodoId) -> Result<(), TodoError> {
+        let _turn = self.writes.lock().await;
         self.get(id)?;
         let store = Arc::clone(&self.store);
         let key = id.clone();
@@ -101,6 +109,7 @@ impl TodoService {
     /// Records where it runs: its worktree and agent are up. It starts out
     /// working, as the agent is told to say once it begins.
     pub async fn attach(&self, id: &TodoId, run: TodoRun) -> Result<Todo, TodoError> {
+        let _turn = self.writes.lock().await;
         let mut todo = self.get(id)?;
         if run.worktree_path.as_os_str().is_empty() {
             return Err(TodoError::Invalid("a run needs its worktree".into()));
@@ -129,6 +138,12 @@ impl TodoService {
     }
 
     pub async fn set_status(&self, id: &TodoId, change: StatusChange) -> Result<Todo, TodoError> {
+        let _turn = self.writes.lock().await;
+        self.change_status(id, change).await
+    }
+
+    /// [`set_status`](Self::set_status), with the write turn already held.
+    async fn change_status(&self, id: &TodoId, change: StatusChange) -> Result<Todo, TodoError> {
         let mut todo = self.get(id)?;
         let by = change.by.trim();
         let by = if by.is_empty() { "You" } else { by };
@@ -165,6 +180,9 @@ impl TodoService {
                 "an agent reports working, testing or review; {status} is the user's or Kumo's"
             )));
         }
+        // Checked and changed in the same turn: the user can't push it
+        // in between.
+        let _turn = self.writes.lock().await;
         let todo = self.get(id)?;
         if todo.run.is_none() || todo.status() >= TodoStatus::Pushed {
             return Err(TodoError::Invalid(
@@ -176,7 +194,7 @@ impl TodoService {
             .as_ref()
             .map(|r| r.agent_name.clone())
             .filter(|n| !n.is_empty());
-        self.set_status(
+        self.change_status(
             id,
             StatusChange {
                 status,

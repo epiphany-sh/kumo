@@ -111,6 +111,28 @@ impl PullRequestClient for BitbucketPulls {
         Ok(pick.map(|pr| self.complete(target, token, pr, &me)))
     }
 
+    /// One GET per pull request, by its id: no statuses.
+    fn states(
+        &self,
+        target: &CiTarget,
+        token: &str,
+        numbers: &[u64],
+    ) -> Result<Vec<(u64, PrState)>, CiProblem> {
+        let base = Self::base(target);
+        let mut states = Vec::with_capacity(numbers.len());
+        for &n in numbers {
+            match self
+                .http
+                .get_json(&format!("{base}/pullrequests/{n}"), &Self::headers(token))
+            {
+                Ok(pr) => states.push((n, state_of(pr["state"].as_str()))),
+                Err(p) if p.kind == CiProblemKind::NotFound => {}
+                Err(p) => return Err(p),
+            }
+        }
+        Ok(states)
+    }
+
     fn create(
         &self,
         target: &CiTarget,
@@ -239,6 +261,14 @@ fn person(user: &Value, me: &str) -> Person {
     Person::new(id, name, you)
 }
 
+fn state_of(state: Option<&str>) -> PrState {
+    match state {
+        Some("MERGED") => PrState::Merged,
+        Some("DECLINED" | "SUPERSEDED") => PrState::Closed,
+        _ => PrState::Open,
+    }
+}
+
 /// [statuses] is `/pullrequests/{id}/statuses`, when read.
 pub(super) fn parse_pr(pr: &Value, statuses: Option<&Value>, me: &str) -> PullRequest {
     let participants: Vec<&Value> = pr["participants"]
@@ -306,11 +336,7 @@ pub(super) fn parse_pr(pr: &Value, statuses: Option<&Value>, me: &str) -> PullRe
             .unwrap_or_default()
             .to_owned(),
         draft: pr["draft"].as_bool().unwrap_or(false),
-        state: match pr["state"].as_str() {
-            Some("MERGED") => PrState::Merged,
-            Some("DECLINED" | "SUPERSEDED") => PrState::Closed,
-            _ => PrState::Open,
-        },
+        state: state_of(pr["state"].as_str()),
         review,
         review_requested_from_you: reviewers.iter().any(|p| p.you),
         reviewers,
@@ -571,5 +597,27 @@ mod tests {
                 "pullrequest:write"
             )
         );
+    }
+
+    #[test]
+    fn reads_states_by_id_and_stops_on_a_refusal() {
+        let server = TestServer::start(|r| {
+            let p = "/repositories/workspace-1-identity/users-api/pullrequests";
+            match r.path.as_str() {
+                x if x == format!("{p}/44") => (200, r#"{"id":44,"state":"DECLINED"}"#.into()),
+                x if x == format!("{p}/45") => (200, r#"{"id":45,"state":"MERGED"}"#.into()),
+                x if x == format!("{p}/46") => (404, r#"{"error":{"message":"not found"}}"#.into()),
+                _ => (401, r#"{"error":{"message":"bad token"}}"#.into()),
+            }
+        });
+        let client = BitbucketPulls::default();
+        let states = client
+            .states(&target(&server.url, ""), "t", &[44, 45, 46])
+            .unwrap();
+        assert_eq!(states, [(44, PrState::Closed), (45, PrState::Merged)]);
+        let problem = client
+            .states(&target(&server.url, ""), "t", &[44, 47])
+            .unwrap_err();
+        assert_eq!(problem.kind, CiProblemKind::Unauthorized);
     }
 }

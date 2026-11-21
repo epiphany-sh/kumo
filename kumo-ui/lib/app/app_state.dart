@@ -1740,20 +1740,80 @@ class AppState extends ChangeNotifier {
   }
 
   /// TODOs whose pull request merged move to merged (and are cleaned up
-  /// when the user asked for that). Called while the TODOs view is open.
+  /// when the user asked for that). Called while the TODOs view shows.
+  ///
+  /// By number, one light call per repository (a few repositories at a
+  /// time), with no git: the TODO kept its pull request's number. By branch
+  /// only for one without a number, with a daemon that can't ask by number,
+  /// or once for a number the host calls closed or doesn't know (the pull
+  /// request may have been opened again under another).
   Future<void> checkTodoMerges() async {
-    for (final todo in todos.todos.where((t) => t.status == TodoStatus.pr && !t.done)) {
-      final run = todo.run;
-      if (run == null) continue;
-      try {
-        final branch = await pullRequests.forBranch(run.worktreePath, refresh: true);
-        if (branch.pullRequest?.state != PrOpenState.merged) continue;
-        final merged = await todos.setStatus(todo.id, TodoStatus.merged, by: 'Kumo', note: branch.pullRequest!.label);
-        if (merged != null && setting<bool>(todoAutoCleanSetting, false)) await cleanUpTodo(merged);
-      } on Object {
-        // The host can't be reached now: the next check tries again.
+    if (_checkingMerges) return;
+    _checkingMerges = true;
+    try {
+      final waiting = [
+        for (final t in todos.todos)
+          if (t.status == TodoStatus.pr && !t.done && t.run != null) t,
+      ];
+      final byRepo = <String, List<TodoItem>>{};
+      final byBranch = <TodoItem>[];
+      for (final t in waiting) {
+        final run = t.run!;
+        if (run.prNumber > 0 && run.repoPath.isNotEmpty) {
+          (byRepo[run.repoPath] ??= []).add(t);
+        } else {
+          byBranch.add(t);
+        }
       }
+      // At most 50 numbers a call, as the daemon takes them.
+      final calls = [
+        for (final MapEntry(key: repo, value: list) in byRepo.entries)
+          for (var i = 0; i < list.length; i += 50) (repo, list.sublist(i, i + 50 < list.length ? i + 50 : list.length)),
+      ];
+      Future<void> next() async {
+        while (calls.isNotEmpty) {
+          final (repo, list) = calls.removeLast();
+          final Map<int, PrOpenState>? states;
+          try {
+            states = await pullRequests.states(repo, [for (final t in list) t.run!.prNumber]);
+          } on Object {
+            continue; // The host can't be reached now: the next check tries again.
+          }
+          for (final t in list) {
+            final run = t.run!;
+            final state = states?[run.prNumber];
+            if (state == PrOpenState.merged) {
+              // GitLab calls them merge requests, !231.
+              await _todoMerged(t, '${run.prUrl.contains('/merge_requests/') ? '!' : '#'}${run.prNumber}');
+            } else if (states == null || (state != PrOpenState.open && _askedByBranch.add('${t.id}#${t.run!.prNumber}'))) {
+              byBranch.add(t);
+            }
+          }
+        }
+      }
+
+      await Future.wait([for (var i = 0; i < 3; i++) next()]);
+      for (final t in byBranch) {
+        try {
+          final branch = await pullRequests.forBranch(t.run!.worktreePath, refresh: true);
+          if (branch.pullRequest?.state == PrOpenState.merged) await _todoMerged(t, branch.pullRequest!.label);
+        } on Object {
+          // The host can't be reached now: the next check tries again.
+        }
+      }
+    } finally {
+      _checkingMerges = false;
     }
+  }
+
+  bool _checkingMerges = false;
+
+  /// TODOs (by id and number) already looked up by branch once.
+  final _askedByBranch = <String>{};
+
+  Future<void> _todoMerged(TodoItem todo, String label) async {
+    final merged = await todos.setStatus(todo.id, TodoStatus.merged, by: 'Kumo', note: label);
+    if (merged != null && setting<bool>(todoAutoCleanSetting, false)) await cleanUpTodo(merged);
   }
 
   /// Merged: removes its worktree and local branch, and checks it off.

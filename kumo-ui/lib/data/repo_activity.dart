@@ -198,6 +198,10 @@ abstract class RepoActivitySource extends ChangeNotifier {
   /// Newest first. [allBranches] adds commits not on main yet.
   List<RepoCommit> commits({bool allBranches = false});
 
+  /// Reads the history when the source was made without it; a source that
+  /// reads it on its own has nothing to do.
+  Future<void> loadHistory() async {}
+
   /// Whether [commits] can include other branches.
   bool get allBranchesSupported;
 

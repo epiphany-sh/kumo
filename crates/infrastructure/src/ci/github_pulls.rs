@@ -130,6 +130,55 @@ impl PullRequestClient for GitHubPulls {
             .cloned())
     }
 
+    /// One query for all of them: an alias per number (`p0`, `p1`…, from
+    /// the index alone), the numbers as variables.
+    fn states(
+        &self,
+        target: &CiTarget,
+        token: &str,
+        numbers: &[u64],
+    ) -> Result<Vec<(u64, PrState)>, CiProblem> {
+        if numbers.is_empty() {
+            return Ok(Vec::new());
+        }
+        let (owner, name) = Self::owner_name(target)?;
+        let params: String = (0..numbers.len())
+            .map(|i| format!(", $n{i}: Int!"))
+            .collect();
+        let fields: String = (0..numbers.len())
+            .map(|i| format!(" p{i}: pullRequest(number: $n{i}) {{ number state }}"))
+            .collect();
+        let query = format!(
+            "query($owner: String!, $name: String!{params}) {{ repository(owner: $owner, name: $name) {{{fields} }} }}"
+        );
+        let mut variables = json!({ "owner": owner, "name": name });
+        for (i, n) in numbers.iter().enumerate() {
+            variables[format!("n{i}")] = json!(n);
+        }
+        let answer = self.http.post(
+            &Self::graphql_url(target),
+            &Self::headers(token),
+            Some(&json!({ "query": query, "variables": variables })),
+        )?;
+        // A number that isn't a pull request comes back null, with a
+        // NOT_FOUND error of its own: the others still answer.
+        let repo = &answer["data"]["repository"];
+        if repo.is_null() {
+            return Err(graphql_problem(&answer).unwrap_or_else(|| {
+                CiProblem::new(
+                    CiProblemKind::NotFound,
+                    format!("No repository {}", target.repo),
+                )
+            }));
+        }
+        Ok((0..numbers.len())
+            .filter_map(|i| {
+                let pr = &repo[format!("p{i}")];
+                Some((pr["number"].as_u64()?, state_of(pr["state"].as_str())))
+            })
+            .collect())
+    }
+
     fn create(
         &self,
         target: &CiTarget,
@@ -310,6 +359,14 @@ fn person(node: &Value, viewer: &str) -> Person {
     )
 }
 
+fn state_of(state: Option<&str>) -> PrState {
+    match state {
+        Some("MERGED") => PrState::Merged,
+        Some("CLOSED") => PrState::Closed,
+        _ => PrState::Open,
+    }
+}
+
 pub(super) fn parse_pr(pr: &Value, viewer: &str) -> PullRequest {
     let requested: Vec<Person> = pr["reviewRequests"]["nodes"]
         .as_array()
@@ -358,11 +415,7 @@ pub(super) fn parse_pr(pr: &Value, viewer: &str) -> PullRequest {
         branch: pr["headRefName"].as_str().unwrap_or_default().to_owned(),
         base: pr["baseRefName"].as_str().unwrap_or_default().to_owned(),
         draft: pr["isDraft"].as_bool().unwrap_or(false),
-        state: match pr["state"].as_str() {
-            Some("MERGED") => PrState::Merged,
-            Some("CLOSED") => PrState::Closed,
-            _ => PrState::Open,
-        },
+        state: state_of(pr["state"].as_str()),
         review,
         review_requested_from_you: requested.iter().any(|p| p.you),
         reviewers,
@@ -663,5 +716,45 @@ mod tests {
         let pr = json!({"number": 1, "reviewThreads": {"nodes": [{"isResolved": false}, {"isResolved": true}, {"isResolved": false}]}});
         assert_eq!(parse_pr(&pr, "").open_threads, Some(2));
         assert_eq!(parse_pr(&json!({"number": 1}), "").open_threads, None);
+    }
+
+    #[test]
+    fn reads_states_by_number_in_one_query() {
+        let server = TestServer::start(|r| {
+            let body = r.json();
+            let query = body["query"].as_str().unwrap();
+            assert!(query.contains("p0: pullRequest(number: $n0) { number state }"));
+            assert!(query.contains("p2: pullRequest(number: $n2)"));
+            assert!(!query.contains("521"), "numbers go as variables");
+            assert_eq!(
+                (&body["variables"]["n0"], &body["variables"]["n2"]),
+                (&serde_json::json!(521), &serde_json::json!(9999))
+            );
+            (
+                200,
+                r#"{"data":{"repository":{"p0":{"number":521,"state":"MERGED"},"p1":{"number":518,"state":"OPEN"},"p2":null}},
+                   "errors":[{"type":"NOT_FOUND","path":["repository","p2"],"message":"Could not resolve to a PullRequest with the number of 9999."}]}"#
+                    .to_owned(),
+            )
+        });
+        let states = GitHubPulls::default()
+            .states(&target(&server.url, ""), "gho_x", &[521, 518, 9999])
+            .unwrap();
+        assert_eq!(states, [(521, PrState::Merged), (518, PrState::Open)]);
+        assert_eq!(server.requests().len(), 1);
+    }
+
+    #[test]
+    fn states_of_a_repository_it_cannot_see_are_a_problem() {
+        let server = TestServer::start(|_| {
+            (
+                200,
+                r#"{"data":{"repository":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a Repository"}]}"#.to_owned(),
+            )
+        });
+        let problem = GitHubPulls::default()
+            .states(&target(&server.url, ""), "gho_x", &[1])
+            .unwrap_err();
+        assert_eq!(problem.kind, CiProblemKind::NotFound);
     }
 }
