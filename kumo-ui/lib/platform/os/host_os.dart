@@ -169,6 +169,10 @@ abstract class HostOs {
   /// content once the native backdrop is on, so the layout leaves room.
   bool get windowButtonsInContent;
 
+  /// Whether the OS draws the window's own title bar and buttons, so the
+  /// app paints none (Windows, Linux).
+  bool get nativeTitleBar;
+
   /// Where the icon chosen in Settings › Appearance shows, said for the
   /// user; null when the app can't change its own icon here.
   String? get appIconPlaces;
