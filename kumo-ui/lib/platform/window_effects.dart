@@ -44,6 +44,14 @@ class WindowEffects {
     }
   }
 
+  /// Whether the native window buttons sit inside our content right now
+  /// (macOS with the backdrop on), so the layout leaves room for them.
+  static bool get windowButtonsInContent => !kIsWeb && hostOs.windowButtonsInContent && nativeBackdrop;
+
+  /// Whether the sidebar paints mock traffic lights: where no native ones
+  /// show (web, macOS without the backdrop), never under an OS title bar.
+  static bool get paintedTrafficLights => kIsWeb || (!hostOs.nativeTitleBar && !windowButtonsInContent);
+
   /// Height reserved at the top of the sidebar for the native traffic lights.
-  static double get trafficLightsInset => (!kIsWeb && hostOs.windowButtonsInContent && nativeBackdrop) ? 40 : 6;
+  static double get trafficLightsInset => windowButtonsInContent ? 40 : 6;
 }

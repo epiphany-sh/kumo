@@ -61,6 +61,12 @@ impl AgentProvider {
         badge.to_uppercase()
     }
 
+    /// The models and efforts it can be started with; None when Kumo
+    /// doesn't know them (CLIs it hasn't checked, custom agents).
+    pub fn tuning(&self) -> Option<&'static super::Tuning> {
+        self.preset.and_then(|p| super::tuning_for(p.id))
+    }
+
     pub fn takes_prompt_argument(&self) -> bool {
         match self.preset {
             Some(preset) => matches!(preset.prompt, PromptStyle::Argument(_)),

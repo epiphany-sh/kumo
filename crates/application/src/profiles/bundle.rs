@@ -22,6 +22,7 @@ use crate::releases::ReleaseService;
 use crate::tasks::TaskService;
 use crate::terminal::TerminalService;
 use crate::test_runs::TestService;
+use crate::todos::TodoService;
 use crate::workspace::WorkspaceService;
 
 /// Every per-profile use case, over that profile's stores.
@@ -35,6 +36,8 @@ pub struct ProfileServices {
     /// Your agents: their files, runs and test runs.
     pub agent_defs: Arc<AgentDefService>,
     pub tasks: Arc<TaskService>,
+    /// The user's own TODOs.
+    pub todos: Arc<TodoService>,
     pub pipelines: Arc<PipelinesService>,
     pub pulls: Arc<PullRequestService>,
     pub releases: Arc<ReleaseService>,

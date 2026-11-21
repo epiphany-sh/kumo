@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use futures::{Stream, StreamExt};
-use kumo_application::agents::{AgentService, ProviderSettings};
+use kumo_application::agents::{AgentLaunch, AgentService, AgentTuning, ProviderSettings};
 use kumo_domain::agents::AgentSessionId;
 use kumo_domain::terminal::TerminalId;
 use kumo_proto::v1 as pb;
@@ -126,16 +126,21 @@ impl pb::agents_server::Agents for AgentsGrpc {
         let service = self.service(&request).await?;
         let r = request.into_inner();
         let size = size_from(r.cols, r.rows).map_err(status_from)?;
-        let provider = non_empty(r.provider_id);
         let session = service
-            .start(
-                provider.as_deref(),
-                &PathBuf::from(r.worktree_path),
-                &r.prompt,
-                &r.title,
-                r.context.into_iter().map(agent_context_from).collect(),
+            .start(AgentLaunch {
+                provider_id: non_empty(r.provider_id),
+                cwd: PathBuf::from(r.worktree_path),
+                prompt: r.prompt,
+                title: r.title,
+                context: r.context.into_iter().map(agent_context_from).collect(),
                 size,
-            )
+                tuning: AgentTuning {
+                    model: r.model,
+                    effort: r.effort,
+                    todo: non_empty(r.todo_id),
+                },
+                ..AgentLaunch::default()
+            })
             .await
             .map_err(agents_status_from)?;
         Ok(Response::new(agent_session_to(session)))

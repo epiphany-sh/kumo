@@ -14,6 +14,7 @@ import 'engine/engine_profiles.dart';
 import 'engine/engine_pull_requests.dart';
 import 'engine/engine_shell_activity.dart';
 import 'engine/engine_tasks_source.dart';
+import 'engine/engine_todos_source.dart';
 import 'engine/engine_tests_source.dart';
 import 'engine/engine_workspace_source.dart';
 import 'engine/engine_worktree_changes.dart';
@@ -57,6 +58,7 @@ Future<void> main() async {
       agentDefs: EngineAgentDefs(engine, agents, workspace),
       usage: EngineAiUsage(engine, agents),
       tasks: EngineTasksSource(engine),
+      todos: EngineTodosSource(engine),
       pipelinesFor: ({required repo, required worktree, required worktreePath}) =>
           EnginePipelinesSource(engine, worktreePath, provider: CiProvider.ofHost(repo.host), branch: worktree.branch),
       testsFor: (worktree) => EngineTestsSource(engine, worktree),

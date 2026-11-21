@@ -20,18 +20,31 @@ enum _ReleaseFilter { all, releases, tags }
 /// picked: its notes, what changed since the release before it, and what
 /// can be done with it.
 class _ReleasesView extends StatefulWidget {
-  const _ReleasesView({super.key, required this.source});
+  const _ReleasesView({super.key, required this.source, this.asked});
   final RepoActivitySource source;
+
+  /// A tag to select (⌘K); a new record each time it's asked.
+  final (String,)? asked;
 
   @override
   State<_ReleasesView> createState() => _ReleasesViewState();
 }
 
 class _ReleasesViewState extends State<_ReleasesView> {
-  String? _selected;
+  late String? _selected = widget.asked?.$1;
   _ReleaseFilter _filter = _ReleaseFilter.all;
   final _ranges = <String, Future<ReleaseRange>>{};
   bool _menuOpen = false;
+
+  @override
+  void didUpdateWidget(_ReleasesView old) {
+    super.didUpdateWidget(old);
+    final asked = widget.asked;
+    if (asked != null && !identical(asked, old.asked)) {
+      _selected = asked.$1;
+      _filter = _ReleaseFilter.all;
+    }
+  }
 
   RepoActivitySource get source => widget.source;
 

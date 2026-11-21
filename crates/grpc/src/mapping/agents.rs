@@ -9,8 +9,25 @@ pub fn provider_to(view: ProviderView) -> pb::AgentProvider {
         provider,
         resolved,
         own_sign_in,
+        models,
     } = view;
+    let tuning = provider.tuning();
     pb::AgentProvider {
+        tunable: tuning.is_some(),
+        models: models
+            .into_iter()
+            .map(|m| pb::AgentModelChoice {
+                id: m.id,
+                name: m.name,
+                efforts: m.efforts,
+            })
+            .collect(),
+        efforts: tuning
+            .map(|t| t.efforts.iter().map(|e| (*e).to_owned()).collect())
+            .unwrap_or_default(),
+        no_effort_with: tuning
+            .map(|t| t.no_effort_with.to_owned())
+            .unwrap_or_default(),
         takes_prompt_argument: provider.takes_prompt_argument(),
         has_login: provider.has_login(),
         usage_readable: provider.usage_readable(),

@@ -18,6 +18,7 @@ import '../theme/kumo_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/controls.dart';
 import '../widgets/kicons.dart';
+import '../widgets/skill_picker.dart';
 import '../widgets/usage_meter.dart' show resetLabel;
 import 'agent_terminals.dart';
 

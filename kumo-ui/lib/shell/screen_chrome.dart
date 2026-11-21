@@ -1,8 +1,7 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
-import '../platform/os/host_os.dart';
+import '../overlays/global_search.dart';
 import '../platform/os/key_combo.dart';
 import '../platform/window_effects.dart';
 import '../theme/kumo_theme.dart';
@@ -41,15 +40,15 @@ class ScreenToolbar extends StatelessWidget {
   /// Its key; [AppKeys.search] when not given.
   final String? searchKey;
 
-  /// The search field opens this (a picker of its own) instead of taking
-  /// text.
+  /// The search field opens this (a picker of its own) instead of the
+  /// global search (⌘K).
   final VoidCallback? onSearch;
 
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final c = context.c;
-    final hiddenSidebarInset = (!s.sidebarVisible && !kIsWeb && hostOs.windowButtonsInContent && WindowEffects.nativeBackdrop) ? 76.0 : 0.0;
+    final hiddenSidebarInset = (!s.sidebarVisible && WindowEffects.windowButtonsInContent) ? 76.0 : 0.0;
     final (themeIcon, themeName) = switch (s.mode) {
       KumoThemeMode.dark => (KIcons.moon, 'Dark'),
       KumoThemeMode.light => (KIcons.sun, 'Light'),
@@ -67,7 +66,7 @@ class ScreenToolbar extends StatelessWidget {
         Expanded(child: Align(alignment: Alignment.centerLeft, child: Capsule(child: breadcrumb))),
         const SizedBox(width: 8),
         // An update waiting takes some of the search field's room.
-        SizedBox(width: s.updates.ready == null ? 300 : 220, child: _SearchField(hint: searchHint, shortcut: searchKey ?? AppKeys.search.label, onTap: onSearch)),
+        SizedBox(width: s.updates.ready == null ? 300 : 220, child: _SearchField(hint: searchHint, shortcut: searchKey ?? AppKeys.search.label, onTap: onSearch ?? () => showGlobalSearch(context, AppScope.read(context)))),
         const SizedBox(width: 8),
         if (s.updates.ready case final version?) ...[
           Tooltip(
@@ -84,44 +83,26 @@ class ScreenToolbar extends StatelessWidget {
 }
 
 class _SearchField extends StatelessWidget {
-  const _SearchField({required this.hint, required this.shortcut, this.onTap});
+  const _SearchField({required this.hint, required this.shortcut, required this.onTap});
   final String hint;
   final String shortcut;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final tap = onTap;
-    if (tap != null) {
-      return KPressable(
-        onTap: tap,
-        semanticLabel: hint,
-        builder: (context, hover, focus) => Capsule(
-          padding: const EdgeInsets.only(left: 12, right: 8),
-          child: Row(children: [
-            Icon(KIcons.search, size: 16, color: hover ? c.text2 : c.text3),
-            const SizedBox(width: 8),
-            Expanded(child: Text(hint, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, color: hover ? c.text2 : c.text3))),
-            Kbd(shortcut),
-          ]),
-        ),
-      );
-    }
-    return Capsule(
-      padding: const EdgeInsets.only(left: 12, right: 8),
-      child: Row(children: [
-        Icon(KIcons.search, size: 16, color: c.text3),
-        const SizedBox(width: 8),
-        Expanded(
-          child: TextField(
-            style: sans(13, color: c.text),
-            cursorColor: c.acc,
-            decoration: InputDecoration.collapsed(hintText: hint, hintStyle: sans(13, color: c.text3)),
-          ),
-        ),
-        Kbd(shortcut),
-      ]),
+    return KPressable(
+      onTap: onTap,
+      semanticLabel: hint,
+      builder: (context, hover, focus) => Capsule(
+        padding: const EdgeInsets.only(left: 12, right: 8),
+        child: Row(children: [
+          Icon(KIcons.search, size: 16, color: hover ? c.text2 : c.text3),
+          const SizedBox(width: 8),
+          Expanded(child: Text(hint, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, color: hover ? c.text2 : c.text3))),
+          Kbd(shortcut),
+        ]),
+      ),
     );
   }
 }

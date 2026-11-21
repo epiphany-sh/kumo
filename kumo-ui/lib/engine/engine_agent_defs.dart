@@ -26,7 +26,7 @@ class EngineAgentDefs extends AgentDefsSource {
   bool _supported = true;
   List<AgentDef> _list = const [];
   String? _error;
-  List<String> _skills = const [];
+  List<AgentSkill> _skills = const [];
   List<String> _mcpServers = const [];
   bool _triggers = false;
 
@@ -49,7 +49,7 @@ class EngineAgentDefs extends AgentDefsSource {
   @override
   String? get error => _error;
   @override
-  List<String> get skills => _skills;
+  List<AgentSkill> get skills => _skills;
   @override
   List<String> get mcpServers => _mcpServers;
   @override
@@ -80,7 +80,22 @@ class EngineAgentDefs extends AgentDefsSource {
       _error = null;
       try {
         final caps = await client.capabilities(pb.AgentDefCapabilitiesRequest());
-        _skills = caps.skills.toList();
+        _skills = caps.skillList.isNotEmpty
+            ? [
+                for (final k in caps.skillList)
+                  AgentSkill(
+                    k.name,
+                    description: k.description,
+                    from: switch (k.from) {
+                      pb.AgentSkillFrom.AGENT_SKILL_FROM_REPO => SkillFrom.repo,
+                      pb.AgentSkillFrom.AGENT_SKILL_FROM_PLUGIN => SkillFrom.plugin,
+                      _ => SkillFrom.personal,
+                    },
+                    fromName: k.fromName,
+                  ),
+              ]
+            // An engine from before: names only.
+            : [for (final name in caps.skills) AgentSkill(name)];
         _mcpServers = caps.mcpServers.toList();
         _triggers = caps.triggersSupported;
       } on Object {
@@ -155,7 +170,10 @@ class EngineAgentDefs extends AgentDefsSource {
   Future<AgentDef?> draft(String description, {AgentScope scope = AgentScope.personal, String repo = ''}) async {
     final text = await _ask(draftAgentPrompt(description), cwd: scope == AgentScope.project ? _repoPath(repo) : '');
     if (text == null) return null;
-    final taken = {for (final a in _list) if (a.scope == scope && (scope == AgentScope.personal || a.repo == repo)) a.name};
+    final taken = {
+      for (final a in _list)
+        if (a.scope == scope && (scope == AgentScope.personal || a.repo == repo)) a.name
+    };
     final drafted = readAgentFile(text, scope: scope, repo: repo, taken: taken).agent;
     return drafted == null ? null : withClaudeCodeTools(drafted);
   }
@@ -206,7 +224,10 @@ class EngineAgentDefs extends AgentDefsSource {
   }
 
   @override
-  List<AgentRun> runsOf(AgentDef agent) => [for (final r in _agents.runs) if (r.agent == agent.name) r];
+  List<AgentRun> runsOf(AgentDef agent) => [
+        for (final r in _agents.runs)
+          if (r.agent == agent.name) r
+      ];
 
   @override
   List<PlayRun> playRuns(AgentDef agent) {
@@ -219,7 +240,10 @@ class EngineAgentDefs extends AgentDefsSource {
   Future<void> _readPlays(AgentDef agent) async {
     try {
       final list = await (await _client).listPlays(pb.ListPlaysRequest(agent: _fileOf(agent)));
-      final live = [for (final r in _plays[agent.key] ?? const <PlayRun>[]) if (r.state == PlayState.running) r];
+      final live = [
+        for (final r in _plays[agent.key] ?? const <PlayRun>[])
+          if (r.state == PlayState.running) r
+      ];
       _plays[agent.key] = [
         ...live,
         for (final record in list.plays)
@@ -234,7 +258,8 @@ class EngineAgentDefs extends AgentDefsSource {
   }
 
   @override
-  Future<PlayRun?> play(AgentDef agent, {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async {
+  Future<PlayRun?> play(AgentDef agent,
+      {required String task, required String worktreePath, AgentDef? owner, bool draft = true, List<AgentContextItem> context = const [], AgentCli cli = AgentCli.claude}) async {
     final history = owner ?? agent;
     final request = pb.PlayRequest(
       name: agent.name,

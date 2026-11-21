@@ -20,6 +20,9 @@ class KumoPalette {
     required this.panelBorder,
     required this.panelSheen,
     required this.panelShadow,
+    required this.windowSheen,
+    required this.rimTop,
+    required this.rimBottom,
     required this.chip,
     required this.chipBorder,
     required this.chipSheen,
@@ -82,6 +85,13 @@ class KumoPalette {
   final Color panelSheen;
   final List<BoxShadow> panelShadow;
 
+  /// Light falling on the window from its top-left corner.
+  final Color windowSheen;
+
+  /// Specular rim inside a glass edge: bright on top, faint on the bottom.
+  final Color rimTop;
+  final Color rimBottom;
+
   final Color chip;
   final Color chipBorder;
   final Color chipSheen;
@@ -142,27 +152,34 @@ class KumoPalette {
 
   bool get isDark => brightness == Brightness.dark;
 
+  /// [pop] laid over a solid base, for surfaces with no blur behind them
+  /// (tooltips, Material menus): the glass pop alone is too clear there.
+  Color get popSolid => Color.alphaBlend(pop, isDark ? const Color(0xF2181A24) : const Color(0xF2F7F8FB));
+
   static const dark = KumoPalette(
     brightness: Brightness.dark,
     window: Color(0x8C10121A), // rgba(16,18,26,.55)
-    windowBorder: Color(0x1FFFFFFF),
+    windowBorder: Color(0x2EFFFFFF),
     panel: Color(0x0EFFFFFF),
     panelStrong: Color(0x17FFFFFF),
-    panelBorder: Color(0x1AFFFFFF),
-    panelSheen: Color(0x14FFFFFF),
-    panelShadow: [BoxShadow(color: Color(0x38000000), blurRadius: 30, offset: Offset(0, 10))],
-    chip: Color(0x14FFFFFF),
-    chipBorder: Color(0x1FFFFFFF),
-    chipSheen: Color(0x1FFFFFFF),
-    navActive: Color(0x1CFFFFFF),
+    panelBorder: Color(0x26FFFFFF),
+    panelSheen: Color(0x0CFFFFFF),
+    panelShadow: [BoxShadow(color: Color(0x42000000), blurRadius: 30, offset: Offset(0, 10))],
+    windowSheen: Color(0x13FFFFFF),
+    rimTop: Color(0x38FFFFFF),
+    rimBottom: Color(0x0FFFFFFF),
+    chip: Color(0x17FFFFFF),
+    chipBorder: Color(0x2BFFFFFF),
+    chipSheen: Color(0x29FFFFFF),
+    navActive: Color(0x24FFFFFF),
     tabActive: Color(0x1AFFFFFF),
     term: Color(0x6B06070C),
     pane: Color(0x08FFFFFF),
     paneBorder: Color(0x12FFFFFF),
     divider: Color(0x14FFFFFF),
     paper: Color(0x730A0B12),
-    pop: Color(0xD91E202C),
-    popBorder: Color(0x24FFFFFF),
+    pop: Color(0xAD1A1C28), // rgba(26,28,40,.68)
+    popBorder: Color(0x33FFFFFF),
     text: Color(0xFFF3F4F8),
     text2: Color(0xBDECEEF6),
     text3: Color(0x8FECEEF6),
@@ -195,33 +212,36 @@ class KumoPalette {
     curMark: Color(0x335EE09A),
     incBg: Color(0x1A78A0FF),
     incMark: Color(0x3878A0FF),
-    wallpaperBase: Color(0xFF07080D),
-    wallpaperBlobs: [Color(0x996C54FF), Color(0x7A00A8BE), Color(0x61DE468C)],
+    wallpaperBase: Color(0xFF06070C),
+    wallpaperBlobs: [Color(0xA87258FF), Color(0x8500B4CC), Color(0x70E84894), Color(0x334678FF)],
   );
 
   static const light = KumoPalette(
     brightness: Brightness.light,
     window: Color(0x6BFFFFFF), // rgba(255,255,255,.42)
-    windowBorder: Color(0xCCFFFFFF),
-    panel: Color(0x80FFFFFF),
+    windowBorder: Color(0xEBFFFFFF),
+    panel: Color(0x5CFFFFFF),
     panelStrong: Color(0xB8FFFFFF),
-    panelBorder: Color(0xD9FFFFFF),
-    panelSheen: Color(0x99FFFFFF),
+    panelBorder: Color(0xF2FFFFFF),
+    panelSheen: Color(0x69FFFFFF),
     panelShadow: [
       BoxShadow(color: Color(0x0F1E1E3C), blurRadius: 2, offset: Offset(0, 1)),
-      BoxShadow(color: Color(0x14282850), blurRadius: 32, offset: Offset(0, 12)),
+      BoxShadow(color: Color(0x1A282850), blurRadius: 32, offset: Offset(0, 12)),
     ],
-    chip: Color(0x99FFFFFF),
+    windowSheen: Color(0x80FFFFFF),
+    rimTop: Color(0xFFFFFFFF),
+    rimBottom: Color(0x99FFFFFF),
+    chip: Color(0x80FFFFFF),
     chipBorder: Color(0x14141428),
     chipSheen: Color(0xCCFFFFFF),
-    navActive: Color(0xE6FFFFFF),
-    tabActive: Color(0xEBFFFFFF),
-    term: Color(0xA8FFFFFF),
-    pane: Color(0x9EFFFFFF),
+    navActive: Color(0xB3FFFFFF),
+    tabActive: Color(0xBDFFFFFF),
+    term: Color(0x61FFFFFF), // rgba(255,255,255,.38)
+    pane: Color(0x80FFFFFF),
     paneBorder: Color(0x12141428),
     divider: Color(0x14141428),
     paper: Color(0xC7FFFFFF),
-    pop: Color(0xCCFFFFFF),
+    pop: Color(0xA8FFFFFF), // rgba(255,255,255,.66)
     popBorder: Color(0xF2FFFFFF),
     text: Color(0xFF15161C),
     text2: Color(0xBD15161C),
@@ -256,14 +276,14 @@ class KumoPalette {
     incBg: Color(0x143A4FD8),
     incMark: Color(0x2E3A4FD8),
     wallpaperBase: Color(0xFFEDF0F6),
-    wallpaperBlobs: [Color(0xBFA0BEFF), Color(0xCCB0E0E8), Color(0xB3CCC4FF)],
+    wallpaperBlobs: [Color(0xE696B6FF), Color(0xE6A0E2EC), Color(0xD9D4BEFF), Color(0x6BFFC6E2)],
   );
 
   /// Terminal area for the hybrid look: dark tokens, more opaque smoked glass.
   static final hybridTerminal = dark.copyWith(
-    term: const Color(0xD6141620),
+    term: const Color(0xC7141620), // rgba(20,22,32,.78)
     pane: const Color(0x09FFFFFF),
-    panelBorder: const Color(0x24FFFFFF),
+    panelBorder: const Color(0x2EFFFFFF),
     panelShadow: const [BoxShadow(color: Color(0x471E2250), blurRadius: 44, offset: Offset(0, 20))],
   );
 
@@ -283,6 +303,9 @@ class KumoPalette {
       panelBorder: panelBorder ?? this.panelBorder,
       panelSheen: panelSheen,
       panelShadow: panelShadow ?? this.panelShadow,
+      windowSheen: windowSheen,
+      rimTop: rimTop,
+      rimBottom: rimBottom,
       chip: chip,
       chipBorder: chipBorder,
       chipSheen: chipSheen,
@@ -332,9 +355,12 @@ class KumoPalette {
     );
   }
 
-  /// Window tint for a translucency level (0.25–0.9), as in the canvas tweak.
+  /// Window tint for the glass translucency the user picks (0.25–0.9). The
+  /// higher it is, the more of the desktop shows: the tint gets lighter.
+  /// 0.6 gives the canvas's tint (0.55 in dark).
   KumoPalette withTranslucency(double t) {
-    final a = (isDark ? t : (t - 0.14).clamp(0.12, 1.0)).clamp(0.0, 1.0);
+    final tint = (1.15 - t).clamp(0.25, 0.9);
+    final a = (isDark ? tint : (tint - 0.24).clamp(0.08, 1.0)).clamp(0.0, 1.0);
     final base = isDark ? const Color(0xFF10121A) : const Color(0xFFFFFFFF);
     return copyWith(window: base.withAlpha((a * 255).round()));
   }

@@ -12,6 +12,7 @@ mod releases;
 mod tasks;
 mod terminal;
 mod tests;
+mod todos;
 mod usage;
 mod workspace;
 
@@ -38,5 +39,8 @@ pub use terminal::{
     terminals_activity_to,
 };
 pub use tests::{test_run_to, tests_snapshot_to, tests_status_from};
+pub use todos::{
+    todo_list_to, todo_run_from, todo_status_from, todo_status_to, todo_to, todos_status_from,
+};
 pub use usage::usage_report_to;
 pub use workspace::{candidate_to, snapshot_to, worktree_to};

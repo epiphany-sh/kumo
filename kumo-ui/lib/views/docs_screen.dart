@@ -134,8 +134,30 @@ class _DocsScreenState extends State<DocsScreen> {
     if (_browseSource == null && sources.isNotEmpty) _goTo(sources.first, const []);
   }
 
+  AppState? _app;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final app = AppScope.read(context);
+    if (identical(app, _app)) return;
+    _app?.docRequest.removeListener(_onRequest);
+    _app = app..docRequest.addListener(_onRequest);
+    _onRequest();
+  }
+
+  /// A page asked from elsewhere (⌘K): read and kept in Recent.
+  void _onRequest() {
+    final app = _app;
+    final id = app?.docRequest.value;
+    if (app == null || id == null || !mounted) return;
+    app.docRequest.value = null;
+    _open(id, remember: true);
+  }
+
   @override
   void dispose() {
+    _app?.docRequest.removeListener(_onRequest);
     _debounce?.cancel();
     _query.dispose();
     super.dispose();

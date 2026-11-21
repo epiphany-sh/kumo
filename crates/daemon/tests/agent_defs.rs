@@ -287,6 +287,18 @@ async fn capabilities_list_skills_and_mcp_servers() {
         .unwrap()
         .into_inner();
     assert_eq!(got.skills, ["go-tests", "sql-review"]);
+    let from: Vec<(&str, i32, &str)> = got
+        .skill_list
+        .iter()
+        .map(|k| (k.name.as_str(), k.from, k.from_name.as_str()))
+        .collect();
+    assert_eq!(
+        from,
+        [
+            ("go-tests", pb::AgentSkillFrom::Personal as i32, ""),
+            ("sql-review", pb::AgentSkillFrom::Repo as i32, "app"),
+        ]
+    );
     assert_eq!(got.mcp_servers, ["jira", "postgres"]);
     assert!(!got.triggers_supported);
 }

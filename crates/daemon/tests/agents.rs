@@ -1099,3 +1099,72 @@ async fn a_cli_typed_in_a_terminal_is_seen() {
     shell.send(b"yes\n").await;
     terminal_agents_where(&mut client, <[pb::TerminalAgent]>::is_empty).await;
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_agent_on_a_todo_gets_its_model_effort_and_how_to_report() {
+    let daemon = TestDaemon::start().await;
+    let mut client = daemon.client().await;
+    let wt = worktree(&daemon, &mut client).await;
+    fake_cli(
+        &daemon.bin(),
+        "claude",
+        "for a in \"$@\"; do echo \"arg: $a\"; done; echo \"todo: $KUMO_TODO\"; read line",
+    );
+    let claude = connect(&mut client, "claude", true).await;
+    assert!(claude.tunable);
+    assert!(claude.models.iter().any(|m| m.id == "opus"));
+    assert_eq!(claude.efforts.last().map(String::as_str), Some("max"));
+
+    let session = client
+        .agents
+        .start(pb::StartAgentRequest {
+            model: "opus".into(),
+            effort: "high".into(),
+            todo_id: "todo-1".into(),
+            ..start(&wt, "claude", "Retry on rate limits")
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let mut terminal = Attached::new(&mut client, &session.terminal_id, true).await;
+    terminal.read_until("arg: --model").await;
+    terminal.read_until("arg: opus").await;
+    terminal.read_until("arg: --effort").await;
+    terminal.read_until("arg: high").await;
+    terminal.read_until("arg: Retry on rate limits").await;
+    terminal.read_until("todo review").await;
+    terminal.read_until("todo: todo-1").await;
+
+    // An effort the CLI doesn't take, and a custom agent: refused.
+    let bad = client
+        .agents
+        .start(pb::StartAgentRequest {
+            effort: "extreme".into(),
+            ..start(&wt, "claude", "go")
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(bad.code(), tonic::Code::InvalidArgument, "{bad:?}");
+    fake_cli(&daemon.bin(), "mine", "read line");
+    let custom = client
+        .agents
+        .save_provider(pb::SaveProviderRequest {
+            name: "Mine".into(),
+            program: "mine".into(),
+            enabled: true,
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(!custom.tunable);
+    let refused = client
+        .agents
+        .start(pb::StartAgentRequest {
+            model: "x".into(),
+            ..start(&wt, &custom.id, "go")
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code(), tonic::Code::InvalidArgument, "{refused:?}");
+}

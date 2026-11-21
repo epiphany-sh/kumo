@@ -9,6 +9,7 @@ mod daemon;
 pub mod git_credential;
 mod profiles;
 mod single_instance;
+pub mod todo_report;
 
 pub use config::{DaemonConfig, PlanAccounts, SecretsBackend};
 pub use daemon::Daemon;

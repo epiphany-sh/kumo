@@ -72,6 +72,35 @@ class _GitScreenState extends State<GitScreen> {
   RepoActivitySource? _source;
   String? _sourceKey;
 
+  /// A release asked from elsewhere (⌘K): its tag, and a new object each
+  /// time so asking for the same one again selects it again.
+  (String,)? _releaseAsked;
+
+  AppState? _app;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final app = AppScope.read(context);
+    if (identical(app, _app)) return;
+    _app?.releaseRequest.removeListener(_onRelease);
+    _app = app..releaseRequest.addListener(_onRelease);
+    _onRelease();
+  }
+
+  /// Releases of the current worktree's repository, on the tag asked.
+  void _onRelease() {
+    final app = _app;
+    final tag = app?.releaseRequest.value;
+    if (app == null || tag == null || !mounted) return;
+    app.releaseRequest.value = null;
+    setState(() {
+      _repoId = null;
+      _releases = true;
+      _releaseAsked = (tag,);
+    });
+  }
+
   /// One source for the selected repository, only while the view shows:
   /// the view sits in an IndexedStack, and offstage it shouldn't poll CI.
   /// The daemon backs it in the app; the design mocks in widget tests.
@@ -104,6 +133,7 @@ class _GitScreenState extends State<GitScreen> {
 
   @override
   void dispose() {
+    _app?.releaseRequest.removeListener(_onRelease);
     _source
       ?..removeListener(_changed)
       ..dispose();
@@ -275,7 +305,7 @@ class _GitScreenState extends State<GitScreen> {
     return ScreenFrame(
       toolbar: toolbar,
       body: _releases
-          ? _ReleasesView(key: ValueKey('releases ${repo.id}'), source: source)
+          ? _ReleasesView(key: ValueKey('releases ${repo.id}'), source: source, asked: _releaseAsked)
           : LayoutBuilder(builder: (context, box) {
         if (box.maxWidth < 1000) {
           // Narrow window: the four sections stacked.

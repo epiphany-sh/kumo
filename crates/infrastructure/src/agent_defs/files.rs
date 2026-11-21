@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use kumo_domain::agent_defs::{AgentDefFiles, FoundFile, check_agent_name};
+use kumo_domain::agent_defs::{AgentDefFiles, FoundFile, FoundSkill, check_agent_name};
 use kumo_domain::agents::AgentError;
 use serde_json::Value;
 
@@ -99,17 +99,53 @@ impl AgentDefFiles for LocalAgentDefFiles {
         }
     }
 
-    fn folders(&self, dir: &Path) -> Vec<String> {
-        let mut names: Vec<String> = fs::read_dir(dir)
+    fn skills(&self, dir: &Path) -> Vec<FoundSkill> {
+        let mut skills: Vec<FoundSkill> = fs::read_dir(dir)
             .into_iter()
             .flatten()
             .flatten()
             .filter(|e| e.path().is_dir())
-            .map(|e| e.file_name().to_string_lossy().into_owned())
-            .filter(|n| !n.starts_with('.'))
+            .map(|e| (e.file_name().to_string_lossy().into_owned(), e.path()))
+            .filter(|(n, _)| !n.starts_with('.'))
+            .map(|(name, path)| FoundSkill {
+                description: head(&path.join("SKILL.md"))
+                    .map(|md| skill_description(&md))
+                    .unwrap_or_default(),
+                name,
+            })
             .collect();
-        names.sort();
-        names
+        skills.sort_by(|a, b| a.name.cmp(&b.name));
+        skills
+    }
+
+    fn plugins(&self, claude_dir: &Path) -> Vec<(String, PathBuf)> {
+        let Some(installed) = json(&claude_dir.join("plugins").join("installed_plugins.json"))
+        else {
+            return Vec::new();
+        };
+        let Some(plugins) = installed.get("plugins").and_then(Value::as_object) else {
+            return Vec::new();
+        };
+        let mut found: Vec<(String, PathBuf)> = plugins
+            .iter()
+            .filter_map(|(key, installs)| {
+                // `<plugin>@<marketplace>`: Claude Code names its skills
+                // `<plugin>:<skill>`.
+                let name = key.split('@').next()?.trim();
+                let ok = !name.is_empty()
+                    && name
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.');
+                let path = installs
+                    .as_array()?
+                    .iter()
+                    .find_map(|i| i.get("installPath").and_then(Value::as_str))?;
+                ok.then(|| (name.to_owned(), PathBuf::from(path)))
+            })
+            .collect();
+        found.sort();
+        found.dedup_by(|a, b| a.0 == b.0);
+        found
     }
 
     fn mcp_servers(&self, config: &Path, repos: &[PathBuf]) -> Vec<String> {
@@ -174,6 +210,66 @@ impl AgentDefFiles for LocalAgentDefFiles {
     }
 }
 
+/// The start of a file (where its frontmatter is): a `SKILL.md` can be long.
+fn head(path: &Path) -> Option<String> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    fs::File::open(path)
+        .ok()?
+        .take(16 * 1024)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// The `description` of a `SKILL.md`'s frontmatter, on one line: plain,
+/// quoted or a folded (`>`) or literal (`|`) block.
+fn skill_description(markdown: &str) -> String {
+    let mut lines = markdown.lines();
+    if lines.next().map(str::trim) != Some("---") {
+        return String::new();
+    }
+    let mut text = String::new();
+    let mut block = false;
+    for line in lines {
+        if line.trim() == "---" {
+            break;
+        }
+        if block {
+            if line.starts_with([' ', '\t']) || line.trim().is_empty() {
+                text.push(' ');
+                text.push_str(line.trim());
+                continue;
+            }
+            break;
+        }
+        if let Some(value) = line.strip_prefix("description:") {
+            let value = value.trim();
+            if value.starts_with(['>', '|']) {
+                block = true;
+                continue;
+            }
+            text = unquote(value);
+            break;
+        }
+    }
+    let one_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    one_line.chars().take(400).collect()
+}
+
+fn unquote(value: &str) -> String {
+    for q in ['"', '\''] {
+        if let Some(inner) = value.strip_prefix(q).and_then(|v| v.strip_suffix(q)) {
+            return if q == '"' {
+                inner.replace("\\\"", "\"")
+            } else {
+                inner.replace("''", "'")
+            };
+        }
+    }
+    value.to_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -218,7 +314,52 @@ mod tests {
         fs::create_dir_all(skills.join("go-tests")).unwrap();
         fs::create_dir_all(skills.join(".hidden")).unwrap();
         fs::write(skills.join("file.md"), "").unwrap();
-        assert_eq!(LocalAgentDefFiles.folders(&skills), ["go-tests"]);
+        fs::create_dir_all(skills.join("sql-review")).unwrap();
+        fs::write(
+            skills.join("sql-review/SKILL.md"),
+            "---\nname: sql-review\ndescription: >\n  Reviews SQL migrations\n  before they ship.\n---\n# SQL\n",
+        )
+        .unwrap();
+        fs::write(
+            skills.join("go-tests/SKILL.md"),
+            "---\nname: go-tests\ndescription: \"Table tests, the \\\"Go\\\" way\"\n---\n",
+        )
+        .unwrap();
+        let found = LocalAgentDefFiles.skills(&skills);
+        let got: Vec<(&str, &str)> = found
+            .iter()
+            .map(|s| (s.name.as_str(), s.description.as_str()))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                ("go-tests", "Table tests, the \"Go\" way"),
+                ("sql-review", "Reviews SQL migrations before they ship.")
+            ]
+        );
+        assert_eq!(skill_description("# no frontmatter\ndescription: x"), "");
+
+        let plugins = dir.path().join("plugins");
+        fs::create_dir_all(&plugins).unwrap();
+        fs::write(
+            plugins.join("installed_plugins.json"),
+            serde_json::json!({"version": 2, "plugins": {
+                "lint-kit@market": [{"scope": "user", "installPath": "/p/lint-kit/1.0.0"}],
+                "../bad@market": [{"installPath": "/p/bad"}],
+                "empty@market": []
+            }})
+            .to_string(),
+        )
+        .unwrap();
+        assert_eq!(
+            LocalAgentDefFiles.plugins(dir.path()),
+            [("lint-kit".to_owned(), PathBuf::from("/p/lint-kit/1.0.0"))]
+        );
+        assert!(
+            LocalAgentDefFiles
+                .plugins(&dir.path().join("none"))
+                .is_empty()
+        );
 
         let repo = dir.path().join("app");
         fs::create_dir_all(&repo).unwrap();

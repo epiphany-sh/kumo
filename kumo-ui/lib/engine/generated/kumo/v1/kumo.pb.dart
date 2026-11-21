@@ -6939,6 +6939,10 @@ class AgentProvider extends $pb.GeneratedMessage {
     $core.bool? usageReadable,
     $core.bool? readUsage,
     $core.bool? ownSignIn,
+    $core.Iterable<AgentModelChoice>? models,
+    $core.Iterable<$core.String>? efforts,
+    $core.String? noEffortWith,
+    $core.bool? tunable,
   }) {
     final result = AgentProvider._();
     if (id != null) result.id = id;
@@ -6958,6 +6962,10 @@ class AgentProvider extends $pb.GeneratedMessage {
     if (usageReadable != null) result.usageReadable = usageReadable;
     if (readUsage != null) result.readUsage = readUsage;
     if (ownSignIn != null) result.ownSignIn = ownSignIn;
+    if (models != null) result.models.addAll(models);
+    if (efforts != null) result.efforts.addAll(efforts);
+    if (noEffortWith != null) result.noEffortWith = noEffortWith;
+    if (tunable != null) result.tunable = tunable;
     return result;
   }
 
@@ -6990,6 +6998,11 @@ class AgentProvider extends $pb.GeneratedMessage {
     ..aOB(14, _omitFieldNames ? '' : 'usageReadable')
     ..aOB(15, _omitFieldNames ? '' : 'readUsage')
     ..aOB(16, _omitFieldNames ? '' : 'ownSignIn')
+    ..pPM<AgentModelChoice>(17, _omitFieldNames ? '' : 'models',
+        subBuilder: AgentModelChoice.$_createMessage)
+    ..pPS(18, _omitFieldNames ? '' : 'efforts')
+    ..aOS(19, _omitFieldNames ? '' : 'noEffortWith')
+    ..aOB(20, _omitFieldNames ? '' : 'tunable')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7168,6 +7181,117 @@ class AgentProvider extends $pb.GeneratedMessage {
   $core.bool hasOwnSignIn() => $_has(15);
   @$pb.TagNumber(16)
   void clearOwnSignIn() => $_clearField(16);
+
+  /// The models it can be started with: what the CLI lists for its account
+  /// (Codex), else what it documents (Claude Code's aliases). Only these
+  /// are taken.
+  @$pb.TagNumber(17)
+  $pb.PbList<AgentModelChoice> get models => $_getList(16);
+
+  /// Effort levels of its default model (and of models that list none),
+  /// lowest first. Empty: it has no such setting.
+  @$pb.TagNumber(18)
+  $pb.PbList<$core.String> get efforts => $_getList(17);
+
+  /// A model with which it takes no effort (Copilot's "auto": it picks both).
+  @$pb.TagNumber(19)
+  $core.String get noEffortWith => $_getSZ(18);
+  @$pb.TagNumber(19)
+  set noEffortWith($core.String value) => $_setString(18, value);
+  @$pb.TagNumber(19)
+  $core.bool hasNoEffortWith() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearNoEffortWith() => $_clearField(19);
+
+  /// Kumo can start it with a model and effort (known CLIs it has checked).
+  /// Empty model and effort always mean the CLI's own settings.
+  @$pb.TagNumber(20)
+  $core.bool get tunable => $_getBF(19);
+  @$pb.TagNumber(20)
+  set tunable($core.bool value) => $_setBool(19, value);
+  @$pb.TagNumber(20)
+  $core.bool hasTunable() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearTunable() => $_clearField(20);
+}
+
+/// A model a CLI can be started with.
+class AgentModelChoice extends $pb.GeneratedMessage {
+  factory AgentModelChoice({
+    $core.String? id,
+    $core.String? name,
+    $core.Iterable<$core.String>? efforts,
+  }) {
+    final result = AgentModelChoice._();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (efforts != null) result.efforts.addAll(efforts);
+    return result;
+  }
+
+  AgentModelChoice._();
+
+  factory AgentModelChoice.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AgentModelChoice()..mergeFromBuffer(data, registry);
+  factory AgentModelChoice.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AgentModelChoice()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AgentModelChoice',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: AgentModelChoice.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..pPS(3, _omitFieldNames ? '' : 'efforts')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AgentModelChoice clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AgentModelChoice copyWith(void Function(AgentModelChoice) updates) =>
+      super.copyWith((message) => updates(message as AgentModelChoice))
+          as AgentModelChoice;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use AgentModelChoice() / AgentModelChoice.new instead')
+  static AgentModelChoice create() => AgentModelChoice._();
+  static $pb.GeneratedMessage $_createMessage() => AgentModelChoice._();
+  @$core.override
+  AgentModelChoice createEmptyInstance() => AgentModelChoice._();
+  @$core.pragma('dart2js:noInline')
+  static AgentModelChoice getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AgentModelChoice>(
+          AgentModelChoice.$_createMessage);
+  static AgentModelChoice? _defaultInstance;
+
+  /// As the CLI names it: "opus", "gpt-6-luna".
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  /// As it shows it: "GPT-6-Luna".
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  /// The effort levels it takes, lowest first; empty: the provider's.
+  @$pb.TagNumber(3)
+  $pb.PbList<$core.String> get efforts => $_getList(2);
 }
 
 class ListProvidersRequest extends $pb.GeneratedMessage {
@@ -7743,6 +7867,9 @@ class StartAgentRequest extends $pb.GeneratedMessage {
     $core.int? cols,
     $core.int? rows,
     $core.Iterable<AgentContext>? context,
+    $core.String? model,
+    $core.String? effort,
+    $core.String? todoId,
   }) {
     final result = StartAgentRequest._();
     if (providerId != null) result.providerId = providerId;
@@ -7752,6 +7879,9 @@ class StartAgentRequest extends $pb.GeneratedMessage {
     if (cols != null) result.cols = cols;
     if (rows != null) result.rows = rows;
     if (context != null) result.context.addAll(context);
+    if (model != null) result.model = model;
+    if (effort != null) result.effort = effort;
+    if (todoId != null) result.todoId = todoId;
     return result;
   }
 
@@ -7776,6 +7906,9 @@ class StartAgentRequest extends $pb.GeneratedMessage {
     ..aI(6, _omitFieldNames ? '' : 'rows', fieldType: $pb.PbFieldType.OU3)
     ..pPM<AgentContext>(7, _omitFieldNames ? '' : 'context',
         subBuilder: AgentContext.$_createMessage)
+    ..aOS(8, _omitFieldNames ? '' : 'model')
+    ..aOS(9, _omitFieldNames ? '' : 'effort')
+    ..aOS(10, _omitFieldNames ? '' : 'todoId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7859,6 +7992,37 @@ class StartAgentRequest extends $pb.GeneratedMessage {
   /// What the prompt hands it (a ticket, a page), for the record.
   @$pb.TagNumber(7)
   $pb.PbList<AgentContext> get context => $_getList(6);
+
+  /// One of the provider's `models`; empty: its own default.
+  @$pb.TagNumber(8)
+  $core.String get model => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set model($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasModel() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearModel() => $_clearField(8);
+
+  /// One of the provider's `efforts`; empty: its own default.
+  @$pb.TagNumber(9)
+  $core.String get effort => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set effort($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasEffort() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearEffort() => $_clearField(9);
+
+  /// The TODO it works on: it gets `KUMO_TODO` and is told how to report
+  /// its progress with `kumod todo`.
+  @$pb.TagNumber(10)
+  $core.String get todoId => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set todoId($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasTodoId() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearTodoId() => $_clearField(10);
 }
 
 /// A ticket, page or piece of code an agent was given.
@@ -11216,11 +11380,13 @@ class AgentDefCapabilities extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? skills,
     $core.Iterable<$core.String>? mcpServers,
     $core.bool? triggersSupported,
+    $core.Iterable<AgentSkill>? skillList,
   }) {
     final result = AgentDefCapabilities._();
     if (skills != null) result.skills.addAll(skills);
     if (mcpServers != null) result.mcpServers.addAll(mcpServers);
     if (triggersSupported != null) result.triggersSupported = triggersSupported;
+    if (skillList != null) result.skillList.addAll(skillList);
     return result;
   }
 
@@ -11240,6 +11406,8 @@ class AgentDefCapabilities extends $pb.GeneratedMessage {
     ..pPS(1, _omitFieldNames ? '' : 'skills')
     ..pPS(2, _omitFieldNames ? '' : 'mcpServers')
     ..aOB(3, _omitFieldNames ? '' : 'triggersSupported')
+    ..pPM<AgentSkill>(4, _omitFieldNames ? '' : 'skillList',
+        subBuilder: AgentSkill.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -11283,6 +11451,107 @@ class AgentDefCapabilities extends $pb.GeneratedMessage {
   $core.bool hasTriggersSupported() => $_has(2);
   @$pb.TagNumber(3)
   void clearTriggersSupported() => $_clearField(3);
+
+  /// The skills with what they're for and where they come from: personal
+  /// ones, each repository's, then each installed plugin's (named
+  /// `<plugin>:<skill>`). Each name once.
+  @$pb.TagNumber(4)
+  $pb.PbList<AgentSkill> get skillList => $_getList(3);
+}
+
+class AgentSkill extends $pb.GeneratedMessage {
+  factory AgentSkill({
+    $core.String? name,
+    $core.String? description,
+    AgentSkillFrom? from,
+    $core.String? fromName,
+  }) {
+    final result = AgentSkill._();
+    if (name != null) result.name = name;
+    if (description != null) result.description = description;
+    if (from != null) result.from = from;
+    if (fromName != null) result.fromName = fromName;
+    return result;
+  }
+
+  AgentSkill._();
+
+  factory AgentSkill.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AgentSkill()..mergeFromBuffer(data, registry);
+  factory AgentSkill.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AgentSkill()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AgentSkill',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: AgentSkill.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aOS(2, _omitFieldNames ? '' : 'description')
+    ..aE<AgentSkillFrom>(3, _omitFieldNames ? '' : 'from',
+        enumValues: AgentSkillFrom.values)
+    ..aOS(4, _omitFieldNames ? '' : 'fromName')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AgentSkill clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AgentSkill copyWith(void Function(AgentSkill) updates) =>
+      super.copyWith((message) => updates(message as AgentSkill)) as AgentSkill;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use AgentSkill() / AgentSkill.new instead')
+  static AgentSkill create() => AgentSkill._();
+  static $pb.GeneratedMessage $_createMessage() => AgentSkill._();
+  @$core.override
+  AgentSkill createEmptyInstance() => AgentSkill._();
+  @$core.pragma('dart2js:noInline')
+  static AgentSkill getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<AgentSkill>(AgentSkill.$_createMessage);
+  static AgentSkill? _defaultInstance;
+
+  /// As the agent file lists it.
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => $_clearField(1);
+
+  /// From its SKILL.md, on one line; may be empty.
+  @$pb.TagNumber(2)
+  $core.String get description => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set description($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDescription() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDescription() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  AgentSkillFrom get from => $_getN(2);
+  @$pb.TagNumber(3)
+  set from(AgentSkillFrom value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFrom() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFrom() => $_clearField(3);
+
+  /// The repository's or the plugin's name; empty for personal ones.
+  @$pb.TagNumber(4)
+  $core.String get fromName => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set fromName($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFromName() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFromName() => $_clearField(4);
 }
 
 class TaskSource extends $pb.GeneratedMessage {
@@ -18753,6 +19022,1022 @@ class StopTestsResponse extends $pb.GeneratedMessage {
       _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<StopTestsResponse>(
           StopTestsResponse.$_createMessage);
   static StopTestsResponse? _defaultInstance;
+}
+
+/// Where a TODO runs once handed to an agent.
+class TodoRun extends $pb.GeneratedMessage {
+  factory TodoRun({
+    $core.String? repoPath,
+    $core.String? worktreePath,
+    $core.String? branch,
+    $core.String? base,
+    $core.String? providerId,
+    $core.String? agentName,
+    $core.String? model,
+    $core.String? effort,
+    $core.String? sessionId,
+    $fixnum.Int64? prNumber,
+    $core.String? prUrl,
+  }) {
+    final result = TodoRun._();
+    if (repoPath != null) result.repoPath = repoPath;
+    if (worktreePath != null) result.worktreePath = worktreePath;
+    if (branch != null) result.branch = branch;
+    if (base != null) result.base = base;
+    if (providerId != null) result.providerId = providerId;
+    if (agentName != null) result.agentName = agentName;
+    if (model != null) result.model = model;
+    if (effort != null) result.effort = effort;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (prNumber != null) result.prNumber = prNumber;
+    if (prUrl != null) result.prUrl = prUrl;
+    return result;
+  }
+
+  TodoRun._();
+
+  factory TodoRun.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TodoRun()..mergeFromBuffer(data, registry);
+  factory TodoRun.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TodoRun()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TodoRun',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TodoRun.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'repoPath')
+    ..aOS(2, _omitFieldNames ? '' : 'worktreePath')
+    ..aOS(3, _omitFieldNames ? '' : 'branch')
+    ..aOS(4, _omitFieldNames ? '' : 'base')
+    ..aOS(5, _omitFieldNames ? '' : 'providerId')
+    ..aOS(6, _omitFieldNames ? '' : 'agentName')
+    ..aOS(7, _omitFieldNames ? '' : 'model')
+    ..aOS(8, _omitFieldNames ? '' : 'effort')
+    ..aOS(9, _omitFieldNames ? '' : 'sessionId')
+    ..a<$fixnum.Int64>(
+        10, _omitFieldNames ? '' : 'prNumber', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(11, _omitFieldNames ? '' : 'prUrl')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TodoRun clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TodoRun copyWith(void Function(TodoRun) updates) =>
+      super.copyWith((message) => updates(message as TodoRun)) as TodoRun;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TodoRun() / TodoRun.new instead')
+  static TodoRun create() => TodoRun._();
+  static $pb.GeneratedMessage $_createMessage() => TodoRun._();
+  @$core.override
+  TodoRun createEmptyInstance() => TodoRun._();
+  @$core.pragma('dart2js:noInline')
+  static TodoRun getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TodoRun>(TodoRun.$_createMessage);
+  static TodoRun? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get repoPath => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set repoPath($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRepoPath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRepoPath() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get worktreePath => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set worktreePath($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasWorktreePath() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearWorktreePath() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get branch => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set branch($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBranch() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBranch() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get base => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set base($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasBase() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearBase() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get providerId => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set providerId($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasProviderId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearProviderId() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get agentName => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set agentName($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasAgentName() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAgentName() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get model => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set model($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasModel() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearModel() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get effort => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set effort($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasEffort() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearEffort() => $_clearField(8);
+
+  /// The agent session working on it; empty once it's gone.
+  @$pb.TagNumber(9)
+  $core.String get sessionId => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set sessionId($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasSessionId() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearSessionId() => $_clearField(9);
+
+  /// Its pull request, once there is one.
+  @$pb.TagNumber(10)
+  $fixnum.Int64 get prNumber => $_getI64(9);
+  @$pb.TagNumber(10)
+  set prNumber($fixnum.Int64 value) => $_setInt64(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasPrNumber() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearPrNumber() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.String get prUrl => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set prUrl($core.String value) => $_setString(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasPrUrl() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearPrUrl() => $_clearField(11);
+}
+
+/// When it reached a status, and who moved it there ("Claude Code", "You",
+/// "Kumo").
+class TodoStep extends $pb.GeneratedMessage {
+  factory TodoStep({
+    TodoStatus? status,
+    $core.String? by,
+    $fixnum.Int64? atUnixMs,
+    $core.String? note,
+  }) {
+    final result = TodoStep._();
+    if (status != null) result.status = status;
+    if (by != null) result.by = by;
+    if (atUnixMs != null) result.atUnixMs = atUnixMs;
+    if (note != null) result.note = note;
+    return result;
+  }
+
+  TodoStep._();
+
+  factory TodoStep.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TodoStep()..mergeFromBuffer(data, registry);
+  factory TodoStep.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TodoStep()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TodoStep',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TodoStep.$_createMessage)
+    ..aE<TodoStatus>(1, _omitFieldNames ? '' : 'status',
+        enumValues: TodoStatus.values)
+    ..aOS(2, _omitFieldNames ? '' : 'by')
+    ..a<$fixnum.Int64>(
+        3, _omitFieldNames ? '' : 'atUnixMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(4, _omitFieldNames ? '' : 'note')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TodoStep clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TodoStep copyWith(void Function(TodoStep) updates) =>
+      super.copyWith((message) => updates(message as TodoStep)) as TodoStep;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TodoStep() / TodoStep.new instead')
+  static TodoStep create() => TodoStep._();
+  static $pb.GeneratedMessage $_createMessage() => TodoStep._();
+  @$core.override
+  TodoStep createEmptyInstance() => TodoStep._();
+  @$core.pragma('dart2js:noInline')
+  static TodoStep getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TodoStep>(TodoStep.$_createMessage);
+  static TodoStep? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  TodoStatus get status => $_getN(0);
+  @$pb.TagNumber(1)
+  set status(TodoStatus value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStatus() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStatus() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get by => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set by($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBy() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBy() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get atUnixMs => $_getI64(2);
+  @$pb.TagNumber(3)
+  set atUnixMs($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAtUnixMs() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAtUnixMs() => $_clearField(3);
+
+  /// What it said with it, e.g. "48 tests pass".
+  @$pb.TagNumber(4)
+  $core.String get note => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set note($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasNote() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearNote() => $_clearField(4);
+}
+
+class Todo extends $pb.GeneratedMessage {
+  factory Todo({
+    $core.String? id,
+    $core.String? title,
+    $core.String? notes,
+    $core.String? repoPath,
+    $core.bool? done,
+    $fixnum.Int64? createdUnixMs,
+    TodoStatus? status,
+    TodoRun? run,
+    $core.Iterable<TodoStep>? steps,
+  }) {
+    final result = Todo._();
+    if (id != null) result.id = id;
+    if (title != null) result.title = title;
+    if (notes != null) result.notes = notes;
+    if (repoPath != null) result.repoPath = repoPath;
+    if (done != null) result.done = done;
+    if (createdUnixMs != null) result.createdUnixMs = createdUnixMs;
+    if (status != null) result.status = status;
+    if (run != null) result.run = run;
+    if (steps != null) result.steps.addAll(steps);
+    return result;
+  }
+
+  Todo._();
+
+  factory Todo.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Todo()..mergeFromBuffer(data, registry);
+  factory Todo.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      Todo()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Todo',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: Todo.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'title')
+    ..aOS(3, _omitFieldNames ? '' : 'notes')
+    ..aOS(4, _omitFieldNames ? '' : 'repoPath')
+    ..aOB(5, _omitFieldNames ? '' : 'done')
+    ..a<$fixnum.Int64>(
+        6, _omitFieldNames ? '' : 'createdUnixMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aE<TodoStatus>(7, _omitFieldNames ? '' : 'status',
+        enumValues: TodoStatus.values)
+    ..aOM<TodoRun>(8, _omitFieldNames ? '' : 'run',
+        subBuilder: TodoRun.$_createMessage)
+    ..pPM<TodoStep>(9, _omitFieldNames ? '' : 'steps',
+        subBuilder: TodoStep.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Todo clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Todo copyWith(void Function(Todo) updates) =>
+      super.copyWith((message) => updates(message as Todo)) as Todo;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use Todo() / Todo.new instead')
+  static Todo create() => Todo._();
+  static $pb.GeneratedMessage $_createMessage() => Todo._();
+  @$core.override
+  Todo createEmptyInstance() => Todo._();
+  @$core.pragma('dart2js:noInline')
+  static Todo getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<Todo>(Todo.$_createMessage);
+  static Todo? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get title => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set title($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTitle() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTitle() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get notes => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set notes($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasNotes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearNotes() => $_clearField(3);
+
+  /// The repository it's about; empty: any.
+  @$pb.TagNumber(4)
+  $core.String get repoPath => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set repoPath($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRepoPath() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRepoPath() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get done => $_getBF(4);
+  @$pb.TagNumber(5)
+  set done($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDone() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDone() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get createdUnixMs => $_getI64(5);
+  @$pb.TagNumber(6)
+  set createdUnixMs($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCreatedUnixMs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCreatedUnixMs() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  TodoStatus get status => $_getN(6);
+  @$pb.TagNumber(7)
+  set status(TodoStatus value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasStatus() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearStatus() => $_clearField(7);
+
+  /// Unset until it's handed to an agent.
+  @$pb.TagNumber(8)
+  TodoRun get run => $_getN(7);
+  @$pb.TagNumber(8)
+  set run(TodoRun value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasRun() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearRun() => $_clearField(8);
+  @$pb.TagNumber(8)
+  TodoRun ensureRun() => $_ensure(7);
+
+  /// Oldest first; the last one is the current status.
+  @$pb.TagNumber(9)
+  $pb.PbList<TodoStep> get steps => $_getList(8);
+}
+
+class TodoList extends $pb.GeneratedMessage {
+  factory TodoList({
+    $core.Iterable<Todo>? todos,
+  }) {
+    final result = TodoList._();
+    if (todos != null) result.todos.addAll(todos);
+    return result;
+  }
+
+  TodoList._();
+
+  factory TodoList.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TodoList()..mergeFromBuffer(data, registry);
+  factory TodoList.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      TodoList()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TodoList',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: TodoList.$_createMessage)
+    ..pPM<Todo>(1, _omitFieldNames ? '' : 'todos',
+        subBuilder: Todo.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TodoList clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TodoList copyWith(void Function(TodoList) updates) =>
+      super.copyWith((message) => updates(message as TodoList)) as TodoList;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use TodoList() / TodoList.new instead')
+  static TodoList create() => TodoList._();
+  static $pb.GeneratedMessage $_createMessage() => TodoList._();
+  @$core.override
+  TodoList createEmptyInstance() => TodoList._();
+  @$core.pragma('dart2js:noInline')
+  static TodoList getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TodoList>(TodoList.$_createMessage);
+  static TodoList? _defaultInstance;
+
+  /// Newest first.
+  @$pb.TagNumber(1)
+  $pb.PbList<Todo> get todos => $_getList(0);
+}
+
+class WatchTodosRequest extends $pb.GeneratedMessage {
+  factory WatchTodosRequest() => WatchTodosRequest._();
+
+  WatchTodosRequest._();
+
+  factory WatchTodosRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WatchTodosRequest()..mergeFromBuffer(data, registry);
+  factory WatchTodosRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      WatchTodosRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'WatchTodosRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: WatchTodosRequest.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchTodosRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  WatchTodosRequest copyWith(void Function(WatchTodosRequest) updates) =>
+      super.copyWith((message) => updates(message as WatchTodosRequest))
+          as WatchTodosRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use WatchTodosRequest() / WatchTodosRequest.new instead')
+  static WatchTodosRequest create() => WatchTodosRequest._();
+  static $pb.GeneratedMessage $_createMessage() => WatchTodosRequest._();
+  @$core.override
+  WatchTodosRequest createEmptyInstance() => WatchTodosRequest._();
+  @$core.pragma('dart2js:noInline')
+  static WatchTodosRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<WatchTodosRequest>(
+          WatchTodosRequest.$_createMessage);
+  static WatchTodosRequest? _defaultInstance;
+}
+
+class AddTodoRequest extends $pb.GeneratedMessage {
+  factory AddTodoRequest({
+    $core.String? title,
+    $core.String? notes,
+    $core.String? repoPath,
+  }) {
+    final result = AddTodoRequest._();
+    if (title != null) result.title = title;
+    if (notes != null) result.notes = notes;
+    if (repoPath != null) result.repoPath = repoPath;
+    return result;
+  }
+
+  AddTodoRequest._();
+
+  factory AddTodoRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AddTodoRequest()..mergeFromBuffer(data, registry);
+  factory AddTodoRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AddTodoRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AddTodoRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: AddTodoRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'title')
+    ..aOS(2, _omitFieldNames ? '' : 'notes')
+    ..aOS(3, _omitFieldNames ? '' : 'repoPath')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AddTodoRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AddTodoRequest copyWith(void Function(AddTodoRequest) updates) =>
+      super.copyWith((message) => updates(message as AddTodoRequest))
+          as AddTodoRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use AddTodoRequest() / AddTodoRequest.new instead')
+  static AddTodoRequest create() => AddTodoRequest._();
+  static $pb.GeneratedMessage $_createMessage() => AddTodoRequest._();
+  @$core.override
+  AddTodoRequest createEmptyInstance() => AddTodoRequest._();
+  @$core.pragma('dart2js:noInline')
+  static AddTodoRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AddTodoRequest>(
+          AddTodoRequest.$_createMessage);
+  static AddTodoRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get title => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set title($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTitle() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTitle() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get notes => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set notes($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNotes() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNotes() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get repoPath => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set repoPath($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRepoPath() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRepoPath() => $_clearField(3);
+}
+
+class UpdateTodoRequest extends $pb.GeneratedMessage {
+  factory UpdateTodoRequest({
+    $core.String? id,
+    $core.String? title,
+    $core.String? notes,
+    $core.String? repoPath,
+    $core.bool? done,
+  }) {
+    final result = UpdateTodoRequest._();
+    if (id != null) result.id = id;
+    if (title != null) result.title = title;
+    if (notes != null) result.notes = notes;
+    if (repoPath != null) result.repoPath = repoPath;
+    if (done != null) result.done = done;
+    return result;
+  }
+
+  UpdateTodoRequest._();
+
+  factory UpdateTodoRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateTodoRequest()..mergeFromBuffer(data, registry);
+  factory UpdateTodoRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      UpdateTodoRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UpdateTodoRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: UpdateTodoRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'title')
+    ..aOS(3, _omitFieldNames ? '' : 'notes')
+    ..aOS(4, _omitFieldNames ? '' : 'repoPath')
+    ..aOB(5, _omitFieldNames ? '' : 'done')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateTodoRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UpdateTodoRequest copyWith(void Function(UpdateTodoRequest) updates) =>
+      super.copyWith((message) => updates(message as UpdateTodoRequest))
+          as UpdateTodoRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use UpdateTodoRequest() / UpdateTodoRequest.new instead')
+  static UpdateTodoRequest create() => UpdateTodoRequest._();
+  static $pb.GeneratedMessage $_createMessage() => UpdateTodoRequest._();
+  @$core.override
+  UpdateTodoRequest createEmptyInstance() => UpdateTodoRequest._();
+  @$core.pragma('dart2js:noInline')
+  static UpdateTodoRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<UpdateTodoRequest>(
+          UpdateTodoRequest.$_createMessage);
+  static UpdateTodoRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get title => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set title($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTitle() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTitle() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get notes => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set notes($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasNotes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearNotes() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get repoPath => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set repoPath($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRepoPath() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRepoPath() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get done => $_getBF(4);
+  @$pb.TagNumber(5)
+  set done($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDone() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDone() => $_clearField(5);
+}
+
+class DeleteTodoRequest extends $pb.GeneratedMessage {
+  factory DeleteTodoRequest({
+    $core.String? id,
+  }) {
+    final result = DeleteTodoRequest._();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  DeleteTodoRequest._();
+
+  factory DeleteTodoRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteTodoRequest()..mergeFromBuffer(data, registry);
+  factory DeleteTodoRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteTodoRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteTodoRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DeleteTodoRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteTodoRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteTodoRequest copyWith(void Function(DeleteTodoRequest) updates) =>
+      super.copyWith((message) => updates(message as DeleteTodoRequest))
+          as DeleteTodoRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use DeleteTodoRequest() / DeleteTodoRequest.new instead')
+  static DeleteTodoRequest create() => DeleteTodoRequest._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteTodoRequest._();
+  @$core.override
+  DeleteTodoRequest createEmptyInstance() => DeleteTodoRequest._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteTodoRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<DeleteTodoRequest>(
+          DeleteTodoRequest.$_createMessage);
+  static DeleteTodoRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+}
+
+class DeleteTodoResponse extends $pb.GeneratedMessage {
+  factory DeleteTodoResponse() => DeleteTodoResponse._();
+
+  DeleteTodoResponse._();
+
+  factory DeleteTodoResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteTodoResponse()..mergeFromBuffer(data, registry);
+  factory DeleteTodoResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      DeleteTodoResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeleteTodoResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: DeleteTodoResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteTodoResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeleteTodoResponse copyWith(void Function(DeleteTodoResponse) updates) =>
+      super.copyWith((message) => updates(message as DeleteTodoResponse))
+          as DeleteTodoResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use DeleteTodoResponse() / DeleteTodoResponse.new instead')
+  static DeleteTodoResponse create() => DeleteTodoResponse._();
+  static $pb.GeneratedMessage $_createMessage() => DeleteTodoResponse._();
+  @$core.override
+  DeleteTodoResponse createEmptyInstance() => DeleteTodoResponse._();
+  @$core.pragma('dart2js:noInline')
+  static DeleteTodoResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeleteTodoResponse>(
+          DeleteTodoResponse.$_createMessage);
+  static DeleteTodoResponse? _defaultInstance;
+}
+
+class AttachTodoRequest extends $pb.GeneratedMessage {
+  factory AttachTodoRequest({
+    $core.String? id,
+    TodoRun? run,
+  }) {
+    final result = AttachTodoRequest._();
+    if (id != null) result.id = id;
+    if (run != null) result.run = run;
+    return result;
+  }
+
+  AttachTodoRequest._();
+
+  factory AttachTodoRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AttachTodoRequest()..mergeFromBuffer(data, registry);
+  factory AttachTodoRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      AttachTodoRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AttachTodoRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: AttachTodoRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOM<TodoRun>(2, _omitFieldNames ? '' : 'run',
+        subBuilder: TodoRun.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AttachTodoRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AttachTodoRequest copyWith(void Function(AttachTodoRequest) updates) =>
+      super.copyWith((message) => updates(message as AttachTodoRequest))
+          as AttachTodoRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use AttachTodoRequest() / AttachTodoRequest.new instead')
+  static AttachTodoRequest create() => AttachTodoRequest._();
+  static $pb.GeneratedMessage $_createMessage() => AttachTodoRequest._();
+  @$core.override
+  AttachTodoRequest createEmptyInstance() => AttachTodoRequest._();
+  @$core.pragma('dart2js:noInline')
+  static AttachTodoRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AttachTodoRequest>(
+          AttachTodoRequest.$_createMessage);
+  static AttachTodoRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  TodoRun get run => $_getN(1);
+  @$pb.TagNumber(2)
+  set run(TodoRun value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRun() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRun() => $_clearField(2);
+  @$pb.TagNumber(2)
+  TodoRun ensureRun() => $_ensure(1);
+}
+
+class SetTodoStatusRequest extends $pb.GeneratedMessage {
+  factory SetTodoStatusRequest({
+    $core.String? id,
+    TodoStatus? status,
+    $core.String? by,
+    $core.String? note,
+    $fixnum.Int64? prNumber,
+    $core.String? prUrl,
+    $core.bool? clearRun,
+  }) {
+    final result = SetTodoStatusRequest._();
+    if (id != null) result.id = id;
+    if (status != null) result.status = status;
+    if (by != null) result.by = by;
+    if (note != null) result.note = note;
+    if (prNumber != null) result.prNumber = prNumber;
+    if (prUrl != null) result.prUrl = prUrl;
+    if (clearRun != null) result.clearRun = clearRun;
+    return result;
+  }
+
+  SetTodoStatusRequest._();
+
+  factory SetTodoStatusRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetTodoStatusRequest()..mergeFromBuffer(data, registry);
+  factory SetTodoStatusRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetTodoStatusRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetTodoStatusRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SetTodoStatusRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aE<TodoStatus>(2, _omitFieldNames ? '' : 'status',
+        enumValues: TodoStatus.values)
+    ..aOS(3, _omitFieldNames ? '' : 'by')
+    ..aOS(4, _omitFieldNames ? '' : 'note')
+    ..a<$fixnum.Int64>(
+        5, _omitFieldNames ? '' : 'prNumber', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(6, _omitFieldNames ? '' : 'prUrl')
+    ..aOB(7, _omitFieldNames ? '' : 'clearRun')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetTodoStatusRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetTodoStatusRequest copyWith(void Function(SetTodoStatusRequest) updates) =>
+      super.copyWith((message) => updates(message as SetTodoStatusRequest))
+          as SetTodoStatusRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use SetTodoStatusRequest() / SetTodoStatusRequest.new instead')
+  static SetTodoStatusRequest create() => SetTodoStatusRequest._();
+  static $pb.GeneratedMessage $_createMessage() => SetTodoStatusRequest._();
+  @$core.override
+  SetTodoStatusRequest createEmptyInstance() => SetTodoStatusRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SetTodoStatusRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SetTodoStatusRequest>(
+          SetTodoStatusRequest.$_createMessage);
+  static SetTodoStatusRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  TodoStatus get status => $_getN(1);
+  @$pb.TagNumber(2)
+  set status(TodoStatus value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasStatus() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStatus() => $_clearField(2);
+
+  /// Who moved it: an agent's name, "You" or "Kumo".
+  @$pb.TagNumber(3)
+  $core.String get by => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set by($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBy() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBy() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get note => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set note($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasNote() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearNote() => $_clearField(4);
+
+  /// With TODO_STATUS_PR: the pull request.
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get prNumber => $_getI64(4);
+  @$pb.TagNumber(5)
+  set prNumber($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPrNumber() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPrNumber() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get prUrl => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set prUrl($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasPrUrl() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPrUrl() => $_clearField(6);
+
+  /// With TODO_STATUS_OPEN: forget the run too (cleaned up, or stopped).
+  @$pb.TagNumber(7)
+  $core.bool get clearRun => $_getBF(6);
+  @$pb.TagNumber(7)
+  set clearRun($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasClearRun() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearClearRun() => $_clearField(7);
 }
 
 const $core.bool _omitFieldNames =

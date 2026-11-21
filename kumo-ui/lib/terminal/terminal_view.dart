@@ -1113,7 +1113,7 @@ class _JumpToBottom extends StatelessWidget {
             height: 28,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              color: c.pop,
+              color: c.popSolid,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: c.popBorder),
             ),

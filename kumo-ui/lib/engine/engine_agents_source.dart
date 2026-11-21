@@ -156,7 +156,7 @@ class EngineAgentsSource extends AgentsSource {
   Future<String?> login(String id) async => (await _call((c) => c.loginProvider(pb.LoginProviderRequest(id: id))))?.terminalId;
 
   @override
-  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = '', List<AgentContextItem> context = const []}) async {
+  Future<AgentRun?> start({String? providerId, required String worktreePath, String prompt = '', String title = '', List<AgentContextItem> context = const [], String model = '', String effort = '', String todoId = ''}) async {
     final session = await _call((c) => c.start(pb.StartAgentRequest(
           providerId: providerId ?? '',
           worktreePath: worktreePath,
@@ -165,6 +165,9 @@ class EngineAgentsSource extends AgentsSource {
           cols: 120,
           rows: 40,
           context: [for (final item in context) _contextTo(item)],
+          model: model,
+          effort: effort,
+          todoId: todoId,
         )));
     return session == null ? null : _run(session);
   }
@@ -197,6 +200,10 @@ class EngineAgentsSource extends AgentsSource {
         installHint: p.installHint,
         takesPrompt: p.takesPromptArgument,
         hasLogin: p.hasLogin,
+        tunable: p.tunable,
+        models: List.unmodifiable([for (final m in p.models) AgentModelChoice(id: m.id, name: m.name, efforts: List.unmodifiable(m.efforts))]),
+        efforts: List.unmodifiable(p.efforts),
+        noEffortWith: p.noEffortWith,
       );
 
   static AgentRun _run(pb.AgentSession s) => agentRunFrom(s);

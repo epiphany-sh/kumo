@@ -21,6 +21,7 @@ use kumo_proto::v1::releases_server::ReleasesServer;
 use kumo_proto::v1::tasks_server::TasksServer;
 use kumo_proto::v1::terminals_server::TerminalsServer;
 use kumo_proto::v1::tests_server::TestsServer;
+use kumo_proto::v1::todos_server::TodosServer;
 use kumo_proto::v1::workspace_server::WorkspaceServer;
 use tokio::net::TcpListener;
 use tonic::transport::Server;
@@ -30,7 +31,7 @@ use crate::auth::RequireBearer;
 use crate::profile::Profiles;
 use crate::services::{
     AgentDefsGrpc, AgentsGrpc, CoreGrpc, DocsGrpc, GitGrpc, PipelinesGrpc, ProfilesGrpc,
-    PullRequestsGrpc, ReleasesGrpc, TasksGrpc, TerminalsGrpc, TestsGrpc, WorkspaceGrpc,
+    PullRequestsGrpc, ReleasesGrpc, TasksGrpc, TerminalsGrpc, TestsGrpc, TodosGrpc, WorkspaceGrpc,
 };
 
 /// Use cases the server exposes.
@@ -150,6 +151,10 @@ impl GrpcServer {
             ))
             .add_service(TestsServer::with_interceptor(
                 TestsGrpc::new(Arc::clone(&self.services.profiles)),
+                auth.clone(),
+            ))
+            .add_service(TodosServer::with_interceptor(
+                TodosGrpc::new(Arc::clone(&self.services.profiles)),
                 auth,
             ))
             .serve_with_incoming_shutdown(incoming, shutdown)
