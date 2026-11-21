@@ -104,7 +104,7 @@ class AppShell extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               if (s.demoWallpaper || !WindowEffects.nativeBackdrop) DemoWallpaper(palette: c),
-              ColoredBox(color: c.window),
+              WindowGlass(palette: c),
               Padding(
                 padding: const EdgeInsets.all(10),
                 child: Row(
