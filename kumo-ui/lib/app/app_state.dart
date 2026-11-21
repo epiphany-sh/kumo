@@ -1492,6 +1492,36 @@ class AppState extends ChangeNotifier {
     view = KumoView.agents;
   }
 
+  /// A ticket (a [TaskEntry.id]) the Tasks view should open next, asked
+  /// from elsewhere (⌘K). The view takes it and clears it.
+  final ticketRequest = ValueNotifier<String?>(null);
+
+  /// Opens the Tasks view on ticket [id].
+  void showTicket(String id) {
+    ticketRequest.value = id;
+    view = KumoView.tasks;
+  }
+
+  /// A page (a [DocSummary.id]) the Docs view should open next (⌘K). The
+  /// view takes it and clears it.
+  final docRequest = ValueNotifier<String?>(null);
+
+  /// Opens the Docs view on page [id].
+  void showDoc(String id) {
+    docRequest.value = id;
+    view = KumoView.docs;
+  }
+
+  /// A release or tag (its tag) of the current worktree's repository the
+  /// Git view should show next (⌘K). The view takes it and clears it.
+  final releaseRequest = ValueNotifier<String?>(null);
+
+  /// Opens the Git view's Releases on [tag], in the current repository.
+  void showRelease(String tag) {
+    releaseRequest.value = tag;
+    view = KumoView.git;
+  }
+
   final _queued = <(String, AgentContextItem, String)>[];
   bool _flushing = false;
 
@@ -1751,6 +1781,9 @@ class AppState extends ChangeNotifier {
       ..dispose();
     agentDefs.dispose();
     agentsRequest.dispose();
+    ticketRequest.dispose();
+    docRequest.dispose();
+    releaseRequest.dispose();
     tasks.dispose();
     usage
       ..removeListener(notifyListeners)

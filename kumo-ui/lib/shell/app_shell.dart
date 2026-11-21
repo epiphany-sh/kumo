@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../app/app_state.dart';
 import '../editor/comment.dart';
 import '../editor/quick_open.dart';
+import '../overlays/global_search.dart';
 import '../overlays/settings_dialog.dart';
 import '../platform/os/host_os.dart';
 import '../platform/os/key_combo.dart';
@@ -62,6 +63,7 @@ class AppShell extends StatelessWidget {
       map[hostOs.paneShortcut(PaneShortcut.closePane)] = close;
       map[hostOs.paneShortcut(PaneShortcut.newTab)] = () => s.sendTerminalCommand(TerminalCommand.newTerminal);
       bind(AppKeys.settings, () => showSettingsDialog(context));
+      bind(AppKeys.search, () => showGlobalSearch(context, s));
 
       // The editor's keys: ⌘ on macOS, Ctrl elsewhere (AppKeys). Off macOS
       // they only exist while a file shows, so a terminal keeps Ctrl+F,
