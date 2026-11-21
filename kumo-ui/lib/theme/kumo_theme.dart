@@ -82,7 +82,7 @@ ThemeData materialThemeFor(KumoPalette c) {
   final scheme = ColorScheme.fromSeed(
     seedColor: c.acc,
     brightness: c.brightness,
-  ).copyWith(primary: c.accFill, onPrimary: c.accText, surface: c.pop, onSurface: c.text);
+  ).copyWith(primary: c.accFill, onPrimary: c.accText, surface: c.popSolid, onSurface: c.text);
   return ThemeData(
     useMaterial3: true,
     brightness: c.brightness,
@@ -106,7 +106,7 @@ ThemeData materialThemeFor(KumoPalette c) {
       radius: const Radius.circular(3),
     ),
     tooltipTheme: TooltipThemeData(
-      decoration: BoxDecoration(color: c.pop, borderRadius: BorderRadius.circular(8), border: Border.all(color: c.popBorder)),
+      decoration: BoxDecoration(color: c.popSolid, borderRadius: BorderRadius.circular(8), border: Border.all(color: c.popBorder)),
       textStyle: sans(11.5, color: c.text),
       waitDuration: const Duration(milliseconds: 500),
     ),

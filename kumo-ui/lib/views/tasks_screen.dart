@@ -63,8 +63,32 @@ class _TasksScreenState extends State<TasksScreen> {
     _query.addListener(() => setState(() {}));
   }
 
+  AppState? _app;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final app = AppScope.read(context);
+    if (identical(app, _app)) return;
+    _app?.ticketRequest.removeListener(_onRequest);
+    _app = app..ticketRequest.addListener(_onRequest);
+    _onRequest();
+  }
+
+  /// A ticket asked from elsewhere (⌘K): opened in the panel, whatever
+  /// the board's filters show.
+  void _onRequest() {
+    final app = _app;
+    final id = app?.ticketRequest.value;
+    if (app == null || id == null || !mounted) return;
+    app.ticketRequest.value = null;
+    _select(id);
+    _keys.requestFocus();
+  }
+
   @override
   void dispose() {
+    _app?.ticketRequest.removeListener(_onRequest);
     _query.dispose();
     _keys.dispose();
     for (final s in _scrollers.values) {
