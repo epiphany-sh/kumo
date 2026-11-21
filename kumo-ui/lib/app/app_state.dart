@@ -289,7 +289,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  double _translucency = 0.55;
+  double _translucency = 0.6;
   double get translucency => _translucency;
   set translucency(double v) {
     _translucency = v.clamp(0.25, 0.9);
