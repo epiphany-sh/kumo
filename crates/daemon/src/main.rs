@@ -39,6 +39,13 @@ enum Tool {
         /// `get`, `store` or `erase` (only `get` answers).
         operation: String,
     },
+    /// An agent working on a TODO reports how it goes: `working`, `testing`
+    /// or `review`, with an optional one-line note. Reads `KUMO_TODO`.
+    Todo {
+        status: String,
+        /// e.g. "48 tests pass".
+        note: Option<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -67,6 +74,23 @@ async fn async_main(args: Args) -> ExitCode {
             kumod::git_credential::run(&data_dir, operation).await;
         }
         return ExitCode::SUCCESS;
+    }
+    if let Some(Tool::Todo { status, note }) = &args.command {
+        let data_dir = args.data_dir.clone().or_else(|| {
+            dirs::data_local_dir().map(|d| d.join(kumo_infrastructure::channel::app_name()))
+        });
+        let reported = match data_dir {
+            Some(data_dir) => {
+                kumod::todo_report::run(&data_dir, status, note.as_deref().unwrap_or_default())
+                    .await
+            }
+            None => false,
+        };
+        return if reported {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
     }
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))

@@ -13,6 +13,7 @@ import '../data/docs_source.dart';
 import '../data/pull_requests_source.dart';
 import '../data/tasks_source.dart';
 import '../data/tests_source.dart';
+import '../data/todos_source.dart';
 import '../data/changes.dart';
 import '../data/workspace_source.dart';
 import '../data/worktree_changes.dart';
@@ -96,6 +97,7 @@ class AppState extends ChangeNotifier {
     AgentDefsSource? agentDefs,
     AiUsageSource? usage,
     TasksSource? tasks,
+    TodosSource? todos,
     PipelinesFactory? pipelinesFor,
     TestsSource Function(String worktreePath)? testsFor,
     CiHostsSource? ciHosts,
@@ -114,6 +116,7 @@ class AppState extends ChangeNotifier {
         agentDefs = agentDefs ?? (agents == null ? MockAgentDefs() : UnsupportedAgentDefs()),
         usage = usage ?? MockAiUsageSource(),
         tasks = tasks ?? MockTasksSource(),
+        todos = todos ?? MockTodosSource(),
         _changesFor = changesFor,
         _pipelinesFor = pipelinesFor ?? mockPipelinesFor,
         _testsFor = testsFor,
@@ -1610,6 +1613,227 @@ class AppState extends ChangeNotifier {
   /// update doesn't rebuild the rest of the app.
   final TasksSource tasks;
 
+  // ---- TODOs ----
+
+  /// The user's own TODOs, kept by the workspace. Views listen to it
+  /// directly, like [tasks].
+  final TodosSource todos;
+
+  /// Preference: clean up a TODO when its pull request merges.
+  static const todoAutoCleanSetting = 'todos.autoClean';
+
+  /// Repositories picked last in any repository picker, newest first.
+  static const recentReposSetting = 'repos.recent';
+
+  List<String> get recentRepos => [
+        for (final id in setting<String>(recentReposSetting, '').split('\n'))
+          if (id.isNotEmpty && workspace.repo(id) != null) id,
+      ];
+
+  void rememberRepo(String id) {
+    if (id.isEmpty) return;
+    final list = [id, ...recentRepos.where((r) => r != id)].take(5);
+    setSetting(recentReposSetting, list.join('\n'));
+  }
+
+  /// What an agent gets for [todo]: the TODO and the user's notes. The
+  /// engine adds how to report its progress.
+  static String todoPrompt(TodoItem todo) => [
+        todo.title,
+        if (todo.notes.trim().isNotEmpty) ...['', 'Notes:', todo.notes.trim()],
+      ].join('\n');
+
+  /// Hands [todo] to an agent: a new worktree of [repo] on [branch] from
+  /// [base], and the agent started there with [model] and [effort] ('':
+  /// its own settings). Null when it started; otherwise why not.
+  Future<String?> startTodo(TodoItem todo, {required Repo repo, required String branch, String base = '', String? providerId, String model = '', String effort = ''}) async {
+    final provider = agents.connected.where((a) => a.id == providerId).firstOrNull ?? agents.connected.firstOrNull;
+    if (provider == null) return 'Connect an agent in Settings › AI agents first.';
+    try {
+      await workspace.createWorktree(repo, branch: branch, createBranch: true, base: base);
+    } on Object catch (e) {
+      return workspace.error ?? '$e';
+    }
+    final created = workspace.repo(repo.id)?.worktrees.where((w) => w.branch == branch).firstOrNull;
+    if (created == null) return workspace.error ?? 'The worktree for $branch didn’t show up.';
+    final path = workspace.absolutePathOf(created);
+    rememberRepo(repo.id);
+    final run = await agents.start(
+      providerId: provider.id,
+      worktreePath: path,
+      prompt: todoPrompt(todo),
+      title: 'TODO · ${todo.title}',
+      model: model,
+      effort: effort,
+      todoId: todo.id,
+    );
+    if (run == null) return 'Worktree ready, but the agent didn’t start: ${agents.error ?? 'unknown error'}';
+    final attached = await todos.attach(
+      todo.id,
+      TodoRun(repoPath: repo.id, worktreePath: path, branch: branch, base: base, providerId: provider.id, agentName: provider.name, model: model, effort: effort, sessionId: run.id),
+    );
+    return attached == null ? todos.error : null;
+  }
+
+  /// [todo]'s worktree and its repository, while it has one.
+  (Repo, Worktree)? todoWorktree(TodoItem todo) {
+    final run = todo.run;
+    if (run == null) return null;
+    final repo = workspace.repo(run.repoPath);
+    final tree = repo?.worktrees.where((w) => workspace.absolutePathOf(w) == run.worktreePath).firstOrNull;
+    return repo == null || tree == null ? null : (repo, tree);
+  }
+
+  /// Approved: commits what the agent left uncommitted (titled as the
+  /// TODO) and pushes the branch. Null when done; otherwise why not.
+  Future<String?> approveTodo(TodoItem todo) async {
+    final run = todo.run;
+    if (run == null) return 'It has no worktree.';
+    final factory = _changesFor;
+    if (factory != null) {
+      final changes = factory(run.worktreePath);
+      try {
+        await _statusOf(changes);
+        if (changes.changed.isNotEmpty) {
+          if (await changes.commit(todo.title, all: true, push: true) == null) return changes.error ?? 'The commit failed.';
+        } else {
+          await changes.push();
+          if (changes.error != null) return changes.error;
+        }
+      } finally {
+        changes.dispose();
+      }
+    }
+    return await todos.setStatus(todo.id, TodoStatus.pushed, by: 'You') == null ? todos.error : null;
+  }
+
+  /// Waits for [changes]' first status (a few seconds at most).
+  static Future<void> _statusOf(WorktreeChanges changes) async {
+    if (changes.version > 0) return;
+    final ready = Completer<void>();
+    void check() {
+      if (changes.version > 0 && !ready.isCompleted) ready.complete();
+    }
+    changes.addListener(check);
+    try {
+      await ready.future.timeout(const Duration(seconds: 5), onTimeout: () {});
+    } finally {
+      changes.removeListener(check);
+    }
+  }
+
+  /// Opens [todo]'s pull request: its title, and its notes as the
+  /// description. Null when done; otherwise why not.
+  Future<String?> createTodoPr(TodoItem todo) async {
+    final run = todo.run;
+    if (run == null) return 'It has no worktree.';
+    final body = [
+      if (todo.notes.trim().isNotEmpty) todo.notes.trim(),
+      if (run.agentName.isNotEmpty) '_Done by ${run.agentName} from a Kumo TODO, tried and approved before pushing._',
+    ].join('\n\n');
+    try {
+      final pr = await pullRequests.create(worktreePath: run.worktreePath, title: todo.title, body: body, base: run.base);
+      return await todos.setStatus(todo.id, TodoStatus.pr, by: 'Kumo', note: pr.label, prNumber: pr.number, prUrl: pr.url) == null ? todos.error : null;
+    } on Object catch (e) {
+      return '$e';
+    }
+  }
+
+  /// TODOs whose pull request merged move to merged (and are cleaned up
+  /// when the user asked for that). Called while the TODOs view is open.
+  Future<void> checkTodoMerges() async {
+    for (final todo in todos.todos.where((t) => t.status == TodoStatus.pr && !t.done)) {
+      final run = todo.run;
+      if (run == null) continue;
+      try {
+        final branch = await pullRequests.forBranch(run.worktreePath, refresh: true);
+        if (branch.pullRequest?.state != PrOpenState.merged) continue;
+        final merged = await todos.setStatus(todo.id, TodoStatus.merged, by: 'Kumo', note: branch.pullRequest!.label);
+        if (merged != null && setting<bool>(todoAutoCleanSetting, false)) await cleanUpTodo(merged);
+      } on Object {
+        // The host can't be reached now: the next check tries again.
+      }
+    }
+  }
+
+  /// Merged: removes its worktree and local branch, and checks it off.
+  /// The pull request and its commits stay. Null when done; otherwise why.
+  Future<String?> cleanUpTodo(TodoItem todo) async {
+    final where = todoWorktree(todo);
+    if (where != null) {
+      final (repo, tree) = where;
+      try {
+        final removal = await workspace.removeWorktree(repo, tree, deleteBranch: true);
+        if (!removal.removed) return 'Its worktree has ${removal.changedFiles} changed files: commit or discard them first.';
+      } on Object catch (e) {
+        return workspace.error ?? '$e';
+      }
+    }
+    final open = await todos.setStatus(todo.id, TodoStatus.open, clearRun: true);
+    if (open == null) return todos.error;
+    return await todos.update(open, done: true) == null ? todos.error : null;
+  }
+
+  /// Sends the user's [changes] to the TODO's agent: typed into its session
+  /// when it's still running, else a new session in the same worktree.
+  Future<String?> askTodoChanges(TodoItem todo, String changes) async {
+    final run = todo.run;
+    if (run == null) return 'It has no worktree.';
+    final text = 'The user tried the change and asks for this:\n$changes';
+    final alive = run.sessionId.isNotEmpty && agents.runs.any((r) => r.id == run.sessionId && r.status != AgentStatus.done);
+    if (alive && await agents.addContext(run.sessionId, AgentContextItem(kind: AgentContextKind.task, title: 'Changes for: ${todo.title}'), text: text)) {
+      return await todos.setStatus(todo.id, TodoStatus.working, by: run.agentName) == null ? todos.error : null;
+    }
+    final started = await agents.start(
+      providerId: run.providerId.isEmpty ? null : run.providerId,
+      worktreePath: run.worktreePath,
+      prompt: '${todoPrompt(todo)}\n\n$text',
+      title: 'TODO · ${todo.title}',
+      model: run.model,
+      effort: run.effort,
+      todoId: todo.id,
+    );
+    if (started == null) return 'The agent didn’t start: ${agents.error ?? 'unknown error'}';
+    final attached = await todos.attach(
+      todo.id,
+      TodoRun(repoPath: run.repoPath, worktreePath: run.worktreePath, branch: run.branch, base: run.base, providerId: run.providerId, agentName: run.agentName, model: run.model, effort: run.effort, sessionId: started.id),
+    );
+    return attached == null ? todos.error : null;
+  }
+
+  /// Starts [todo]'s agent again in its own worktree (the last session
+  /// stopped before finishing), with [model] and [effort]. Null when it
+  /// started; otherwise why not.
+  Future<String?> retryTodo(TodoItem todo, {String? providerId, String model = '', String effort = ''}) async {
+    final run = todo.run;
+    if (run == null) return 'It has no worktree.';
+    final provider = agents.connected.where((a) => a.id == providerId).firstOrNull ?? agents.connected.firstOrNull;
+    if (provider == null) return 'Connect an agent in Settings › AI agents first.';
+    final started = await agents.start(
+      providerId: provider.id,
+      worktreePath: run.worktreePath,
+      prompt: '${todoPrompt(todo)}\n\nAn earlier session on this stopped before finishing: look at what is already changed in this worktree, then go on from there.',
+      title: 'TODO · ${todo.title}',
+      model: model,
+      effort: effort,
+      todoId: todo.id,
+    );
+    if (started == null) return 'The agent didn’t start: ${agents.error ?? 'unknown error'}';
+    final attached = await todos.attach(
+      todo.id,
+      TodoRun(repoPath: run.repoPath, worktreePath: run.worktreePath, branch: run.branch, base: run.base, providerId: provider.id, agentName: provider.name, model: model, effort: effort, sessionId: started.id),
+    );
+    return attached == null ? todos.error : null;
+  }
+
+  /// Stops [todo]'s agent: what it did so far is the user's to review.
+  Future<void> stopTodoAgent(TodoItem todo) async {
+    final run = todo.run;
+    if (run == null) return;
+    if (run.sessionId.isNotEmpty) await agents.stop(run.sessionId);
+    await todos.setStatus(todo.id, TodoStatus.review, by: 'You', note: 'Stopped ${run.agentName.isEmpty ? 'the agent' : run.agentName}');
+  }
+
   /// Starts work on [task]: a new worktree on [branch], linked to the task,
   /// the task moved to In progress where its tool allows, and (with
   /// [agent]) an agent with the task as its prompt. Throws a readable
@@ -1785,6 +2009,7 @@ class AppState extends ChangeNotifier {
     docRequest.dispose();
     releaseRequest.dispose();
     tasks.dispose();
+    todos.dispose();
     usage
       ..removeListener(notifyListeners)
       ..dispose();

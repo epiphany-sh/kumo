@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use super::{AgentDefKey, AgentDefSettings, FoundFile, PlayRecord};
+use super::{AgentDefKey, AgentDefSettings, FoundFile, FoundSkill, PlayRecord};
 use crate::agents::AgentError;
 
 /// The agent files and the folders runs work in.
@@ -15,8 +15,12 @@ pub trait AgentDefFiles: Send + Sync + 'static {
     fn write(&self, dir: &Path, name: &str, markdown: &str) -> Result<FoundFile, AgentError>;
     /// Removes `<dir>/<name>.md`; fine when it's gone already.
     fn remove(&self, dir: &Path, name: &str) -> Result<(), AgentError>;
-    /// The folders directly in `dir` (skills).
-    fn folders(&self, dir: &Path) -> Vec<String>;
+    /// The skills directly in `dir`: each folder (hidden ones aside), with
+    /// the description its `SKILL.md` gives. Sorted by name.
+    fn skills(&self, dir: &Path) -> Vec<FoundSkill>;
+    /// The Claude Code plugins installed in `claude_dir` (its
+    /// `plugins/installed_plugins.json`): each one's name and folder.
+    fn plugins(&self, claude_dir: &Path) -> Vec<(String, PathBuf)>;
     /// MCP server names: `mcpServers` of Claude Code's config file
     /// (`config`, top level and the projects in `repos`), and each repo's
     /// `.mcp.json`.

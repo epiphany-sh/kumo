@@ -140,11 +140,12 @@ extension _Actions on _TaskDetailState {
       else ...[
         Row(children: [
           Expanded(
-            child: KSelect<String>(
+            child: RepoPicker(
               label: 'Repository',
               value: _repo ?? repos.first.id,
-              items: [for (final r in repos) (r.id, r.name)],
-              onChanged: _pickRepo,
+              onChanged: (id) {
+                if (id != null) _pickRepo(id);
+              },
             ),
           ),
           const SizedBox(width: 10),

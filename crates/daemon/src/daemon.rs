@@ -86,6 +86,7 @@ impl Daemon {
         let machine = Arc::new(LocalMachineAccounts::new(&home, Arc::clone(&locator)));
         let opener = ProfileOpener {
             helper,
+            kumod: helper_program,
             data_dir: data_dir.clone(),
             home: home.clone(),
             locator,

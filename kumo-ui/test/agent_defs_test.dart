@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/app/kumo_app.dart';
@@ -12,6 +13,7 @@ import 'package:kumo_ui/data/models.dart' show AgentStatus;
 import 'package:kumo_ui/views/agents_library.dart' show lineDiff;
 import 'package:kumo_ui/views/agents_screen.dart';
 import 'package:kumo_ui/widgets/controls.dart' show KSegmented;
+import 'package:kumo_ui/widgets/skill_picker.dart';
 
 Future<AppState> _pumpAgents(WidgetTester tester, {AgentsMode mode = AgentsMode.library, Size size = const Size(1440, 1000)}) async {
   tester.view.physicalSize = size;
@@ -184,12 +186,59 @@ void main() {
       var run = PlayRun(id: 'p', agent: 'a', task: 't', draft: true, startedAt: DateTime(2026));
       for (final line in [
         jsonEncode({'type': 'system', 'subtype': 'init'}),
-        jsonEncode({'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': 'Reading the diff.'}]}}),
-        jsonEncode({'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'id': 't1', 'name': 'Read', 'input': {'file_path': 'a.go'}}]}}),
-        jsonEncode({'type': 'user', 'message': {'content': [{'type': 'tool_result', 'tool_use_id': 't1', 'content': [{'type': 'text', 'text': 'Read 40 lines'}]}]}}),
+        jsonEncode({
+          'type': 'assistant',
+          'message': {
+            'content': [
+              {'type': 'text', 'text': 'Reading the diff.'}
+            ]
+          }
+        }),
+        jsonEncode({
+          'type': 'assistant',
+          'message': {
+            'content': [
+              {
+                'type': 'tool_use',
+                'id': 't1',
+                'name': 'Read',
+                'input': {'file_path': 'a.go'}
+              }
+            ]
+          }
+        }),
+        jsonEncode({
+          'type': 'user',
+          'message': {
+            'content': [
+              {
+                'type': 'tool_result',
+                'tool_use_id': 't1',
+                'content': [
+                  {'type': 'text', 'text': 'Read 40 lines'}
+                ]
+              }
+            ]
+          }
+        }),
         'not json',
-        jsonEncode({'type': 'assistant', 'message': {'content': [{'type': 'text', 'text': 'Nothing to reuse.'}]}}),
-        jsonEncode({'type': 'result', 'subtype': 'success', 'num_turns': 3, 'duration_ms': 4000, 'total_cost_usd': 0.02, 'result': 'Nothing to reuse.', 'usage': {'input_tokens': 1000, 'output_tokens': 200}}),
+        jsonEncode({
+          'type': 'assistant',
+          'message': {
+            'content': [
+              {'type': 'text', 'text': 'Nothing to reuse.'}
+            ]
+          }
+        }),
+        jsonEncode({
+          'type': 'result',
+          'subtype': 'success',
+          'num_turns': 3,
+          'duration_ms': 4000,
+          'total_cost_usd': 0.02,
+          'result': 'Nothing to reuse.',
+          'usage': {'input_tokens': 1000, 'output_tokens': 200}
+        }),
       ]) {
         run = foldStreamJson(run, line, at: Duration.zero);
       }
@@ -346,6 +395,98 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('Edit: skills are searched and picked from a list, however many there are', (tester) async {
+      await _pumpAgents(tester, size: const Size(2200, 1200));
+      await tester.tap(find.text('test-writer').first);
+      await tester.pump();
+      await tester.tap(find.text('Edit').first);
+      await tester.pump();
+      await tester.ensureVisible(find.text('Advanced'));
+      await tester.pump();
+      await tester.tap(find.text('Advanced'));
+      await tester.pump();
+      await tester.ensureVisible(find.byType(SkillPicker));
+      await tester.pump();
+      expect(find.text('go-conventions'), findsNothing, reason: 'only its own skills show as chips');
+      await tester.tap(find.byType(SkillPicker));
+      await tester.pumpAndSettle();
+      expect(find.text('go-conventions'), findsOneWidget, reason: 'personal skills come first');
+      await tester.tap(find.text('PERSONAL').last);
+      await tester.pump();
+      expect(find.text('go-conventions'), findsNothing);
+      expect(find.text('pricing-rules'), findsOneWidget, reason: 'grouped by where each comes from');
+      expect(find.text('lint-kit plugin'), findsOneWidget);
+      expect(find.text('1 selected · ${mockSkills.length} skills'), findsOneWidget);
+
+      final search = find.byWidgetPredicate((w) => w is TextField && (w.decoration?.hintText ?? '').startsWith('Search skills'));
+      await tester.enterText(search, 'flaky');
+      await tester.pump();
+      expect(find.text('1 of ${mockSkills.length} skills'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+
+      // What it does is searched too; arrows move, Return adds.
+      await tester.enterText(search, 'mermaid');
+      await tester.pump();
+      expect(find.textContaining('docs-kit:diagrams', findRichText: true), findsOneWidget);
+      await tester.enterText(search, 'docs');
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+
+      await tester.enterText(search, '');
+      await tester.pump();
+      await tester.tap(find.text('Selected').last);
+      await tester.pump();
+      expect(find.text('3 selected · ${mockSkills.length} skills'), findsOneWidget);
+      expect(find.text('lint-kit plugin'), findsNothing, reason: 'only what is picked');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('skills: go-table-tests, test-kit:flaky-hunt, docs-kit:readme'), findsOneWidget, reason: 'the file preview follows');
+      expect(find.text('test-kit:flaky-hunt'), findsOneWidget, reason: 'a chip in the field');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Edit: the skill picker says when nothing is picked, and goes back to all', (tester) async {
+      await _pumpAgents(tester, size: const Size(2200, 1200));
+      await tester.tap(find.text('test-writer').first);
+      await tester.pump();
+      await tester.tap(find.text('Edit').first);
+      await tester.pump();
+      await tester.ensureVisible(find.text('Advanced'));
+      await tester.pump();
+      await tester.tap(find.text('Advanced'));
+      await tester.pump();
+      await tester.ensureVisible(find.byType(SkillPicker));
+      await tester.pump();
+      await tester.tap(find.byType(SkillPicker));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Selected').last);
+      await tester.pump();
+      await tester.tap(find.text('Clear'));
+      await tester.pump();
+      expect(find.text('No skills picked yet'), findsOneWidget);
+      expect(find.text('0 selected · ${mockSkills.length} skills'), findsOneWidget);
+      await tester.tap(find.text('Show all'));
+      await tester.pump();
+      expect(find.text('go-conventions'), findsOneWidget, reason: 'back to every skill');
+
+      final search = find.byWidgetPredicate((w) => w is TextField && (w.decoration?.hintText ?? '').startsWith('Search skills'));
+      await tester.enterText(search, 'nothing-like-this');
+      await tester.pump();
+      expect(find.text('No skill matches “nothing-like-this”'), findsOneWidget);
+      await tester.tap(find.text('Clear search'));
+      await tester.pump();
+      expect(find.text('go-conventions'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('skills: go-table-tests'), findsNothing, reason: 'cleared in the file too');
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('Create: a template opens unsaved in Edit; import reads a pasted file', (tester) async {
       final state = await _pumpAgents(tester);
       await tester.tap(find.text('Create agent').first);
@@ -451,13 +592,18 @@ void main() {
   });
 
   test('inline, an agent keeps what its file says', () {
-    const file = '---\nname: full\ndescription: d\ntools: Read, Bash\nskills: a, b\nmemory: project\ndisallowedTools: Bash, Write\neffort: high\nhooks:\n  Stop:\n    - type: command\n---\n\nDo things.';
+    const file =
+        '---\nname: full\ndescription: d\ntools: Read, Bash\nskills: a, b\nmemory: project\ndisallowedTools: Bash, Write\neffort: high\nhooks:\n  Stop:\n    - type: command\n---\n\nDo things.';
     final json = (jsonDecode(agentInlineJson(readAgentFile(file, asWritten: true).agent!)) as Map)['full'] as Map;
     expect(json['disallowedTools'], ['Bash', 'Write'], reason: 'a list, or --agents refuses the whole agent');
     expect(json['skills'], ['a', 'b']);
     expect(json['memory'], 'project');
     expect(json['effort'], 'high');
-    expect(json['hooks'], {'Stop': [{'type': 'command'}]});
+    expect(json['hooks'], {
+      'Stop': [
+        {'type': 'command'}
+      ]
+    });
   });
 
   test('two repositories of the same name keep their agents apart', () {
@@ -469,8 +615,17 @@ void main() {
   test('only time working counts towards a run’s limit', () {
     final started = DateTime(2026);
     AgentRun run(AgentStatus status) => AgentRun(
-          id: 'w', providerId: 'claude', providerName: 'Claude', short: 'CC', worktreePath: '/wt', terminalId: 't', title: 'x',
-          status: status, startedAt: started, worked: const Duration(minutes: 2), stateSince: started.add(const Duration(minutes: 5)),
+          id: 'w',
+          providerId: 'claude',
+          providerName: 'Claude',
+          short: 'CC',
+          worktreePath: '/wt',
+          terminalId: 't',
+          title: 'x',
+          status: status,
+          startedAt: started,
+          worked: const Duration(minutes: 2),
+          stateSince: started.add(const Duration(minutes: 5)),
         );
     final now = started.add(const Duration(minutes: 6));
     expect(run(AgentStatus.needsYou).workedAt(now), const Duration(minutes: 2));

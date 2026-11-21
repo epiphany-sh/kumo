@@ -17,6 +17,7 @@ import '../platform/os/key_combo.dart';
 import 'task_detail.dart';
 import 'task_labels.dart';
 import 'task_visuals.dart';
+import 'todos_view.dart';
 
 /// One board for every task source (Obsidian, Bear, GitHub, Jira,
 /// Todoist), served from the engine's cache. Mine by default, Everyone on
@@ -27,6 +28,9 @@ class TasksScreen extends StatefulWidget {
 
   /// Preference: "mine" or "everyone".
   static const scopeSetting = 'tasks.scope';
+
+  /// Preference: "tickets" (the board) or "todos" (the user's own).
+  static const viewSetting = 'tasks.view';
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();
@@ -251,8 +255,28 @@ class _TasksScreenState extends State<TasksScreen> {
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
-    return ListenableBuilder(listenable: s.tasks, builder: (context, _) => _build(context, s, s.tasks));
+    return ListenableBuilder(
+      listenable: Listenable.merge([s.tasks, s.todos]),
+      builder: (context, _) => _showsTodos(s) ? TodosView(viewSwitch: _viewSwitch(s)) : _build(context, s, s.tasks),
+    );
   }
+
+  static bool _showsTodos(AppState s) => s.setting<String>(TasksScreen.viewSetting, 'tickets') == 'todos';
+
+  /// Tickets (from the user's tools) | TODOs (their own, on this Mac).
+  Widget _viewSwitch(AppState s) => Tooltip(
+        message: 'Tickets come from your tools; TODOs are yours, kept on this Mac',
+        child: KSegmented<String>(
+          label: 'Tasks view',
+          height: 30,
+          items: [('tickets', 'Tickets', '${s.tasks.tasks.length}'), ('todos', 'TODOs', '${s.todos.todos.where((t) => !t.done).length}')],
+          value: _showsTodos(s) ? 'todos' : 'tickets',
+          onChanged: (view) {
+            s.setSetting(TasksScreen.viewSetting, view);
+            setState(() {});
+          },
+        ),
+      );
 
   Widget _build(BuildContext context, AppState s, TasksSource source) {
     final c = context.c;
@@ -283,7 +307,10 @@ class _TasksScreenState extends State<TasksScreen> {
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-              Text('Tasks', style: sans(22, weight: FontWeight.w600, color: c.text, letterSpacing: -0.4)),
+              Wrap(spacing: 14, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                Text('Tasks', style: sans(22, weight: FontWeight.w600, color: c.text, letterSpacing: -0.4)),
+                _viewSwitch(s),
+              ]),
               const SizedBox(height: 2),
               Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: c.text3)),
             ]),

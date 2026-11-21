@@ -12,6 +12,7 @@ import '../widgets/controls.dart';
 import '../widgets/floating_panel.dart';
 import '../widgets/glass.dart';
 import '../widgets/kicons.dart';
+import '../widgets/repo_picker.dart';
 
 enum _Source { ticket, fresh, existing }
 
@@ -77,15 +78,6 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
     if (b == null) return const ['origin/fix/TSK-377-export-rounding', 'origin/chore/pgx-v5.7', 'origin/spike/cache'];
     final checkedOut = {for (final w in _repoEntry?.worktrees ?? const <Worktree>[]) w.branch};
     return [for (final l in b.local) if (!checkedOut.contains(l)) l, ...b.remote];
-  }
-
-  /// Repos the user has put in a namespace, plus the one we opened on.
-  List<String> get _repoOptions {
-    final names = <String>{widget.repo};
-    for (final n in AppScope.read(context).namespaces) {
-      names.addAll(n.repos);
-    }
-    return names.toList();
   }
 
   @override
@@ -277,18 +269,18 @@ class _NewWorktreePopoverState extends State<NewWorktreePopover> {
         items: const [(_Source.ticket, 'From task', null), (_Source.fresh, 'New branch', null), (_Source.existing, 'Existing', null)],
       ),
       const SizedBox(height: 12),
-      KSelect<String>(
+      RepoPicker(
         label: 'Repository',
         value: _repo,
-        items: [
-          for (final r in _repoOptions) (r, _workspace.repo(r)?.name ?? r),
-        ],
-        onChanged: (v) => setState(() {
-          _repo = v;
-          _branches = null;
-          _fillNames();
-          _loadBranches();
-        }),
+        onChanged: (v) {
+          if (v == null) return;
+          setState(() {
+            _repo = v;
+            _branches = null;
+            _fillNames();
+            _loadBranches();
+          });
+        },
       ),
       const SizedBox(height: 10),
       if (_src == _Source.ticket && _task == null) ...[

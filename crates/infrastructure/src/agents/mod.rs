@@ -2,11 +2,13 @@
 
 mod homes;
 mod locator;
+mod models;
 mod processes;
 mod usage;
 
 pub use homes::ProfileCliHomes;
 pub use locator::ShellPathLocator;
+pub use models::CliModelCatalog;
 pub use processes::OsProcesses;
 pub use usage::{
     ClaudeAccount, ClaudeStatusLine, CodexAccount, CodexRollouts, CopilotAccount, CopilotEvents,

@@ -325,6 +325,28 @@ class AgentDefTrigger extends $pb.ProtobufEnum {
   const AgentDefTrigger._(super.value, super.name);
 }
 
+class AgentSkillFrom extends $pb.ProtobufEnum {
+  static const AgentSkillFrom AGENT_SKILL_FROM_PERSONAL =
+      AgentSkillFrom._(0, _omitEnumNames ? '' : 'AGENT_SKILL_FROM_PERSONAL');
+  static const AgentSkillFrom AGENT_SKILL_FROM_REPO =
+      AgentSkillFrom._(1, _omitEnumNames ? '' : 'AGENT_SKILL_FROM_REPO');
+  static const AgentSkillFrom AGENT_SKILL_FROM_PLUGIN =
+      AgentSkillFrom._(2, _omitEnumNames ? '' : 'AGENT_SKILL_FROM_PLUGIN');
+
+  static const $core.List<AgentSkillFrom> values = <AgentSkillFrom>[
+    AGENT_SKILL_FROM_PERSONAL,
+    AGENT_SKILL_FROM_REPO,
+    AGENT_SKILL_FROM_PLUGIN,
+  ];
+
+  static final $core.List<AgentSkillFrom?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static AgentSkillFrom? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const AgentSkillFrom._(super.value, super.name);
+}
+
 class TaskSourceKind extends $pb.ProtobufEnum {
   static const TaskSourceKind TASK_SOURCE_KIND_UNSPECIFIED =
       TaskSourceKind._(0, _omitEnumNames ? '' : 'TASK_SOURCE_KIND_UNSPECIFIED');
@@ -775,6 +797,43 @@ class TestRunState extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const TestRunState._(super.value, super.name);
+}
+
+class TodoStatus extends $pb.ProtobufEnum {
+  /// Not handed to an agent yet.
+  static const TodoStatus TODO_STATUS_OPEN =
+      TodoStatus._(0, _omitEnumNames ? '' : 'TODO_STATUS_OPEN');
+  static const TodoStatus TODO_STATUS_WORKING =
+      TodoStatus._(1, _omitEnumNames ? '' : 'TODO_STATUS_WORKING');
+  static const TodoStatus TODO_STATUS_TESTING =
+      TodoStatus._(2, _omitEnumNames ? '' : 'TODO_STATUS_TESTING');
+
+  /// The agent is done and its tests pass: the user tries it and approves.
+  static const TodoStatus TODO_STATUS_REVIEW =
+      TodoStatus._(3, _omitEnumNames ? '' : 'TODO_STATUS_REVIEW');
+  static const TodoStatus TODO_STATUS_PUSHED =
+      TodoStatus._(4, _omitEnumNames ? '' : 'TODO_STATUS_PUSHED');
+  static const TodoStatus TODO_STATUS_PR =
+      TodoStatus._(5, _omitEnumNames ? '' : 'TODO_STATUS_PR');
+  static const TodoStatus TODO_STATUS_MERGED =
+      TodoStatus._(6, _omitEnumNames ? '' : 'TODO_STATUS_MERGED');
+
+  static const $core.List<TodoStatus> values = <TodoStatus>[
+    TODO_STATUS_OPEN,
+    TODO_STATUS_WORKING,
+    TODO_STATUS_TESTING,
+    TODO_STATUS_REVIEW,
+    TODO_STATUS_PUSHED,
+    TODO_STATUS_PR,
+    TODO_STATUS_MERGED,
+  ];
+
+  static final $core.List<TodoStatus?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 6);
+  static TodoStatus? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TodoStatus._(super.value, super.name);
 }
 
 const $core.bool _omitEnumNames =

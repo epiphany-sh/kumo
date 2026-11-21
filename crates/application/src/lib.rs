@@ -24,4 +24,5 @@ pub mod releases;
 pub mod tasks;
 pub mod terminal;
 pub mod test_runs;
+pub mod todos;
 pub mod workspace;
