@@ -4814,6 +4814,62 @@ final $typed_data.Uint8List createPullRequestRequestDescriptor = $convert.base64
     'RyZWVQYXRoEhQKBXRpdGxlGAIgASgJUgV0aXRsZRISCgRib2R5GAMgASgJUgRib2R5EhIKBGJh'
     'c2UYBCABKAlSBGJhc2USFAoFZHJhZnQYBSABKAhSBWRyYWZ0');
 
+@$core.Deprecated('Use pullRequestStatesRequestDescriptor instead')
+const PullRequestStatesRequest$json = {
+  '1': 'PullRequestStatesRequest',
+  '2': [
+    {'1': 'repo_path', '3': 1, '4': 1, '5': 9, '10': 'repoPath'},
+    {'1': 'numbers', '3': 2, '4': 3, '5': 4, '10': 'numbers'},
+  ],
+};
+
+/// Descriptor for `PullRequestStatesRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pullRequestStatesRequestDescriptor =
+    $convert.base64Decode(
+        'ChhQdWxsUmVxdWVzdFN0YXRlc1JlcXVlc3QSGwoJcmVwb19wYXRoGAEgASgJUghyZXBvUGF0aB'
+        'IYCgdudW1iZXJzGAIgAygEUgdudW1iZXJz');
+
+@$core.Deprecated('Use pullRequestStatesDescriptor instead')
+const PullRequestStates$json = {
+  '1': 'PullRequestStates',
+  '2': [
+    {
+      '1': 'states',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kumo.v1.PullRequestStateOf',
+      '10': 'states'
+    },
+  ],
+};
+
+/// Descriptor for `PullRequestStates`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pullRequestStatesDescriptor = $convert.base64Decode(
+    'ChFQdWxsUmVxdWVzdFN0YXRlcxIzCgZzdGF0ZXMYASADKAsyGy5rdW1vLnYxLlB1bGxSZXF1ZX'
+    'N0U3RhdGVPZlIGc3RhdGVz');
+
+@$core.Deprecated('Use pullRequestStateOfDescriptor instead')
+const PullRequestStateOf$json = {
+  '1': 'PullRequestStateOf',
+  '2': [
+    {'1': 'number', '3': 1, '4': 1, '5': 4, '10': 'number'},
+    {
+      '1': 'state',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.kumo.v1.PrState',
+      '10': 'state'
+    },
+  ],
+};
+
+/// Descriptor for `PullRequestStateOf`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pullRequestStateOfDescriptor = $convert.base64Decode(
+    'ChJQdWxsUmVxdWVzdFN0YXRlT2YSFgoGbnVtYmVyGAEgASgEUgZudW1iZXISJgoFc3RhdGUYAi'
+    'ABKA4yEC5rdW1vLnYxLlByU3RhdGVSBXN0YXRl');
+
 @$core.Deprecated('Use pullRequestThreadsRequestDescriptor instead')
 const PullRequestThreadsRequest$json = {
   '1': 'PullRequestThreadsRequest',

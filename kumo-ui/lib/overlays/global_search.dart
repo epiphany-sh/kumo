@@ -12,7 +12,8 @@ import '../data/models.dart';
 import '../data/pull_requests_source.dart';
 import '../data/repo_activity.dart';
 import '../data/repo_history.dart';
-import '../editor/quick_open.dart' show fuzzyMatch, goToFile, openWorktreeFile, rankFiles, recentFiles;
+import '../data/tasks_source.dart' show TaskEntry;
+import '../editor/quick_open.dart' show FileIndex, FileMatches, TopK, fuzzyMatch, goToFile, markedSpans, openWorktreeFile, recentFiles;
 import '../engine/engine_repo_activity.dart';
 import '../engine/engine_scope.dart';
 import '../platform/open_url.dart';
@@ -138,12 +139,21 @@ List<(T, List<int>)> rankFuzzy<T>(String query, Iterable<T> items, String Functi
   return [for (final s in scored) (s.$3, s.$4)];
 }
 
+final _spaces = RegExp(r'\s+');
+
+/// The words of [query], lower case, as [wordHits] looks for them.
+List<String> queryWords(String query) => [
+      for (final w in query.toLowerCase().split(_spaces))
+        if (w.isNotEmpty) w
+    ];
+
 /// Where each word of [query] first shows in [text] (case ignored), or
 /// null when one doesn't: the words, not their letters scattered, so a
 /// ticket or a page matches what was typed.
-List<int>? wordHits(String query, String text) {
-  final words = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
-  final lower = text.toLowerCase();
+List<int>? wordHits(String query, String text) => _hitsOf(queryWords(query), text.toLowerCase());
+
+/// [wordHits] with the [words] split and the text already in [lower] case.
+List<int>? _hitsOf(List<String> words, String lower) {
   final at = <int>{};
   for (final w in words) {
     final i = lower.indexOf(w);
@@ -155,36 +165,119 @@ List<int>? wordHits(String query, String text) {
   return at.toList()..sort();
 }
 
+/// Whether every one of [words] shows in [lower].
+bool _hasAll(List<String> words, String lower) {
+  for (final w in words) {
+    if (!lower.contains(w)) return false;
+  }
+  return true;
+}
+
 /// [items] where every word of [query] shows in their [key], [title] or
 /// [rest], best first: the key itself, keys and titles that start with the
 /// query, then titles with every word. Hits are on the title. All of them,
 /// in order, when the query is empty.
-List<(T, List<int>)> rankText<T>(String query, Iterable<T> items, {required String Function(T) key, required String Function(T) title, Iterable<String> Function(T)? rest}) {
-  final q = query.trim().toLowerCase();
-  if (q.isEmpty) return [for (final i in items) (i, const <int>[])];
-  final scored = <(int, int, T, List<int>)>[];
-  for (final (n, item) in items.indexed) {
-    final k = key(item).toLowerCase();
-    final t = title(item);
-    final hay = [k, t, ...?rest?.call(item)].join(' ');
-    if (wordHits(q, hay) == null) continue;
-    final inTitle = wordHits(q, t);
-    final score = k == q
-        ? 100
-        : k.startsWith(q)
-            ? 80
-            : t.toLowerCase().startsWith(q)
-                ? 60
-                : inTitle != null
-                    ? 40
-                    : 20;
-    scored.add((score, n, item, inTitle ?? const []));
+List<(T, List<int>)> rankText<T>(String query, Iterable<T> items, {required String Function(T) key, required String Function(T) title, Iterable<String> Function(T)? rest}) =>
+    TextIndex<T>(items.toList(), key: key, title: title, rest: rest).rank(query).top;
+
+/// What [TextIndex.rank] found: the best [top], and how many matched in all.
+typedef TextMatches<T> = ({List<(T, List<int>)> top, int total});
+
+/// [items] made ready for [rankText] as the query is typed: each one's key,
+/// title and searchable text in lower case, once; and what the last query
+/// matched, so a query that only adds to it looks at those alone (text that
+/// lacks `ab` lacks `abc` too).
+class TextIndex<T> {
+  TextIndex(this.items, {required String Function(T) key, required String Function(T) title, Iterable<String> Function(T)? rest})
+      : _key = List.filled(items.length, ''),
+        _title = List.filled(items.length, ''),
+        _titleLower = List.filled(items.length, ''),
+        _hay = List.filled(items.length, '') {
+    for (final (n, item) in items.indexed) {
+      final k = key(item).toLowerCase();
+      final t = title(item);
+      _key[n] = k;
+      _title[n] = t;
+      _titleLower[n] = t.toLowerCase();
+      _hay[n] = [k, t, ...?rest?.call(item)].join(' ').toLowerCase();
+    }
   }
-  scored.sort((a, b) {
+
+  final List<T> items;
+  final List<String> _key;
+  final List<String> _title;
+  final List<String> _titleLower;
+  final List<String> _hay;
+
+  String? _lastQ;
+  List<int> _lastHits = const [];
+  int? _lastLimit;
+  TextMatches<T>? _last;
+
+  /// Whether [other] holds the same items, so this index still serves it.
+  bool serves(List<T> other) {
+    if (identical(other, items)) return true;
+    if (other.length != items.length) return false;
+    for (var i = 0; i < items.length; i++) {
+      final a = other[i], b = items[i];
+      if (!identical(a, b) && a != b) return false;
+    }
+    return true;
+  }
+
+  /// The best [limit] (all when null) for [query].
+  TextMatches<T> rank(String query, {int? limit}) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) {
+      _lastQ = null;
+      return (top: [for (final i in limit == null ? items : items.take(limit)) (i, const <int>[])], total: items.length);
+    }
+    if (q == _lastQ && limit == _lastLimit) return _last!;
+    final words = queryWords(q);
+    final prev = _lastQ;
+    final narrow = prev != null && q.startsWith(prev);
+    final hits = <int>[];
+    final scored = <(int, int, List<int>)>[];
+    final best = limit == null ? null : TopK<(int, int, List<int>)>(limit, _better);
+    void look(int n) {
+      if (!_hasAll(words, _hay[n])) return;
+      hits.add(n);
+      final k = _key[n];
+      final inTitle = _hitsOf(words, _titleLower[n]);
+      final score = k == q
+          ? 100
+          : k.startsWith(q)
+              ? 80
+              : _titleLower[n].startsWith(q)
+                  ? 60
+                  : inTitle != null
+                      ? 40
+                      : 20;
+      final e = (score, n, inTitle ?? const <int>[]);
+      best == null ? scored.add(e) : best.add(e);
+    }
+
+    if (narrow) {
+      for (final n in _lastHits) {
+        look(n);
+      }
+    } else {
+      for (var n = 0; n < items.length; n++) {
+        look(n);
+      }
+    }
+    final ranked = best?.sorted() ?? (scored..sort(_better));
+    _lastQ = q;
+    _lastHits = hits;
+    _lastLimit = limit;
+    return _last = (top: [for (final (_, n, at) in ranked) (items[n], at)], total: hits.length);
+  }
+
+  /// Higher score first, then in the order given.
+  static int _better((int, int, List<int>) a, (int, int, List<int>) b) {
     final c = b.$1.compareTo(a.$1);
     return c != 0 ? c : a.$2.compareTo(b.$2);
-  });
-  return [for (final s in scored) (s.$3, s.$4)];
+  }
 }
 
 /// What the palette can run, for [s] as it is now.
@@ -231,11 +324,12 @@ Future<void> showGlobalSearch(BuildContext context, AppState s, {SearchTab tab =
   final c = context.c;
   final commands = paletteCommands(context, s);
   // The current worktree's repository: its releases and tags (and its
-  // history when the worktree has none to give). Lives while the palette
-  // is open; follows no worktree's pipelines.
+  // history when the worktree has none to give, asked only then). Lives
+  // while the palette is open; follows no worktree's pipelines. Its pull
+  // requests aren't asked: the palette lists every repository's itself.
   final repo = s.activeRepo;
   final engine = EngineScope.maybeOf(context);
-  final RepoActivitySource? activity = repo == null ? null : (engine == null ? MockRepoActivity(repo, s.worktreesOf(repo)) : EngineRepoActivity(engine, s.workspace, repo, const []));
+  final RepoActivitySource? activity = repo == null ? null : (engine == null ? MockRepoActivity(repo, s.worktreesOf(repo)) : EngineRepoActivity(engine, s.workspace, repo, const [], history: false, loadPullRequests: false));
   try {
     final picked = await showGeneralDialog<SearchResult>(
       context: context,
@@ -298,10 +392,26 @@ class _GlobalSearchState extends State<GlobalSearch> {
   final _scroll = ScrollController();
   late SearchTab _tab = widget.tab;
 
-  /// Every group's matches, before the tab cuts them.
+  /// Every group's best matches (as many as a tab shows), before the tab
+  /// cuts them, and how many each found in all.
   Map<SearchGroup, List<SearchResult>> _matches = const {};
+  Map<SearchGroup, int> _totals = const {};
+
+  /// The worktree's files and the tickets, made ready to rank once (and
+  /// again only when they change), with their last rows.
+  FileIndex? _fileIndex;
+  FileMatches? _fileFound;
+  List<SearchResult> _fileRows = const [];
+  TextIndex<TaskEntry>? _ticketIndex;
+  TextMatches<TaskEntry>? _ticketFound;
+  List<SearchResult> _ticketRows = const [];
   List<SearchResult> _results = const [];
-  int _selected = 0;
+
+  /// The row picked: a notifier, so moving it (the mouse over the rows)
+  /// repaints two rows' backgrounds, not the whole list.
+  final _picked = ValueNotifier<int>(0);
+  int get _selected => _picked.value;
+  set _selected(int i) => _picked.value = i;
 
   // ---- What loads ----
 
@@ -340,6 +450,7 @@ class _GlobalSearchState extends State<GlobalSearch> {
     _query.dispose();
     _field.dispose();
     _scroll.dispose();
+    _picked.dispose();
     super.dispose();
   }
 
@@ -353,6 +464,8 @@ class _GlobalSearchState extends State<GlobalSearch> {
     if (!mounted) return;
     _log = log;
     _logRead = true;
+    // No log of its own: the repository's history stands in.
+    if (log == null) widget.activity?.loadHistory();
     _reload();
   }
 
@@ -457,162 +570,196 @@ class _GlobalSearchState extends State<GlobalSearch> {
         SearchTab.files || SearchTab.agents => false,
       };
 
+  /// Ranks every group for the query, keeping the [_tabLimit] best of each
+  /// (rows are made for those alone) and the count of the rest. The files
+  /// and tickets, the long lists, are ranked again only when the query or
+  /// they changed (a pull request arriving doesn't touch them), and a query
+  /// that adds letters looks only at what the last one found.
   void _rank() {
     final s = _s;
     final q = _query.text.trim();
     final m = <SearchGroup, List<SearchResult>>{};
+    final totals = <SearchGroup, int>{};
 
-    m[SearchGroup.commands] = [
-      for (final (cmd, hits) in rankFuzzy(q, widget.commands, (c) => c.title))
-        SearchResult(group: SearchGroup.commands, id: cmd.title, title: cmd.title, icon: cmd.icon, shortcut: cmd.shortcut, hits: hits, run: cmd.run),
-    ];
+    /// The best of [ranked] as rows, and how many there were.
+    List<SearchResult> top<E>(SearchGroup g, List<E> ranked, SearchResult Function(E) row) {
+      totals[g] = ranked.length;
+      return [for (final e in ranked.take(_tabLimit)) row(e)];
+    }
 
-    m[SearchGroup.files] = [
-      for (final (path, at) in rankFiles(q, s.visibleFiles, recent: recentFiles(s), limit: 500))
-        () {
-          final base = path.lastIndexOf('/') + 1;
-          return SearchResult(
-            group: SearchGroup.files,
-            id: path,
-            title: path.substring(base),
-            detail: base == 0 ? '' : path.substring(0, base - 1),
-            icon: KIcons.file,
-            leading: FileIcon(path, size: 15),
-            hits: [for (final i in at) if (i >= base) i - base],
-            run: () => openWorktreeFile(s, path),
-          );
-        }(),
-    ];
+    m[SearchGroup.commands] = top(SearchGroup.commands, rankFuzzy(q, widget.commands, (c) => c.title),
+        (e) => SearchResult(group: SearchGroup.commands, id: e.$1.title, title: e.$1.title, icon: e.$1.icon, shortcut: e.$1.shortcut, hits: e.$2, run: e.$1.run));
 
-    m[SearchGroup.pullRequests] = [
-      for (final ((repo, pr), hits) in rankText(q, _prs ?? const <(Repo, PullRequestInfo)>[],
-          key: (e) => e.$2.label, title: (e) => e.$2.title, rest: (e) => [e.$2.branch, e.$2.author, e.$1.name]))
-        SearchResult(
-          group: SearchGroup.pullRequests,
-          id: pr.url.isNotEmpty ? pr.url : '${repo.id}#${pr.number}',
-          title: pr.title,
-          tag: pr.label,
-          detail: [repo.name, pr.author, if (pr.draft) 'draft'].join(' · '),
-          icon: KIcons.pullRequest,
-          tint: (c) => pr.draft ? c.text3 : c.ok,
-          hits: hits,
-          run: () => openUrl(pr.url),
-        ),
-    ];
+    final files = s.visibleFiles;
+    if (!(_fileIndex?.serves(files) ?? false)) _fileIndex = FileIndex(files);
+    final fileFound = _fileIndex!.rank(q, recent: recentFiles(s), limit: _tabLimit);
+    if (!identical(fileFound, _fileFound)) {
+      _fileFound = fileFound;
+      _fileRows = [
+        for (final (path, at) in fileFound.top)
+          () {
+            final base = path.lastIndexOf('/') + 1;
+            return SearchResult(
+              group: SearchGroup.files,
+              id: path,
+              title: path.substring(base),
+              detail: base == 0 ? '' : path.substring(0, base - 1),
+              icon: KIcons.file,
+              leading: FileIcon(path, size: 15),
+              hits: [for (final i in at) if (i >= base) i - base],
+              run: () => openWorktreeFile(s, path),
+            );
+          }(),
+      ];
+    }
+    m[SearchGroup.files] = _fileRows;
+    totals[SearchGroup.files] = fileFound.total;
+
+    final prs = rankText(q, _prs ?? const <(Repo, PullRequestInfo)>[], key: (e) => e.$2.label, title: (e) => e.$2.title, rest: (e) => [e.$2.branch, e.$2.author, e.$1.name]);
+    m[SearchGroup.pullRequests] = top(SearchGroup.pullRequests, prs, (e) {
+      final ((repo, pr), hits) = e;
+      return SearchResult(
+        group: SearchGroup.pullRequests,
+        id: pr.url.isNotEmpty ? pr.url : '${repo.id}#${pr.number}',
+        title: pr.title,
+        tag: pr.label,
+        detail: [repo.name, pr.author, if (pr.draft) 'draft'].join(' · '),
+        icon: KIcons.pullRequest,
+        tint: (c) => pr.draft ? c.text3 : c.ok,
+        hits: hits,
+        run: () => openUrl(pr.url),
+      );
+    });
 
     final commits = _commits;
     final shas = {for (final (i, k) in commits.indexed) k.sha: i};
-    m[SearchGroup.commits] = [
-      for (final (k, hits) in rankText(q, commits, key: (k) => k.sha, title: (k) => k.subject, rest: (k) => [k.author]))
-        SearchResult(
-          group: SearchGroup.commits,
-          id: k.sha,
-          title: k.subject,
-          tag: k.shortSha,
-          detail: '${k.author} · ${relativeTime(k.time)}',
-          icon: KIcons.commit,
-          hits: hits,
-          run: () => widget.openCommit?.call(commits, shas[k.sha]!),
-        ),
-    ];
+    m[SearchGroup.commits] = top(SearchGroup.commits, rankText(q, commits, key: (k) => k.sha, title: (k) => k.subject, rest: (k) => [k.author]), (e) {
+      final (k, hits) = e;
+      return SearchResult(
+        group: SearchGroup.commits,
+        id: k.sha,
+        title: k.subject,
+        tag: k.shortSha,
+        detail: '${k.author} · ${relativeTime(k.time)}',
+        icon: KIcons.commit,
+        hits: hits,
+        run: () => widget.openCommit?.call(commits, shas[k.sha]!),
+      );
+    });
 
-    m[SearchGroup.releases] = [
-      for (final (r, hits) in rankText(q, widget.activity?.releases ?? const <RepoRelease>[], key: (r) => r.tag, title: (r) => r.name.isNotEmpty ? r.name : r.tag))
-        SearchResult(
-          group: SearchGroup.releases,
-          id: r.tag,
-          title: r.name.isNotEmpty ? r.name : r.tag,
-          tag: r.name.isNotEmpty && r.name != r.tag ? r.tag : '',
-          detail: '${switch (r.kind) {
-            ReleaseKind.release => 'Release',
-            ReleaseKind.preRelease => 'Pre-release',
-            ReleaseKind.draft => 'Draft',
-            ReleaseKind.tagOnly => 'Tag',
-          }} · ${relativeTime(r.time)}',
-          icon: KIcons.tag,
-          hits: hits,
-          run: () => s.showRelease(r.tag),
-        ),
-    ];
+    final releases = rankText(q, widget.activity?.releases ?? const <RepoRelease>[], key: (r) => r.tag, title: (r) => r.name.isNotEmpty ? r.name : r.tag);
+    m[SearchGroup.releases] = top(SearchGroup.releases, releases, (e) {
+      final (r, hits) = e;
+      return SearchResult(
+        group: SearchGroup.releases,
+        id: r.tag,
+        title: r.name.isNotEmpty ? r.name : r.tag,
+        tag: r.name.isNotEmpty && r.name != r.tag ? r.tag : '',
+        detail: '${switch (r.kind) {
+          ReleaseKind.release => 'Release',
+          ReleaseKind.preRelease => 'Pre-release',
+          ReleaseKind.draft => 'Draft',
+          ReleaseKind.tagOnly => 'Tag',
+        }} · ${relativeTime(r.time)}',
+        icon: KIcons.tag,
+        hits: hits,
+        run: () => s.showRelease(r.tag),
+      );
+    });
 
     final worktrees = [
       for (final r in s.workspace.repos)
         for (final w in s.worktreesOf(r)) (r, w),
     ];
-    m[SearchGroup.worktrees] = [
-      for (final ((repo, w), hits) in rankFuzzy(q, worktrees, (e) => e.$2.branch))
-        SearchResult(group: SearchGroup.worktrees, id: w.path.isNotEmpty ? w.path : '${repo.id}:${w.branch}', title: w.branch, detail: repo.name, icon: KIcons.branch, hits: hits, run: () => s.openWorktree(w)),
-    ];
+    m[SearchGroup.worktrees] = top(SearchGroup.worktrees, rankFuzzy(q, worktrees, (e) => e.$2.branch), (e) {
+      final ((repo, w), hits) = e;
+      return SearchResult(
+          group: SearchGroup.worktrees, id: w.path.isNotEmpty ? w.path : '${repo.id}:${w.branch}', title: w.branch, detail: repo.name, icon: KIcons.branch, hits: hits, run: () => s.openWorktree(w));
+    });
 
-    final columns = {for (final (col, label) in taskColumns) col: label};
-    m[SearchGroup.tickets] = q.isEmpty
-        ? const []
-        : [
-            for (final (t, hits) in rankText(q, s.tasks.tasks, key: (t) => t.key, title: (t) => t.title, rest: (t) => [...t.labels, t.assignee?.name ?? '']))
-              SearchResult(
-                group: SearchGroup.tickets,
-                id: t.id,
-                title: t.title,
-                tag: t.key,
-                detail: '${s.tasks.source(t.sourceId)?.name ?? t.kind.label} · ${t.sourceStatus.isNotEmpty ? t.sourceStatus : columns[t.column] ?? ''}',
-                icon: taskTypeIcon(t.type),
-                tint: (c) => taskTypeColor(c, t.type),
-                hits: hits,
-                run: () => s.showTicket(t.id),
-              ),
-          ];
+    if (q.isEmpty) {
+      m[SearchGroup.tickets] = const [];
+      totals[SearchGroup.tickets] = 0;
+    } else {
+      final tasks = s.tasks.tasks;
+      if (!(_ticketIndex?.serves(tasks) ?? false)) {
+        _ticketIndex = TextIndex<TaskEntry>(tasks, key: (t) => t.key, title: (t) => t.title, rest: (t) => [...t.labels, t.assignee?.name ?? '']);
+      }
+      final found = _ticketIndex!.rank(q, limit: _tabLimit);
+      if (!identical(found, _ticketFound)) {
+        _ticketFound = found;
+        final columns = {for (final (col, label) in taskColumns) col: label};
+        _ticketRows = [
+          for (final (t, hits) in found.top)
+            SearchResult(
+              group: SearchGroup.tickets,
+              id: t.id,
+              title: t.title,
+              tag: t.key,
+              detail: '${s.tasks.source(t.sourceId)?.name ?? t.kind.label} · ${t.sourceStatus.isNotEmpty ? t.sourceStatus : columns[t.column] ?? ''}',
+              icon: taskTypeIcon(t.type),
+              tint: (c) => taskTypeColor(c, t.type),
+              hits: hits,
+              run: () => s.showTicket(t.id),
+            ),
+        ];
+      }
+      m[SearchGroup.tickets] = _ticketRows;
+      totals[SearchGroup.tickets] = found.total;
+    }
 
     // The docs answered for this query: the recent ones for none, the
     // last query's while the next is asked.
     final docsFor = _docsFor;
-    m[SearchGroup.docs] = docsFor == null || (docsFor != q && (docsFor.isEmpty || q.isEmpty))
-        ? const []
-        : [
-            for (final d in _docs)
-              SearchResult(
-                group: SearchGroup.docs,
-                id: d.id,
-                title: d.title,
-                detail: [d.place, d.author].where((x) => x.isNotEmpty).join(' · '),
-                icon: KIcons.page,
-                hits: wordHits(docsFor, d.title) ?? const [],
-                run: () => s.showDoc(d.id),
-              ),
-          ];
+    final docs = docsFor == null || (docsFor != q && (docsFor.isEmpty || q.isEmpty)) ? const <DocSummary>[] : _docs;
+    m[SearchGroup.docs] = top(
+      SearchGroup.docs,
+      docs,
+      (d) => SearchResult(
+        group: SearchGroup.docs,
+        id: d.id,
+        title: d.title,
+        detail: [d.place, d.author].where((x) => x.isNotEmpty).join(' · '),
+        icon: KIcons.page,
+        hits: wordHits(docsFor!, d.title) ?? const [],
+        run: () => s.showDoc(d.id),
+      ),
+    );
 
     // Waiting on you first, then running, then done.
     final runs = [...s.agents.runs]..sort((a, b) => _statusOrder(a.status).compareTo(_statusOrder(b.status)));
-    m[SearchGroup.sessions] = [
-      for (final (r, hits) in rankText(q, runs, key: (r) => r.agent, title: (r) => r.title, rest: (r) => [r.providerName, r.prompt]))
-        SearchResult(
-          group: SearchGroup.sessions,
-          id: r.id,
-          title: r.title.isNotEmpty ? r.title : r.providerName,
-          detail: [r.providerName, _statusLabel(r.status)].join(' · '),
-          icon: KIcons.agent,
-          tint: (c) => switch (r.status) {
-            AgentStatus.needsYou => c.warn,
-            AgentStatus.running => c.acc,
-            AgentStatus.done => c.text3,
-          },
-          hits: r.title.isNotEmpty ? hits : const [],
-          run: () => s.showInAgents(AgentsRequest.session(r.id)),
-        ),
-    ];
-    m[SearchGroup.agents] = [
-      for (final (d, hits) in rankText(q, s.agentDefs.agents, key: (d) => d.name, title: (d) => d.name, rest: (d) => [d.description]))
-        SearchResult(
-          group: SearchGroup.agents,
-          id: d.key,
-          title: d.name,
-          detail: d.description,
-          icon: KIcons.sparkle,
-          hits: hits,
-          run: () => s.showInAgents(AgentsRequest.agent(d.key)),
-        ),
-    ];
+    m[SearchGroup.sessions] = top(SearchGroup.sessions, rankText(q, runs, key: (r) => r.agent, title: (r) => r.title, rest: (r) => [r.providerName, r.prompt]), (e) {
+      final (r, hits) = e;
+      return SearchResult(
+        group: SearchGroup.sessions,
+        id: r.id,
+        title: r.title.isNotEmpty ? r.title : r.providerName,
+        detail: [r.providerName, _statusLabel(r.status)].join(' · '),
+        icon: KIcons.agent,
+        tint: (c) => switch (r.status) {
+          AgentStatus.needsYou => c.warn,
+          AgentStatus.running => c.acc,
+          AgentStatus.done => c.text3,
+        },
+        hits: r.title.isNotEmpty ? hits : const [],
+        run: () => s.showInAgents(AgentsRequest.session(r.id)),
+      );
+    });
+    m[SearchGroup.agents] = top(SearchGroup.agents, rankText(q, s.agentDefs.agents, key: (d) => d.name, title: (d) => d.name, rest: (d) => [d.description]), (e) {
+      final (d, hits) = e;
+      return SearchResult(
+        group: SearchGroup.agents,
+        id: d.key,
+        title: d.name,
+        detail: d.description,
+        icon: KIcons.sparkle,
+        hits: hits,
+        run: () => s.showInAgents(AgentsRequest.agent(d.key)),
+      );
+    });
 
     _matches = m;
+    _totals = totals;
     _cut();
   }
 
@@ -642,7 +789,7 @@ class _GlobalSearchState extends State<GlobalSearch> {
   /// How many [tab] would find for the query.
   int _count(SearchTab tab) => [
         for (final g in SearchGroup.values)
-          if (g.tab == tab || (tab == SearchTab.all && g.shownIn(tab))) (_matches[g] ?? const []).length,
+          if (g.tab == tab || (tab == SearchTab.all && g.shownIn(tab))) _totals[g] ?? 0,
       ].fold(0, (a, b) => a + b);
 
   /// The list's rows: a header before each group's first result.
@@ -659,7 +806,7 @@ class _GlobalSearchState extends State<GlobalSearch> {
 
   void _move(int delta) {
     if (_results.isEmpty) return;
-    setState(() => _selected = (_selected + delta).clamp(0, _results.length - 1));
+    _selected = (_selected + delta).clamp(0, _results.length - 1);
     if (!_scroll.hasClients) return;
     var top = 4.0;
     for (final (header, i) in _rows) {
@@ -797,7 +944,7 @@ class _GlobalSearchState extends State<GlobalSearch> {
 
   Widget _header(BuildContext context, SearchGroup g) {
     final c = context.c;
-    final total = _matches[g]?.length ?? 0;
+    final total = _totals[g] ?? 0;
     final shown = _results.where((r) => r.group == g).length;
     return SizedBox(
       height: _headerH,
@@ -815,22 +962,26 @@ class _GlobalSearchState extends State<GlobalSearch> {
   Widget _row(BuildContext context, int i) {
     final c = context.c;
     final r = _results[i];
-    final on = i == _selected;
     final hit = r.hits.toSet();
     final titleStyle = sans(13, weight: FontWeight.w500, color: c.text);
     final strong = titleStyle.copyWith(color: c.acc, fontWeight: FontWeight.w700);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onHover: (_) {
-        if (_selected != i) setState(() => _selected = i);
+        if (_selected != i) _selected = i;
       },
       child: GestureDetector(
         onTap: () => _open(i),
-        child: Container(
-          height: _rowH,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(color: on ? c.navActive : null, borderRadius: BorderRadius.circular(9)),
+        // Only the background follows the pick; the row's content is built once.
+        child: ValueListenableBuilder<int>(
+          valueListenable: _picked,
+          builder: (context, picked, content) => Container(
+            height: _rowH,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(color: picked == i ? c.navActive : null, borderRadius: BorderRadius.circular(9)),
+            child: content,
+          ),
           child: Row(children: [
             SizedBox(width: 18, child: Center(child: r.leading ?? Icon(r.icon, size: 15, color: r.tint?.call(c) ?? c.text2))),
             const SizedBox(width: 10),
@@ -852,7 +1003,7 @@ class _GlobalSearchState extends State<GlobalSearch> {
 /// keeps at least a third when both are long). A title that still doesn't
 /// fit is cut in front, so what matched shows ("…sh/release/0.8.3"). A
 /// row cut anywhere shows its whole title (and detail) on hover.
-class MatchLine extends StatelessWidget {
+class MatchLine extends StatefulWidget {
   const MatchLine({super.key, required this.title, required this.hits, required this.detail, required this.style, required this.strong, required this.detailStyle});
 
   final String title;
@@ -862,17 +1013,45 @@ class MatchLine extends StatelessWidget {
   final TextStyle strong;
   final TextStyle detailStyle;
 
+  @override
+  State<MatchLine> createState() => _MatchLineState();
+}
+
+/// Keeps what it measured (the title's and detail's widths, and where a
+/// cut title starts for the room it had) until the text, its styles or the
+/// room change: a row built again as it was isn't laid out again to measure.
+class _MatchLineState extends State<MatchLine> {
   static const _gap = 10.0;
   static const _ellipsis = '…';
 
+  /// What the widths below were measured under.
+  (TextStyle, TextScaler, TextDirection)? _measuredUnder;
+  double _titleW = 0;
+  double _detailW = 0;
+
+  /// The room the cut was found for, and where it starts.
+  double? _cutRoom;
+  int _from = 0;
+
+  @override
+  void didUpdateWidget(MatchLine old) {
+    super.didUpdateWidget(old);
+    final w = widget;
+    if (w.title != old.title || w.detail != old.detail || w.style != old.style || w.strong != old.strong || w.detailStyle != old.detailStyle || !setEquals(w.hits, old.hits)) {
+      _measuredUnder = null;
+    }
+  }
+
   /// [title] from [from] (with "…" in front when cut) up to [to].
   TextSpan _spans(int from, [int? to]) => TextSpan(children: [
-        if (from > 0) TextSpan(text: _ellipsis, style: style),
-        for (var k = from; k < (to ?? title.length); k++) TextSpan(text: title[k], style: hits.contains(k) ? strong : style),
+        if (from > 0) TextSpan(text: _ellipsis, style: widget.style),
+        ...markedSpans(widget.title, widget.hits, widget.style, widget.strong, from: from, to: to),
       ]);
 
   @override
   Widget build(BuildContext context) {
+    final w = widget;
+    final title = w.title, detail = w.detail, hits = w.hits;
     final scaler = MediaQuery.textScalerOf(context);
     final direction = Directionality.of(context);
     // Measured as Text draws it: under the inherited style (Material's
@@ -886,44 +1065,55 @@ class MatchLine extends StatelessWidget {
       return w;
     }
 
+    final under = (inherited, scaler, direction);
+    if (_measuredUnder != under) {
+      _measuredUnder = under;
+      _titleW = widthOf(_spans(0));
+      _detailW = detail.isEmpty ? 0.0 : widthOf(TextSpan(text: detail, style: w.detailStyle)) + _gap;
+      _cutRoom = null;
+    }
+    final titleW = _titleW, detailW = _detailW;
+
     return LayoutBuilder(builder: (context, box) {
       final room = box.maxWidth;
-      final titleW = widthOf(_spans(0));
-      final detailW = detail.isEmpty ? 0.0 : widthOf(TextSpan(text: detail, style: detailStyle)) + _gap;
       // The title first; the detail keeps a third when both are long.
       final titleRoom = titleW + detailW <= room ? titleW : (room - detailW).clamp(math.min(titleW, room * 2 / 3), room).toDouble();
       final cut = titleW > titleRoom + 0.5;
 
       // Cut in front when the last match would fall past the end: the
       // fewest letters dropped that bring the matches into view.
-      var from = 0;
-      if (cut && hits.isNotEmpty) {
-        final first = hits.reduce(math.min);
-        final last = hits.reduce(math.max) + 1;
-        bool fits(int f) => widthOf(_spans(f, last)) <= titleRoom;
-        if (!fits(0)) {
-          var lo = 1, hi = first;
-          if (!fits(hi)) {
-            from = first;
-          } else {
-            while (lo < hi) {
-              final mid = (lo + hi) ~/ 2;
-              if (fits(mid)) {
-                hi = mid;
-              } else {
-                lo = mid + 1;
+      if (_cutRoom != titleRoom) {
+        _cutRoom = titleRoom;
+        var from = 0;
+        if (cut && hits.isNotEmpty) {
+          final first = hits.reduce(math.min);
+          final last = hits.reduce(math.max) + 1;
+          bool fits(int f) => widthOf(_spans(f, last)) <= titleRoom;
+          if (!fits(0)) {
+            var lo = 1, hi = first;
+            if (!fits(hi)) {
+              from = first;
+            } else {
+              while (lo < hi) {
+                final mid = (lo + hi) ~/ 2;
+                if (fits(mid)) {
+                  hi = mid;
+                } else {
+                  lo = mid + 1;
+                }
               }
+              from = lo;
             }
-            from = lo;
           }
         }
+        _from = from;
       }
 
       final line = Row(children: [
-        SizedBox(width: math.min(titleRoom, room), child: Text.rich(_spans(from), maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis)),
+        SizedBox(width: math.min(titleRoom, room), child: Text.rich(_spans(_from), maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis)),
         if (detail.isNotEmpty) ...[
           const SizedBox(width: _gap),
-          Expanded(child: Text(detail, maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis, style: detailStyle)),
+          Expanded(child: Text(detail, maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis, style: w.detailStyle)),
         ],
       ]);
       // The whole of it on hover when anything is cut, or near the edge

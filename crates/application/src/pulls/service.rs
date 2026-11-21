@@ -8,7 +8,7 @@ use kumo_domain::pipelines::{
     PipelinesError, TokenFallback,
 };
 use kumo_domain::pulls::{
-    NewPullRequest, PullRequest, PullRequestClient, ReviewThread, ThreadAnswer,
+    NewPullRequest, PrState, PullRequest, PullRequestClient, ReviewThread, ThreadAnswer,
 };
 use kumo_domain::workspace::{Remote, Repo, WorkspaceSnapshot};
 use tokio::sync::watch;
@@ -47,12 +47,18 @@ pub struct BranchPullRequest {
 /// How many open pull requests a list brings.
 const LIMIT: usize = 30;
 
+/// How many pull requests one [`PullRequestService::states`] asks about.
+pub const MAX_STATES: usize = 50;
+
 pub struct PullRequestService {
     ports: PullRequestPorts,
     workspace: watch::Receiver<Arc<WorkspaceSnapshot>>,
     /// How long an answer is reused.
     fresh: Duration,
     lists: Mutex<HashMap<PathBuf, (Instant, PullRequestList)>>,
+    /// One list asked of the host at a time per repository: a second
+    /// asked meanwhile waits and takes the first's answer.
+    listing: Mutex<HashMap<PathBuf, Arc<tokio::sync::Mutex<()>>>>,
     branches: Mutex<HashMap<PathBuf, (Instant, BranchPullRequest)>>,
     /// Clones outside the workspace, by [`PullRequestService::adopt_clone`].
     adopted: Mutex<HashMap<PathBuf, Repo>>,
@@ -75,6 +81,7 @@ impl PullRequestService {
             workspace,
             fresh,
             lists: Mutex::new(HashMap::new()),
+            listing: Mutex::default(),
             branches: Mutex::new(HashMap::new()),
             adopted: Mutex::default(),
         }
@@ -99,6 +106,12 @@ impl PullRequestService {
         let repo = self
             .repo(repo_path)
             .ok_or_else(|| PipelinesError::UnknownWorktree(repo_path.display().to_string()))?;
+        if !refresh && let Some(hit) = fresh(&self.lists, &repo.path, self.fresh) {
+            return Ok(hit);
+        }
+        // Two views asking at once (the Git view and ⌘K) share one call.
+        let gate = Arc::clone(lock(&self.listing).entry(repo.path.clone()).or_default());
+        let _turn = gate.lock().await;
         if !refresh && let Some(hit) = fresh(&self.lists, &repo.path, self.fresh) {
             return Ok(hit);
         }
@@ -162,6 +175,36 @@ impl PullRequestService {
         };
         remember(&self.branches, path, answer.clone());
         Ok(answer)
+    }
+
+    /// The state of pull requests `numbers` of the repository at
+    /// `repo_path`, in one light call where the host allows it: no worktree
+    /// read, no git, nothing cached. A number the host doesn't know is left
+    /// out.
+    pub async fn states(
+        &self,
+        repo_path: &Path,
+        numbers: &[u64],
+    ) -> Result<Vec<(u64, PrState)>, PipelinesError> {
+        // GraphQL's Int is 32-bit.
+        if numbers.iter().any(|&n| n == 0 || n > i32::MAX as u64) {
+            return Err(PipelinesError::Invalid("Not a pull request number".into()));
+        }
+        let mut numbers = numbers.to_vec();
+        numbers.sort_unstable();
+        numbers.dedup();
+        if numbers.len() > MAX_STATES {
+            return Err(PipelinesError::Invalid(format!(
+                "At most {MAX_STATES} pull requests at a time"
+            )));
+        }
+        if numbers.is_empty() {
+            return Ok(Vec::new());
+        }
+        let (client, target, token) = self.repo_target(repo_path).await?;
+        blocking(move || client.states(&target, &token, &numbers))
+            .await?
+            .map_err(PipelinesError::Ci)
     }
 
     /// Opens a pull request from `worktree`'s branch (it must be pushed).

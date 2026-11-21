@@ -16342,6 +16342,197 @@ class CreatePullRequestRequest extends $pb.GeneratedMessage {
   void clearDraft() => $_clearField(5);
 }
 
+class PullRequestStatesRequest extends $pb.GeneratedMessage {
+  factory PullRequestStatesRequest({
+    $core.String? repoPath,
+    $core.Iterable<$fixnum.Int64>? numbers,
+  }) {
+    final result = PullRequestStatesRequest._();
+    if (repoPath != null) result.repoPath = repoPath;
+    if (numbers != null) result.numbers.addAll(numbers);
+    return result;
+  }
+
+  PullRequestStatesRequest._();
+
+  factory PullRequestStatesRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PullRequestStatesRequest()..mergeFromBuffer(data, registry);
+  factory PullRequestStatesRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PullRequestStatesRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PullRequestStatesRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: PullRequestStatesRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'repoPath')
+    ..p<$fixnum.Int64>(2, _omitFieldNames ? '' : 'numbers', $pb.PbFieldType.KU6)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullRequestStatesRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullRequestStatesRequest copyWith(
+          void Function(PullRequestStatesRequest) updates) =>
+      super.copyWith((message) => updates(message as PullRequestStatesRequest))
+          as PullRequestStatesRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PullRequestStatesRequest() / PullRequestStatesRequest.new instead')
+  static PullRequestStatesRequest create() => PullRequestStatesRequest._();
+  static $pb.GeneratedMessage $_createMessage() => PullRequestStatesRequest._();
+  @$core.override
+  PullRequestStatesRequest createEmptyInstance() =>
+      PullRequestStatesRequest._();
+  @$core.pragma('dart2js:noInline')
+  static PullRequestStatesRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PullRequestStatesRequest>(
+          PullRequestStatesRequest.$_createMessage);
+  static PullRequestStatesRequest? _defaultInstance;
+
+  /// The repository's main checkout.
+  @$pb.TagNumber(1)
+  $core.String get repoPath => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set repoPath($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRepoPath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRepoPath() => $_clearField(1);
+
+  /// At most 50, each above 0.
+  @$pb.TagNumber(2)
+  $pb.PbList<$fixnum.Int64> get numbers => $_getList(1);
+}
+
+class PullRequestStates extends $pb.GeneratedMessage {
+  factory PullRequestStates({
+    $core.Iterable<PullRequestStateOf>? states,
+  }) {
+    final result = PullRequestStates._();
+    if (states != null) result.states.addAll(states);
+    return result;
+  }
+
+  PullRequestStates._();
+
+  factory PullRequestStates.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PullRequestStates()..mergeFromBuffer(data, registry);
+  factory PullRequestStates.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PullRequestStates()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PullRequestStates',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: PullRequestStates.$_createMessage)
+    ..pPM<PullRequestStateOf>(1, _omitFieldNames ? '' : 'states',
+        subBuilder: PullRequestStateOf.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullRequestStates clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullRequestStates copyWith(void Function(PullRequestStates) updates) =>
+      super.copyWith((message) => updates(message as PullRequestStates))
+          as PullRequestStates;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PullRequestStates() / PullRequestStates.new instead')
+  static PullRequestStates create() => PullRequestStates._();
+  static $pb.GeneratedMessage $_createMessage() => PullRequestStates._();
+  @$core.override
+  PullRequestStates createEmptyInstance() => PullRequestStates._();
+  @$core.pragma('dart2js:noInline')
+  static PullRequestStates getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PullRequestStates>(
+          PullRequestStates.$_createMessage);
+  static PullRequestStates? _defaultInstance;
+
+  /// The ones the host knows; a number it doesn't is left out.
+  @$pb.TagNumber(1)
+  $pb.PbList<PullRequestStateOf> get states => $_getList(0);
+}
+
+class PullRequestStateOf extends $pb.GeneratedMessage {
+  factory PullRequestStateOf({
+    $fixnum.Int64? number,
+    PrState? state,
+  }) {
+    final result = PullRequestStateOf._();
+    if (number != null) result.number = number;
+    if (state != null) result.state = state;
+    return result;
+  }
+
+  PullRequestStateOf._();
+
+  factory PullRequestStateOf.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PullRequestStateOf()..mergeFromBuffer(data, registry);
+  factory PullRequestStateOf.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PullRequestStateOf()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PullRequestStateOf',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: PullRequestStateOf.$_createMessage)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'number', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aE<PrState>(2, _omitFieldNames ? '' : 'state', enumValues: PrState.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullRequestStateOf clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullRequestStateOf copyWith(void Function(PullRequestStateOf) updates) =>
+      super.copyWith((message) => updates(message as PullRequestStateOf))
+          as PullRequestStateOf;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PullRequestStateOf() / PullRequestStateOf.new instead')
+  static PullRequestStateOf create() => PullRequestStateOf._();
+  static $pb.GeneratedMessage $_createMessage() => PullRequestStateOf._();
+  @$core.override
+  PullRequestStateOf createEmptyInstance() => PullRequestStateOf._();
+  @$core.pragma('dart2js:noInline')
+  static PullRequestStateOf getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PullRequestStateOf>(
+          PullRequestStateOf.$_createMessage);
+  static PullRequestStateOf? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get number => $_getI64(0);
+  @$pb.TagNumber(1)
+  set number($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasNumber() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearNumber() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  PrState get state => $_getN(1);
+  @$pb.TagNumber(2)
+  set state(PrState value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasState() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearState() => $_clearField(2);
+}
+
 class PullRequestThreadsRequest extends $pb.GeneratedMessage {
   factory PullRequestThreadsRequest({
     $core.String? repoPath,

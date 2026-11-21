@@ -5,6 +5,14 @@ use kumo_proto::v1 as pb;
 use super::pipelines::{ci_problem_to, ci_provider_to, ms, state_to};
 use super::tasks::person_to;
 
+pub fn pr_state_to(state: PrState) -> pb::PrState {
+    match state {
+        PrState::Open => pb::PrState::Open,
+        PrState::Merged => pb::PrState::Merged,
+        PrState::Closed => pb::PrState::Closed,
+    }
+}
+
 pub fn pull_request_to(pr: &PullRequest) -> pb::PullRequest {
     pb::PullRequest {
         number: pr.number,
@@ -14,12 +22,7 @@ pub fn pull_request_to(pr: &PullRequest) -> pb::PullRequest {
         branch: pr.branch.clone(),
         base: pr.base.clone(),
         draft: pr.draft,
-        state: match pr.state {
-            PrState::Open => pb::PrState::Open,
-            PrState::Merged => pb::PrState::Merged,
-            PrState::Closed => pb::PrState::Closed,
-        }
-        .into(),
+        state: pr_state_to(pr.state).into(),
         review: match pr.review {
             ReviewState::None => pb::ReviewState::None,
             ReviewState::Required => pb::ReviewState::Required,

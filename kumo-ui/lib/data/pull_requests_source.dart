@@ -118,6 +118,12 @@ abstract class PullRequestsSource {
   /// message when the host refuses. An empty [base] is the default branch.
   Future<PullRequestInfo> create({required String worktreePath, required String title, String body = '', String base = '', bool draft = false});
 
+  /// The state of pull requests [numbers] of the repository whose main
+  /// checkout is [repoPath], by number: one light call to the host, and no
+  /// git. A number the host doesn't know is left out. Null when the daemon
+  /// can't tell (an older one): [forBranch] answers instead.
+  Future<Map<int, PrOpenState>?> states(String repoPath, List<int> numbers) async => null;
+
   /// Whether [edit] works (the daemon has `PullRequests.Edit`).
   bool get canEdit => false;
 
@@ -136,6 +142,12 @@ class MockPullRequests implements PullRequestsSource {
 
   final Duration latency;
   final created = <String, PullRequestInfo>{};
+
+  /// Pull requests merged on the "host", by number ([states] says so).
+  final merged = <int>{};
+
+  /// What [states] and [forBranch] were asked, in order.
+  final asked = <String>[];
 
   /// What [edit] changed, by number.
   final edited = <int, ({String? title, String? body, bool? draft})>{};
@@ -209,8 +221,20 @@ class MockPullRequests implements PullRequestsSource {
   }
 
   @override
+  Future<Map<int, PrOpenState>?> states(String repoPath, List<int> numbers) async {
+    await _wait();
+    asked.add('states $repoPath ${numbers.join(',')}');
+    final known = {for (final p in [..._prs, ...created.values]) p.number};
+    return {
+      for (final n in numbers)
+        if (known.contains(n) || merged.contains(n)) n: merged.contains(n) ? PrOpenState.merged : PrOpenState.open,
+    };
+  }
+
+  @override
   Future<BranchPullRequest> forBranch(String worktreePath, {bool refresh = false}) async {
     await _wait();
+    asked.add('forBranch $worktreePath');
     // Mock worktrees live at ~/wt/<repo>/<key>: the key names the branch.
     final key = worktreePath.split('/').last;
     final pr = created[worktreePath] ?? _prs.where((p) => p.branch.contains(key)).firstOrNull;

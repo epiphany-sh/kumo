@@ -1919,6 +1919,9 @@ service PullRequests {
   // Replies to a thread (when `reply` isn't empty) and resolves it (when
   // `resolve`).
   rpc AnswerThread(AnswerThreadRequest) returns (ReviewThread);
+  // The state of pull requests of a repository, by number: one light call
+  // to the host for all of them, and no git (for TODOs waiting on a merge).
+  rpc States(PullRequestStatesRequest) returns (PullRequestStates);
 }
 
 enum PrState {
@@ -1999,6 +2002,23 @@ message CreatePullRequestRequest {
   // Target branch; empty = the repository's default branch.
   string base = 4;
   bool draft = 5;
+}
+
+message PullRequestStatesRequest {
+  // The repository's main checkout.
+  string repo_path = 1;
+  // At most 50, each above 0.
+  repeated uint64 numbers = 2;
+}
+
+message PullRequestStates {
+  // The ones the host knows; a number it doesn't is left out.
+  repeated PullRequestStateOf states = 1;
+}
+
+message PullRequestStateOf {
+  uint64 number = 1;
+  PrState state = 2;
 }
 
 message PullRequestThreadsRequest {

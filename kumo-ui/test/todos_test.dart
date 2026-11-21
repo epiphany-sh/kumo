@@ -199,6 +199,36 @@ void main() {
     expect(find.text('Shipping'), findsOneWidget);
   });
 
+  testWidgets('merges are looked for by number while TODOs show, and not under another view', (tester) async {
+    final todos = MockTodosSource();
+    final pulls = MockPullRequests()..merged.add(530);
+    final t = await _at(todos, 'Retry on rate limits', TodoStatus.pushed);
+    await todos.setStatus(t.id, TodoStatus.pr, by: 'Kumo', note: '#530', prNumber: 530, prUrl: 'https://github.com/platform/repo-a/pull/530');
+    final other = await _at(todos, 'Bump the toolchain', TodoStatus.pushed);
+    await todos.setStatus(other.id, TodoStatus.pr, by: 'Kumo', note: '#531', prNumber: 531, prUrl: 'https://github.com/platform/repo-a/pull/531');
+    final s = await _pump(tester, todos: todos, pulls: pulls);
+    await tester.pump(const Duration(minutes: 3));
+    expect(pulls.asked, isEmpty, reason: 'Tasks isn’t the view showing');
+
+    s.view = KumoView.tasks;
+    await tester.pump();
+    await tester.pump();
+    expect(pulls.asked.first, 'states repo-a 531,530', reason: 'one call for the repository, right away');
+    expect(s.todos.todo(t.id)!.status, TodoStatus.merged);
+    // 531 isn't on the host: looked up by branch, once.
+    expect(pulls.asked.where((a) => a.startsWith('forBranch')), hasLength(1));
+
+    await tester.pump(const Duration(minutes: 1));
+    expect(pulls.asked.last, 'states repo-a 531');
+    expect(pulls.asked.where((a) => a.startsWith('forBranch')), hasLength(1), reason: 'not by branch again');
+
+    s.view = KumoView.terminal;
+    await tester.pump();
+    final asked = pulls.asked.length;
+    await tester.pump(const Duration(minutes: 5));
+    expect(pulls.asked, hasLength(asked), reason: 'nothing asked while another view shows');
+  });
+
   testWidgets('merged: clean up forgets the worktree and checks it off', (tester) async {
     final todos = MockTodosSource();
     await _at(todos, 'Bump the toolchain', TodoStatus.merged);

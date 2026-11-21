@@ -6,7 +6,7 @@ import 'engine_pipelines_source.dart';
 import 'generated/kumo/v1/kumo.pbgrpc.dart' as pb;
 import 'kumo_engine.dart';
 
-/// Pull requests over `PullRequests` (List / ForBranch / Create).
+/// Pull requests over `PullRequests` (List / ForBranch / States / Create).
 class EnginePullRequests implements PullRequestsSource {
   EnginePullRequests(this._engine);
   final KumoEngine _engine;
@@ -37,6 +37,26 @@ class EnginePullRequests implements PullRequestsSource {
       pullRequest: answer.hasPullRequest() ? pullRequestFrom(answer.pullRequest) : null,
       problem: answer.hasProblem() ? ciProblemFrom(answer.problem) : null,
     );
+  }
+
+  /// `PullRequests.States`; null from a daemon without it.
+  @override
+  Future<Map<int, PrOpenState>?> states(String repoPath, List<int> numbers) async {
+    final pb.PullRequestStates answer;
+    try {
+      answer = await (await _engine.connection()).pulls.states(pb.PullRequestStatesRequest(repoPath: repoPath, numbers: [for (final n in numbers) Int64(n)]));
+    } on GrpcError catch (e) {
+      if (e.code == StatusCode.unimplemented) return null;
+      throw e.message ?? e.codeName;
+    }
+    return {
+      for (final s in answer.states)
+        s.number.toInt(): switch (s.state) {
+          pb.PrState.PR_STATE_MERGED => PrOpenState.merged,
+          pb.PrState.PR_STATE_CLOSED => PrOpenState.closed,
+          _ => PrOpenState.open,
+        },
+    };
   }
 
   /// `PullRequests.Edit` isn't in the daemon yet: the Git view copies the

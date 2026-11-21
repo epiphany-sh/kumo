@@ -45,12 +45,28 @@ class _TodosViewState extends State<TodosView> {
   void initState() {
     super.initState();
     _draft.addListener(() => setState(() {}));
-    // Pull requests merge on the host: look every minute while this is open.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final s = AppScope.read(context);
+  }
+
+  /// Pull requests merge on the host: looked for every minute while this
+  /// shows, and once on coming back. Tasks sits in the shell's
+  /// IndexedStack, so this stays mounted under the other views: there it
+  /// doesn't ask (as the Git view doesn't poll CI offstage). Nor while the
+  /// app is hidden.
+  void _watchMerges(AppState s) {
+    final showing = s.view == KumoView.tasks;
+    if (showing == (_merges != null)) return;
+    _merges?.cancel();
+    _merges = null;
+    if (!showing) return;
+    void check() {
+      final life = WidgetsBinding.instance.lifecycleState;
+      if (life == AppLifecycleState.hidden || life == AppLifecycleState.paused) return;
       s.checkTodoMerges().ignore();
-      _merges = Timer.periodic(const Duration(minutes: 1), (_) => s.checkTodoMerges().ignore());
+    }
+
+    _merges = Timer.periodic(const Duration(minutes: 1), (_) => check());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) check();
     });
   }
 
@@ -78,6 +94,7 @@ class _TodosViewState extends State<TodosView> {
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
+    _watchMerges(s);
     return ListenableBuilder(listenable: s.todos, builder: (context, _) => _build(context, s, s.todos));
   }
 

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
@@ -101,6 +103,34 @@ void main() {
     test('word hits mark the letters matched', () {
       expect(wordHits('bulk', 'Bulk discounts'), [0, 1, 2, 3]);
       expect(wordHits('nope', 'Bulk discounts'), isNull);
+    });
+
+    test('an index ranks as typed as it does from scratch', () {
+      final random = Random(3);
+      const words = ['bulk', 'discount', 'retry', 'envoy', 'price', 'history', 'api', 'rounding', 'TSK'];
+      final many = [
+        for (var i = 0; i < 400; i++)
+          _task('TSK-$i', [for (var k = 0; k < 1 + random.nextInt(4); k++) words[random.nextInt(words.length)]].join(' '), labels: [if (random.nextBool()) words[random.nextInt(words.length)]]),
+      ];
+      final index = TextIndex<TaskEntry>(many, key: (t) => t.key, title: (t) => t.title, rest: (t) => t.labels);
+      const letters = 'bulkdiscoretypah 1-';
+      var q = '';
+      for (var step = 0; step < 400; step++) {
+        final r = random.nextInt(10);
+        if (r < 6) {
+          q += letters[random.nextInt(letters.length)];
+        } else if (r < 8 && q.isNotEmpty) {
+          q = q.substring(0, q.length - 1);
+        } else if (r < 9) {
+          q = words[random.nextInt(words.length)].substring(0, 3);
+        } else {
+          q = '';
+        }
+        final all = _tickets(q, many);
+        final found = index.rank(q, limit: 20);
+        expect([for (final (t, at) in found.top) '${t.key} $at'], [for (final (t, at) in all.take(20)) '${t.key} $at'], reason: 'query "$q"');
+        expect(found.total, all.length, reason: 'query "$q"');
+      }
     });
 
     test('with no query every command shows, in order', () {

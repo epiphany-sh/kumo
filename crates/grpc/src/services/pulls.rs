@@ -7,8 +7,8 @@ use kumo_proto::v1 as pb;
 use tonic::{Request, Response, Status};
 
 use crate::mapping::{
-    branch_pull_request_to, pipelines_status_from, pull_request_list_to, pull_request_to,
-    review_thread_to,
+    branch_pull_request_to, pipelines_status_from, pr_state_to, pull_request_list_to,
+    pull_request_to, review_thread_to,
 };
 use crate::profile::{Profiles, services_of};
 
@@ -109,5 +109,26 @@ impl pb::pull_requests_server::PullRequests for PullRequestsGrpc {
             .await
             .map_err(pipelines_status_from)?;
         Ok(Response::new(review_thread_to(&thread)))
+    }
+
+    async fn states(
+        &self,
+        request: Request<pb::PullRequestStatesRequest>,
+    ) -> Result<Response<pb::PullRequestStates>, Status> {
+        let service = self.service(&request).await?;
+        let r = request.into_inner();
+        let states = service
+            .states(&PathBuf::from(r.repo_path), &r.numbers)
+            .await
+            .map_err(pipelines_status_from)?;
+        Ok(Response::new(pb::PullRequestStates {
+            states: states
+                .into_iter()
+                .map(|(number, state)| pb::PullRequestStateOf {
+                    number,
+                    state: pr_state_to(state).into(),
+                })
+                .collect(),
+        }))
     }
 }

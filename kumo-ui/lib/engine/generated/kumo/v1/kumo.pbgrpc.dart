@@ -2660,6 +2660,15 @@ class PullRequestsClient extends $grpc.Client {
     return $createUnaryCall(_$answerThread, request, options: options);
   }
 
+  /// The state of pull requests of a repository, by number: one light call
+  /// to the host for all of them, and no git (for TODOs waiting on a merge).
+  $grpc.ResponseFuture<$0.PullRequestStates> states(
+    $0.PullRequestStatesRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$states, request, options: options);
+  }
+
   // method descriptors
 
   static final _$list =
@@ -2687,6 +2696,11 @@ class PullRequestsClient extends $grpc.Client {
           '/kumo.v1.PullRequests/AnswerThread',
           ($0.AnswerThreadRequest value) => value.writeToBuffer(),
           $0.ReviewThread.fromBuffer);
+  static final _$states =
+      $grpc.ClientMethod<$0.PullRequestStatesRequest, $0.PullRequestStates>(
+          '/kumo.v1.PullRequests/States',
+          ($0.PullRequestStatesRequest value) => value.writeToBuffer(),
+          $0.PullRequestStates.fromBuffer);
 }
 
 @$pb.GrpcServiceName('kumo.v1.PullRequests')
@@ -2736,6 +2750,15 @@ abstract class PullRequestsServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.AnswerThreadRequest.fromBuffer(value),
         ($0.ReviewThread value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.PullRequestStatesRequest, $0.PullRequestStates>(
+            'States',
+            states_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.PullRequestStatesRequest.fromBuffer(value),
+            ($0.PullRequestStates value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.PullRequestList> list_Pre($grpc.ServiceCall $call,
@@ -2777,6 +2800,14 @@ abstract class PullRequestsServiceBase extends $grpc.Service {
 
   $async.Future<$0.ReviewThread> answerThread(
       $grpc.ServiceCall call, $0.AnswerThreadRequest request);
+
+  $async.Future<$0.PullRequestStates> states_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.PullRequestStatesRequest> $request) async {
+    return states($call, await $request);
+  }
+
+  $async.Future<$0.PullRequestStates> states(
+      $grpc.ServiceCall call, $0.PullRequestStatesRequest request);
 }
 
 @$pb.GrpcServiceName('kumo.v1.Releases')

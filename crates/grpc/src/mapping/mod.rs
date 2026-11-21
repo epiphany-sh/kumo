@@ -28,7 +28,9 @@ pub use error::{
 };
 pub use pipelines::{ci_problem_to, host_info_to, pipelines_snapshot_to};
 pub use profiles::{gh_account_from, gh_account_to, profile_list_to, profile_to, ssh_key_to};
-pub use pulls::{branch_pull_request_to, pull_request_list_to, pull_request_to, review_thread_to};
+pub use pulls::{
+    branch_pull_request_to, pr_state_to, pull_request_list_to, pull_request_to, review_thread_to,
+};
 pub use releases::{release_list_to, release_range_to, release_to};
 pub use tasks::{
     detected_to, source_options_from, source_to, task_detail_to, task_link_to, task_status_from,

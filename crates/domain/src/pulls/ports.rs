@@ -1,6 +1,6 @@
 use crate::pipelines::{CiProblem, CiProvider, CiTarget};
 
-use super::{NewPullRequest, PullRequest, ReviewThread, ThreadAnswer};
+use super::{NewPullRequest, PrState, PullRequest, ReviewThread, ThreadAnswer};
 
 /// One host's pull requests. Blocking: callers run it off the async
 /// runtime. `target.branch` is ignored by [`list`](Self::list).
@@ -18,6 +18,16 @@ pub trait PullRequestClient: Send + Sync + 'static {
     /// The branch's pull request: the open one, else the latest merged or
     /// closed one; None when it never had one.
     fn for_branch(&self, target: &CiTarget, token: &str) -> Result<Option<PullRequest>, CiProblem>;
+
+    /// The state of pull requests `numbers`, and nothing else (no reviews,
+    /// no checks): what's cheapest to ask, in as few calls as the host
+    /// allows. A number the host doesn't know is left out.
+    fn states(
+        &self,
+        target: &CiTarget,
+        token: &str,
+        numbers: &[u64],
+    ) -> Result<Vec<(u64, PrState)>, CiProblem>;
 
     fn create(
         &self,

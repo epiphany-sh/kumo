@@ -48,6 +48,7 @@ fn pr(number: u64, branch: &str) -> PullRequest {
 #[derive(Default)]
 struct Host {
     lists: AtomicUsize,
+    states: Mutex<Vec<Vec<u64>>>,
     created: Mutex<Vec<NewPullRequest>>,
     answered: Mutex<Vec<(u64, ThreadAnswer)>>,
     fail: Mutex<Option<CiProblem>>,
@@ -84,6 +85,29 @@ impl PullRequestClient for Host {
     }
     fn for_branch(&self, target: &CiTarget, _: &str) -> Result<Option<PullRequest>, CiProblem> {
         Ok((target.branch == "feat/x").then(|| pr(521, "feat/x")))
+    }
+    fn states(
+        &self,
+        target: &CiTarget,
+        token: &str,
+        numbers: &[u64],
+    ) -> Result<Vec<(u64, PrState)>, CiProblem> {
+        assert_eq!((target.repo.as_str(), token), ("platform/app", "ghp"));
+        self.states.lock().unwrap().push(numbers.to_vec());
+        Ok(numbers
+            .iter()
+            .filter(|&&n| n != 404)
+            .map(|&n| {
+                (
+                    n,
+                    if n == 521 {
+                        PrState::Merged
+                    } else {
+                        PrState::Open
+                    },
+                )
+            })
+            .collect())
     }
     fn create(
         &self,
@@ -351,4 +375,49 @@ async fn threads_are_read_and_answered_on_the_repository() {
         f.service.threads(Path::new(MAIN), 521).await,
         Err(PipelinesError::Ci(p)) if p.kind == CiProblemKind::NotConnected
     ));
+}
+
+#[tokio::test]
+async fn states_by_number_in_one_call_without_reading_the_branch() {
+    let f = fixture();
+    // Not pushed: a branch read would say so; states don't read it.
+    f.branch.0.lock().unwrap().upstream = None;
+    let states = f
+        .service
+        .states(Path::new(MAIN), &[518, 521, 404, 521])
+        .await
+        .unwrap();
+    assert_eq!(states, [(518, PrState::Open), (521, PrState::Merged)]);
+    assert_eq!(
+        *f.host.states.lock().unwrap(),
+        [vec![404, 518, 521]],
+        "one call, each number once"
+    );
+}
+
+#[tokio::test]
+async fn states_refuse_bad_numbers_and_too_many() {
+    let f = fixture();
+    for numbers in [vec![0], vec![u64::from(u32::MAX)], (1..=51).collect()] {
+        assert!(matches!(
+            f.service.states(Path::new(MAIN), &numbers).await,
+            Err(PipelinesError::Invalid(_))
+        ));
+    }
+    assert!(matches!(
+        f.service.states(Path::new("/elsewhere"), &[1]).await,
+        Err(PipelinesError::UnknownWorktree(_))
+    ));
+    assert!(f.host.states.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn lists_asked_at_once_share_one_call() {
+    let f = fixture();
+    let (a, b) = tokio::join!(
+        f.service.list(Path::new(MAIN), false),
+        f.service.list(Path::new(MAIN), false)
+    );
+    assert_eq!(a.unwrap(), b.unwrap());
+    assert_eq!(f.host.lists.load(Ordering::SeqCst), 1);
 }
