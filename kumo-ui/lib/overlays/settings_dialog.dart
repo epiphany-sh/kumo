@@ -296,10 +296,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
       case SettingsTab.shortcuts:
         return _Page('Shortcuts', 'Keyboard shortcuts across Kumo.', sections: [
           ('Terminal', [
-            _KbdRow('New tab', AppKeys.pane(PaneShortcut.newTab).caps),
-            _KbdRow('Split right', AppKeys.pane(PaneShortcut.splitRight).caps),
-            _KbdRow('Split down', AppKeys.pane(PaneShortcut.splitDown).caps),
-            _KbdRow('Close pane', AppKeys.pane(PaneShortcut.closePane).caps),
+            _KbdRow('New tab', hostOs.keyCaps(hostOs.paneKey(PaneShortcut.newTab))),
+            _KbdRow('Split right', hostOs.keyCaps(hostOs.paneKey(PaneShortcut.splitRight))),
+            _KbdRow('Split down', hostOs.keyCaps(hostOs.paneKey(PaneShortcut.splitDown))),
+            _KbdRow('Close pane', hostOs.keyCaps(hostOs.paneKey(PaneShortcut.closePane))),
             _KbdRow('Previous command you ran', AppKeys.previousCommand.caps),
             _KbdRow('Next command you ran', AppKeys.nextCommand.caps),
             _KbdRow('Command history', AppKeys.terminalHistory.caps),

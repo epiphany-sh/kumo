@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/platform/os/key_combo.dart';
+import 'package:kumo_ui/platform/os/linux.dart';
+import 'package:kumo_ui/platform/os/windows.dart';
 import 'package:kumo_ui/terminal/ansi_screen.dart';
 import 'package:kumo_ui/terminal/term_selection.dart';
 import 'package:kumo_ui/terminal/terminal_surface.dart';
@@ -117,4 +119,72 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('on Windows Ctrl+C copies a selection and clears it; then Ctrl+C is ^C again', (tester) async {
+    useHostOs(WindowsOs(const {}, (_) => false));
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') copied = (call.arguments as Map)['text'] as String?;
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+    final shell = _Shell();
+    await tester.pumpWidget(KumoTheme(
+      mode: KumoThemeMode.dark,
+      palette: KumoPalette.dark,
+      terminalPalette: KumoPalette.dark,
+      child: MaterialApp(home: Scaffold(body: SizedBox(width: 600, height: 200, child: TerminalCanvas(surface: shell, active: true)))),
+    ));
+    await tester.pump();
+    final box = tester.getTopLeft(find.byType(TerminalCanvas));
+    final tp = TextPainter(text: TextSpan(text: 'M', style: mono(12, height: 1.25)), textDirection: TextDirection.ltr)..layout();
+    final cw = tp.width;
+    final lh = tp.height;
+    tp.dispose();
+    Offset at(int line, int col) => box + Offset(14 + col * cw, 12 + line * lh + lh / 2);
+
+    final gesture = await tester.startGesture(at(0, 0), buttons: kPrimaryButton);
+    await gesture.moveTo(at(0, 5));
+    await gesture.up();
+    await tester.pump();
+    Future<void> ctrlC() async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+    }
+
+    await ctrlC();
+    expect(copied, 'hello');
+    expect(shell.sent, isEmpty, reason: 'copying sends no interrupt');
+    copied = null;
+    await ctrlC();
+    expect(copied, isNull, reason: 'the selection is gone');
+    expect(shell.sent, [
+      [0x03],
+    ]);
+  });
+
+  testWidgets('on Linux Ctrl+C is ^C even over a selection', (tester) async {
+    useHostOs(LinuxOs(const {}));
+    final shell = _Shell();
+    await tester.pumpWidget(KumoTheme(
+      mode: KumoThemeMode.dark,
+      palette: KumoPalette.dark,
+      terminalPalette: KumoPalette.dark,
+      child: MaterialApp(home: Scaffold(body: SizedBox(width: 600, height: 200, child: TerminalCanvas(surface: shell, active: true)))),
+    ));
+    await tester.pump();
+    final box = tester.getTopLeft(find.byType(TerminalCanvas));
+    final gesture = await tester.startGesture(box + const Offset(16, 18), buttons: kPrimaryButton);
+    await gesture.moveTo(box + const Offset(60, 18));
+    await gesture.up();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    expect(shell.sent, [
+      [0x03],
+    ]);
+  });
 }
