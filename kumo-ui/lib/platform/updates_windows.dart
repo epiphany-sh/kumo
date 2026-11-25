@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io' as io show exit, pid;
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:math' show Random;
+import 'dart:math' show Random, max, min;
 import 'dart:typed_data';
 import 'dart:ui' show AppExitResponse;
 
@@ -15,22 +15,31 @@ import 'channel.dart';
 import 'os/host_os.dart';
 import 'updates.dart';
 
-/// A release version, X.Y.Z, compared number by number.
+/// A release version, X.Y.Z or X.Y.Z-prerelease (`0.10.0-beta.1`), ordered
+/// as semver orders them: a prerelease before its release, its identifiers
+/// one by one (numbers as numbers, and before words).
 @immutable
 class UpdateVersion implements Comparable<UpdateVersion> {
-  const UpdateVersion(this.major, this.minor, this.patch);
+  const UpdateVersion(this.major, this.minor, this.patch, [this.pre = const []]);
 
   final int major;
   final int minor;
   final int patch;
 
-  static final _pattern = RegExp(r'^v?(\d+)\.(\d+)\.(\d+)$');
+  /// The prerelease identifiers (`beta`, `1`); empty for a release.
+  final List<String> pre;
 
-  /// `X.Y.Z` or `vX.Y.Z`; null for anything else (`1.2`, `1.2.3-beta`).
+  bool get isPrerelease => pre.isNotEmpty;
+
+  static final _pattern = RegExp(r'^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$');
+  static final _numeric = RegExp(r'^\d+$');
+
+  /// `X.Y.Z`, `X.Y.Z-pre` or either with a `v`; null for anything else
+  /// (`1.2`, `1.2.3-`, build metadata).
   static UpdateVersion? tryParse(String text) {
     final m = _pattern.firstMatch(text.trim());
     if (m == null) return null;
-    return UpdateVersion(int.parse(m[1]!), int.parse(m[2]!), int.parse(m[3]!));
+    return UpdateVersion(int.parse(m[1]!), int.parse(m[2]!), int.parse(m[3]!), m[4]?.split('.') ?? const []);
   }
 
   static UpdateVersion parse(String text) => tryParse(text) ?? (throw FormatException('Not a version: $text'));
@@ -39,7 +48,20 @@ class UpdateVersion implements Comparable<UpdateVersion> {
   int compareTo(UpdateVersion other) {
     if (major != other.major) return major.compareTo(other.major);
     if (minor != other.minor) return minor.compareTo(other.minor);
-    return patch.compareTo(other.patch);
+    if (patch != other.patch) return patch.compareTo(other.patch);
+    if (pre.isEmpty || other.pre.isEmpty) return (pre.isEmpty ? 1 : 0) - (other.pre.isEmpty ? 1 : 0);
+    for (var i = 0; i < pre.length && i < other.pre.length; i++) {
+      final order = _compareIdentifiers(pre[i], other.pre[i]);
+      if (order != 0) return order;
+    }
+    return pre.length.compareTo(other.pre.length);
+  }
+
+  static int _compareIdentifiers(String a, String b) {
+    final an = _numeric.hasMatch(a), bn = _numeric.hasMatch(b);
+    if (an && bn) return BigInt.parse(a).compareTo(BigInt.parse(b));
+    if (an != bn) return an ? -1 : 1;
+    return a.compareTo(b);
   }
 
   bool operator >(UpdateVersion other) => compareTo(other) > 0;
@@ -49,10 +71,10 @@ class UpdateVersion implements Comparable<UpdateVersion> {
   bool operator ==(Object other) => other is UpdateVersion && compareTo(other) == 0;
 
   @override
-  int get hashCode => Object.hash(major, minor, patch);
+  int get hashCode => Object.hash(major, minor, patch, Object.hashAll(pre));
 
   @override
-  String toString() => '$major.$minor.$patch';
+  String toString() => pre.isEmpty ? '$major.$minor.$patch' : '$major.$minor.$patch-${pre.join('.')}';
 }
 
 /// What this build of Kumo is and where it runs: whether it updates itself.
@@ -65,8 +87,9 @@ class UpdateConfig {
     this.debug = false,
     required this.exe,
     required this.localAppData,
-    this.systemRoot = r'C:\Windows',
     String? updatesDir,
+    this.feed = '',
+    this.prereleases = false,
   }) : _updatesDir = updatesDir;
 
   /// This build's, from `packaging/windows-zip.sh` (`--dart-define`).
@@ -74,11 +97,12 @@ class UpdateConfig {
         version: const String.fromEnvironment('KUMO_VERSION'),
         repo: const String.fromEnvironment('KUMO_RELEASE_REPO'),
         key: const String.fromEnvironment('KUMO_UPDATE_KEY'),
+        feed: const String.fromEnvironment('KUMO_UPDATE_FEED'),
+        prereleases: const bool.fromEnvironment('KUMO_UPDATE_PRERELEASES'),
         channel: kumoChannel,
         debug: kDebugMode,
         exe: Platform.resolvedExecutable,
         localAppData: env['LOCALAPPDATA'] ?? '',
-        systemRoot: env['SystemRoot'] ?? env['SYSTEMROOT'] ?? r'C:\Windows',
       );
 
   /// X.Y.Z.
@@ -92,25 +116,34 @@ class UpdateConfig {
 
   /// `KUMO_CHANNEL`: a beta or sandbox build never takes a release.
   final String channel;
+
+  /// `KUMO_UPDATE_FEED`: a URL answering as GitHub's releases list does,
+  /// read instead of [repo]'s (to try an update against a local server);
+  /// empty for GitHub. Set when building only: nothing at run time can
+  /// point a build elsewhere, and what it downloads is still checked
+  /// against [key].
+  final String feed;
+
+  /// `KUMO_UPDATE_PRERELEASES`: whether GitHub prereleases and `-beta`
+  /// versions count as updates. Off, a beta installed by hand still
+  /// updates to the next release.
+  final bool prereleases;
+
+  /// Where the releases are listed.
+  Uri get feedUrl => feed.isNotEmpty ? Uri.parse(feed) : Uri.parse('https://api.github.com/repos/$repo/releases?per_page=20');
   final bool debug;
 
   /// The running Kumo.exe.
   final String exe;
   final String localAppData;
-  final String systemRoot;
   final String? _updatesDir;
 
   /// Where `install.ps1` puts Kumo (its default `-Dest`).
   String get installDir => '$localAppData\\Programs\\Kumo';
 
-  /// Downloads, one folder per version, and `install.ps1`'s `update.log`.
+  /// Downloads, one folder per version, the installer's `setup.log` and
+  /// the `update.log` it (or `install.ps1`) reports a failed update in.
   String get updatesDir => _updatesDir ?? '$localAppData\\Kumo\\updates';
-
-  /// Windows PowerShell, which every Windows has.
-  String get powershell => '$systemRoot\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
-
-  /// Windows' own bsdtar, which extracts zips.
-  String get tar => '$systemRoot\\System32\\tar.exe';
 
   /// The public key's bytes, or null when [key] isn't one.
   Uint8List? get publicKey {
@@ -122,8 +155,9 @@ class UpdateConfig {
     }
   }
 
-  /// A release build with all it needs, running from where `install.ps1`
-  /// installed it: never a build folder, which an update would replace.
+  /// A release build with all it needs, running from where the installer
+  /// (or `install.ps1`) put it: never a build folder, which an update would
+  /// replace.
   bool get active =>
       !debug &&
       channel.isEmpty &&
@@ -194,11 +228,13 @@ class IoUpdateHttp implements UpdateHttp {
   }
 }
 
-/// A Windows build on GitHub: its zip, signature and checksum.
+/// A Windows build on GitHub: its installer, signature and checksum.
 class FeedRelease {
-  const FeedRelease(this.version, this.zip, this.sig, this.sha256);
+  const FeedRelease(this.version, this.installer, this.sig, this.sha256);
   final UpdateVersion version;
-  final Uri zip;
+
+  /// `Kumo-X.Y.Z-windows-x64-setup.exe`.
+  final Uri installer;
   final Uri sig;
 
   /// The `.sha256`, when the release has one.
@@ -213,24 +249,28 @@ class FeedAnswer {
   final DateTime? retryAt;
 }
 
-/// GitHub's releases of [repo]: the newest published one with a signed
-/// Windows zip. Not "latest", which is the newest with the macOS build
-/// (`docs/releasing.md`).
+/// GitHub's releases of [repo] (or another list at [url]): the newest
+/// published one with a signed Windows installer. Not "latest", which is
+/// the newest with the macOS build (`docs/releasing.md`).
 class UpdateFeed {
-  UpdateFeed(this.http, {required this.repo, required this.userAgent, required this.now});
+  UpdateFeed(this.http, {required this.repo, required this.userAgent, required this.now, Uri? url, this.prereleases = false}) : _url = url;
 
   final UpdateHttp http;
   final String repo;
   final String userAgent;
   final DateTime Function() now;
 
+  /// Whether prereleases count ([UpdateConfig.prereleases]).
+  final bool prereleases;
+  final Uri? _url;
+
   String? _etag;
   FeedRelease? _last;
   DateTime? _retryAt;
 
-  Uri get url => Uri.parse('https://api.github.com/repos/$repo/releases?per_page=20');
+  Uri get url => _url ?? Uri.parse('https://api.github.com/repos/$repo/releases?per_page=20');
 
-  static final _zipName = RegExp(r'^Kumo-(\d+\.\d+\.\d+)-windows-x64\.zip$');
+  static final _setupName = RegExp(r'^Kumo-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)-windows-x64-setup\.exe$');
 
   /// Asks GitHub, unless its rate limit says to wait; an unchanged list
   /// (304, by ETag) costs nothing and keeps the last answer. Throws on
@@ -250,7 +290,7 @@ class UpdateFeed {
       case 304:
         return FeedAnswer(release: _last);
       case 200:
-        final release = newest(jsonDecode(reply.text));
+        final release = newest(jsonDecode(reply.text), prereleases: prereleases);
         _etag = reply.headers['etag'];
         _last = release;
         return FeedAnswer(release: release);
@@ -273,23 +313,26 @@ class UpdateFeed {
   }
 
   /// The highest version among [releases] (GitHub's JSON) published, not a
-  /// prerelease, whose tag is its version and whose zip has a `.sig`.
-  static FeedRelease? newest(Object? releases) {
+  /// prerelease (unless [prereleases]), whose tag is its version and whose
+  /// setup.exe has a `.sig`. Releases with only the zip (0.9.0 and older)
+  /// are left to the updaters that install zips.
+  static FeedRelease? newest(Object? releases, {bool prereleases = false}) {
     FeedRelease? best;
     if (releases is! List) return null;
     for (final r in releases) {
-      if (r is! Map || r['draft'] == true || r['prerelease'] == true) continue;
+      if (r is! Map || r['draft'] == true || (r['prerelease'] == true && !prereleases)) continue;
       final tag = UpdateVersion.tryParse('${r['tag_name']}');
       final assets = <String, Uri>{};
       for (final a in r['assets'] is List ? r['assets'] as List : const []) {
         if (a is! Map || a['name'] is! String || a['browser_download_url'] is! String) continue;
         if (Uri.tryParse(a['browser_download_url'] as String) case final url?) assets[a['name'] as String] = url;
       }
-      for (final MapEntry(key: name, value: zip) in assets.entries) {
-        final version = UpdateVersion.tryParse(_zipName.firstMatch(name)?[1] ?? '');
+      for (final MapEntry(key: name, value: installer) in assets.entries) {
+        final version = UpdateVersion.tryParse(_setupName.firstMatch(name)?[1] ?? '');
         final sig = assets['$name.sig'];
         if (version == null || version != tag || sig == null) continue;
-        if (best == null || version > best.version) best = FeedRelease(version, zip, sig, assets['$name.sha256']);
+        if (version.isPrerelease && !prereleases) continue;
+        if (best == null || version > best.version) best = FeedRelease(version, installer, sig, assets['$name.sha256']);
       }
     }
     return best;
@@ -321,9 +364,6 @@ class _IoLauncher implements UpdateLauncher {
 /// Runs [run] once [after] has passed.
 typedef UpdateTimer = Timer Function(Duration after, void Function() run);
 
-/// Extracts the zip at [zip] into the folder [into].
-typedef UpdateExtractor = Future<void> Function(String zip, String into);
-
 /// The version an executable says it is (`X.Y.Z+build`), or null.
 typedef ExeVersionReader = Future<String?> Function(String exe);
 
@@ -347,8 +387,12 @@ void Function()? lockUpdateFolder(String dir) {
 
 /// The `ProductVersion` in a Windows executable's version resource (UTF-16
 /// strings: the key, padding, the value); null when there is none. Kumo's
-/// is `flutter build --build-name` plus `+` and the build number
+/// installer has the version it installs (`packaging/windows/kumo.iss`);
+/// Kumo.exe has `flutter build --build-name` plus `+` and the build number
 /// (`windows/runner/Runner.rc`).
+///
+/// Only the PE image is read, never data appended after it: a setup.exe's
+/// payload holds other executables, with versions of their own.
 String? productVersionIn(Uint8List bytes) {
   const key = 'ProductVersion\u0000';
   final needle = Uint8List(key.length * 2);
@@ -356,14 +400,15 @@ String? productVersionIn(Uint8List bytes) {
     needle[i * 2] = key.codeUnitAt(i) & 0xff;
     needle[i * 2 + 1] = key.codeUnitAt(i) >> 8;
   }
-  // The resources come last: look from the end.
+  final end = _peImageEnd(bytes) ?? bytes.length;
+  // The resources come last in the image: look from its end.
   outer:
-  for (var at = bytes.length - needle.length; at >= 0; at--) {
+  for (var at = end - needle.length; at >= 0; at--) {
     for (var j = 0; j < needle.length; j++) {
       if (bytes[at + j] != needle[j]) continue outer;
     }
     var i = at + needle.length;
-    int unit(int i) => i + 1 < bytes.length ? bytes[i] | bytes[i + 1] << 8 : -1;
+    int unit(int i) => i + 1 < end ? bytes[i] | bytes[i + 1] << 8 : -1;
     while (unit(i) == 0) {
       i += 2;
     }
@@ -376,10 +421,28 @@ String? productVersionIn(Uint8List bytes) {
   return null;
 }
 
-/// Why [zip] must not be installed, or null when [signature] (base64 of a
-/// raw ed25519 signature) is [publicKey]'s over it and [sha256] (hex, when
-/// given) is its hash.
-Future<String?> updateProblem(Uint8List zip, {required String signature, required Uint8List publicKey, String? sha256}) async {
+/// Where a PE file's image ends (its last section's raw data), or null when
+/// [bytes] isn't one.
+int? _peImageEnd(Uint8List bytes) {
+  if (bytes.length < 0x40 || bytes[0] != 0x4d || bytes[1] != 0x5a) return null;
+  final view = ByteData.sublistView(bytes);
+  final pe = view.getUint32(0x3c, Endian.little);
+  if (pe + 24 > bytes.length || bytes[pe] != 0x50 || bytes[pe + 1] != 0x45 || bytes[pe + 2] != 0 || bytes[pe + 3] != 0) return null;
+  final sections = view.getUint16(pe + 6, Endian.little);
+  var at = pe + 24 + view.getUint16(pe + 20, Endian.little);
+  var end = 0;
+  for (var i = 0; i < sections; i++, at += 40) {
+    if (at + 40 > bytes.length) return null;
+    final size = view.getUint32(at + 16, Endian.little);
+    if (size > 0) end = max(end, view.getUint32(at + 20, Endian.little) + size);
+  }
+  return end == 0 ? null : min(end, bytes.length);
+}
+
+/// Why [file] (an installer) must not run, or null when [signature] (base64
+/// of a raw ed25519 signature) is [publicKey]'s over it and [sha256] (hex,
+/// when given) is its hash.
+Future<String?> updateProblem(Uint8List file, {required String signature, required Uint8List publicKey, String? sha256}) async {
   final List<int> sig;
   try {
     sig = base64.decode(signature.trim());
@@ -389,10 +452,10 @@ Future<String?> updateProblem(Uint8List zip, {required String signature, require
   if (sig.length != 64) return 'its signature isn’t readable';
   if (sha256 != null) {
     final expected = sha256.trim().split(RegExp(r'\s+')).first.toLowerCase();
-    final actual = (await Sha256().hash(zip)).bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    final actual = (await Sha256().hash(file)).bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
     if (actual != expected) return 'it doesn’t match its checksum';
   }
-  final ok = await Ed25519().verify(zip, signature: Signature(sig, publicKey: SimplePublicKey(publicKey, type: KeyPairType.ed25519)));
+  final ok = await Ed25519().verify(file, signature: Signature(sig, publicKey: SimplePublicKey(publicKey, type: KeyPairType.ed25519)));
   return ok ? null : 'its signature isn’t Kumo’s';
 }
 
@@ -406,11 +469,13 @@ class _UpdateError implements Exception {
 
 /// Kumo's updater on Windows, as Sparkle is on macOS: an installed release
 /// build checks GitHub 30 s after it starts and then every hour (while
-/// Settings › General › "Download updates automatically" is on), downloads
-/// a newer Windows zip, checks its ed25519 signature and extracts it to
-/// `%LOCALAPPDATA%\Kumo\updates\<version>`. Then it's [ready]: restarting
-/// runs that zip's `install.ps1`, which waits for Kumo to exit, swaps the
-/// files and opens Kumo again; quitting runs it without the reopening.
+/// Settings › General › "Download updates automatically" is on; "Check for
+/// Updates…" checks now), downloads a newer
+/// `Kumo-X.Y.Z-windows-x64-setup.exe`, checks its ed25519 signature and
+/// keeps it in `%LOCALAPPDATA%\Kumo\updates\<version>.<pid>.<tag>`. Then
+/// it's [ready]: restarting runs that installer silently, which waits for
+/// Kumo to exit, swaps the files (`packaging/windows/kumo.iss`) and opens
+/// Kumo again; quitting runs it without the reopening.
 ///
 /// Anything else (a debug or channel build, one without the `--dart-define`s
 /// from `packaging/windows-zip.sh`, one run from a build folder) never
@@ -422,7 +487,6 @@ class WindowsUpdates extends AppUpdates {
     UpdateLauncher? launcher,
     UpdateTimer? timer,
     DateTime Function()? now,
-    UpdateExtractor? extract,
     ExeVersionReader? exeVersion,
     this.stopDaemon,
     Future<bool> Function()? relaunchApp,
@@ -434,7 +498,6 @@ class WindowsUpdates extends AppUpdates {
         _launcher = launcher ?? const _IoLauncher(),
         _timer = timer ?? Timer.new,
         _now = now ?? DateTime.now,
-        _extract = extract,
         _exeVersion = exeVersion ?? _readExeVersion,
         _relaunchApp = relaunchApp ?? (() => hostOs.relaunchAfterExit()),
         autoUpdate = autoUpdate ?? (() => true),
@@ -458,7 +521,6 @@ class WindowsUpdates extends AppUpdates {
   final UpdateLauncher _launcher;
   final UpdateTimer _timer;
   final DateTime Function() _now;
-  final UpdateExtractor? _extract;
   final ExeVersionReader _exeVersion;
   final Future<bool> Function() _relaunchApp;
   final UpdateFolderLock _lockFolder;
@@ -468,7 +530,7 @@ class WindowsUpdates extends AppUpdates {
   final UpdateHttp? _http;
 
   late final UpdateHttp _net = _http ?? IoUpdateHttp(userAgent: _userAgent);
-  late final UpdateFeed _feed = UpdateFeed(_net, repo: config.repo, userAgent: _userAgent, now: _now);
+  late final UpdateFeed _feed = UpdateFeed(_net, repo: config.repo, userAgent: _userAgent, now: _now, url: config.feedUrl, prereleases: config.prereleases);
   String get _userAgent => 'Kumo/${config.version} (Windows)';
 
   late final UpdateVersion _current;
@@ -480,15 +542,15 @@ class WindowsUpdates extends AppUpdates {
 
   String? _ready;
 
-  /// The ready version's extracted `Kumo` folder.
-  String? _readyDir;
+  /// The ready version's setup.exe.
+  String? _readyInstaller;
 
   @override
   String? get ready => _ready;
 
-  /// The ready version's `Kumo` folder, in this Kumo's own download folder.
+  /// The ready version's setup.exe, in this Kumo's own download folder.
   @visibleForTesting
-  String? get readyDir => _readyDir;
+  String? get readyInstaller => _readyInstaller;
 
   @override
   bool get canCheck => config.active;
@@ -566,9 +628,10 @@ class WindowsUpdates extends AppUpdates {
       await dir.create(recursive: true);
       // Held while this Kumo runs: another one starting leaves the folder be.
       _locks[dir.path] = _lockFolder(dir.path) ?? (throw _UpdateError('Couldn’t download Kumo $version: its folder is in use.'));
-      final part = File(_join(dir.path, 'Kumo.zip.part'));
+      final name = 'Kumo-$version-windows-x64-setup.exe';
+      final part = File(_join(dir.path, '$name.part'));
       try {
-        await _net.download(release.zip, part);
+        await _net.download(release.installer, part);
       } on Object catch (e) {
         throw _UpdateError('Couldn’t download Kumo $version: ${e is HttpException ? e.message : e}');
       }
@@ -588,28 +651,22 @@ class WindowsUpdates extends AppUpdates {
       final problem = await _problemOffThread(bytes, sigText, key, sha);
       if (problem != null) throw _UpdateError('Kumo $version wasn’t installed: $problem.');
 
-      // Extract the very bytes just verified, never the download read again.
-      final zip = File(_join(dir.path, 'Kumo.zip'));
-      await zip.writeAsBytes(bytes, flush: true);
-      await (_extract ?? _tarExtract)(zip.path, dir.path);
-      final kumo = _join(dir.path, 'Kumo');
-      final exe = _join(kumo, 'Kumo.exe');
-      if (!File(exe).existsSync() || !File(_join(kumo, 'install.ps1')).existsSync()) {
-        throw _UpdateError('Kumo $version’s download has no Kumo.exe or install.ps1.');
-      }
-      // The zip is signed, but not its name: the Kumo inside must be the
+      // Keep the very bytes just verified, never the download read again.
+      final setup = File(_join(dir.path, name));
+      await setup.writeAsBytes(bytes, flush: true);
+      // The installer is signed, but not its name: it must install the
       // version it was published as, never this one or an older one.
-      final inside = UpdateVersion.tryParse((await _exeVersion(exe))?.split('+').first ?? '');
+      final inside = UpdateVersion.tryParse((await _exeVersion(setup.path))?.split('+').first ?? '');
       if (inside != release.version || inside! <= _current) {
-        throw _UpdateError('Kumo $version’s download holds another version (${inside ?? 'unknown'}), so it wasn’t installed.');
+        throw _UpdateError('Kumo $version’s installer holds another version (${inside ?? 'unknown'}), so it wasn’t installed.');
       }
 
-      final previous = _readyDir;
+      final previous = _readyInstaller;
       _ready = version;
-      _readyDir = kumo;
+      _readyInstaller = setup.path;
       _set(UpdateReady(version));
       if (!_disposed) notifyListeners();
-      if (previous != null) _discard(Directory(previous).parent);
+      if (previous != null) _discard(File(previous).parent);
     } on Object {
       _discard(dir);
       rethrow;
@@ -629,17 +686,13 @@ class WindowsUpdates extends AppUpdates {
     _deleteQuietly(dir);
   }
 
-  Future<void> _tarExtract(String zip, String into) async {
-    final r = await Process.run(config.tar, ['-xf', zip, '-C', into]);
-    if (r.exitCode != 0) throw _UpdateError('Couldn’t extract the update: ${'${r.stderr}'.trim()}');
-  }
-
   /// [updateProblem] in another isolate; static, so the closure carries
   /// only its arguments there.
-  static Future<String?> _problemOffThread(Uint8List zip, String signature, Uint8List key, String? sha256) =>
-      Isolate.run(() => updateProblem(zip, signature: signature, publicKey: key, sha256: sha256));
+  static Future<String?> _problemOffThread(Uint8List file, String signature, Uint8List key, String? sha256) =>
+      Isolate.run(() => updateProblem(file, signature: signature, publicKey: key, sha256: sha256));
 
-  static Future<String?> _readExeVersion(String exe) async => productVersionIn(await File(exe).readAsBytes());
+  /// Off the UI thread too: an installer is tens of MB.
+  static Future<String?> _readExeVersion(String exe) => Isolate.run(() async => productVersionIn(await File(exe).readAsBytes()));
 
   static void _deleteQuietly(Directory dir) {
     try {
@@ -649,7 +702,8 @@ class WindowsUpdates extends AppUpdates {
     }
   }
 
-  /// What `install.ps1` reports a failed update with (packaging/install.ps1.in).
+  /// What the installer (`packaging/windows/kumo.iss`) and `install.ps1`
+  /// report a failed update with.
   static const _failedLine = 'Kumo wasn\'t updated: ';
 
   /// Deletes the downloads no running Kumo holds (their update is
@@ -686,25 +740,20 @@ class WindowsUpdates extends AppUpdates {
     }
   }
 
-  /// `install.ps1` from the ready version's folder, for this Kumo.
-  List<String> _installerArgs(String kumo, {bool relaunch = true}) => [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-WindowStyle',
-        'Hidden',
-        '-File',
-        _join(kumo, 'install.ps1'),
-        '-From',
-        kumo,
-        '-WaitPid',
-        '${_launcher.pid}',
-        if (!relaunch) '-NoRelaunch',
+  /// The installer, silent, once this Kumo has exited (`/WAITPID`), opening
+  /// Kumo again unless quitting (`/RELAUNCH`); `packaging/windows/kumo.iss`.
+  List<String> _installerArgs({bool relaunch = true}) => [
+        '/VERYSILENT',
+        '/SUPPRESSMSGBOXES',
+        '/NORESTART',
+        '/WAITPID=${_launcher.pid}',
+        '/LOG=${_join(config.updatesDir, 'setup.log')}',
+        if (relaunch) '/RELAUNCH',
       ];
 
   @override
   Future<void> installAndRelaunch() async {
-    if (_readyDir != null) await _restart();
+    if (_readyInstaller != null) await _restart();
   }
 
   @override
@@ -714,12 +763,12 @@ class WindowsUpdates extends AppUpdates {
   /// else just reopens Kumo.
   Future<void> _restart() async {
     await stopDaemon?.call();
-    if (_readyDir != null) {
+    if (_readyInstaller != null) {
       // Gone, Kumo stays open to say so; the next check downloads it again.
-      final kumo = _installable();
-      if (kumo == null) return;
+      final setup = _installable();
+      if (setup == null) return;
       try {
-        await _launcher.start(config.powershell, _installerArgs(kumo));
+        await _launcher.start(setup, _installerArgs());
         _launcher.exit(0);
         return;
       } on Object catch (e) {
@@ -729,16 +778,16 @@ class WindowsUpdates extends AppUpdates {
     await _relaunchApp();
   }
 
-  /// The ready version's folder while its `install.ps1` is still there;
-  /// gone, the update is forgotten (and downloaded again by the next check).
+  /// The ready version's installer while it's still there; gone, the update
+  /// is forgotten (and downloaded again by the next check).
   String? _installable() {
-    final kumo = _readyDir;
-    if (kumo == null) return null;
-    if (File(_join(kumo, 'install.ps1')).existsSync()) return kumo;
+    final setup = _readyInstaller;
+    if (setup == null) return null;
+    if (File(setup).existsSync()) return setup;
     final version = _ready;
     _ready = null;
-    _readyDir = null;
-    _discard(Directory(kumo).parent);
+    _readyInstaller = null;
+    _discard(File(setup).parent);
     _set(UpdateFailed('Kumo $version’s download is gone, so it wasn’t installed. Kumo will download it again.'));
     if (!_disposed) notifyListeners();
     return null;
@@ -749,9 +798,9 @@ class WindowsUpdates extends AppUpdates {
   /// the next Kumo restarts it on the new ones once it's idle.
   @visibleForTesting
   Future<AppExitResponse> installOnQuit() async {
-    if (_installable() case final kumo?) {
+    if (_installable() case final setup?) {
       try {
-        await _launcher.start(config.powershell, _installerArgs(kumo, relaunch: false));
+        await _launcher.start(setup, _installerArgs(relaunch: false));
       } on Object catch (e) {
         debugPrint('kumo: couldn’t start the update on quit: $e');
       }
