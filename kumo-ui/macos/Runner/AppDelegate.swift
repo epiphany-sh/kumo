@@ -218,6 +218,8 @@ final class Updates: NSObject, SPUUpdaterDelegate {
     // across launches: opening Kumo is when a new version should show.
     controller.updater.checkForUpdatesInBackground()
     addMenuItem(controller)
+    // The Flutter side may have asked before Sparkle started.
+    channel?.invokeMethod("available", arguments: true)
   }
 
   /// "Check for Updates…" under "About Kumo", as Mac apps have it.
@@ -247,6 +249,10 @@ final class Updates: NSObject, SPUUpdaterDelegate {
       case "check":
         self?.controller?.checkForUpdates(nil)
         result(nil)
+      case "available":
+        // Settings offers "Check for Updates…" only where Sparkle runs: a
+        // release build, with a feed.
+        result(self?.controller != nil)
       default:
         result(FlutterMethodNotImplemented)
       }

@@ -189,8 +189,8 @@ class WindowsOs extends HostOs {
     return true;
   }
 
-  /// Kumo's own updater ([WindowsUpdates]): GitHub releases, signed zips
-  /// and the zip's `install.ps1`.
+  /// Kumo's own updater ([WindowsUpdates]): GitHub releases and their
+  /// signed `-setup.exe`, run silently.
   @override
   AppUpdates updates({Future<void> Function()? stopDaemon, bool Function()? autoUpdate}) =>
       WindowsUpdates(config: UpdateConfig.fromEnvironment(env), stopDaemon: stopDaemon, autoUpdate: autoUpdate);

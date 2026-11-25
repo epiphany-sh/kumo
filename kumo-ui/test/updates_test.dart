@@ -30,6 +30,14 @@ class _Updates extends AppUpdates {
 /// An updater Settings can ask to check (Windows).
 class _CheckingUpdates extends AppUpdates {
   var checks = 0;
+  var installs = 0;
+  String? ready_;
+
+  @override
+  String? get ready => ready_;
+
+  @override
+  Future<void> installAndRelaunch() async => installs++;
 
   @override
   bool get canCheck => true;
@@ -117,10 +125,47 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Settings › General has no update check where the OS updater checks by itself', (tester) async {
+  testWidgets('Settings › General offers the restart once an update is ready', (tester) async {
+    final updates = _CheckingUpdates();
+    await openSettings(tester, updates);
+    expect(find.text('Restart to Update'), findsNothing);
+
+    updates.ready_ = '0.9.0';
+    updates.finish(const UpdateReady('0.9.0'));
+    await tester.pump();
+    await tester.tap(find.text('Restart to Update'));
+    expect(updates.installs, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Settings › General has no update check where the build never updates itself', (tester) async {
     await openSettings(tester, _Updates());
     expect(find.text('Check for Updates…'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  test('Sparkle offers a check once the runner says it has a feed, and checking asks Sparkle', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final calls = <String>[];
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(const MethodChannel('kumo/updates'), (call) async {
+      calls.add(call.method);
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(const MethodChannel('kumo/updates'), null));
+    final updates = SparkleUpdates();
+    addTearDown(updates.dispose);
+    var notified = 0;
+    updates.addListener(() => notified++);
+    expect(updates.canCheck, isFalse, reason: 'a local build has no feed');
+
+    const codec = StandardMethodCodec();
+    await messenger.handlePlatformMessage('kumo/updates', codec.encodeMethodCall(const MethodCall('available', true)), (_) {});
+    expect(updates.canCheck, isTrue);
+    expect(notified, 1);
+
+    await updates.check();
+    expect(calls, ['available', 'check'], reason: 'asked once when created, then checked');
   });
 
   test('Sparkle installs only once the daemon has stopped', () async {
@@ -129,7 +174,8 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
       const MethodChannel('kumo/updates'),
       (call) async {
-        calls.add(call.method);
+        // Asked once, when created: not part of installing.
+        if (call.method != 'available') calls.add(call.method);
         return null;
       },
     );

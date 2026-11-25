@@ -1,7 +1,7 @@
 name: release
 
 # Publishes Kumo X.Y.Z: the GitHub release (the macOS zip, appcast and
-# install.sh; the Windows zip and install.ps1) and the Homebrew cask. macOS
+# install.sh; the Windows setup.exe, zip and install.ps1) and the Homebrew cask. macOS
 # and Windows publish on their own (GitHub's macOS runners can go days
 # without capacity): only macOS makes the release "Latest", which is what
 # Sparkle, install.sh and brew download from (packaging/github-release.sh). A
@@ -207,6 +207,14 @@ jobs:
           RELEASE_REPO: ${{ github.repository }}
         run: packaging/windows-zip.sh "$VERSION"
 
+      # The installer people download and Kumo updates itself with, holding
+      # what the zip does. Inno Setup is installed only if the image lacks it.
+      - name: Installer
+        env:
+          RELEASE_REPO: ${{ github.repository }}
+          INSTALL_INNO_SETUP: 1
+        run: packaging/windows-installer.sh "$VERSION"
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-app
@@ -215,7 +223,8 @@ jobs:
           if-no-files-found: error
 
   # Doesn't wait for macOS, and doesn't make the release "Latest":
-  # install.ps1 finds the newest release with a Windows zip.
+  # install.ps1 and the app's updater find the newest release with a
+  # Windows build.
   windows-publish:
     needs: [version, windows-build]
     runs-on: ubuntu-latest
@@ -239,15 +248,20 @@ jobs:
 
       - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-path: dist/Kumo-${{ needs.version.outputs.version }}-windows-x64.zip
+          subject-path: |
+            dist/Kumo-${{ needs.version.outputs.version }}-windows-x64.zip
+            dist/Kumo-${{ needs.version.outputs.version }}-windows-x64-setup.exe
 
-      # The .sig is what the app checks before installing an update. Signed
+      # The .sig is what the app checks before installing an update: the
+      # setup.exe's since 0.10.0, the zip's for Kumo 0.9.0's updater. Signed
       # here, not in windows-build: the job that holds the key doesn't run
       # what it signs.
-      - name: Sign the zip
+      - name: Sign the installer and the zip
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-        run: packaging/sign-ed25519.sh "dist/Kumo-$VERSION-windows-x64.zip"
+        run: |
+          packaging/sign-ed25519.sh "dist/Kumo-$VERSION-windows-x64-setup.exe"
+          packaging/sign-ed25519.sh "dist/Kumo-$VERSION-windows-x64.zip"
 
       - name: GitHub release
         env:
@@ -255,5 +269,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           packaging/github-release.sh "$VERSION" "$SHA" \
+            "dist/Kumo-$VERSION-windows-x64-setup.exe" "dist/Kumo-$VERSION-windows-x64-setup.exe.sha256" \
+            "dist/Kumo-$VERSION-windows-x64-setup.exe.sig" \
             "dist/Kumo-$VERSION-windows-x64.zip" "dist/Kumo-$VERSION-windows-x64.zip.sha256" \
             "dist/Kumo-$VERSION-windows-x64.zip.sig" dist/install.ps1

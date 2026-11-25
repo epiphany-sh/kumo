@@ -118,13 +118,15 @@ try {
         # overwritten, but they can be renamed: everything there is set aside as
         # <name>.<id>.old, and the new files go in their place. kumod keeps
         # running from the old files; Kumo restarts it on the new ones once no
-        # terminals are open. Anything failing puts the old ones back.
+        # terminals are open. Anything failing puts the old ones back. The
+        # uninstaller the setup.exe registered (unins000.*) stays where
+        # Apps & Features looks for it.
         New-Item -ItemType Directory -Path $Dest -Force | Out-Null
         $id = [Guid]::NewGuid()
         $aside = New-Object System.Collections.Generic.List[string]
         $copied = New-Object System.Collections.Generic.List[string]
         try {
-            foreach ($item in @(Get-ChildItem -LiteralPath $Dest -Force | Where-Object { $_.Name -notlike '*.old' })) {
+            foreach ($item in @(Get-ChildItem -LiteralPath $Dest -Force | Where-Object { $_.Name -notlike '*.old' -and $_.Name -notlike 'unins*' })) {
                 Rename-Item -LiteralPath $item.FullName -NewName "$($item.Name).$id.old"
                 $aside.Add($item.Name)
             }

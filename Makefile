@@ -8,6 +8,20 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
+# Windows: Git for Windows' bash, named by its full path, so `make` works
+# from PowerShell too (there /bin/bash means nothing, and make would fall
+# back to cmd.exe). Never the "bash" on PATH: System32's is WSL. Git's root
+# comes from `git --exec-path` (<root>/mingw64/libexec/git-core), else
+# %ProgramFiles%\Git; BASH_EXE=<path> overrides it. Its usr/bin (test, cp,
+# sed, sha256sum...) goes first on the recipes' PATH.
+ifeq ($(OS),Windows_NT)
+  KUMO_GIT_EXEC := $(subst \,/,$(shell git --exec-path))
+  GIT_ROOT ?= $(or $(strip $(foreach arch,mingw64 clangarm64 mingw32,$(if $(findstring /$(arch)/libexec/git-core,$(KUMO_GIT_EXEC)),$(patsubst %/$(arch)/libexec/git-core,%,$(KUMO_GIT_EXEC))))),$(subst \,/,$(ProgramFiles))/Git)
+  BASH_EXE ?= $(GIT_ROOT)/usr/bin/bash.exe
+  SHELL    := $(BASH_EXE)
+  export PATH := $(GIT_ROOT)/usr/bin;$(GIT_ROOT)/mingw64/bin;$(PATH)
+endif
+
 # rustup installs to ~/.cargo/bin: use it when a shell opened before the
 # install (or a GUI) doesn't have it on PATH.
 CARGO   ?= $(or $(shell command -v cargo 2>/dev/null),$(wildcard $(HOME)/.cargo/bin/cargo),cargo)
@@ -71,7 +85,7 @@ BUILD ?= $(shell git rev-list --count HEAD 2>/dev/null)
 # protoc: the one vendored by Cargo (crates/proto) if present, else the system one.
 PROTOC ?= $(firstword $(wildcard $(HOME)/.cargo/registry/src/*/protoc-bin-vendored-macos-*/bin/protoc) protoc)
 
-.PHONY: help all engine ui app bundle sign package release sparkle-keys run dev stop status sandbox sandbox-stop test check bench bench-ui proto clean signing-cert
+.PHONY: help all engine ui app bundle sign package release windows-installer sparkle-keys run dev stop status sandbox sandbox-stop test check bench bench-ui proto clean signing-cert
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-8s\033[0m %s\n", $$1, $$2}'
@@ -146,6 +160,20 @@ package: ## From a signed app: dist/ with the zip, appcast, checksum, installers
 	sed -e 's|@RELEASE_REPO@|$(RELEASE_REPO)|g' -e 's|@RELEASE_ORG@|$(RELEASE_ORG)|g' -e 's|@VERSION@|$(VERSION)|g' \
 		-e "s|@SHA256@|$$(shasum -a 256 dist/Kumo-$(VERSION).zip | cut -d' ' -f1)|g" packaging/homebrew/kumo.rb.in > dist/kumo.rb
 	@echo "✓ dist/: Kumo-$(VERSION).zip, Kumo.zip, Kumo.zip.sha256, appcast.xml, install.sh, install.ps1, kumo.rb"
+
+windows-installer: ## Windows: make windows-installer VERSION=0.10.0-beta.1 → dist/ zip + setup.exe (+ .sig with SPARKLE_KEY_FILE)
+	@test -n "$(VERSION)" || { echo "make windows-installer VERSION=x.y.z[-pre]"; exit 1; }
+	@test "$(PLATFORM)" = windows || { echo "make windows-installer runs on Windows"; exit 1; }
+	RELEASE_REPO=$(RELEASE_REPO) $(if $(BUILD),BUILD=$(BUILD)) packaging/windows-zip.sh $(VERSION)
+	RELEASE_REPO=$(RELEASE_REPO) packaging/windows-installer.sh $(VERSION)
+	@# SPARKLE_KEY_FILE: the private key as `generate_keys -x` exports it (as
+	@# for macOS). Without it the installer isn't signed: it installs by hand,
+	@# but no Kumo takes it as an update.
+	@if [ -n "$(SPARKLE_KEY_FILE)" ]; then \
+		SPARKLE_PRIVATE_KEY="$$(cat "$(SPARKLE_KEY_FILE)")" packaging/sign-ed25519.sh dist/Kumo-$(VERSION)-windows-x64-setup.exe; \
+	else \
+		echo "  (not signed: no SPARKLE_KEY_FILE. Kumo's updater only takes a signed installer)"; \
+	fi
 
 $(SPARKLE_TOOLS)/sign_update:
 	mkdir -p target/sparkle-$(SPARKLE_VERSION)

@@ -641,21 +641,26 @@ class _Row extends StatelessWidget {
   }
 }
 
-/// "Check for Updates…", with where checking is under it; only where Kumo
-/// checks by itself ([AppUpdates.canCheck]).
+/// "Check for Updates…", with where checking is under it, or "Restart to
+/// Update" once one is ready; only in a build that updates itself
+/// ([AppUpdates.canCheck]).
 class _UpdateCheckRow extends StatelessWidget {
   const _UpdateCheckRow({required this.updates});
   final AppUpdates updates;
 
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder<UpdateStatus>(
-        valueListenable: updates.status,
-        builder: (context, status, _) {
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: Listenable.merge([updates, updates.status]),
+        builder: (context, _) {
+          final status = updates.status.value;
           final busy = status is UpdateChecking || status is UpdateDownloading;
+          final ready = updates.ready;
           return _Row(
             label: 'Updates',
-            desc: describeUpdateStatus(status),
-            control: KButton(label: 'Check for Updates…', height: 30, fontSize: 12.5, onTap: busy ? null : () => updates.check().ignore()),
+            desc: ready != null && status is! UpdateReady ? describeUpdateStatus(UpdateReady(ready)) : describeUpdateStatus(status),
+            control: ready != null
+                ? KButton.primary(label: 'Restart to Update', height: 30, fontSize: 12.5, onTap: updates.installAndRelaunch)
+                : KButton(label: 'Check for Updates…', height: 30, fontSize: 12.5, onTap: busy ? null : () => updates.check().ignore()),
           );
         },
       );
