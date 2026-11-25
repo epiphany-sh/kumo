@@ -20,6 +20,14 @@ void main() {
       }
     });
 
+    test('keeps the port and scheme of a web remote, not of an ssh one', () {
+      expect(remoteWebOf('https://gitlab.corp.example:8443/team/repo.git')?.url, 'https://gitlab.corp.example:8443/team/repo');
+      expect(remoteWebOf('http://gitlab.corp.example:8080/team/repo.git')?.url, 'http://gitlab.corp.example:8080/team/repo');
+      expect(remoteWebOf('https://me:secret@gitlab.corp.example:8443/team/repo.git')?.url, 'https://gitlab.corp.example:8443/team/repo');
+      expect(remoteWebOf('ssh://git@gitlab.corp.example:2222/team/repo.git')?.url, 'https://gitlab.corp.example/team/repo');
+      expect(remoteWebOf('git://gitlab.corp.example:9418/team/repo.git')?.url, 'https://gitlab.corp.example/team/repo');
+    });
+
     test('never keeps credentials from an https remote', () {
       expect(remoteWebOf('https://me:ghp_secret@github.com/platform/repo-a.git')?.url, 'https://github.com/platform/repo-a');
     });
@@ -121,6 +129,12 @@ void main() {
       expect(links.newRequestUrl, 'https://github.com/platform/repo-a/compare/main...release/0.10.0?expand=1');
       final older = branchLinksOf(remoteUrl: remote, branch: 'release/0.9.0', base: 'origin/main', pushed: true, remoteBranches: remotes)!;
       expect(older.newRequestUrl, 'https://github.com/platform/repo-a/compare/main...release/0.9.0?expand=1');
+    });
+
+    test('the default branch has no pull request to create, even with an open release', () {
+      final links = branchLinksOf(remoteUrl: remote, branch: 'main', base: 'origin/main', pushed: true, remoteBranches: remotes)!;
+      expect(links.newRequestUrl, isNull);
+      expect(links.primaryUrl, 'https://github.com/platform/repo-a/tree/main');
     });
   });
 

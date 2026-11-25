@@ -1257,11 +1257,19 @@ class AppState extends ChangeNotifier {
     try {
       remote = (await workspace.branches(repo))?.remote;
     } on Object {
-      // No answer: pull requests target the base, as without releases.
+      // No answer: see below.
     }
     _remoteBranchesAsking.remove(key);
     if (_disposed) return;
-    final before = _remoteBranches[key]?.$1 ?? const <String>[];
+    final had = _remoteBranches[key];
+    // A failed read keeps the last good list (forgetting it would forget the
+    // open release too), restamped so a failing git is asked again only once
+    // [prFreshFor] passes, not on every rebuild.
+    if (remote == null && had != null) {
+      _remoteBranches[key] = (had.$1, DateTime.now());
+      return;
+    }
+    final before = had?.$1 ?? const <String>[];
     final now = remote ?? const <String>[];
     _remoteBranches[key] = (now, DateTime.now());
     if (openReleaseOf(now) != openReleaseOf(before)) notifyListeners();

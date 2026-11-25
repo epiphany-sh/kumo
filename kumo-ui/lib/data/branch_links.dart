@@ -69,7 +69,9 @@ RemoteWeb? remoteWebOf(String remoteUrl) {
     final slash = rest.indexOf('/');
     if (slash < 0) return null;
     final authority = rest.substring(0, slash);
-    domain = authority.substring(authority.lastIndexOf('@') + 1).split(':').first;
+    final hostPort = authority.substring(authority.lastIndexOf('@') + 1);
+    // A web remote's port is the web page's too; an ssh or git one isn't.
+    domain = given == 'http' || given == 'https' ? hostPort : hostPort.split(':').first;
     path = rest.substring(slash + 1);
   } else {
     // scp-like: [user@]host:path. A drive letter (C:\…) is a local path.
@@ -158,7 +160,7 @@ class BranchLinks {
 /// open and with an address. Pull requests to create target the open
 /// release among [remoteBranches] (see [openReleaseOf]), else [base], what
 /// the branch is compared with (`origin/main`). A release branch itself
-/// targets [base].
+/// targets [base]; [base] itself has none to create.
 BranchLinks? branchLinksOf({
   required String remoteUrl,
   required String branch,
@@ -170,14 +172,15 @@ BranchLinks? branchLinksOf({
   if (!pushed || branch.isEmpty) return null;
   final web = remoteWebOf(remoteUrl);
   if (web == null) return null;
+  final baseBranch = baseBranchOf(base);
   final release = branch.startsWith('release/') ? null : openReleaseOf(remoteBranches);
-  final target = release ?? baseBranchOf(base);
+  final target = release ?? baseBranch;
   final open = pullRequest != null && pullRequest.state == PrOpenState.open && pullRequest.url.isNotEmpty ? pullRequest : null;
   return BranchLinks(
     web: web,
     branch: branch,
     branchUrl: web.branchUrl(branch),
-    newRequestUrl: branch == target ? null : web.newRequestUrl(branch, base: target),
+    newRequestUrl: branch == target || branch == baseBranch ? null : web.newRequestUrl(branch, base: target),
     pullRequest: open,
   );
 }
