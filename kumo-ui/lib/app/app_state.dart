@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import '../data/agent_defs_source.dart';
 import '../data/agents_source.dart';
 import '../data/ai_usage_source.dart';
+import '../data/branch_links.dart';
 import '../data/ci_hosts_source.dart';
 import '../data/pipelines_source.dart';
 import '../data/profiles_source.dart';
@@ -1201,6 +1202,7 @@ class AppState extends ChangeNotifier {
     _changes = path == null ? NoWorktreeChanges() : factory(path);
     _changes.addListener(notifyListeners);
     _commitNotice = null;
+    _noticeAfterPush = false;
     _canUndoCommit = false;
   }
 
@@ -1212,6 +1214,58 @@ class AppState extends ChangeNotifier {
   /// (not once it was pushed).
   bool _canUndoCommit = false;
   bool get canUndoCommit => _canUndoCommit;
+
+  /// Whether [commitNotice] says the branch was just pushed (it then links
+  /// to the branch's pull request, see [branchLinks]).
+  bool _noticeAfterPush = false;
+  bool get noticeAfterPush => _noticeAfterPush;
+
+  /// Where the current worktree's branch is on its host, and its open pull
+  /// request (or where to open one). Null until the branch is pushed, or
+  /// when the remote isn't on a host Kumo knows.
+  BranchLinks? get branchLinks {
+    final git = _changes;
+    if (!git.pushed) return null;
+    final entry = activeWorktreeEntry;
+    final repo = activeRepo;
+    return branchLinksOf(
+      remoteUrl: repo?.remoteUrl ?? '',
+      branch: git.branch,
+      base: git.base,
+      pushed: true,
+      pullRequest: entry == null || entry.branch != git.branch ? null : pullRequestOf(entry),
+      remoteBranches: repo == null ? const [] : _remoteBranchesOf(repo),
+    );
+  }
+
+  /// Each repository's remote branches (`origin/release/0.10.0`), when they
+  /// were asked for, and the repositories being asked now (key: [Repo.id]).
+  final _remoteBranches = <String, (List<String>, DateTime)>{};
+  final _remoteBranchesAsking = <String>{};
+
+  /// [repo]'s remote branches as last read (empty until they arrive; asking
+  /// notifies when they do), trusted for [prFreshFor].
+  List<String> _remoteBranchesOf(Repo repo) {
+    final key = repo.id;
+    final have = _remoteBranches[key];
+    if ((have == null || DateTime.now().difference(have.$2) > prFreshFor) && _remoteBranchesAsking.add(key)) _askRemoteBranches(key, repo);
+    return have?.$1 ?? const [];
+  }
+
+  Future<void> _askRemoteBranches(String key, Repo repo) async {
+    List<String>? remote;
+    try {
+      remote = (await workspace.branches(repo))?.remote;
+    } on Object {
+      // No answer: pull requests target the base, as without releases.
+    }
+    _remoteBranchesAsking.remove(key);
+    if (_disposed) return;
+    final before = _remoteBranches[key]?.$1 ?? const <String>[];
+    final now = remote ?? const <String>[];
+    _remoteBranches[key] = (now, DateTime.now());
+    if (openReleaseOf(now) != openReleaseOf(before)) notifyListeners();
+  }
 
   /// Git answers asynchronously; ignore answers that arrive after disposal.
   bool _disposed = false;
@@ -1268,6 +1322,7 @@ class AppState extends ChangeNotifier {
     final n = '$count ${count == 1 ? 'file' : 'files'}';
     final push = how == 'push';
     _commitNotice = how == 'amend' ? 'Amending with $n…' : 'Committed $n${push ? ', pushing…' : ''}';
+    _noticeAfterPush = false;
     _canUndoCommit = false;
     final changes = _changes;
     // A file being discarded must not end up in the commit.
@@ -1277,6 +1332,7 @@ class AppState extends ChangeNotifier {
     committing.then((sha) {
       if (_disposed || !identical(changes, _changes)) return;
       _canUndoCommit = sha != null && !push;
+      _noticeAfterPush = sha != null && push;
       _commitNotice = sha == null
           ? 'Commit failed: ${changes.error ?? 'unknown error'}'
           : switch (how) {
@@ -1301,7 +1357,7 @@ class AppState extends ChangeNotifier {
           // A first push starts the branch's pipelines.
           if (changes.error == null && identical(pipelines, _pipelines)) pipelines.branchPushed();
         });
-    _sync('Pushing…', run, (c) => 'Pushed ${c.branch}', 'Push');
+    _sync('Pushing…', run, (c) => 'Pushed ${c.branch}', 'Push', pushes: true);
   }
 
   void pull() => _sync('Pulling…', _changes.pull, (c) => 'Pulled into ${c.branch}', 'Pull');
@@ -1309,22 +1365,25 @@ class AppState extends ChangeNotifier {
   void fetch() => _sync('Fetching…', _changes.fetch, (_) => 'Fetched', 'Fetch');
 
   /// Runs a remote git action with its notice: [doing] now, then [done] or
-  /// why [what] failed.
-  void _sync(String doing, Future<void> Function() run, String Function(WorktreeChanges changes) done, String what) {
+  /// why [what] failed. [pushes]: done, the notice is [noticeAfterPush].
+  void _sync(String doing, Future<void> Function() run, String Function(WorktreeChanges changes) done, String what, {bool pushes = false}) {
     final changes = _changes;
     _commitNotice = doing;
+    _noticeAfterPush = false;
     _canUndoCommit = false;
     notifyListeners();
     run().then((_) {
       if (_disposed || !identical(changes, _changes)) return;
       final error = changes.error;
       _commitNotice = error == null ? done(changes) : '$what failed: $error';
+      _noticeAfterPush = pushes && error == null;
       notifyListeners();
     });
   }
 
   void undoCommit() {
     _commitNotice = null;
+    _noticeAfterPush = false;
     _canUndoCommit = false;
     _changes.undoLastCommit();
     notifyListeners();

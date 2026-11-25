@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../app/app_state.dart';
 import '../data/agents_source.dart';
 import '../data/ai_usage_source.dart';
+import '../data/branch_links.dart';
 import '../data/changes.dart';
 import '../data/docs_source.dart';
 import '../data/models.dart';
@@ -198,12 +199,20 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
     }
   }
 
+  /// Copies the link to the branch's pull request (or to the branch).
+  Future<void> _copyLink(AppState s, BranchLinks links) async {
+    final pr = links.pullRequest;
+    await Clipboard.setData(ClipboardData(text: pr?.url ?? links.branchUrl));
+    s.notify('Copied the link to ${pr?.label ?? links.branch}');
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final c = context.c;
     final pending = s.pendingChanges;
     final onBranch = s.branchChanges;
+    final links = s.branchLinks;
     final q = _query.text.trim().toLowerCase();
     bool match(ChangedFile f) => q.isEmpty || f.path.toLowerCase().contains(q);
     final git = s.changes;
@@ -234,6 +243,13 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
             message: '$ahead to push · ${git.behind} to pull${git.pushed ? '' : ' · not published yet'}',
             child: Text('↑$ahead ↓${git.behind}', style: mono(11.5, color: c.text3)),
           ),
+        if (links != null)
+          KIconButton(
+            icon: links.pullRequest != null || links.newRequestUrl != null ? KIcons.pullRequest : KIcons.external,
+            label: links.primaryLabel,
+            color: links.pullRequest != null ? c.acc : null,
+            onTap: () => openUrl(links.primaryUrl),
+          ),
         KIconButton(
           icon: KIcons.search,
           label: 'Filter files',
@@ -251,21 +267,35 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
               btn,
               position: belowOf(btn),
               alignRight: true,
-              builder: (context, close) => KMenuPanel(width: 200, children: [
-                for (final (icon, label, action) in [
-                  (Icons.refresh_rounded, 'Fetch', s.fetch),
-                  (KIcons.download, git.behind > 0 ? 'Pull ↓${git.behind}' : 'Pull', s.pull),
-                  (KIcons.upload, !git.pushed ? 'Publish branch' : (ahead > 0 ? 'Push ↑$ahead' : 'Push'), s.push),
-                ])
-                  KMenuItem(
-                    icon: icon,
-                    label: label,
-                    onTap: () {
-                      close();
-                      action();
-                    },
-                  ),
-                const KMenuDivider(),
+              builder: (context, close) => KMenuPanel(width: links == null ? 200 : 230, children: [
+                for (final group in [
+                  [
+                    (Icons.refresh_rounded, 'Fetch', s.fetch),
+                    (KIcons.download, git.behind > 0 ? 'Pull ↓${git.behind}' : 'Pull', s.pull),
+                    (KIcons.upload, !git.pushed ? 'Publish branch' : (ahead > 0 ? 'Push ↑$ahead' : 'Push'), s.push),
+                  ],
+                  // The branch on its host, once pushed.
+                  if (links != null)
+                    [
+                      if (links.pullRequest case final pr?)
+                        (KIcons.pullRequest, 'Open ${links.web.request} ${pr.label}', () => openUrl(pr.url))
+                      else if (links.newRequestUrl case final url?)
+                        (KIcons.pullRequest, 'Create ${links.web.request}', () => openUrl(url)),
+                      (KIcons.external, 'Open branch on ${links.web.hostName}', () => openUrl(links.branchUrl)),
+                      (KIcons.link, links.pullRequest != null ? 'Copy ${links.web.request} link' : 'Copy branch link', () => _copyLink(s, links)),
+                    ],
+                ]) ...[
+                  for (final (icon, label, action) in group)
+                    KMenuItem(
+                      icon: icon,
+                      label: label,
+                      onTap: () {
+                        close();
+                        action();
+                      },
+                    ),
+                  const KMenuDivider(),
+                ],
                 if (widget.compact)
                   KMenuItem(
                     icon: KIcons.external,
@@ -382,6 +412,19 @@ class _SourceControlPanelState extends State<SourceControlPanel> {
             const SizedBox(width: 6),
             Expanded(child: Text(s.commitNotice!, style: sans(12, color: c.text2))),
             if (s.canUndoCommit) KButton(label: 'Undo', kind: KButtonKind.ghost, height: 26, fontSize: 12, onTap: s.undoCommit),
+            // Just pushed: on to its pull request.
+            if (s.noticeAfterPush && links != null)
+              KButton(
+                label: switch (links) {
+                  BranchLinks(pullRequest: final pr?) => 'Open ${pr.label}',
+                  BranchLinks(newRequestUrl: _?) => 'Create ${links.web.requestShort}',
+                  _ => 'Open on ${links.web.hostName}',
+                },
+                kind: KButtonKind.ghost,
+                height: 26,
+                fontSize: 12,
+                onTap: () => openUrl(links.primaryUrl),
+              ),
           ]),
         ),
       ],

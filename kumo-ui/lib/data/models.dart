@@ -66,8 +66,11 @@ class PipelineRun {
 }
 
 class Repo {
-  const Repo({required this.name, required this.host, required this.worktrees, this.path});
+  const Repo({required this.name, required this.host, required this.worktrees, this.path, this.remoteUrl = ''});
   final String name;
+
+  /// The `origin` (or first) remote's URL, as git has it; empty without one.
+  final String remoteUrl;
 
   /// Absolute path of the main checkout (daemon data). Mocks have none.
   final String? path;
