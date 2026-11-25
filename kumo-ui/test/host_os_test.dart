@@ -94,6 +94,8 @@ void main() {
       expect(os.paneShortcutLabel(PaneShortcut.closePane), '⌘W');
       expect(os.paneShortcutLabel(PaneShortcut.splitRight), '⌘D');
       expect(os.paneShortcutLabel(PaneShortcut.splitDown), '⇧⌘D');
+      expect(os.terminalCtrlClipboard, isFalse);
+      expect(os.terminalComposesText, isTrue, reason: 'dead keys (⌥N N → ñ) compose through the text input system');
     });
 
     test('Finder, and this Mac', () {
@@ -204,14 +206,19 @@ void main() {
       expect(WindowsOs(const {'PATH': r'C:\a', 'COMSPEC': 'cmd'}, null, exists).shell, 'cmd');
     });
 
-    test('pane keys use Ctrl+Shift, leaving Ctrl+D / T / W to the shell', () {
+    test('pane keys use Ctrl+Shift, leaving Ctrl+T / W to the shell; Ctrl+D splits right and Ctrl+Shift+D down', () {
       expect(_keys(os.paneShortcut(PaneShortcut.newTab)), _keys(const SingleActivator(LogicalKeyboardKey.keyT, control: true, shift: true)));
       expect(_keys(os.paneShortcut(PaneShortcut.closePane)), _keys(const SingleActivator(LogicalKeyboardKey.keyW, control: true, shift: true)));
-      expect(_keys(os.paneShortcut(PaneShortcut.splitRight)), _keys(const SingleActivator(LogicalKeyboardKey.keyD, control: true, shift: true)));
-      expect(_keys(os.paneShortcut(PaneShortcut.splitDown)), _keys(const SingleActivator(LogicalKeyboardKey.keyE, control: true, shift: true)));
+      expect(_keys(os.paneShortcut(PaneShortcut.splitRight)), _keys(const SingleActivator(LogicalKeyboardKey.keyD, control: true)));
+      expect(_keys(os.paneShortcut(PaneShortcut.splitDown)), _keys(const SingleActivator(LogicalKeyboardKey.keyD, control: true, shift: true)));
       expect(os.paneShortcutLabel(PaneShortcut.newTab), 'Ctrl+Shift+T');
-      expect(os.paneShortcutLabel(PaneShortcut.splitRight), 'Ctrl+Shift+D');
-      expect(os.paneShortcutLabel(PaneShortcut.splitDown), 'Ctrl+Shift+E');
+      expect(os.paneShortcutLabel(PaneShortcut.splitRight), 'Ctrl+D');
+      expect(os.paneShortcutLabel(PaneShortcut.splitDown), 'Ctrl+Shift+D');
+      expect(os.keyCaps(os.paneKey(PaneShortcut.splitDown)), ['Ctrl', 'Shift', 'D']);
+    });
+
+    test('Ctrl+C and Ctrl+V are the terminal’s clipboard keys', () {
+      expect(os.terminalCtrlClipboard, isTrue);
     });
 
     test('Explorer, and this PC', () {
@@ -306,9 +313,15 @@ void main() {
       expect(os.shellDescription, 'Login shell for new tabs (Ctrl+Shift+T) and splits.');
     });
 
-    test('pane keys use Ctrl+Shift', () {
+    test('pane keys use Ctrl+Shift, leaving Ctrl+D to the shell', () {
       expect(_keys(os.paneShortcut(PaneShortcut.newTab)), _keys(const SingleActivator(LogicalKeyboardKey.keyT, control: true, shift: true)));
       expect(os.paneShortcutLabel(PaneShortcut.closePane), 'Ctrl+Shift+W');
+      expect(_keys(os.paneShortcut(PaneShortcut.splitRight)), _keys(const SingleActivator(LogicalKeyboardKey.keyD, control: true, shift: true)));
+      expect(_keys(os.paneShortcut(PaneShortcut.splitDown)), _keys(const SingleActivator(LogicalKeyboardKey.keyE, control: true, shift: true)));
+    });
+
+    test('Ctrl+C and Ctrl+V stay the shell’s', () {
+      expect(os.terminalCtrlClipboard, isFalse);
     });
 
     test('the file manager, and this computer', () {

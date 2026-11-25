@@ -93,7 +93,8 @@ void main() {
     debugHostOs = WindowsOs(const {});
     final state = await pumpApp(tester);
     expect(find.byTooltip('New tab (Ctrl+Shift+T)'), findsOneWidget);
-    expect(find.byTooltip('Split right (Ctrl+Shift+D)'), findsWidgets);
+    expect(find.byTooltip('Split right (Ctrl+D)'), findsWidgets);
+    expect(find.byTooltip('Split down (Ctrl+Shift+D)'), findsWidgets);
     expect(find.byTooltip('Settings (Ctrl+,)'), findsOneWidget);
     expect(find.byTooltip('Hide sidebar (Ctrl+Alt+S)'), findsOneWidget);
     expect(find.byTooltip('Terminal in ~, not tied to a repository  Ctrl+1'), findsOneWidget);

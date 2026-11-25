@@ -113,7 +113,8 @@ void main() {
         expect(AppKeys.backToPrompt.label, 'Shift+End');
         expect(AppKeys.nextWord.label, 'Alt+→');
         expect(AppKeys.runFromHistory.label, 'Ctrl+↵');
-        expect(os.paneShortcutLabel(PaneShortcut.splitDown), 'Ctrl+Shift+E');
+        // Windows splits with Ctrl+D / Ctrl+Shift+D; Linux leaves Ctrl+D to the shell.
+        expect(os.paneShortcutLabel(PaneShortcut.splitDown), name == 'Windows' ? 'Ctrl+Shift+D' : 'Ctrl+Shift+E');
       });
 
       test('caps, one per key', () {
