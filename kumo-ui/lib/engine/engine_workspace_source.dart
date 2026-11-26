@@ -224,6 +224,7 @@ class EngineWorkspaceSource extends WorkspaceSource {
         name: r.name,
         host: _hostCode(r.host),
         path: r.path,
+        remoteUrl: r.remoteUrl,
         worktrees: [for (final w in r.worktrees) _worktree(w)],
       );
 
