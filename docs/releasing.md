@@ -19,28 +19,57 @@ Los builds locales (`make app`, `make run`, `make dev`) no tienen feed: nunca
 se reemplazan solos por la versión publicada.
 
 **Windows** sale en el mismo release. Los `.exe` no llevan firma de código
-(Authenticode), pero el zip sí lleva una firma ed25519 hecha con la misma
-clave de Sparkle (`Kumo-X.Y.Z-windows-x64.zip.sig`):
+(Authenticode), pero el instalador y el zip sí llevan una firma ed25519 hecha
+con la misma clave de Sparkle (`Kumo-X.Y.Z-windows-x64-setup.exe.sig`,
+`Kumo-X.Y.Z-windows-x64.zip.sig`):
 
-- **Instalación**: `install.ps1` baja el zip de Windows del release
-  más nuevo que lo tenga (no de "Latest", ver abajo), lo copia a
-  `%LOCALAPPDATA%\Programs\Kumo`, le saca la marca de "bajado de
-  internet" (así SmartScreen no frena) y crea el acceso en el menú Inicio.
-  Solo compara el zip con su `.sha256`, no verifica la firma.
-- **Updates**: la app consulta los releases de GitHub, baja el zip más nuevo,
-  verifica el `.sig` contra la clave pública de Sparkle que trae adentro
-  (`--dart-define=KUMO_UPDATE_KEY`) y recién ahí lo instala con su
-  `install.ps1`. Correr `install.ps1` a mano también actualiza.
+- **Instalación**: `Kumo-X.Y.Z-windows-x64-setup.exe`, un instalador de Inno
+  Setup (`packaging/windows/kumo.iss`) por usuario, sin pedir admin. Instala
+  en `%LOCALAPPDATA%\Programs\Kumo`, crea el acceso en el menú Inicio y
+  registra el desinstalador en "Aplicaciones instaladas" (HKCU). Su `AppId`
+  no cambia nunca: así Windows sabe que una versión nueva es la misma app.
+  `install.ps1` sigue funcionando (baja el zip del release más nuevo que lo
+  tenga, no de "Latest", ver abajo) e instala en la misma carpeta, así que
+  uno actualiza lo que instaló el otro. Ninguno de los dos verifica la firma
+  al instalar a mano: `install.ps1` compara el zip con su `.sha256`.
+- **Updates**: igual que Sparkle. La app consulta los releases de GitHub al
+  abrir (a los 30 s) y después cada hora, mientras "Download updates
+  automatically" esté prendido; Settings › General › "Check for Updates…"
+  consulta en el momento. Baja el `-setup.exe` más nuevo, verifica el `.sig`
+  contra la clave pública de Sparkle que trae adentro
+  (`--dart-define=KUMO_UPDATE_KEY`) y que el instalador diga ser esa versión
+  (su `ProductVersion`), y avisa "Restart to update". Con el click corre el
+  instalador en silencio (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+  /WAITPID=<pid> /RELAUNCH`), que espera a que Kumo se cierre, instala y lo
+  vuelve a abrir. Sin el click, instala al cerrar Kumo (sin reabrirlo). Si
+  falla, lo anota en `%LOCALAPPDATA%\Kumo\updates\update.log` y la app lo
+  muestra en Settings la próxima vez; el log completo del instalador queda en
+  `setup.log`, al lado.
+- **Solo los builds de release se actualizan**: los que arma
+  `packaging/windows-zip.sh` (con versión, repo y clave por `--dart-define`),
+  instalados en `%LOCALAPPDATA%\Programs\Kumo`. Un build de debug, uno de
+  canal (`make sandbox`) o uno corriendo desde otra carpeta nunca consultan.
 - **El daemon**: un `kumod.exe` corriendo (y las DLL que cargó) no se puede
-  pisar ni borrar, pero sí renombrar. `install.ps1` renombra todo lo que hay
-  en la carpeta a `<nombre>.<id>.old` y copia lo nuevo; si algo falla, borra
-  lo copiado y devuelve los `.old` a su nombre. El viejo sigue corriendo y la
-  UI lo reinicia sobre el nuevo como en macOS. Los `.old` se borran en la
-  próxima instalación, si ya no corren. El zip trae su propio `install.ps1`
-  (`Kumo\install.ps1 -From <carpeta> -WaitPid <pid>`) para que Kumo se
-  actualice solo; `packaging/tests/install-swap.ps1` lo prueba en CI.
+  pisar ni borrar, pero sí renombrar. El instalador renombra `kumod.exe` y
+  las DLL de la carpeta a `<nombre>.<id>.old` antes de copiar; si la
+  instalación falla, los devuelve a su nombre. Las ventanas de Kumo abiertas
+  se cierran (Restart Manager, que solo mira archivos de la UI: nunca cierra
+  `kumod`). El viejo sigue corriendo con sus terminales y la UI lo reinicia
+  sobre el nuevo como en macOS. Los `.old` se borran en la próxima
+  instalación, si ya no corren. `install.ps1` hace lo mismo con todo lo que
+  hay en la carpeta, menos el desinstalador (`unins000.*`);
+  `packaging/tests/install-swap.ps1` lo prueba en CI.
 - **El zip** (`packaging/windows-zip.sh`) trae `Kumo.exe`, `kumod.exe` y el
-  runtime de VC++ que necesitan los dos.
+  runtime de VC++ que necesitan los dos. El instalador
+  (`packaging/windows-installer.sh`) se arma desde ese zip, así que trae lo
+  mismo. El zip sigue firmado porque el updater de Kumo 0.9.0 instala zips.
+- **La firma**: `packaging/sign-ed25519.sh` firma con `openssl` (el
+  `sign_update` de Sparkle es solo para macOS). `SPARKLE_PRIVATE_KEY` es lo
+  que exporta `generate_keys -x`: la semilla ed25519 de 32 bytes en base64.
+  El `.sig` es la firma ed25519 cruda (64 bytes) en base64, lo mismo que
+  Sparkle llama `edSignature`. Antes de escribirlo, el script la verifica
+  contra `packaging/sparkle-public-key`, así una clave equivocada falla en CI
+  y no en las máquinas de la gente.
 
 ## Dónde vive todo
 
@@ -52,7 +81,8 @@ clave de Sparkle (`Kumo-X.Y.Z-windows-x64.zip.sig`):
 | Appcast (lo que lee Sparkle) | `…/releases/latest/download/appcast.xml` |
 | Instalador | `curl -fsSL https://github.com/epiphany-sh/kumo/releases/latest/download/install.sh \| sh` |
 | Homebrew | `github.com/epiphany-sh/homebrew-kumo` → `brew install epiphany-sh/kumo/kumo` |
-| Instalador de Windows | `irm https://github.com/epiphany-sh/kumo/releases/latest/download/install.ps1 \| iex` |
+| Instalador de Windows | `Kumo-X.Y.Z-windows-x64-setup.exe` en `github.com/epiphany-sh/kumo/releases` |
+| Instalador de Windows (PowerShell) | `irm https://github.com/epiphany-sh/kumo/releases/latest/download/install.ps1 \| iex` |
 
 ## Setup (una sola vez)
 
@@ -108,7 +138,7 @@ fix/…      ─┴─▶  release/X.Y.Z  ──▶  main  ──▶  vX.Y.Z pub
 4. **Mergeá la release a `main`** con un PR (`release/0.3.0` → `main`). Es lo
    único que entra a `main`. Con el merge, el workflow `release` publica
    `0.3.0`: buildea, firma, arma el zip, el appcast y el `install.sh` en
-   macOS; el zip y el `install.ps1` en Windows. Cada uno sube lo suyo al release
+   macOS; el instalador, el zip y el `install.ps1` en Windows. Cada uno sube lo suyo al release
    (el primero que termina lo crea, con su tag); macOS además actualiza el
    cask del tap.
 
@@ -118,7 +148,8 @@ fix/…      ─┴─▶  release/X.Y.Z  ──▶  main  ──▶  vX.Y.Z pub
    publica primero, el release queda sin "Latest" hasta que termina macOS, y
    las Macs siguen viendo la versión anterior. `install.ps1` viaja con los
    dos y busca el zip de Windows más nuevo, esté o no en "Latest"
-   (`packaging/github-release.sh`).
+   (`packaging/github-release.sh`); el updater de Windows hace lo mismo con
+   el `-setup.exe`.
 
 Los releases van de a uno. Si fallan los dos builds, no queda tag:
 re-correlo desde Actions. Si falla uno solo, el otro ya creó el tag y el
@@ -165,6 +196,65 @@ de commits: siempre crece.
 
 Para probarlo local sin publicar: `make release VERSION=0.2.0` deja todo en
 `dist/` (firma el appcast con la clave de tu Keychain). En Windows, desde Git
-Bash: `packaging/windows-zip.sh 0.2.0`. Cada PR también buildea la app de
-Windows (job `windows-app` de `ci`, no obligatorio) y la deja como artifact
-una semana, para probarla sin publicar.
+Bash: `make windows-installer VERSION=0.2.0` deja el zip y el
+`-setup.exe` en `dist/` (necesita Inno Setup 6:
+`winget install --id JRSoftware.InnoSetup -e --scope user`). Con
+`SPARKLE_KEY_FILE=<archivo con la clave privada>` también lo firma; sin
+eso, avisa y no firma: se instala a mano, pero ningún Kumo lo toma como
+update. Cada PR también buildea la app y el instalador de Windows (job
+`windows-app` de `ci`, no obligatorio) y deja la app como artifact una
+semana, para probarla sin publicar.
+
+### Probar el updater de Windows con una beta
+
+Sin tocar los releases de verdad: un par de claves de prueba, un feed local
+y dos betas. Desde Git Bash, en la raíz del repo:
+
+1. **Claves de prueba** (nunca la de Sparkle):
+
+   ```bash
+   mkdir -p target/update-test && cd target/update-test
+   openssl genpkey -algorithm ed25519 -outform DER -out key.der
+   tail -c 32 key.der | openssl base64 -A > private-key   # la semilla, como generate_keys -x
+   openssl pkey -inform DER -in key.der -pubout -outform DER | tail -c 32 | openssl base64 -A > public-key
+   cd ../..
+   ```
+
+2. **La beta 1, apuntando al feed local**. Las variables quedan fijas en el
+   build (`--dart-define`), no se pueden cambiar con la app instalada:
+
+   ```bash
+   export SPARKLE_PUBLIC_KEY=$(cat target/update-test/public-key)
+   export UPDATE_FEED=http://127.0.0.1:8765/releases.json
+   export UPDATE_PRERELEASES=1     # sin esto, una beta solo se actualiza a releases
+   make windows-installer VERSION=0.10.0-beta.1 SPARKLE_KEY_FILE=target/update-test/private-key
+   ```
+
+   Instalala: doble click en `dist/Kumo-0.10.0-beta.1-windows-x64-setup.exe`
+   (o con `/VERYSILENT`).
+
+3. **La beta 2, servida en el feed local**, con las mismas variables:
+
+   ```bash
+   make windows-installer VERSION=0.10.0-beta.2 SPARKLE_KEY_FILE=target/update-test/private-key
+   mkdir -p target/update-test/feed
+   cp dist/Kumo-0.10.0-beta.2-windows-x64-setup.exe* target/update-test/feed/
+   cat > target/update-test/feed/releases.json <<'EOF'
+   [{"tag_name": "v0.10.0-beta.2", "draft": false, "prerelease": true, "assets": [
+     {"name": "Kumo-0.10.0-beta.2-windows-x64-setup.exe", "browser_download_url": "http://127.0.0.1:8765/Kumo-0.10.0-beta.2-windows-x64-setup.exe"},
+     {"name": "Kumo-0.10.0-beta.2-windows-x64-setup.exe.sig", "browser_download_url": "http://127.0.0.1:8765/Kumo-0.10.0-beta.2-windows-x64-setup.exe.sig"},
+     {"name": "Kumo-0.10.0-beta.2-windows-x64-setup.exe.sha256", "browser_download_url": "http://127.0.0.1:8765/Kumo-0.10.0-beta.2-windows-x64-setup.exe.sha256"}]}]
+   EOF
+   py -3 -m http.server 8765 --bind 127.0.0.1 --directory target/update-test/feed
+   ```
+
+4. En la beta 1 instalada: Settings › General › **Check for Updates…**.
+   Pasa por "Downloading…" y queda "Kumo 0.10.0-beta.2 is ready". **Restart
+   to Update**: Kumo se cierra, el instalador corre en silencio y abre la
+   beta 2 (Settings › About, o `update.log` en
+   `%LOCALAPPDATA%\Kumo\updates`).
+
+Para desinstalar: "Aplicaciones instaladas" › Kumo, o
+`%LOCALAPPDATA%\Programs\Kumo\unins000.exe /VERYSILENT`. Las betas de
+prueba usan la clave de prueba: no aceptan updates firmados con la de
+Sparkle, así que después instalá la versión publicada encima.

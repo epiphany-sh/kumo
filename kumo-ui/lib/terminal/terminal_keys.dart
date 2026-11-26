@@ -2,6 +2,10 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show SingleActivator;
+
+import '../platform/os/host_os.dart';
+import '../platform/os/key_combo.dart';
 
 /// Bytes a key press sends to the PTY (xterm conventions), or null when the
 /// terminal does not handle it, so it bubbles up to app shortcuts (⌘…).
@@ -66,6 +70,58 @@ List<int>? _macLineEdit(LogicalKeyboardKey key, HardwareKeyboard keys) {
   if (key == LogicalKeyboardKey.backspace) return [0x15];
   return null;
 }
+
+/// What a clipboard key does in a terminal ([terminalClipboardKey]).
+enum TerminalClipboardKey {
+  /// Copies the selection and keeps it.
+  copy,
+
+  /// Copies the selection and drops it, as Windows Terminal's Ctrl+C.
+  copyAndClear,
+
+  /// Pastes the clipboard.
+  paste,
+}
+
+/// The clipboard action [event] stands for on [os], or null when it isn't
+/// one and goes on as a key (Ctrl+C with nothing selected is ^C).
+///
+/// ⌘C / ⌘V on macOS and Ctrl+Shift+C / V elsewhere ([AppKeys.terminalCopy]);
+/// where [HostOs.terminalCtrlClipboard], plain Ctrl+C over a selection and
+/// Ctrl+V too. [canPaste] is false for a pane nobody types into.
+TerminalClipboardKey? terminalClipboardKey(KeyEvent event, {required HostOs os, required bool hasSelection, required bool canPaste, HardwareKeyboard? keys}) {
+  final state = keys ?? HardwareKeyboard.instance;
+  bool pressed(KeyCombo combo) => os.keyActivator(combo).accepts(event, state);
+  final ctrl = os.terminalCtrlClipboard;
+  if (hasSelection) {
+    if (pressed(AppKeys.terminalCopy)) return TerminalClipboardKey.copy;
+    if (ctrl && _ctrlC.accepts(event, state)) return TerminalClipboardKey.copyAndClear;
+  }
+  if (canPaste && (pressed(AppKeys.terminalPaste) || (ctrl && _ctrlV.accepts(event, state)))) return TerminalClipboardKey.paste;
+  return null;
+}
+
+const _ctrlC = SingleActivator(LogicalKeyboardKey.keyC, control: true);
+const _ctrlV = SingleActivator(LogicalKeyboardKey.keyV, control: true);
+
+/// What to send for [value], the text input system's state, once a
+/// character is composed (a dead key and the letter after it, or an input
+/// method): its text when the composition is over, null while one is
+/// still going on or there is nothing.
+String? terminalComposedText(TextEditingValue value) {
+  if (value.composing.isValid && !value.composing.isCollapsed) return null;
+  return value.text.isEmpty ? null : value.text;
+}
+
+/// Bytes for an editing command the input method sends instead of a key
+/// (↩ ends a composition and then inserts a newline), or null for one the
+/// terminal leaves alone.
+List<int>? terminalSelectorInput(String selector) => switch (selector) {
+      'insertNewline:' => const [0x0d],
+      'insertTab:' => const [0x09],
+      'deleteBackward:' => const [0x7f],
+      _ => null,
+    };
 
 /// Text from the clipboard, wrapped when the program asked for it. Only text,
 /// tabs and line breaks go in: an escape or another control character would

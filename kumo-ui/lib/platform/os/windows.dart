@@ -1,12 +1,14 @@
 import 'dart:io' as io show exit, pid;
 import 'dart:io' show Platform, Process, ProcessException, ProcessStartMode;
 
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 
 import '../channel.dart';
 import '../updates.dart';
 import '../updates_windows.dart';
 import 'host_os.dart';
+import 'key_combo.dart';
 
 /// Windows.
 class WindowsOs extends HostOs {
@@ -132,6 +134,20 @@ class WindowsOs extends HostOs {
   @override
   String get shellDescription => 'Shell for new tabs (${paneShortcutLabel(PaneShortcut.newTab)}) and splits.';
 
+  /// Splits as on macOS (⌘D right, ⇧⌘D down) with Ctrl: Ctrl+D no longer
+  /// reaches the shell as EOF here.
+  @override
+  KeyCombo paneKey(PaneShortcut command) => switch (command) {
+        PaneShortcut.splitRight => const KeyCombo(LogicalKeyboardKey.keyD, primary: true),
+        PaneShortcut.splitDown => const KeyCombo(LogicalKeyboardKey.keyD, primary: true, shift: true),
+        _ => super.paneKey(command),
+      };
+
+  /// As Windows Terminal: Ctrl+C copies a selection (^C without one) and
+  /// Ctrl+V pastes.
+  @override
+  bool get terminalCtrlClipboard => true;
+
   @override
   (String, List<String>) openUrlCommand(String url) => ('rundll32', ['url.dll,FileProtocolHandler', url]);
 
@@ -189,8 +205,8 @@ class WindowsOs extends HostOs {
     return true;
   }
 
-  /// Kumo's own updater ([WindowsUpdates]): GitHub releases, signed zips
-  /// and the zip's `install.ps1`.
+  /// Kumo's own updater ([WindowsUpdates]): GitHub releases and their
+  /// signed `-setup.exe`, run silently.
   @override
   AppUpdates updates({Future<void> Function()? stopDaemon, bool Function()? autoUpdate}) =>
       WindowsUpdates(config: UpdateConfig.fromEnvironment(env), stopDaemon: stopDaemon, autoUpdate: autoUpdate);

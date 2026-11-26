@@ -55,7 +55,8 @@ class AppShell extends StatelessWidget {
       bind(AppKeys.toggleSidePanel, s.toggleSidePanel);
       // Terminal panes, iTerm-style (forwarded only while the Terminal view
       // is showing): ⌘D split right, ⇧⌘D split down, ⌘W close, ⌘T new
-      // (Ctrl+Shift+D / E / W / T off macOS, see HostOs.paneShortcut). In
+      // (Ctrl+Shift+D / E / W / T on Linux, Ctrl+D / Ctrl+Shift+D to split on
+      // Windows, see HostOs.paneShortcut). In
       // the full editor ⌘W closes its file instead.
       void close() => s.view == KumoView.files ? s.sendFileCommand(FileCommand.close) : s.sendTerminalCommand(TerminalCommand.closePane);
       map[hostOs.paneShortcut(PaneShortcut.splitRight)] = () => s.sendTerminalCommand(TerminalCommand.splitRight);

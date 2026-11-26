@@ -1,11 +1,124 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/app/app_state.dart';
 import 'package:kumo_ui/app/kumo_app.dart';
 import 'package:kumo_ui/data/mock_project.dart';
+import 'package:kumo_ui/data/pipelines_source.dart';
+import 'package:kumo_ui/data/models.dart';
+import 'package:kumo_ui/data/pull_requests_source.dart';
+import 'package:kumo_ui/data/workspace_source.dart';
+import 'package:kumo_ui/widgets/context_menu.dart';
+
+/// The design's host, where no branch has a pull request yet.
+class _NoPullRequests extends MockPullRequests {
+  @override
+  Future<BranchPullRequest> forBranch(String worktreePath, {bool refresh = false}) async => const BranchPullRequest(provider: CiProvider.githubActions);
+}
+
+/// The design's repositories, whose remote has release branches.
+class _WithReleases extends MockWorkspaceSource {
+  @override
+  Future<RepoBranches?> branches(Repo repo) async =>
+      const RepoBranches(current: 'main', local: ['main'], remote: ['origin/main', 'origin/release/0.9.0', 'origin/release/0.10.0', 'origin/release/0.8.3']);
+}
+
+/// What the app puts on the clipboard.
+List<String> _clipboard(WidgetTester tester) {
+  final copied = <String>[];
+  tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+    if (call.method == 'Clipboard.setData') copied.add((call.arguments as Map)['text'] as String);
+    return null;
+  });
+  addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+  return copied;
+}
+
+/// The design's worktree with its Git tab open.
+Future<AppState> _gitTab(WidgetTester tester, {PullRequestsSource? pullRequests, WorkspaceSource? workspace}) async {
+  tester.view.physicalSize = const Size(1440, 960);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final state = AppState(demoWallpaper: true, pullRequests: pullRequests, workspace: workspace);
+  await tester.pumpWidget(KumoApp(state: state));
+  await tester.pump();
+  state.openContext(ContextTab.git);
+  await tester.pump();
+  return state;
+}
+
+/// Publishes the design's branch, and waits for its pull request.
+Future<void> _publish(WidgetTester tester, AppState state) async {
+  state.push();
+  for (var i = 0; i < 4; i++) {
+    await tester.pump();
+  }
+  expect(state.changes.pushed, isTrue);
+}
+
+/// [text] in the open menu.
+Finder _inMenu(String text) => find.descendant(of: find.byType(KMenuPanel), matching: find.text(text));
 
 void main() {
+  testWidgets('source control: a pushed branch links to its open pull request', (tester) async {
+    final state = await _gitTab(tester);
+    final copied = _clipboard(tester);
+    expect(state.branchLinks, isNull, reason: 'not published yet');
+    expect(find.byTooltip('Open pull request #521 on GitHub'), findsNothing);
+
+    await _publish(tester, state);
+    expect(state.branchLinks?.primaryUrl, 'https://github.com/platform/repo-a/pull/521');
+    expect(find.byTooltip('Open pull request #521 on GitHub'), findsOneWidget);
+    expect(state.commitNotice, 'Pushed ${state.changes.branch}');
+    expect(find.text('Open #521'), findsOneWidget, reason: 'the push notice links to it');
+
+    await tester.tap(find.byTooltip('More source control actions'));
+    await tester.pumpAndSettle();
+    expect(_inMenu('Open pull request #521'), findsOneWidget);
+    expect(_inMenu('Open branch on GitHub'), findsOneWidget);
+    expect(_inMenu('Create pull request'), findsNothing);
+    await tester.tap(_inMenu('Copy pull request link'));
+    await tester.pumpAndSettle();
+    expect(copied, ['https://github.com/platform/repo-a/pull/521']);
+    expect(state.undo?.message, 'Copied the link to #521');
+    await tester.pump(const Duration(seconds: 9));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('source control: a pushed branch without one offers to create its pull request', (tester) async {
+    final state = await _gitTab(tester, pullRequests: _NoPullRequests());
+    final copied = _clipboard(tester);
+    await tester.tap(find.byTooltip('More source control actions'));
+    await tester.pumpAndSettle();
+    expect(_inMenu('Create pull request'), findsNothing, reason: 'nothing on the host before publishing');
+    expect(_inMenu('Copy branch link'), findsNothing);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+
+    await _publish(tester, state);
+    expect(state.branchLinks?.primaryUrl, 'https://github.com/platform/repo-a/compare/main...feat/TSK-412-bulk-discounts?expand=1');
+    expect(find.byTooltip('Create pull request on GitHub'), findsOneWidget);
+    expect(find.text('Create PR'), findsOneWidget, reason: 'the push notice offers it');
+
+    await tester.tap(find.byTooltip('More source control actions'));
+    await tester.pumpAndSettle();
+    expect(_inMenu('Create pull request'), findsOneWidget);
+    expect(_inMenu('Open branch on GitHub'), findsOneWidget);
+    await tester.tap(_inMenu('Copy branch link'));
+    await tester.pumpAndSettle();
+    expect(copied, ['https://github.com/platform/repo-a/tree/feat/TSK-412-bulk-discounts']);
+    await tester.pump(const Duration(seconds: 9));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('source control: the pull request to create targets the open release branch', (tester) async {
+    final state = await _gitTab(tester, pullRequests: _NoPullRequests(), workspace: _WithReleases());
+    await _publish(tester, state);
+    expect(state.branchLinks?.primaryUrl, 'https://github.com/platform/repo-a/compare/release/0.10.0...feat/TSK-412-bulk-discounts?expand=1');
+    expect(tester.takeException(), isNull);
+  });
+
   test('stage all, commit what is staged, then push: nothing left to undo', () async {
     final s = AppState();
     final git = s.changes;

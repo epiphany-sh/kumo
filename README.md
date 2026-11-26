@@ -15,18 +15,21 @@ curl -fsSL https://github.com/epiphany-sh/kumo/releases/latest/download/install.
 O con Homebrew: `brew install epiphany-sh/kumo/kumo`. Después Kumo se
 actualiza solo (Sparkle).
 
-En Windows 10 u 11 de 64 bits, desde PowerShell:
+En Windows 10 u 11 de 64 bits, bajá `Kumo-X.Y.Z-windows-x64-setup.exe` del
+[último release que lo tenga](https://github.com/epiphany-sh/kumo/releases)
+y abrilo. No pide admin: lo instala en `%LOCALAPPDATA%\Programs\Kumo`, con
+acceso en el menú Inicio, y se desinstala desde "Aplicaciones instaladas".
+Como no está firmado, SmartScreen avisa la primera vez ("Más información" →
+"Ejecutar de todas formas"). O, desde PowerShell:
 
 ```powershell
 irm https://github.com/epiphany-sh/kumo/releases/latest/download/install.ps1 | iex
 ```
 
-Lo instala en `%LOCALAPPDATA%\Programs\Kumo`, con acceso en el menú Inicio.
-En Windows no se actualiza solo: para actualizar, volvé a correr el mismo
-comando. También está el zip suelto en cada release
-(`Kumo-X.Y.Z-windows-x64.zip`): descomprimilo y abrí `Kumo.exe`. Como no
-está firmado, SmartScreen avisa la primera vez ("Más información" →
-"Ejecutar de todas formas").
+Después Kumo se actualiza solo, como en macOS: avisa "Restart to update" y,
+si no hacés click, instala al cerrarse. También está el zip suelto en cada
+release (`Kumo-X.Y.Z-windows-x64.zip`): descomprimilo y abrí `Kumo.exe`
+(así no se actualiza solo).
 
 Cómo se publica una versión: [`docs/releasing.md`](docs/releasing.md).
 
@@ -44,7 +47,9 @@ make run
 
 Compila `kumod` y la app Flutter en release, mete `kumod` adentro del bundle
 (`Kumo.app/Contents/MacOS/kumod`; en Windows, al lado de `Kumo.exe`),
-reinicia el daemon y abre la app. En Windows, `make` corre desde Git Bash. La app
+reinicia el daemon y abre la app. En Windows, `make` corre desde Git Bash o
+desde PowerShell: necesita Git for Windows, porque las recetas corren en su
+`bash` (nunca en el de WSL; `BASH_EXE=<ruta>` elige otro). La app
 descubre el daemon por `daemon.json` o lo lanza desacoplado si no está corriendo.
 
 | Comando | Qué hace |

@@ -146,6 +146,10 @@ jobs:
           channel: stable
           cache: true
       - run: packaging/windows-zip.sh 0.0.0
+      - name: Installer
+        env:
+          INSTALL_INNO_SETUP: 1 # only if the image lacks Inno Setup
+        run: packaging/windows-installer.sh 0.0.0
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: Kumo-windows-x64

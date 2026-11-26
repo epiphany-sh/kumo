@@ -56,6 +56,11 @@ class MacOs extends HostOs {
   @override
   SingleActivator keyActivator(KeyCombo combo) => commandKeyActivator(combo);
 
+  /// AppKit composes dead keys (⌥N, ⌥E, ⌥`…) only for a text input client:
+  /// a key event alone never carries the composed character.
+  @override
+  bool get terminalComposesText => true;
+
   /// Glyphs in Apple's order (⌃ ⌥ ⇧ ⌘), then the key.
   @override
   List<String> keyCaps(KeyCombo combo) => [if (combo.control) '⌃', if (combo.alt) '⌥', if (combo.shift) '⇧', if (combo.primary) '⌘', combo.keyName ?? combo.macKey ?? macKeyGlyphs[combo.key] ?? plainKeyName(combo.key)];

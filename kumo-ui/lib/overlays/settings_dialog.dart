@@ -296,10 +296,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
       case SettingsTab.shortcuts:
         return _Page('Shortcuts', 'Keyboard shortcuts across Kumo.', sections: [
           ('Terminal', [
-            _KbdRow('New tab', AppKeys.pane(PaneShortcut.newTab).caps),
-            _KbdRow('Split right', AppKeys.pane(PaneShortcut.splitRight).caps),
-            _KbdRow('Split down', AppKeys.pane(PaneShortcut.splitDown).caps),
-            _KbdRow('Close pane', AppKeys.pane(PaneShortcut.closePane).caps),
+            _KbdRow('New tab', hostOs.keyCaps(hostOs.paneKey(PaneShortcut.newTab))),
+            _KbdRow('Split right', hostOs.keyCaps(hostOs.paneKey(PaneShortcut.splitRight))),
+            _KbdRow('Split down', hostOs.keyCaps(hostOs.paneKey(PaneShortcut.splitDown))),
+            _KbdRow('Close pane', hostOs.keyCaps(hostOs.paneKey(PaneShortcut.closePane))),
             _KbdRow('Previous command you ran', AppKeys.previousCommand.caps),
             _KbdRow('Next command you ran', AppKeys.nextCommand.caps),
             _KbdRow('Command history', AppKeys.terminalHistory.caps),
@@ -641,21 +641,26 @@ class _Row extends StatelessWidget {
   }
 }
 
-/// "Check for Updates…", with where checking is under it; only where Kumo
-/// checks by itself ([AppUpdates.canCheck]).
+/// "Check for Updates…", with where checking is under it, or "Restart to
+/// Update" once one is ready; only in a build that updates itself
+/// ([AppUpdates.canCheck]).
 class _UpdateCheckRow extends StatelessWidget {
   const _UpdateCheckRow({required this.updates});
   final AppUpdates updates;
 
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder<UpdateStatus>(
-        valueListenable: updates.status,
-        builder: (context, status, _) {
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: Listenable.merge([updates, updates.status]),
+        builder: (context, _) {
+          final status = updates.status.value;
           final busy = status is UpdateChecking || status is UpdateDownloading;
+          final ready = updates.ready;
           return _Row(
             label: 'Updates',
-            desc: describeUpdateStatus(status),
-            control: KButton(label: 'Check for Updates…', height: 30, fontSize: 12.5, onTap: busy ? null : () => updates.check().ignore()),
+            desc: ready != null && status is! UpdateReady ? describeUpdateStatus(UpdateReady(ready)) : describeUpdateStatus(status),
+            control: ready != null
+                ? KButton.primary(label: 'Restart to Update', height: 30, fontSize: 12.5, onTap: updates.installAndRelaunch)
+                : KButton(label: 'Check for Updates…', height: 30, fontSize: 12.5, onTap: busy ? null : () => updates.check().ignore()),
           );
         },
       );

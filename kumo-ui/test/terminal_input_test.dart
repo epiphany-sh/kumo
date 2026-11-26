@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kumo_ui/platform/os/host_os.dart';
+import 'package:kumo_ui/platform/os/linux.dart';
 import 'package:kumo_ui/platform/os/macos.dart';
 import 'package:kumo_ui/platform/os/windows.dart';
 import 'package:kumo_ui/terminal/ansi_screen.dart';
@@ -169,8 +170,8 @@ void main() {
     expect(shell.sent, isEmpty);
   });
 
-  testWidgets('off macOS the pane keys (Ctrl+Shift+T / W / D / E) are left to the app; Ctrl+T is the shell’s', (tester) async {
-    debugHostOs = WindowsOs(const {});
+  testWidgets('on Linux the pane keys (Ctrl+Shift+T / W / D / E) are left to the app; Ctrl+T and Ctrl+D are the shell’s', (tester) async {
+    debugHostOs = LinuxOs(const {});
     addTearDown(() => debugHostOs = null);
     final shell = _FakeShell();
     await tester.pumpWidget(KumoTheme(
@@ -188,10 +189,92 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
     expect(shell.sent, isEmpty);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    expect(shell.sent, [
+      [0x14],
+      [0x04],
+    ]);
+  });
+
+  testWidgets('on Windows Ctrl+D and Ctrl+Shift+D (splits) and Ctrl+Shift+T / W are left to the app; Ctrl+T is the shell’s', (tester) async {
+    debugHostOs = WindowsOs(const {});
+    addTearDown(() => debugHostOs = null);
+    final shell = _FakeShell();
+    await tester.pumpWidget(KumoTheme(
+      mode: KumoThemeMode.dark,
+      palette: KumoPalette.dark,
+      terminalPalette: KumoPalette.dark,
+      child: MaterialApp(home: Scaffold(body: TerminalCanvas(surface: shell, active: true))),
+    ));
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    for (final key in [LogicalKeyboardKey.keyT, LogicalKeyboardKey.keyW, LogicalKeyboardKey.keyD]) {
+      await tester.sendKeyEvent(key);
+    }
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    expect(shell.sent, isEmpty, reason: 'Ctrl+D splits instead of sending EOF');
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     expect(shell.sent, [
       [0x14],
     ]);
+  });
+
+  testWidgets('on macOS Ctrl+D is the shell’s EOF', (tester) async {
+    debugHostOs = MacOs(const {});
+    addTearDown(() => debugHostOs = null);
+    final shell = await _pumpShell(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    expect(shell.sent, [
+      [0x04],
+    ]);
+  });
+
+  group('composed text on macOS', () {
+    setUp(() => debugHostOs = MacOs(const {}));
+    tearDown(() => debugHostOs = null);
+
+    testWidgets('⌥N then N types ñ: the dead key goes to the input method, and its character to the shell', (tester) async {
+      final shell = await _pumpShell(tester);
+      expect(tester.testTextInput.hasAnyClients, isTrue, reason: 'the focused pane listens to the text input system');
+      // ⌥N is a dead key: AppKit gives it no character.
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyN, character: '');
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      tester.testTextInput.updateEditingValue(const TextEditingValue(text: '˜', composing: TextRange(start: 0, end: 1), selection: TextSelection.collapsed(offset: 1)));
+      await tester.pump();
+      // N while composing is the input method's, not typed as is.
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+      expect(shell.sent, isEmpty);
+      tester.testTextInput.updateEditingValue(const TextEditingValue(text: 'ñ', selection: TextSelection.collapsed(offset: 1)));
+      await tester.pump();
+      expect(shell.sent.map(utf8.decode).toList(), ['ñ']);
+      // Composition over, keys type as before.
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyX);
+      expect(shell.sent.map(utf8.decode).toList(), ['ñ', 'x']);
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.testTextInput.hasAnyClients, isFalse, reason: 'a pane that is gone stops listening');
+    }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+    testWidgets('⌥E then E types é', (tester) async {
+      final shell = await _pumpShell(tester);
+      tester.testTextInput.updateEditingValue(const TextEditingValue(text: '´', composing: TextRange(start: 0, end: 1), selection: TextSelection.collapsed(offset: 1)));
+      await tester.pump();
+      tester.testTextInput.updateEditingValue(const TextEditingValue(text: 'é', selection: TextSelection.collapsed(offset: 1)));
+      await tester.pump();
+      expect(shell.sent.map(utf8.decode).toList(), ['é']);
+    }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+    testWidgets('Windows and Linux keep typing from key events only', (tester) async {
+      debugHostOs = WindowsOs(const {});
+      await _pumpShell(tester);
+      expect(tester.testTextInput.hasAnyClients, isFalse);
+    });
   });
 
   Future<void> holding(WidgetTester tester, List<LogicalKeyboardKey> modifiers, LogicalKeyboardKey key) async {
@@ -323,6 +406,29 @@ void main() {
       await tester.pump();
       expect(shell.sent.map(utf8.decode).toList(), ['\x1b[200~/Users/me/Desktop/Screen\\ Shot.png\x1b[201~', '\x1b[200~plain text\x1b[201~']);
     }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+    testWidgets('on Windows Ctrl+V pastes, bracketed when the program asked', (tester) async {
+      debugHostOs = WindowsOs(const {});
+      addTearDown(() => debugHostOs = null);
+      final shell = await _pumpShell(tester, program: r'C:\Program Files\PowerShell\7\pwsh.exe');
+      await holding(tester, [ctrl], LogicalKeyboardKey.keyV);
+      await tester.pump();
+      shell.feed('\x1b[?2004h');
+      await holding(tester, [ctrl], LogicalKeyboardKey.keyV);
+      await tester.pump();
+      expect(shell.sent.map(utf8.decode).toList(), ['plain text', '\x1b[200~plain text\x1b[201~']);
+    });
+
+    testWidgets('on Linux Ctrl+V is the shell’s (^V)', (tester) async {
+      debugHostOs = LinuxOs(const {});
+      addTearDown(() => debugHostOs = null);
+      final shell = await _pumpShell(tester, program: '/bin/bash');
+      await holding(tester, [ctrl], LogicalKeyboardKey.keyV);
+      await tester.pump();
+      expect(shell.sent, [
+        [0x16],
+      ]);
+    });
 
     testWidgets('on Windows Ctrl+Shift+V pastes a copied file or screenshot quoted for PowerShell', (tester) async {
       debugHostOs = WindowsOs(const {});

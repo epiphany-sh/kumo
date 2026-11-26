@@ -3,16 +3,16 @@ import 'models.dart';
 /// Mock data matching the design canvas. Replace with daemon streams later.
 abstract final class Mock {
   static const repos = <Repo>[
-    Repo(name: 'repo-a', host: 'GH', worktrees: [
+    Repo(name: 'repo-a', host: 'GH', remoteUrl: 'git@github.com:platform/repo-a.git', worktrees: [
       Worktree(branch: 'main', note: 'clean', tone: WorktreeTone.idle, path: '~/dev/repo-a', sync: 'up to date', agent: 'No agent', changes: 'clean'),
       Worktree(branch: 'feat/TSK-412-bulk-discounts', note: 'Claude · running', tone: WorktreeTone.running, path: '~/wt/repo-a/TSK-412', sync: '↑2 ↓0', agent: 'Claude · running', changes: '4 files', unpushed: 2),
       Worktree(branch: 'fix/TSK-398-rounding', note: 'Codex · needs you', tone: WorktreeTone.warn, path: '~/wt/repo-a/TSK-398', sync: '↑1 ↓0', agent: 'Codex · needs you', changes: '2 files', unpushed: 1, everPushed: false),
     ]),
-    Repo(name: 'repo-b', host: 'GL', worktrees: [
+    Repo(name: 'repo-b', host: 'GL', remoteUrl: 'git@gitlab.com:platform/repo-b.git', worktrees: [
       Worktree(branch: 'main', note: 'clean', tone: WorktreeTone.idle, path: '~/dev/repo-b', sync: '↓1 behind', agent: 'No agent', changes: 'clean'),
       Worktree(branch: 'perf/cache-warmup', note: 'MR !231 · ready', tone: WorktreeTone.ok, path: '~/wt/repo-b/cache', sync: 'up to date', agent: 'Done · MR !231', changes: 'clean'),
     ]),
-    Repo(name: 'users-permissions', host: 'BB', worktrees: [
+    Repo(name: 'users-permissions', host: 'BB', remoteUrl: 'git@bitbucket.org:identity/users-permissions.git', worktrees: [
       Worktree(branch: 'main', note: 'clean', tone: WorktreeTone.idle, path: '~/dev/users-permissions', sync: 'up to date', agent: 'No agent', changes: 'clean'),
       Worktree(branch: 'feat/audit-log', note: 'Gemini · running', tone: WorktreeTone.running, path: '~/wt/users-permissions/audit', sync: 'local only', agent: 'Gemini · running', changes: 'no changes', everPushed: false),
     ]),

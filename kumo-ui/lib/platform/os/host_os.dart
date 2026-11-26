@@ -102,12 +102,25 @@ abstract class HostOs {
   /// [combo] as menus and tooltips show it: "Ctrl+Shift+D".
   String keyLabel(KeyCombo combo) => keyCaps(combo).join('+');
 
+  /// The combo for a terminal pane command ([AppKeys.pane] unless this OS
+  /// binds it otherwise).
+  KeyCombo paneKey(PaneShortcut command) => AppKeys.pane(command);
+
   /// The key for a terminal pane command: Ctrl+Shift off macOS, like
   /// Windows Terminal and GNOME Terminal, so the shell keeps Ctrl+D / T / W.
-  SingleActivator paneShortcut(PaneShortcut command) => keyActivator(AppKeys.pane(command));
+  SingleActivator paneShortcut(PaneShortcut command) => keyActivator(paneKey(command));
 
   /// [paneShortcut] as menus and tooltips show it.
-  String paneShortcutLabel(PaneShortcut command) => keyLabel(AppKeys.pane(command));
+  String paneShortcutLabel(PaneShortcut command) => keyLabel(paneKey(command));
+
+  /// Whether plain Ctrl+C (over a selection) and Ctrl+V copy and paste in a
+  /// terminal, as in Windows Terminal. Elsewhere they are the shell's ^C
+  /// and ^V.
+  bool get terminalCtrlClipboard => false;
+
+  /// Whether a focused terminal listens to the OS text input system, so
+  /// dead keys and input methods compose characters (⌥N N → ñ on macOS).
+  bool get terminalComposesText => false;
 
   // Desktop integration.
 

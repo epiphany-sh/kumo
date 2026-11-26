@@ -28,6 +28,7 @@ import 'row_layout.dart';
 import 'term_selection.dart';
 import 'terminal_keys.dart';
 import 'terminal_surface.dart';
+import 'terminal_text_input.dart';
 
 /// Paints a [TerminalSurface] with a CustomPainter. Repaint is driven by the
 /// surface's buffer listenable, so new output costs one paint, no rebuild.
@@ -88,6 +89,10 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
   final _focus = FocusNode(debugLabel: 'terminal');
   final _renderer = TerminalGridRenderer();
   bool _hasFocus = false;
+
+  /// The OS text input system, while focused where dead keys and input
+  /// methods need it ([HostOs.terminalComposesText]).
+  late final _textInput = TerminalTextInput(onText: _typeComposed, onBytes: _typeBytes);
 
   // ---- Selection: drag selects, double-click a word, triple-click the line.
   // Kept in buffer lines as of [_selDropped]; re-wrapping drops it.
@@ -797,8 +802,40 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     _drops = Pasteboard.drops.listen(_onDrop);
     HardwareKeyboard.instance.addHandler(_modifierChanged);
     widget.surface.buffer.addListener(_onBuffer);
-    _focus.addListener(() => setState(() => _hasFocus = _focus.hasFocus));
+    _focus.addListener(() {
+      setState(() => _hasFocus = _focus.hasFocus);
+      _syncTextInput();
+    });
     if (widget.active) _grabKeyboard();
+  }
+
+  /// Listens to the text input system while focused on an interactive
+  /// pane, where this OS composes text through it.
+  void _syncTextInput() {
+    if (_focus.hasFocus && widget.surface.interactive && hostOs.terminalComposesText) {
+      _textInput.attach();
+    } else if (_textInput.attached) {
+      _textInput.detach();
+    }
+  }
+
+  /// A character the input method composed (⌥N then N → ñ), typed.
+  void _typeComposed(String text) {
+    final surface = widget.surface;
+    if (!surface.interactive) return;
+    final delete = _kbDelete();
+    if (delete != null) surface.sendBytes(delete);
+    if (_sel != null || _top != null) {
+      setState(() {
+        _sel = _kbSel = null;
+        _top = null;
+      });
+    }
+    surface.sendBytes(utf8.encode(text));
+  }
+
+  void _typeBytes(List<int> bytes) {
+    if (widget.surface.interactive) widget.surface.sendBytes(bytes);
   }
 
   @override
@@ -819,11 +856,13 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
       widget.surface.buffer.addListener(_onBuffer);
       _top = null;
       _sel = _kbSel = null;
+      _syncTextInput();
     }
   }
 
   @override
   void dispose() {
+    _textInput.detach();
     HardwareKeyboard.instance.removeHandler(_modifierChanged);
     _yourLines?.removeListener(_yourLinesChanged);
     _drops?.cancel();
@@ -918,15 +957,25 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     final surface = widget.surface;
     final modes = surface is TerminalModes ? surface : null;
     final keys = HardwareKeyboard.instance;
+    // While the input method composes (⌥N, then N → ñ) the keys are its
+    // own: ignored here, the OS hands them to it and it commits the text.
+    if (_textInput.composing && !keys.isControlPressed && !keys.isMetaPressed) return KeyEventResult.ignored;
     if (_scrollKey(event)) return KeyEventResult.handled;
-    // ⌘C / ⌘V / ⌘A on macOS; Ctrl+Shift+C / V elsewhere (Ctrl+C is ^C).
-    if (AppKeys.terminalCopy.accepts(event, keys) && _selectedText.isNotEmpty) {
-      _copy();
-      return KeyEventResult.handled;
-    }
-    if (AppKeys.terminalPaste.accepts(event, keys) && surface.interactive) {
-      _paste();
-      return KeyEventResult.handled;
+    // ⌘C / ⌘V on macOS; Ctrl+Shift+C / V elsewhere; on Windows also Ctrl+C
+    // over a selection and Ctrl+V (without a selection Ctrl+C is ^C).
+    switch (terminalClipboardKey(event, os: hostOs, hasSelection: _selectedText.isNotEmpty, canPaste: surface.interactive, keys: keys)) {
+      case TerminalClipboardKey.copy:
+        _copy();
+        return KeyEventResult.handled;
+      case TerminalClipboardKey.copyAndClear:
+        _copy();
+        setState(() => _sel = _kbSel = null);
+        return KeyEventResult.handled;
+      case TerminalClipboardKey.paste:
+        _paste();
+        return KeyEventResult.handled;
+      case null:
+        break;
     }
     if (_mac && AppKeys.terminalSelectAll.accepts(event, keys)) {
       _selectAll();

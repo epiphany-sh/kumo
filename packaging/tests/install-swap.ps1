@@ -91,6 +91,7 @@ try {
     Write-Host 'Update while a DLL is loaded:'
     $dest = New-Kumo (Join-Path $root 'dest') '1'
     Set-Content -LiteralPath (Join-Path $dest 'stale.txt.00000000-0000-0000-0000-000000000000.old') 'left by an older update'
+    Set-Content -LiteralPath (Join-Path $dest 'unins000.exe') 'the setup.exe uninstaller'
     $holders += Start-DllHolder (Join-Path $dest 'runtime.dll')
     $deletable = $true
     try { [IO.File]::Delete((Join-Path $dest 'runtime.dll')) } catch { $deletable = $false }
@@ -104,6 +105,7 @@ try {
     Check ((Read-Text (Join-Path $dest 'data\app.so')) -eq 'app 2') 'folders are the new ones'
     Check ((Read-Text (Join-Path $dest 'new-only.txt')) -eq 'new') 'new files are added'
     Check (Test-Path -LiteralPath (Join-Path $dest 'runtime.dll')) 'the new DLL is in place'
+    Check ((Read-Text (Join-Path $dest 'unins000.exe')) -eq 'the setup.exe uninstaller') 'the uninstaller stays in place'
     $old = @(Get-ChildItem -LiteralPath $dest -Filter '*.old' | ForEach-Object Name)
     Check (-not ($old -like 'stale.txt.*')) 'leftovers of an older update are gone'
     Check (@($old -like 'Kumo.exe.*.old').Count -eq 1 -and @($old -like 'runtime.dll.*.old').Count -eq 1 -and @($old -like 'data.*.old').Count -eq 1) "the old files are set aside ($($old -join ', '))"
