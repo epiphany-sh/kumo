@@ -42,8 +42,6 @@ pub trait GitChanges: Send + Sync + 'static {
     /// What one commit changed, file by file (merges: against the first
     /// parent).
     fn show_commit(&self, worktree: &Path, sha: &str) -> Result<CommitDetail, ChangesError>;
-    /// Folders whose changes affect the status: the worktree and its git dir.
-    fn watched_paths(&self, worktree: &Path) -> Result<Vec<PathBuf>, ChangesError>;
 }
 
 /// Reads and writes files inside a worktree, never outside it (symlinks
@@ -72,12 +70,15 @@ pub trait FileStore: Send + Sync + 'static {
 /// Keeps a watch alive; dropping it stops watching.
 pub trait WatchGuard: Send {}
 
-/// Calls `on_change` (from any thread) when something under `paths`
-/// changes. Bursts are not coalesced here.
+/// What a watch calls with the paths that changed (never empty).
+pub type OnChange = Box<dyn Fn(&[PathBuf]) + Send + Sync>;
+
+/// Calls `on_change` (from any thread) with what changed under `paths`.
+/// Bursts are not coalesced here.
 pub trait ChangeWatcher: Send + Sync + 'static {
     fn watch(
         &self,
         paths: &[PathBuf],
-        on_change: Box<dyn Fn() + Send + Sync>,
+        on_change: OnChange,
     ) -> Result<Box<dyn WatchGuard>, ChangesError>;
 }

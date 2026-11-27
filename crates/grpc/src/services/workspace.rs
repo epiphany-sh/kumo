@@ -3,14 +3,26 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use futures::{Stream, StreamExt};
-use kumo_application::workspace::WorkspaceService;
+use kumo_application::workspace::{Presence, WorkspaceService};
 use kumo_domain::workspace::NamespaceId;
 use kumo_proto::v1 as pb;
 use tokio_stream::wrappers::WatchStream;
+use tonic::metadata::MetadataMap;
 use tonic::{Request, Response, Status};
 
 use crate::mapping::{candidate_to, snapshot_to, workspace_status_from, worktree_to};
 use crate::profile::{Profiles, services_of};
+
+/// Which client (a UI window) a call comes from, so its presence goes with
+/// its `Watch` stream. Clients without it share one anonymous slot.
+const CLIENT_HEADER: &str = "kumo-client";
+
+fn client_of(metadata: &MetadataMap) -> &str {
+    metadata
+        .get(CLIENT_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map_or("", str::trim)
+}
 
 type SnapshotStream = Pin<Box<dyn Stream<Item = Result<pb::WorkspaceSnapshot, Status>> + Send>>;
 
@@ -42,8 +54,12 @@ impl pb::workspace_server::Workspace for WorkspaceGrpc {
         request: Request<pb::WatchWorkspaceRequest>,
     ) -> Result<Response<Self::WatchStream>, Status> {
         let service = self.service(&request).await?;
-        let snapshots =
-            WatchStream::new(service.watch()).map(|snapshot| Ok(snapshot_to(&snapshot)));
+        // The client counts (its presence too) until its stream ends.
+        let lease = service.attach(client_of(request.metadata()));
+        let snapshots = WatchStream::new(service.watch()).map(move |snapshot| {
+            let _watching = &lease;
+            Ok(snapshot_to(&snapshot))
+        });
         Ok(Response::new(Box::pin(snapshots)))
     }
 
@@ -54,6 +70,17 @@ impl pb::workspace_server::Workspace for WorkspaceGrpc {
         let service = self.service(&request).await?;
         service.refresh().await;
         Ok(Response::new(pb::RefreshWorkspaceResponse {}))
+    }
+
+    async fn set_presence(
+        &self,
+        request: Request<pb::SetPresenceRequest>,
+    ) -> Result<Response<pb::SetPresenceResponse>, Status> {
+        let service = self.service(&request).await?;
+        let client = client_of(request.metadata()).to_owned();
+        let pb::SetPresenceRequest { focused, visible } = request.into_inner();
+        service.set_presence(&client, Presence { focused, visible });
+        Ok(Response::new(pb::SetPresenceResponse {}))
     }
 
     async fn discover_repos(

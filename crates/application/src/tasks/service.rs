@@ -729,7 +729,7 @@ async fn watch_files(
         return None;
     }
     let started = tokio::task::spawn_blocking(move || {
-        watcher.watch(&paths, Box::new(move || wake.notify_one()))
+        watcher.watch(&paths, Box::new(move |_: &[PathBuf]| wake.notify_one()))
     })
     .await;
     match started {

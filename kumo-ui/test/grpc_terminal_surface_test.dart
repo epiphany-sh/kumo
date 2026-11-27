@@ -1,7 +1,8 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:grpc/grpc.dart';
 import 'package:kumo_ui/engine/daemon_endpoint.dart';
@@ -30,12 +31,16 @@ class _Terminals extends TerminalsServiceBase {
     return OpenResponse(terminalId: 't1');
   }
 
+  /// What the terminal prints.
+  final output = StreamController<TerminalOutput>();
+
   @override
-  Stream<TerminalOutput> attach(ServiceCall call, Stream<TerminalInput> request) async* {
-    await for (final input in request) {
-      inputs.add(input);
-    }
+  Stream<TerminalOutput> attach(ServiceCall call, Stream<TerminalInput> request) {
+    request.listen(inputs.add, onError: (_) {}); // the client going away
+    return output.stream;
   }
+
+  void write(String text) => output.add(TerminalOutput(output: OutputBatch(data: utf8.encode(text))));
 
   @override
   Future<HistoryResponse> history(ServiceCall call, HistoryRequest request) async => HistoryResponse();
@@ -54,6 +59,18 @@ Future<void> _until(bool Function() done) async {
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
 }
+
+/// Runs a frame: what the surface published by frame callback lands.
+void _frame() {
+  SchedulerBinding.instance
+    ..handleBeginFrame(null)
+    ..handleDrawFrame();
+}
+
+/// The text on [surface]'s screen.
+String _screenOf(GrpcTerminalSurface surface) => [
+      for (final line in surface.buffer.value.lines) line.spans.map((s) => s.text).join(),
+    ].join('\n');
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -104,5 +121,64 @@ void main() {
     surface.sendBytes([0x61]);
     await _until(() => terminals.inputs.any((i) => i.hasData()));
     expect(terminals.inputs.where((i) => i.hasResize()), isEmpty);
+  });
+
+  group('visibility', () {
+    late GrpcTerminalSurface surface;
+    final view = Object();
+
+    setUp(() async {
+      surface = GrpcTerminalSurface.shell(engine);
+      surface.resize(80, 24);
+      terminals.opened.complete();
+      await _until(() => terminals.inputs.any((i) => i.hasAttach()));
+    });
+
+    tearDown(() => surface.dispose());
+
+    test('a shown terminal publishes its output once per frame', () async {
+      surface.setVisible(view, true);
+      terminals.write('hello');
+      await _until(() {
+        _frame();
+        return _screenOf(surface).contains('hello');
+      });
+    });
+
+    test('a hidden terminal keeps its output, publishing it all once shown', () async {
+      surface.setVisible(view, true);
+      terminals.write('one ');
+      await _until(() {
+        _frame();
+        return _screenOf(surface).contains('one');
+      });
+      surface.setVisible(view, false);
+      final shown = surface.buffer.value;
+      terminals.write('two ');
+      terminals.write('three');
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      _frame();
+      expect(identical(surface.buffer.value, shown), isTrue);
+      expect(SchedulerBinding.instance.hasScheduledFrame, isFalse);
+
+      var published = 0;
+      surface.buffer.addListener(() => published++);
+      surface.setVisible(view, true);
+      expect(published, 1);
+      expect(_screenOf(surface), contains('one two three'));
+    });
+
+    test('a terminal stays shown while any of its views shows it', () async {
+      final other = Object();
+      surface
+        ..setVisible(view, true)
+        ..setVisible(other, true)
+        ..setVisible(view, false);
+      terminals.write('still');
+      await _until(() {
+        _frame();
+        return _screenOf(surface).contains('still');
+      });
+    });
   });
 }

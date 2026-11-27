@@ -16,7 +16,7 @@ class EngineWorkspaceSource extends WorkspaceSource {
   EngineWorkspaceSource(this._engine) {
     _watch();
     // The user may have run git in a terminal while the window was away.
-    _lifecycle = AppLifecycleListener(onResume: refresh);
+    _lifecycle = AppLifecycleListener(onResume: refresh, onStateChange: _tellPresence);
   }
 
   final KumoEngine _engine;
@@ -68,8 +68,15 @@ class EngineWorkspaceSource extends WorkspaceSource {
     while (!_disposed) {
       try {
         final conn = await _engine.connection();
-        await for (final snapshot in conn.workspace.watch(WatchWorkspaceRequest())) {
+        var told = false;
+        await for (final snapshot in conn.workspace.watch(WatchWorkspaceRequest(), options: _asClient)) {
           if (_disposed) return;
+          // The daemon forgets a client's presence when its watch ends, and
+          // the window may not change state for a long while: tell it now.
+          if (!told) {
+            told = true;
+            _tellPresence(WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed);
+          }
           _apply(snapshot);
         }
       } on Object catch (e) {
@@ -275,6 +282,21 @@ class EngineWorkspaceSource extends WorkspaceSource {
     return List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
   }
 
+  /// This window, as `kumo-client` on its watch and presence: the daemon
+  /// keeps a presence only while the watch of the client that told it lasts.
+  final String _client = _newId();
+  CallOptions get _asClient => CallOptions(metadata: {'kumo-client': _client});
+
+  /// The daemon reads changes on disk less often while the window is in
+  /// the background, and not while it's hidden. Told on every change and
+  /// on every (re)connect. Best effort: an older daemon without the call
+  /// keeps reading as if in front.
+  void _tellPresence(AppLifecycleState state) {
+    if (_disposed || _engine.current == null) return;
+    final request = presenceOf(state);
+    _engine.connection().then((conn) => conn.workspace.setPresence(request, options: _asClient)).ignore();
+  }
+
   @override
   void dispose() {
     _disposed = true;
@@ -282,3 +304,11 @@ class EngineWorkspaceSource extends WorkspaceSource {
     super.dispose();
   }
 }
+
+/// What the daemon is told for each lifecycle state: in front (resumed),
+/// in the background (inactive) or out of sight.
+@visibleForTesting
+SetPresenceRequest presenceOf(AppLifecycleState state) => SetPresenceRequest(
+      focused: state == AppLifecycleState.resumed,
+      visible: state == AppLifecycleState.resumed || state == AppLifecycleState.inactive,
+    );

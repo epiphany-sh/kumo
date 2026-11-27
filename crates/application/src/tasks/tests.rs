@@ -216,8 +216,10 @@ impl TaskConnector for FakeConnector {
 }
 
 /// Fires its callbacks when told to.
+type Callback = Arc<dyn Fn(&[PathBuf]) + Send + Sync>;
+
 #[derive(Default)]
-struct ManualWatcher(Mutex<Vec<Arc<dyn Fn() + Send + Sync>>>);
+struct ManualWatcher(Mutex<Vec<Callback>>);
 
 struct NoGuard;
 impl WatchGuard for NoGuard {}
@@ -225,7 +227,7 @@ impl WatchGuard for NoGuard {}
 impl ManualWatcher {
     fn fire(&self) {
         for callback in self.0.lock().unwrap().iter() {
-            callback();
+            callback(&[PathBuf::from("changed")]);
         }
     }
 }
@@ -234,7 +236,7 @@ impl ChangeWatcher for ManualWatcher {
     fn watch(
         &self,
         _paths: &[PathBuf],
-        on_change: Box<dyn Fn() + Send + Sync>,
+        on_change: kumo_domain::changes::OnChange,
     ) -> Result<Box<dyn WatchGuard>, ChangesError> {
         self.0.lock().unwrap().push(Arc::from(on_change));
         Ok(Box::new(NoGuard))

@@ -1,7 +1,7 @@
 //! [`GitChanges`] for [`GitCli`]: status, diffs and actions on a worktree.
 
 use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use kumo_domain::changes::{
     ChangeKind, ChangesError, CommitDetail, CommitInfo, CommitOptions, DiffLine, DiffLineKind,
@@ -12,8 +12,16 @@ use super::GitCli;
 
 /// Enough context lines for git to print the whole file in one hunk.
 const WHOLE_FILE: &str = "--unified=1000000";
-/// Untracked files bigger than this are not opened to count their lines.
-const MAX_COUNTED_BYTES: u64 = 1024 * 1024;
+/// Branches committed changes are measured against, after the remote's
+/// default one: short name and full ref.
+const BASE_CANDIDATES: [(&str, &str); 4] = [
+    ("origin/main", "refs/remotes/origin/main"),
+    ("origin/master", "refs/remotes/origin/master"),
+    ("main", "refs/heads/main"),
+    ("master", "refs/heads/master"),
+];
+/// Reading a diff never rewrites the index: it would wake the watchers.
+const NO_INDEX_REFRESH: [&str; 2] = ["-c", "diff.autoRefreshIndex=false"];
 
 impl GitCli {
     fn git<I, S>(&self, worktree: &Path, args: I) -> Result<String, ChangesError>
@@ -57,36 +65,40 @@ impl GitCli {
             .is_ok()
     }
 
-    /// The branch committed changes are measured against: the remote's
-    /// default branch when known, else the usual names.
-    fn base_ref(&self, worktree: &Path, branch: Option<&str>) -> Option<String> {
-        let remote_head = self
-            .exec(
-                worktree,
-                [
-                    "symbolic-ref",
-                    "--quiet",
-                    "--short",
-                    "refs/remotes/origin/HEAD",
-                ],
-            )
-            .ok()
-            .map(|s| s.trim().to_owned());
-        let candidates = remote_head
-            .into_iter()
-            .chain(["origin/main", "origin/master", "main", "master"].map(String::from));
-        candidates.filter(|c| Some(c.as_str()) != branch).find(|c| {
-            self.exec(
-                worktree,
-                [
-                    "rev-parse",
-                    "--verify",
-                    "--quiet",
-                    &format!("{c}^{{commit}}"),
-                ],
-            )
-            .is_ok()
-        })
+    /// The branch committed changes are measured against (the remote's
+    /// default branch when known, else the usual names) and its commit.
+    fn base(&self, worktree: &Path, branch: Option<&str>) -> Option<(String, String)> {
+        let mut args = vec![
+            "for-each-ref",
+            "--format=%(refname) %(objectname) %(symref)",
+            "refs/remotes/origin/HEAD",
+        ];
+        args.extend(BASE_CANDIDATES.map(|(_, full)| full));
+        let refs = self.exec(worktree, args).ok()?;
+        pick_base(&refs, branch)
+    }
+
+    /// The changes committed since the merge base with `base`; None when
+    /// there's none.
+    fn committed_since(
+        &self,
+        worktree: &Path,
+        base: &str,
+    ) -> Result<Option<Vec<FileChange>>, ChangesError> {
+        let Some(merge_base) = self.merge_base(worktree, base) else {
+            return Ok(None);
+        };
+        let names = self.git(
+            worktree,
+            ["diff", "-z", "--name-status", "-M", &merge_base, "HEAD"],
+        )?;
+        let mut committed = parse_name_status(&names);
+        let numstat = self.git(
+            worktree,
+            ["diff", "-z", "--numstat", "-M", &merge_base, "HEAD"],
+        )?;
+        apply_numstat(&mut committed, &numstat);
+        Ok(Some(committed))
     }
 
     fn merge_base(&self, worktree: &Path, base: &str) -> Option<String> {
@@ -120,30 +132,30 @@ impl GitChanges for GitCli {
             ],
         )?;
         let mut changes = parse_status(&raw);
-        if self.has_head(worktree) {
-            let numstat = self.git(worktree, ["diff", "-z", "--numstat", "HEAD"])?;
-            apply_numstat(&mut changes.working, &numstat);
-        }
-        for change in changes
-            .working
-            .iter_mut()
-            .filter(|c| c.unstaged == ChangeKind::Untracked)
-        {
-            count_untracked(worktree, change);
-        }
-        if let Some(base) = self.base_ref(worktree, changes.branch.as_deref())
-            && let Some(merge_base) = self.merge_base(worktree, &base)
-        {
-            let names = self.git(
-                worktree,
-                ["diff", "-z", "--name-status", "-M", &merge_base, "HEAD"],
-            )?;
-            let mut committed = parse_name_status(&names);
+        let head = head_of(&raw);
+        if head.is_some() {
             let numstat = self.git(
                 worktree,
-                ["diff", "-z", "--numstat", "-M", &merge_base, "HEAD"],
+                NO_INDEX_REFRESH
+                    .into_iter()
+                    .chain(["diff", "-z", "--numstat", "HEAD"]),
             )?;
-            apply_numstat(&mut committed, &numstat);
+            apply_numstat(&mut changes.working, &numstat);
+        }
+        self.caches
+            .untracked
+            .count(worktree, &mut changes.working, |path| {
+                std::fs::read(path).ok()
+            });
+        if let Some(head) = head
+            && let Some((base, base_oid)) = self.base(worktree, changes.branch.as_deref())
+            && let Some(committed) =
+                self.caches
+                    .committed
+                    .get_or_read(worktree, head, (&base, &base_oid), || {
+                        self.committed_since(worktree, &base)
+                    })?
+        {
             changes.committed = committed;
             changes.base = Some(base);
         }
@@ -214,8 +226,8 @@ impl GitChanges for GitCli {
                 let status = self.git(worktree, ["status", "--porcelain=v2", "--branch", "-z"])?;
                 let branch = parse_status(&status).branch;
                 let merge_base = self
-                    .base_ref(worktree, branch.as_deref())
-                    .and_then(|base| self.merge_base(worktree, &base))
+                    .base(worktree, branch.as_deref())
+                    .and_then(|(base, _)| self.merge_base(worktree, &base))
                     .ok_or_else(|| {
                         ChangesError::Git("this branch has no base to compare with".into())
                     })?;
@@ -355,18 +367,6 @@ impl GitChanges for GitCli {
     fn show_commit(&self, worktree: &Path, sha: &str) -> Result<CommitDetail, ChangesError> {
         self.show(worktree, sha)
     }
-
-    fn watched_paths(&self, worktree: &Path) -> Result<Vec<PathBuf>, ChangesError> {
-        let git_dir = PathBuf::from(
-            self.git(worktree, ["rev-parse", "--absolute-git-dir"])?
-                .trim(),
-        );
-        let mut paths = vec![worktree.to_path_buf()];
-        if !git_dir.starts_with(worktree) {
-            paths.push(git_dir); // linked worktree: its index and HEAD live there
-        }
-        Ok(paths)
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -499,15 +499,46 @@ fn apply_numstat(changes: &mut [FileChange], raw: &str) {
     }
 }
 
-fn count_untracked(worktree: &Path, change: &mut FileChange) {
-    let path = worktree.join(&change.path);
-    if std::fs::metadata(&path).is_ok_and(|m| m.len() <= MAX_COUNTED_BYTES)
-        && let Ok(bytes) = std::fs::read(&path)
-    {
-        let diff = lines_of(&bytes, DiffLineKind::Added);
-        change.binary = diff.binary;
-        change.additions = u32::try_from(diff.lines.len()).unwrap_or(u32::MAX);
-    }
+/// HEAD's commit from `git status --porcelain=v2 --branch`; None before
+/// the first commit.
+fn head_of(raw: &str) -> Option<&str> {
+    raw.split('\0')
+        .find_map(|t| t.strip_prefix("# branch.oid "))
+        .filter(|oid| *oid != "(initial)")
+}
+
+/// The base among `git for-each-ref --format='%(refname) %(objectname)
+/// %(symref)'`'s refs: the remote's default branch, else the first of
+/// [`BASE_CANDIDATES`] there; never the worktree's own `branch`.
+fn pick_base(refs: &str, branch: Option<&str>) -> Option<(String, String)> {
+    let found: Vec<(&str, &str, &str)> = refs
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.splitn(3, ' ');
+            Some((fields.next()?, fields.next()?, fields.next().unwrap_or("")))
+        })
+        .collect();
+    let oid_of = |full: &str| {
+        found
+            .iter()
+            .find(|(name, _, _)| *name == full)
+            .map(|(_, oid, _)| (*oid).to_owned())
+    };
+    let remote_head = found
+        .iter()
+        .find(|(name, _, _)| *name == "refs/remotes/origin/HEAD")
+        .and_then(|(_, oid, target)| {
+            let short = target.trim().strip_prefix("refs/remotes/")?;
+            Some((short.to_owned(), (*oid).to_owned()))
+        });
+    remote_head
+        .into_iter()
+        .chain(
+            BASE_CANDIDATES
+                .iter()
+                .filter_map(|(short, full)| Some(((*short).to_owned(), oid_of(full)?))),
+        )
+        .find(|(short, _)| Some(short.as_str()) != branch)
 }
 
 /// A file's lines, all of one kind. Binary files have none.
@@ -612,6 +643,49 @@ mod tests {
             ]
         );
         assert_eq!(s.working[2].old_path.as_deref(), Some("src/old.rs"));
+    }
+
+    #[test]
+    fn head_is_read_from_the_status() {
+        assert_eq!(
+            head_of("# branch.oid abc123\0# branch.head main\0"),
+            Some("abc123")
+        );
+        assert_eq!(
+            head_of("# branch.oid (initial)\0# branch.head main\0"),
+            None
+        );
+    }
+
+    #[test]
+    fn the_base_is_the_remotes_default_branch_first() {
+        let refs = "refs/heads/main m1 \n\
+                    refs/remotes/origin/HEAD d1 refs/remotes/origin/develop\n\
+                    refs/remotes/origin/main o1 \n";
+        assert_eq!(
+            pick_base(refs, Some("feat/x")),
+            Some(("origin/develop".into(), "d1".into()))
+        );
+        // On that branch itself: the next one.
+        assert_eq!(
+            pick_base(refs, Some("origin/develop")),
+            Some(("origin/main".into(), "o1".into()))
+        );
+    }
+
+    #[test]
+    fn without_a_remote_the_local_main_is_the_base_except_on_it() {
+        let refs = "refs/heads/main m1 \nrefs/heads/master n1 \n";
+        assert_eq!(
+            pick_base(refs, Some("feat/x")),
+            Some(("main".into(), "m1".into()))
+        );
+        assert_eq!(
+            pick_base(refs, Some("main")),
+            Some(("master".into(), "n1".into()))
+        );
+        assert_eq!(pick_base("refs/heads/main m1 \n", Some("main")), None);
+        assert_eq!(pick_base("", None), None);
     }
 
     #[test]

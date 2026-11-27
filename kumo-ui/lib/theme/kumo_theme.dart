@@ -78,7 +78,20 @@ TextStyle mono(double size, {FontWeight weight = FontWeight.w400, Color? color, 
 /// Uppercase micro label ("WORKTREES", "INTEGRATIONS").
 TextStyle microLabel(KumoPalette c) => sans(11, weight: FontWeight.w600, color: c.text3, letterSpacing: 0.66);
 
+/// The last [materialThemeFor]: the app rebuilds on every state change,
+/// and `ColorScheme.fromSeed` is too costly to redo for the same palette.
+(KumoPalette, ThemeData)? _lastTheme;
+
+/// The Material theme for [c], built once while the palette stays.
 ThemeData materialThemeFor(KumoPalette c) {
+  final last = _lastTheme;
+  if (last != null && last.$1 == c) return last.$2;
+  final theme = _materialTheme(c);
+  _lastTheme = (c, theme);
+  return theme;
+}
+
+ThemeData _materialTheme(KumoPalette c) {
   final scheme = ColorScheme.fromSeed(
     seedColor: c.acc,
     brightness: c.brightness,

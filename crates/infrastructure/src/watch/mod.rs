@@ -5,7 +5,7 @@ mod ignored;
 
 use std::path::{Path, PathBuf};
 
-use kumo_domain::changes::{ChangeWatcher, ChangesError, WatchGuard};
+use kumo_domain::changes::{ChangeWatcher, ChangesError, OnChange, WatchGuard};
 use notify::{EventKind, RecursiveMode, Watcher};
 
 use ignored::GitIgnored;
@@ -35,7 +35,7 @@ impl ChangeWatcher for NotifyWatcher {
     fn watch(
         &self,
         paths: &[PathBuf],
-        on_change: Box<dyn Fn() + Send + Sync>,
+        on_change: OnChange,
     ) -> Result<Box<dyn WatchGuard>, ChangesError> {
         let ignored = self
             .skip_git_ignored
@@ -51,8 +51,9 @@ impl ChangeWatcher for NotifyWatcher {
                 }
                 let counts =
                     |p: &PathBuf| relevant(p) && !ignored.as_ref().is_some_and(|i| i.ignored(p));
-                if event.paths.iter().any(counts) {
-                    on_change();
+                let changed: Vec<PathBuf> = event.paths.into_iter().filter(counts).collect();
+                if !changed.is_empty() {
+                    on_change(&changed);
                 }
             })
             .map_err(|e| ChangesError::Io(format!("can't watch files: {e}")))?;
@@ -111,7 +112,7 @@ mod tests {
         let guard = watcher
             .watch(
                 std::slice::from_ref(&root),
-                Box::new(move || {
+                Box::new(move |_: &[PathBuf]| {
                     counter.fetch_add(1, Ordering::SeqCst);
                 }),
             )
