@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 /// The three looks from the design canvas.
@@ -355,13 +356,39 @@ class KumoPalette {
     );
   }
 
+  /// The last [withTranslucency] asked for: the app rebuilds on every state
+  /// change, and the same look should give back the same palette.
+  static (KumoPalette, double, KumoPalette)? _lastTranslucent;
+
   /// Window tint for the glass translucency the user picks (0.25–0.9). The
   /// higher it is, the more of the desktop shows: the tint gets lighter.
   /// 0.6 gives the canvas's tint (0.55 in dark).
   KumoPalette withTranslucency(double t) {
+    final last = _lastTranslucent;
+    if (last != null && last.$2 == t && last.$1 == this) return last.$3;
     final tint = (1.15 - t).clamp(0.25, 0.9);
     final a = (isDark ? tint : (tint - 0.24).clamp(0.08, 1.0)).clamp(0.0, 1.0);
     final base = isDark ? const Color(0xFF10121A) : const Color(0xFFFFFFFF);
-    return copyWith(window: base.withAlpha((a * 255).round()));
+    final p = copyWith(window: base.withAlpha((a * 255).round()));
+    _lastTranslucent = (this, t, p);
+    return p;
   }
+
+  /// Every token, the lists' lengths before their items.
+  List<Object> get _props => [
+        brightness, window, windowBorder, panel, panelStrong, panelBorder, panelSheen, //
+        panelShadow.length, ...panelShadow,
+        windowSheen, rimTop, rimBottom, chip, chipBorder, chipSheen, navActive, tabActive, //
+        term, pane, paneBorder, divider, paper, pop, popBorder, text, text2, text3, //
+        acc, accSoft, accFill, accText, ok, okSoft, warn, warnSoft, err, errSoft, //
+        purple, yellow, cyan, tile, tileText, codeBg, addBg, delBg, hunkBg, //
+        synKw, synStr, synNum, synType, synFn, synKey, curBg, curMark, incBg, incMark, //
+        wallpaperBase, wallpaperBlobs.length, ...wallpaperBlobs,
+      ];
+
+  @override
+  bool operator ==(Object other) => identical(this, other) || other is KumoPalette && listEquals(_props, other._props);
+
+  @override
+  int get hashCode => Object.hashAll(_props);
 }

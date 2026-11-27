@@ -1,12 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
 
 use kumo_domain::changes::{
-    ChangeWatcher, ChangesError, CommitDetail, CommitInfo, CommitOptions, DiffScope, FileContent,
-    FileDiff, FileList, FileStore, GitChanges, RelativePath, WorktreeChanges,
+    ChangesError, CommitDetail, CommitInfo, CommitOptions, DiffScope, FileContent, FileDiff,
+    FileList, FileStore, GitChanges, RelativePath, WorktreeChanges,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 
 use crate::workspace::WorkspaceService;
 
@@ -14,16 +13,12 @@ use crate::workspace::WorkspaceService;
 const MAX_READ_BYTES: usize = 2 * 1024 * 1024;
 /// Files listed at once.
 const MAX_LISTED_FILES: usize = 50_000;
-/// Saving a file or a git command touches many files: wait for the burst
-/// to settle before reading the status again.
-const SETTLE: Duration = Duration::from_millis(150);
 
 /// The adapters the service works with.
 #[derive(Clone)]
 pub struct ChangesPorts {
     pub git: Arc<dyn GitChanges>,
     pub files: Arc<dyn FileStore>,
-    pub watcher: Arc<dyn ChangeWatcher>,
 }
 
 impl std::fmt::Debug for ChangesPorts {
@@ -51,28 +46,18 @@ impl ChangesService {
     }
 
     /// The status now, then whenever it changes, until the receiver is
-    /// dropped. Each change also refreshes the workspace (sidebar counts).
+    /// dropped. Read again each time the workspace re-reads the worktree
+    /// (its files changed on disk, or an action from the app), so as often
+    /// as the workspace's schedule allows.
     pub async fn watch_status(
         self: &Arc<Self>,
         worktree: &Path,
     ) -> Result<mpsc::Receiver<Result<WorktreeChanges, ChangesError>>, ChangesError> {
         let worktree = self.worktree(worktree).await?;
-        let git = Arc::clone(&self.ports.git);
-        let watched = worktree.clone();
-        let paths = blocking(move || git.watched_paths(&watched)).await?;
-
-        let (signal, mut signals) = mpsc::channel::<()>(1);
-        let guard = self.ports.watcher.watch(
-            &paths,
-            Box::new(move || {
-                let _ = signal.try_send(());
-            }),
-        )?;
-
+        let mut refreshed = self.workspace.refreshed();
         let (updates, receiver) = mpsc::channel(4);
         let service = Arc::clone(self);
         tokio::spawn(async move {
-            let _guard = guard; // watching stops when this task ends
             let mut last = None;
             loop {
                 let status = service.read_status(worktree.clone()).await;
@@ -80,17 +65,12 @@ impl ChangesService {
                     if updates.send(status.clone()).await.is_err() {
                         break;
                     }
-                    if last.is_some() {
-                        service.workspace.refresh_worktree(&worktree).await;
-                    }
                     last = Some(status);
                 }
                 tokio::select! {
                     () = updates.closed() => break,
-                    signal = signals.recv() => if signal.is_none() { break },
+                    more = refreshed_again(&mut refreshed, &worktree) => if !more { break },
                 }
-                tokio::time::sleep(SETTLE).await;
-                while signals.try_recv().is_ok() {}
             }
             tracing::debug!(worktree = %worktree.display(), "status watch ended");
         });
@@ -286,6 +266,26 @@ impl ChangesService {
         }
         self.on_worktree(worktree, move |git, wt| action(git, wt, &paths))
             .await
+    }
+}
+
+/// Waits for the workspace to re-read `worktree`, then skips what queued
+/// up meanwhile (one read covers it). False once the workspace is gone.
+async fn refreshed_again(refreshed: &mut broadcast::Receiver<PathBuf>, worktree: &Path) -> bool {
+    loop {
+        match refreshed.recv().await {
+            Ok(path) if path == worktree => break,
+            Ok(_) => {}
+            Err(broadcast::error::RecvError::Lagged(_)) => break,
+            Err(broadcast::error::RecvError::Closed) => return false,
+        }
+    }
+    loop {
+        match refreshed.try_recv() {
+            Ok(_) | Err(broadcast::error::TryRecvError::Lagged(_)) => {}
+            Err(broadcast::error::TryRecvError::Empty) => return true,
+            Err(broadcast::error::TryRecvError::Closed) => return false,
+        }
     }
 }
 

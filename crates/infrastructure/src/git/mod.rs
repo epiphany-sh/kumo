@@ -8,6 +8,7 @@ mod history;
 mod repo_finder;
 mod repo_locator;
 mod runs;
+mod status_cache;
 mod tags;
 
 pub use cli::GitCli;

@@ -3948,6 +3948,119 @@ class RefreshWorkspaceResponse extends $pb.GeneratedMessage {
   static RefreshWorkspaceResponse? _defaultInstance;
 }
 
+class SetPresenceRequest extends $pb.GeneratedMessage {
+  factory SetPresenceRequest({
+    $core.bool? focused,
+    $core.bool? visible,
+  }) {
+    final result = SetPresenceRequest._();
+    if (focused != null) result.focused = focused;
+    if (visible != null) result.visible = visible;
+    return result;
+  }
+
+  SetPresenceRequest._();
+
+  factory SetPresenceRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetPresenceRequest()..mergeFromBuffer(data, registry);
+  factory SetPresenceRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetPresenceRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetPresenceRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SetPresenceRequest.$_createMessage)
+    ..aOB(1, _omitFieldNames ? '' : 'focused')
+    ..aOB(2, _omitFieldNames ? '' : 'visible')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetPresenceRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetPresenceRequest copyWith(void Function(SetPresenceRequest) updates) =>
+      super.copyWith((message) => updates(message as SetPresenceRequest))
+          as SetPresenceRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SetPresenceRequest() / SetPresenceRequest.new instead')
+  static SetPresenceRequest create() => SetPresenceRequest._();
+  static $pb.GeneratedMessage $_createMessage() => SetPresenceRequest._();
+  @$core.override
+  SetPresenceRequest createEmptyInstance() => SetPresenceRequest._();
+  @$core.pragma('dart2js:noInline')
+  static SetPresenceRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SetPresenceRequest>(
+          SetPresenceRequest.$_createMessage);
+  static SetPresenceRequest? _defaultInstance;
+
+  /// The window has the keyboard focus.
+  @$pb.TagNumber(1)
+  $core.bool get focused => $_getBF(0);
+  @$pb.TagNumber(1)
+  set focused($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasFocused() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearFocused() => $_clearField(1);
+
+  /// The window is on screen: not minimized or hidden.
+  @$pb.TagNumber(2)
+  $core.bool get visible => $_getBF(1);
+  @$pb.TagNumber(2)
+  set visible($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasVisible() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearVisible() => $_clearField(2);
+}
+
+class SetPresenceResponse extends $pb.GeneratedMessage {
+  factory SetPresenceResponse() => SetPresenceResponse._();
+
+  SetPresenceResponse._();
+
+  factory SetPresenceResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetPresenceResponse()..mergeFromBuffer(data, registry);
+  factory SetPresenceResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SetPresenceResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetPresenceResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kumo.v1'),
+      createEmptyInstance: SetPresenceResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetPresenceResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetPresenceResponse copyWith(void Function(SetPresenceResponse) updates) =>
+      super.copyWith((message) => updates(message as SetPresenceResponse))
+          as SetPresenceResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use SetPresenceResponse() / SetPresenceResponse.new instead')
+  static SetPresenceResponse create() => SetPresenceResponse._();
+  static $pb.GeneratedMessage $_createMessage() => SetPresenceResponse._();
+  @$core.override
+  SetPresenceResponse createEmptyInstance() => SetPresenceResponse._();
+  @$core.pragma('dart2js:noInline')
+  static SetPresenceResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SetPresenceResponse>(
+          SetPresenceResponse.$_createMessage);
+  static SetPresenceResponse? _defaultInstance;
+}
+
 class DiscoverReposRequest extends $pb.GeneratedMessage {
   factory DiscoverReposRequest({
     $core.Iterable<$core.String>? roots,

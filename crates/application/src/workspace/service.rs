@@ -8,7 +8,10 @@ use kumo_domain::workspace::{
     RepoState, WorkspaceError, WorkspaceSnapshot, WorkspaceStore, Worktree, WorktreeLocation,
     WorktreeRemoval,
 };
-use tokio::sync::{Mutex, watch};
+use tokio::sync::{Mutex, broadcast, watch};
+
+use super::Presence;
+use super::presence::{ClientLease, Presences};
 
 /// The adapters the service works with.
 #[derive(Clone)]
@@ -48,6 +51,10 @@ pub struct WorkspaceService {
     location: std::sync::Mutex<WorktreeLocation>,
     state: Mutex<State>,
     published: watch::Sender<Arc<WorkspaceSnapshot>>,
+    /// Whether the user can see the app: how often changes on disk are read.
+    presences: Arc<Presences>,
+    /// Worktrees whose git state was just re-read.
+    refreshed: broadcast::Sender<PathBuf>,
 }
 
 impl WorkspaceService {
@@ -81,6 +88,8 @@ impl WorkspaceService {
             ports,
             state: Mutex::new(state),
             published,
+            presences: Presences::new(),
+            refreshed: broadcast::Sender::new(64),
         })
     }
 
@@ -98,14 +107,38 @@ impl WorkspaceService {
         self.published.subscribe()
     }
 
-    /// Watches the repositories in the workspace and re-reads one whenever
-    /// something changes on disk, wherever it came from (a `git worktree
-    /// add` or an agent in a terminal). Runs until the service is dropped.
+    /// Every worktree re-read from now on, each time it is (paths as in the
+    /// snapshot). A lagging receiver missed some: it should assume any.
+    pub fn refreshed(&self) -> broadcast::Receiver<PathBuf> {
+        self.refreshed.subscribe()
+    }
+
+    /// `client` (an id unique to it, e.g. a UI window's) watches the
+    /// workspace until the lease is dropped; its presence counts only
+    /// meanwhile (see [`set_presence`](Self::set_presence)).
+    pub fn attach(&self, client: &str) -> ClientLease {
+        self.presences.attach(client)
+    }
+
+    /// Whether `client`'s user can see the app. Changes on disk are read
+    /// less often in the background, and not at all while hidden. Only
+    /// clients holding a lease ([`attach`](Self::attach)) count, and their
+    /// presence goes with it: a UI that quits while minimized doesn't keep
+    /// refreshes paused. Clients combine: visible if any is, focused if
+    /// any is; none means in front.
+    pub fn set_presence(&self, client: &str, presence: Presence) {
+        self.presences.set(client, presence);
+    }
+
+    /// Watches the repositories in the workspace and re-reads what changed
+    /// on disk, wherever it came from (a `git worktree add` or an agent in
+    /// a terminal). Runs until the service is dropped.
     pub fn sync(self: &Arc<Self>) {
         tokio::spawn(super::sync::run(
             Arc::downgrade(self),
             Arc::clone(&self.ports.watcher),
             self.watch(),
+            self.presences.subscribe(),
         ));
     }
 
@@ -130,6 +163,7 @@ impl WorkspaceService {
                 .get(&read.repo.path)
                 .and_then(|s| s.repo.remote.clone());
             self.keep_remote(before.as_ref(), &read.repo).await;
+            self.announce(&read);
             state.repos.insert(read.repo.path.clone(), read);
         }
         self.publish(&mut state);
@@ -321,8 +355,8 @@ impl WorkspaceService {
             .map(|w| w.path.clone())
     }
 
-    /// Re-reads the repository that owns `worktree` (e.g. after a commit or
-    /// files changing on disk). Publishes only if something changed.
+    /// Re-reads the repository that owns `worktree` (e.g. after a commit
+    /// from the app). Publishes only if something changed.
     pub async fn refresh_worktree(&self, worktree: &Path) {
         let mut state = self.state.lock().await;
         let owner = state
@@ -342,6 +376,40 @@ impl WorkspaceService {
         if let Some(owner) = state.repos.get(repo).cloned() {
             self.reread_if_changed(&mut state, owner).await;
         }
+    }
+
+    /// Re-reads one worktree's status, not its repository's (files changed
+    /// in it). Publishes only if something changed.
+    pub(super) async fn refresh_worktree_status(&self, worktree: &Path) {
+        let known = {
+            let state = self.state.lock().await;
+            state
+                .repos
+                .values()
+                .flat_map(|r| &r.worktrees)
+                .any(|w| w.path == worktree)
+        };
+        if !known {
+            return;
+        }
+        let git = Arc::clone(&self.ports.git);
+        let path = worktree.to_path_buf();
+        let status = tokio::task::spawn_blocking(move || git.status(&path).unwrap_or_default())
+            .await
+            .unwrap_or_default();
+        let mut state = self.state.lock().await;
+        let current = state
+            .repos
+            .values_mut()
+            .flat_map(|r| &mut r.worktrees)
+            .find(|w| w.path == worktree);
+        if let Some(current) = current
+            && current.status != status
+        {
+            current.status = status;
+            self.publish(&mut state);
+        }
+        let _ = self.refreshed.send(worktree.to_path_buf());
     }
 
     /// Git repositories under `roots` (or the usual folders), with the
@@ -445,8 +513,18 @@ impl WorkspaceService {
 
     async fn reread_if_changed(&self, state: &mut State, before: RepoState) {
         let repo = before.repo.clone();
-        if *self.reread(state, repo).await != before {
+        let read = self.reread(state, repo).await;
+        self.announce(read);
+        if *read != before {
             self.publish(state);
+        }
+    }
+
+    /// Tells [`refreshed`](Self::refreshed) receivers about a repository's
+    /// worktrees.
+    fn announce(&self, read: &RepoState) {
+        for worktree in &read.worktrees {
+            let _ = self.refreshed.send(worktree.path.clone());
         }
     }
 

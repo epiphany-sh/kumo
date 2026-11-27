@@ -13,6 +13,6 @@ pub use commit::{CommitDetail, CommitFile, CommitInfo, CommitOptions, DiffHunk};
 pub use diff::{DiffLine, DiffLineKind, DiffScope, FileDiff};
 pub use error::ChangesError;
 pub use file::{FileContent, FileList};
-pub use ports::{ChangeWatcher, FileStore, GitChanges, WatchGuard};
+pub use ports::{ChangeWatcher, FileStore, GitChanges, OnChange, WatchGuard};
 pub use relative_path::RelativePath;
 pub use status::{ChangeKind, FileChange, WorktreeChanges};

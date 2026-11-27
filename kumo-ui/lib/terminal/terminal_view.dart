@@ -838,9 +838,26 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     if (widget.surface.interactive) widget.surface.sendBytes(bytes);
   }
 
+  /// Whether this pane shows its surface: not offstage (another screen of
+  /// the IndexedStack, a route covered by another) nor with tickers off.
+  bool _shown = false;
+
+  void _syncShown() {
+    final shown = TickerMode.valuesOf(context).enabled && Visibility.of(context);
+    if (shown == _shown) return;
+    _shown = shown;
+    _show(widget.surface, shown);
+  }
+
+  /// A hidden surface needn't publish its output (see [VisibleSurface]).
+  void _show(TerminalSurface surface, bool shown) {
+    if (surface is VisibleSurface) surface.setVisible(this, shown);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _syncShown();
     final source = context.getInheritedWidgetOfExactType<AppScope>()?.notifier?.yourLines;
     if (source == _yourLines) return;
     _yourLines?.removeListener(_yourLinesChanged);
@@ -854,6 +871,8 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     if (widget.surface != old.surface) {
       old.surface.buffer.removeListener(_onBuffer);
       widget.surface.buffer.addListener(_onBuffer);
+      _show(old.surface, false);
+      _show(widget.surface, _shown);
       _top = null;
       _sel = _kbSel = null;
       _syncTextInput();
@@ -867,6 +886,7 @@ class _TerminalCanvasState extends State<TerminalCanvas> with SingleTickerProvid
     _yourLines?.removeListener(_yourLinesChanged);
     _drops?.cancel();
     widget.surface.buffer.removeListener(_onBuffer);
+    _show(widget.surface, false);
     _barTimer?.cancel();
     _stopAutoScroll();
     _fling.dispose();

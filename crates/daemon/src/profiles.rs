@@ -347,7 +347,6 @@ impl ProfileOpener {
             ChangesPorts {
                 git: Arc::new(git.clone()),
                 files: Arc::new(LocalFileStore),
-                watcher: Arc::new(NotifyWatcher::for_git()),
             },
             Arc::clone(&workspace),
         ));
