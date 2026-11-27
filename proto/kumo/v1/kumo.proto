@@ -370,6 +370,10 @@ service Workspace {
   rpc Watch(WatchWorkspaceRequest) returns (stream WorkspaceSnapshot);
   // Re-reads git state (e.g. when the window gets focus).
   rpc Refresh(RefreshWorkspaceRequest) returns (RefreshWorkspaceResponse);
+  // Whether the user can see the app. Changes on disk are read less often
+  // while the window is in the background, and not until it shows again
+  // while it's hidden. Until told, the daemon assumes it's in front.
+  rpc SetPresence(SetPresenceRequest) returns (SetPresenceResponse);
   // Git repositories found on disk, to pick from when editing a namespace.
   rpc DiscoverRepos(DiscoverReposRequest) returns (DiscoverReposResponse);
   // Creates (empty id) or replaces a namespace. Unknown repo paths are
@@ -451,6 +455,14 @@ message WorktreeStatus {
 
 message RefreshWorkspaceRequest {}
 message RefreshWorkspaceResponse {}
+
+message SetPresenceRequest {
+  // The window has the keyboard focus.
+  bool focused = 1;
+  // The window is on screen: not minimized or hidden.
+  bool visible = 2;
+}
+message SetPresenceResponse {}
 
 message DiscoverReposRequest {
   // Folders to scan; empty means the usual ones (~/workspace, ~/dev, ~/code…).

@@ -1,5 +1,6 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use kumo_domain::profiles::ProfileEnv;
 use kumo_domain::workspace::{
@@ -12,6 +13,8 @@ pub struct GitCli {
     program: PathBuf,
     /// The profile's identity, credentials and SSH key; None: the user's.
     env: Option<ProfileEnv>,
+    /// What reading a worktree's status again can reuse.
+    pub(super) caches: Arc<super::status_cache::StatusCaches>,
 }
 
 impl Default for GitCli {
@@ -19,6 +22,7 @@ impl Default for GitCli {
         Self {
             program: PathBuf::from("git"),
             env: None,
+            caches: Arc::default(),
         }
     }
 }

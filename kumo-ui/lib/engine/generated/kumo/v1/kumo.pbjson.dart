@@ -1566,6 +1566,29 @@ const RefreshWorkspaceResponse$json = {
 final $typed_data.Uint8List refreshWorkspaceResponseDescriptor =
     $convert.base64Decode('ChhSZWZyZXNoV29ya3NwYWNlUmVzcG9uc2U=');
 
+@$core.Deprecated('Use setPresenceRequestDescriptor instead')
+const SetPresenceRequest$json = {
+  '1': 'SetPresenceRequest',
+  '2': [
+    {'1': 'focused', '3': 1, '4': 1, '5': 8, '10': 'focused'},
+    {'1': 'visible', '3': 2, '4': 1, '5': 8, '10': 'visible'},
+  ],
+};
+
+/// Descriptor for `SetPresenceRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List setPresenceRequestDescriptor = $convert.base64Decode(
+    'ChJTZXRQcmVzZW5jZVJlcXVlc3QSGAoHZm9jdXNlZBgBIAEoCFIHZm9jdXNlZBIYCgd2aXNpYm'
+    'xlGAIgASgIUgd2aXNpYmxl');
+
+@$core.Deprecated('Use setPresenceResponseDescriptor instead')
+const SetPresenceResponse$json = {
+  '1': 'SetPresenceResponse',
+};
+
+/// Descriptor for `SetPresenceResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List setPresenceResponseDescriptor =
+    $convert.base64Decode('ChNTZXRQcmVzZW5jZVJlc3BvbnNl');
+
 @$core.Deprecated('Use discoverReposRequestDescriptor instead')
 const DiscoverReposRequest$json = {
   '1': 'DiscoverReposRequest',

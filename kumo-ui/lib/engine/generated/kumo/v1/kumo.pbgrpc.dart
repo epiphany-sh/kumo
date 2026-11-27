@@ -618,6 +618,16 @@ class WorkspaceClient extends $grpc.Client {
     return $createUnaryCall(_$refresh, request, options: options);
   }
 
+  /// Whether the user can see the app. Changes on disk are read less often
+  /// while the window is in the background, and not until it shows again
+  /// while it's hidden. Until told, the daemon assumes it's in front.
+  $grpc.ResponseFuture<$0.SetPresenceResponse> setPresence(
+    $0.SetPresenceRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$setPresence, request, options: options);
+  }
+
   /// Git repositories found on disk, to pick from when editing a namespace.
   $grpc.ResponseFuture<$0.DiscoverReposResponse> discoverRepos(
     $0.DiscoverReposRequest request, {
@@ -679,6 +689,11 @@ class WorkspaceClient extends $grpc.Client {
       '/kumo.v1.Workspace/Refresh',
       ($0.RefreshWorkspaceRequest value) => value.writeToBuffer(),
       $0.RefreshWorkspaceResponse.fromBuffer);
+  static final _$setPresence =
+      $grpc.ClientMethod<$0.SetPresenceRequest, $0.SetPresenceResponse>(
+          '/kumo.v1.Workspace/SetPresence',
+          ($0.SetPresenceRequest value) => value.writeToBuffer(),
+          $0.SetPresenceResponse.fromBuffer);
   static final _$discoverRepos =
       $grpc.ClientMethod<$0.DiscoverReposRequest, $0.DiscoverReposResponse>(
           '/kumo.v1.Workspace/DiscoverRepos',
@@ -734,6 +749,15 @@ abstract class WorkspaceServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.RefreshWorkspaceRequest.fromBuffer(value),
         ($0.RefreshWorkspaceResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.SetPresenceRequest, $0.SetPresenceResponse>(
+            'SetPresence',
+            setPresence_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.SetPresenceRequest.fromBuffer(value),
+            ($0.SetPresenceResponse value) => value.writeToBuffer()));
     $addMethod(
         $grpc.ServiceMethod<$0.DiscoverReposRequest, $0.DiscoverReposResponse>(
             'DiscoverRepos',
@@ -806,6 +830,14 @@ abstract class WorkspaceServiceBase extends $grpc.Service {
 
   $async.Future<$0.RefreshWorkspaceResponse> refresh(
       $grpc.ServiceCall call, $0.RefreshWorkspaceRequest request);
+
+  $async.Future<$0.SetPresenceResponse> setPresence_Pre($grpc.ServiceCall $call,
+      $async.Future<$0.SetPresenceRequest> $request) async {
+    return setPresence($call, await $request);
+  }
+
+  $async.Future<$0.SetPresenceResponse> setPresence(
+      $grpc.ServiceCall call, $0.SetPresenceRequest request);
 
   $async.Future<$0.DiscoverReposResponse> discoverRepos_Pre(
       $grpc.ServiceCall $call,
