@@ -37,3 +37,24 @@ fix/…      ─┴─▶  release/X.Y.Z  ──▶  main  ──▶  vX.Y.Z pub
 - **`release/X.Y.Z` → `main` publica la versión.** No abras ni mergees ese
   PR sin que lo pida el usuario.
 - Nada se pushea directo a `release/*` ni a `main`: todo entra por PR.
+
+## Performance
+
+Kumo queda abierto horas con agentes escribiendo sin parar: todo lo que se
+dispara por evento o por frame se multiplica. Antes de cerrar una feature,
+revisá [docs/performance.md](docs/performance.md). Lo mínimo:
+
+- **Sin animaciones infinitas a vsync**: timer a baja frecuencia,
+  `RepaintBoundary`, y se paran si no se ven o si hay "reducir movimiento".
+- **Lo oculto no dibuja**: nada de snapshots, `setState` ni frames para
+  pantallas o terminales que no están en pantalla.
+- **Rebuilds acotados**: escuchá solo lo que mostrás; lo derivado de la
+  config se cachea y tiene `==`.
+- **Eventos de archivos por el scheduler** (`workspace/schedule.rs`):
+  debounce, piso de 3 s entre corridas, single flight, solo el worktree que
+  cambió. Nunca un segundo watcher ni un `sleep` corto en loop.
+- **Git barato**: pocos procesos, resultados cacheados por oid/mtime,
+  `GIT_OPTIONAL_LOCKS=0`.
+- **Respetá la presencia de la ventana**: sin foco, más lento; oculta, en
+  pausa.
+- **Timers testeados con tiempo falso**, nunca con sleeps reales.
