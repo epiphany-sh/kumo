@@ -1200,8 +1200,16 @@ class WorktreeDot extends StatefulWidget {
   State<WorktreeDot> createState() => _WorktreeDotState();
 }
 
-class _WorktreeDotState extends State<WorktreeDot> with SingleTickerProviderStateMixin {
-  late final _beat = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
+class _WorktreeDotState extends State<WorktreeDot> {
+  /// One fade, out or back in.
+  static const _fade = 1100;
+
+  /// ~10 fps: plenty for a slow fade, and a fraction of a vsync ticker's
+  /// frames while an agent works for hours.
+  static const _step = Duration(milliseconds: 100);
+
+  Timer? _beat;
+  double _opacity = 1;
 
   @override
   void didChangeDependencies() {
@@ -1215,21 +1223,29 @@ class _WorktreeDotState extends State<WorktreeDot> with SingleTickerProviderStat
     _follow();
   }
 
-  /// Beats while asked to, unless the system asks for less motion.
+  /// Beats while asked to and shown (not offstage, tickers on), unless the
+  /// system asks for less motion.
   void _follow() {
-    final beat = widget.pulse && !MediaQuery.disableAnimationsOf(context);
-    if (beat && !_beat.isAnimating) {
-      _beat.repeat(reverse: true);
-    } else if (!beat && _beat.isAnimating) {
-      _beat
-        ..stop()
-        ..value = 0;
+    final beat = widget.pulse && TickerMode.valuesOf(context).enabled && Visibility.of(context) && !MediaQuery.disableAnimationsOf(context);
+    if (beat) {
+      _beat ??= Timer.periodic(_step, _tick);
+    } else {
+      _beat?.cancel();
+      _beat = null;
+      _opacity = 1;
     }
+  }
+
+  /// 1 → 0.35 → 1, eased, every 2 × [_fade].
+  void _tick(Timer t) {
+    final ms = (t.tick * _step.inMilliseconds) % (2 * _fade);
+    final x = ms <= _fade ? ms / _fade : 2 - ms / _fade;
+    setState(() => _opacity = 1 - 0.65 * Curves.easeInOut.transform(x));
   }
 
   @override
   void dispose() {
-    _beat.dispose();
+    _beat?.cancel();
     super.dispose();
   }
 
@@ -1243,10 +1259,8 @@ class _WorktreeDotState extends State<WorktreeDot> with SingleTickerProviderStat
       WorktreeLight.asking => c.warn,
       WorktreeLight.failed => c.err,
     };
-    return FadeTransition(
-      opacity: Tween<double>(begin: 1, end: 0.35).animate(CurvedAnimation(parent: _beat, curve: Curves.easeInOut)),
-      child: Dot(color),
-    );
+    // Its own layer: a beat repaints the dot, not the sidebar around it.
+    return RepaintBoundary(child: Opacity(opacity: _opacity, child: Dot(color)));
   }
 }
 

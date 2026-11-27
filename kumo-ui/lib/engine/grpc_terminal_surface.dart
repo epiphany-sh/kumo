@@ -16,8 +16,9 @@ import 'kumo_engine.dart';
 /// A terminal running in `kumod`, shown through `Terminals.Attach`.
 ///
 /// Output is parsed as it arrives but published at most once per frame
-/// (kumo.md §5.6). Keystrokes typed before the stream is up are queued.
-class GrpcTerminalSurface implements TerminalModes, ShellProgram, CommandHistorySource {
+/// (kumo.md §5.6), and only while a pane shows it ([setVisible]).
+/// Keystrokes typed before the stream is up are queued.
+class GrpcTerminalSurface implements TerminalModes, ShellProgram, CommandHistorySource, VisibleSurface {
   /// Opens the user's login shell in [directory] (their home directory by
   /// default). The PTY is opened at the pane's real size, once it is first
   /// laid out.
@@ -102,6 +103,12 @@ class GrpcTerminalSurface implements TerminalModes, ShellProgram, CommandHistory
   bool _exited = false;
   bool _frameScheduled = false;
   bool _disposed = false;
+
+  /// The views showing it; none: nothing is published.
+  final _views = <Object>{};
+
+  /// The screen changed while hidden: published once shown.
+  bool _dirty = false;
   Timer? _resizeTimer;
   final _history = ValueNotifier(CommandHistory.empty);
   int _seenDone = -1;
@@ -285,7 +292,17 @@ class GrpcTerminalSurface implements TerminalModes, ShellProgram, CommandHistory
     _render();
   }
 
+  @override
+  void setVisible(Object view, bool visible) {
+    if (_disposed) return;
+    final was = _views.isNotEmpty;
+    visible ? _views.add(view) : _views.remove(view);
+    if (!was && _views.isNotEmpty && _dirty) _render();
+  }
+
+  /// Hidden, it asks for no frame: the output waits until it shows.
   void _scheduleFrame() {
+    if (_views.isEmpty) return _render();
     if (_frameScheduled) return;
     _frameScheduled = true;
     SchedulerBinding.instance.scheduleFrameCallback((_) {
@@ -294,10 +311,17 @@ class GrpcTerminalSurface implements TerminalModes, ShellProgram, CommandHistory
     });
   }
 
+  /// Publishes the screen while shown; hidden, only marks it for later.
+  /// What its shell ran is followed either way.
   void _render() {
     if (_disposed) return;
-    _buffer.value = _screen.snapshot(seq: _seq);
     _historyMaybeChanged();
+    if (_views.isEmpty) {
+      _dirty = true;
+      return;
+    }
+    _dirty = false;
+    _buffer.value = _screen.snapshot(seq: _seq);
   }
 
   @override

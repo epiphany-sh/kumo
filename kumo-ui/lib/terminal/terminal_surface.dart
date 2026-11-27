@@ -180,6 +180,15 @@ abstract interface class ShellProgram implements TerminalSurface {
   String get program;
 }
 
+/// A surface that publishes its output only while a pane shows it: one
+/// offstage (another screen, tab or session) keeps parsing what arrives
+/// but neither snapshots it nor asks for frames, and catches up once shown.
+abstract interface class VisibleSurface implements TerminalSurface {
+  /// [view] started ([visible]) or stopped showing this surface; it is
+  /// shown while any view shows it.
+  void setVisible(Object view, bool visible);
+}
+
 /// A surface whose program sets terminal modes (a real PTY): how keys,
 /// paste and the mouse reach it.
 abstract interface class TerminalModes implements TerminalSurface {
